@@ -1,82 +1,74 @@
-from django.shortcuts import render, redirect
-from django.http import HttpResponse, JsonResponse
-from django.core import serializers
+from django.shortcuts import render
+from django.http import HttpResponse
 from django.core.paginator import Paginator
-from .models import Balloon
+from .models import Balloon, BalloonAmount
 from .admin import BalloonResources
-from .forms import Process, GetBalloonsAmount
-from datetime import datetime, date, time, timedelta
+from .forms import GetBalloonsAmount
+from datetime import datetime, timedelta
+
+STATUS_LIST = {
+    '1': 'Регистрация пустого баллона на складе (из кассеты)',
+    '2': 'Погрузка полного баллона в кассету',
+    '3': 'Погрузка полного баллона на трал 1',
+    '4': 'Погрузка полного баллона на трал 2',
+    '5': 'Регистрация полного баллона на складе',
+    '6': 'Регистрация пустого баллона на складе (рампа)',
+    '7': 'Регистрация пустого баллона на складе (цех)',
+    '8': 'Наполнение баллона сжиженным газом',
+}
 
 
-def index(request):
-    balloons = Balloon.objects.all()
-    return render(request, "home.html", {"balloons": balloons})
-
-
-def apiGetBalloonPassport(request):
-    nfc = request.GET.get("nfc", 0)
-    balloons = Balloon.objects.order_by('-id').filter(nfc_tag=nfc)
-    # serialized_queryset = serializers.serialize('json', balloon)
-    return JsonResponse({
-        'nfc_tag': balloons[0].nfc_tag,
-        'serial_number': balloons[0].serial_number,
-        'creation_date': balloons[0].creation_date,
-        'capacity': balloons[0].capacity,
-        'empty_weight': balloons[0].empty_weight,
-        'full_weight': balloons[0].full_weight,
-        'current_examination_date': balloons[0].current_examination_date,
-        'next_examination_date': balloons[0].next_examination_date,
-        'state': balloons[0].state
-    })
-
-
-def reader_info(request, reader='1'):
-    if reader == '1':
-        status = 'Регистрация пустого баллона на складе (цех)'
-    elif reader == '2':
-        status = 'Наполнение баллона сжиженным газом'
-    elif reader == '3':
-        status = 'Регистрация пустого баллона на складе (рампа)'
-    elif reader == '4':
-        status = 'Регистрация полного баллона на складе'
-    elif reader == '5':
-        status = 'Погрузка полного баллона на трал 2'
-    elif reader == '6':
-        status = 'Погрузка полного баллона на трал 1'
-    elif reader == '7':
-        status = 'Погрузка полного баллона в кассету'
-    elif reader == '8':
-        status = 'Регистрация пустого баллона на складе (из кассеты)'
-
-    balloons = Balloon.objects.order_by('-id').filter(state=status)
+def balloons(request):
+    balloons = Balloon.objects.order_by('-id').all()
     paginator = Paginator(balloons, 15)
     page_num = request.GET.get('page', 1)
     page_obj = paginator.get_page(page_num)
+    return render(request, "balloons_table.html", {"page_obj": page_obj})
 
-    date_process = GetBalloonsAmount()
+
+def balloon_passport(request, nfc_tag):
+    balloon = Balloon.objects.filter(nfc_tag=nfc_tag).last()
+
+    return render(request, "balloon_passport.html", {"balloon": balloon})
+
+
+def reader_info(request, reader='1'):
+    current_date = datetime.now().date()
+    previous_date = current_date - timedelta(days=1)
+
     if request.method == "POST":
         required_date = request.POST.get("date")
         format_required_date = datetime.strptime(required_date, '%d.%m.%Y')
-
-        dataset = BalloonResources().export(Balloon.objects.filter(state=status, creation_date=format_required_date))
+        dataset = BalloonResources().export(Balloon.objects.order_by('-id').filter(status=STATUS_LIST[reader],
+                                                                                   change_date=format_required_date))
         response = HttpResponse(dataset.xls, content_type='xls')
         response[
             'Content-Disposition'] = f'attachment; filename="RFID_1_{datetime.strftime(format_required_date, '%Y.%m.%d')}.xls"'
         return response
     else:
         date_process = GetBalloonsAmount()
-        format_required_date = datetime.today()
 
-    last_date_amount = len(balloons.filter(creation_date=datetime.today()))
-    previous_date_amount = len(balloons.filter(creation_date=datetime.today() - timedelta(days=1)))
-    required_date_amount = len(balloons.filter(creation_date=format_required_date))
+    balloons = Balloon.objects.order_by('-id').filter(status=STATUS_LIST[reader])
+    current_quantity_by_sensor = BalloonAmount.objects.filter(reader_id=reader, change_date=current_date)
+    previous_quantity_by_sensor = BalloonAmount.objects.filter(reader_id=reader, change_date=previous_date)
+    current_quantity_by_reader = len(balloons.filter(change_date=current_date))
+    previous_quantity_by_reader = len(balloons.filter(change_date=previous_date))
 
-    view_required_data = datetime.strftime(format_required_date, '%d.%m.%Y')
+    paginator = Paginator(balloons, 15)
+    page_num = request.GET.get('page', 1)
+    page_obj = paginator.get_page(page_num)
 
-    return render(request, "balloons_table.html", {
+    current_quantity_by_sensor_item = previous_quantity_by_sensor_item = 0
+    for amount in current_quantity_by_sensor:
+        current_quantity_by_sensor_item = amount.amount_of_balloons
+    for amount in previous_quantity_by_sensor:
+        previous_quantity_by_sensor_item = amount.amount_of_balloons
+
+    return render(request, "rfid_tables.html", {
         "page_obj": page_obj,
-        'balloons_amount': last_date_amount,
-        'previous_balloons_amount': previous_date_amount,
-        'required_date_amount': required_date_amount,
-        'format_required_date': view_required_data,
-        'form': date_process})
+        'current_quantity_by_reader': current_quantity_by_reader,
+        'previous_quantity_by_reader': previous_quantity_by_reader,
+        'current_quantity_by_sensor': current_quantity_by_sensor_item,
+        'previous_quantity_by_sensor': previous_quantity_by_sensor_item,
+        'form': date_process
+    })

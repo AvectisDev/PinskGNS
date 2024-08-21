@@ -22,4 +22,25 @@ class GetBalloonsAmount(forms.Form):
         if date_data is None or len(date_data) != 10:
             raise forms.ValidationError("Поле не может быть пустым")
         return date_data
-    
+
+
+class UpdateBalloonPassport(forms.Form):
+    nfc_tag = forms.CharField()
+    serial_number = forms.CharField()
+    creation_date = forms.DateField()
+    size = forms.FloatField()
+    netto = forms.FloatField()
+    brutto = forms.FloatField()
+    current_examination_date = forms.DateField()
+    next_examination_date = forms.DateField()
+    manufacturer = forms.CharField()
+    wall_thickness = forms.FloatField()
+    status = forms.CharField()
+
+    #date = forms.CharField(max_length=10, label="Дата", widget=forms.TextInput(attrs={'placeholder': 'дд.мм.гггг'}))
+
+    # def clean_data(self):
+    #     date_data = self.cleaned_data["date"]
+    #     if date_data is None or len(date_data) != 10:
+    #         raise forms.ValidationError("Поле не может быть пустым")
+    #     return date_data

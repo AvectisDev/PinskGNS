@@ -53,6 +53,19 @@
         </span>
     </div>
 
+    <div > 
+        <p>Количество баллонов за текущую смену: RFID-считыватель - {{ current_quantity_by_reader }}, оптический датчик - {{ current_quantity_by_sensor }}</p>
+        <p>Количество баллонов за прошлую смену: RFID-считыватель - {{ previous_quantity_by_reader }}, оптический датчик - {{ previous_quantity_by_sensor }}</p>
+    </div>
+    
+    <div >
+        <form method="post" enctype="multipart/form-data">
+           {% csrf_token %}
+           {{ form }}
+           <button class="btn btn-primary" style="margin: 5% 2% 5% 5%;" type="submit">Выгрузить отчёт за дату</button>
+        </form>
+   </div>
+
 </div>
 
 {% endblock content %}
