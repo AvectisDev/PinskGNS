@@ -9,8 +9,8 @@ readers[0] = {
     'status': 'Регистрация пустого баллона на складе (из кассеты)',
     'input_state': 0,
     'previous_nfc_tags': [],
-    'function': '',
-    'batch': {'loading_batch_id': 0, 'balloons_list': []}
+    'function': None,
+    'batch': {'batch_id': 0, 'balloons_list': []}
 }
 
 # Г-образный
@@ -21,8 +21,8 @@ readers[1] = {
     'status': 'Погрузка полного баллона в кассету',
     'input_state': 0,
     'previous_nfc_tags': [],
-    'function': '',
-    'batch': {'loading_batch_id': 0, 'balloons_list': []}
+    'function': None,
+    'batch': {'batch_id': 0, 'balloons_list': []}
 }
 
 # Считыватели на отгрузке
@@ -34,7 +34,7 @@ readers[2] = {
     'input_state': 0,
     'previous_nfc_tags': [],
     'function': 'unloading',
-    'batch': {'loading_batch_id': 0, 'balloons_list': []}
+    'batch': {'batch_id': 0, 'balloons_list': []}
 }
 
 readers[3] = {
@@ -45,7 +45,7 @@ readers[3] = {
     'input_state': 0,
     'previous_nfc_tags': [],
     'function': 'unloading',
-    'batch': {'loading_batch_id': 0, 'balloons_list': []}
+    'batch': {'batch_id': 0, 'balloons_list': []}
 }
 
 readers[4] = {
@@ -55,8 +55,8 @@ readers[4] = {
     'status': 'Регистрация полного баллона на складе',
     'input_state': 0,
     'previous_nfc_tags': [],
-    'function': '',
-    'batch': {'loading_batch_id': 0, 'balloons_list': []}
+    'function': 'unloading',
+    'batch': {'batch_id': 0, 'balloons_list': []}
 }
 
 readers[5] = {
@@ -67,7 +67,7 @@ readers[5] = {
     'input_state': 0,
     'previous_nfc_tags': [],
     'function': 'loading',
-    'batch': {'loading_batch_id': 0, 'balloons_list': []}
+    'batch': {'batch_id': 0, 'balloons_list': []}
 }
 
 # Считыватели в цеху
@@ -78,8 +78,8 @@ readers[6] = {
     'status': 'Регистрация пустого баллона на складе (цех)',
     'input_state': 0,
     'previous_nfc_tags': [],
-    'function': '',
-    'batch': {'loading_batch_id': 0, 'balloons_list': []}
+    'function': None,
+    'batch': {'batch_id': 0, 'balloons_list': []}
 }
 
 readers[7] = {
@@ -89,26 +89,8 @@ readers[7] = {
     'status': 'Наполнение баллона сжиженным газом',
     'input_state': 0,
     'previous_nfc_tags': [],
-    'function': '',
-    'batch': {'loading_batch_id': 0, 'balloons_list': []}
-}
-
-passport_template = {
-    'nfc_tag': '',
-    'serial_number': '',
-    'creation_date': '',
-    'size': 0.0,
-    'netto': 0.0,
-    'brutto': 0.0,
-    'current_examination_date': '',
-    'next_examination_date': '',
-    'manufacturer': '',
-    'wall_thickness': 0.0,
-    'status': '',
-    'filling_status': 0,
-    'change_date': '',
-    'change_time': '',
-    'user': 1
+    'function': None,
+    'batch': {'batch_id': 0, 'balloons_list': []}
 }
 
 # Команды, посылаемые на считыватель

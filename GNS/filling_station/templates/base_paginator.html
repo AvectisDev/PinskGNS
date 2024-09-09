@@ -1,0 +1,28 @@
+{% extends 'base.html' %}
+
+{% block content %}
+
+    <div>
+        {% block data %}
+        {% endblock data %}
+    </div>
+
+    <div class="pagination">
+         <span class="step-links">
+            {% if page_obj.has_previous %}
+                <a href="?page=1">&laquo; Начало</a>
+                <a href="?page={{ page_obj.previous_page_number }}">назад</a>
+            {% endif %}
+
+            <span class="current">
+                Лист {{ page_obj.number }} из {{ page_obj.paginator.num_pages }}.
+            </span>
+
+            {% if page_obj.has_next %}
+                <a href="?page={{ page_obj.next_page_number }}">вперёд</a>
+                <a href="?page={{ page_obj.paginator.num_pages }}">Конец &raquo;</a>
+            {% endif %}
+        </span>
+    </div>
+
+{% endblock content %}

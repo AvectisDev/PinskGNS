@@ -3,43 +3,99 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Газонаполнительная станция</title>
+    <title>{% block title %} Газонаполнительная станция {% endblock %}</title>
     <link rel="shortcut icon" type="image/ico" href='/static/filling_station/media/Gas.ico'/>
+    <script type="text/javascript" src="/static/filling_station/bootstrap/js/bootstrap.bundle.min.js"></script>
     <link rel="stylesheet" href="/static/filling_station/bootstrap/css/bootstrap.min.css">
-    <link rel="stylesheet" href="/static/filling_station/bootstrap/js/bootstrap.min.js">
 </head>
 <body>
 
+<!-- <div class="left-panel-wrapper">
+    <div class="left-panel">
+      some content some content some content some content some content some content some content some content some content
+    </div>
+</div> -->
+
 <div class="container">
     <header class="d-flex flex-wrap align-items-center justify-content-center justify-content-md-between py-3 mb-4 border-bottom">
-      <div class="col-md-3 mb-2 mb-md-0">
-        <a href="/" class="d-inline-flex link-body-emphasis text-decoration-none">
-            <img src="/static/filling_station/media/logo.svg" width="100%" alt="oops">
-        </a>
-      </div>
+        <div class="col-md-3 mb-2 mb-md-0">
+            <a href="/" class="d-inline-flex link-body-emphasis text-decoration-none">
+                <img src="/static/filling_station/media/logo.svg" width="100%" alt="oops">
+            </a>
+        </div>
 
-      <ul class="nav col-12 col-md-auto mb-2 justify-content-center mb-md-0">
-        <li><a href="/reader/1" class="nav-link px-2 link-secondary">RFID №1</a></li>
-        <li><a href="/reader/2" class="nav-link px-2">RFID №2</a></li>
-        <li><a href="/reader/3" class="nav-link px-2">RFID №3</a></li>
-        <li><a href="/reader/4" class="nav-link px-2">RFID №4</a></li>
-        <li><a href="/reader/5" class="nav-link px-2">RFID №5</a></li>
-        <li><a href="/reader/6" class="nav-link px-2">RFID №6</a></li>
-        <li><a href="/reader/7" class="nav-link px-2">RFID №7</a></li>
-        <li><a href="/reader/8" class="nav-link px-2">RFID №8</a></li>
-      </ul>
+        <ul class="nav nav-tabs">
+            <li class="nav-item">
+                <a class="nav-link" href="/">Архив баллонов</a>
+            </li>
+            <!--            <li class="nav-item">-->
+            <!--                <a class="nav-link active" aria-current="page" href="#">Активная</a>-->
+            <!--            </li>-->
+            <li class="nav-item dropdown">
+                <a class="nav-link dropdown-toggle" data-bs-toggle="dropdown" href="#" role="button"
+                   aria-expanded="false">Считыватели</a>
+                <ul class="dropdown-menu">
+                    <li><a class="dropdown-item" href="/reader/1">RFID №1</a></li>
+                    <li><a class="dropdown-item" href="/reader/2">RFID №2</a></li>
+                    <li><a class="dropdown-item" href="/reader/3">RFID №3</a></li>
+                    <li><a class="dropdown-item" href="/reader/4">RFID №4</a></li>
+                    <li><a class="dropdown-item" href="/reader/5">RFID №5</a></li>
+                    <li><a class="dropdown-item" href="/reader/6">RFID №6</a></li>
+                    <li><a class="dropdown-item" href="/reader/7">RFID №7</a></li>
+                    <li><a class="dropdown-item" href="/reader/8">RFID №8</a></li>
+                    <!--      <li><hr class="dropdown-divider"></li>-->
+                    <!--      <li><a class="dropdown-item" href="#">Отделенная ссылка</a></li>-->
+                </ul>
+            </li>
+            <li class="nav-item dropdown">
+                <a class="nav-link dropdown-toggle" data-bs-toggle="dropdown" href="#" role="button"
+                   aria-expanded="false">Партии</a>
+                <ul class="dropdown-menu">
+                    <li><a class="dropdown-item" href="{% url 'filling_station:railway_loading_batch' %}">Приёмка ж/д
+                        цистерн</a></li>
+                    <li>
+                        <hr class="dropdown-divider">
+                    </li>
+                    <li><a class="dropdown-item" href="{% url 'filling_station:balloons_loading_batch' %}">Приёмка
+                        баллонов</a></li>
+                    <li><a class="dropdown-item" href="{% url 'filling_station:balloons_unloading_batch' %}">Отгрузка
+                        баллонов</a></li>
+                    <li>
+                        <hr class="dropdown-divider">
+                    </li>
+                    <li><a class="dropdown-item" href="{% url 'filling_station:auto_gas_loading_batch' %}">Приёмка
+                        автоцистерн</a></li>
+                    <li><a class="dropdown-item" href="{% url 'filling_station:auto_gas_unloading_batch' %}">Отгрузка
+                        автоцистерн</a></li>
+                </ul>
+            </li>
+            <li class="nav-item dropdown">
+                <a class="nav-link dropdown-toggle" data-bs-toggle="dropdown" href="#" role="button"
+                   aria-expanded="false">Транспорт</a>
+                <ul class="dropdown-menu">
+                    <li><a class="dropdown-item" href="{% url 'filling_station:trucks' %}">Грузовики</a></li>
+                    <li><a class="dropdown-item" href="{% url 'filling_station:trailers' %}">Прицепы</a></li>
+                    <li><a class="dropdown-item" href="{% url 'filling_station:railway_tanks' %}">Ж/д цистерны</a></li>
+                </ul>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" href="{% url 'filling_station:get_ttn' %}">ТТН</a>
+            </li>
+            <!--  <li class="nav-item">-->
+            <!--    <a class="nav-link disabled">Заглушка</a>-->
+            <!--  </li>-->
+        </ul>
 
-      <div class="col-md-3 text-end">
-        <button type="button" class="btn btn-outline-primary me-2">Login</button>
-      </div>
+        <div class="col-md-3 text-end">
+            <button type="button" class="btn btn-outline-primary me-2">Войти</button>
+        </div>
     </header>
 </div>
 
-  <!-- <div class="d-flex flex-wrap align-items-center justify-content-center justify-content-md-between"> -->
-  <div class="d-flex justify-content-center">
-        {% block content %}
-        {% endblock content %}
-  </div>
+<div class="d-flex justify-content-center" style="flex-direction: column; align-items: center;">
+    {% block content %}
+    {% endblock content %}
+</div>
 
 </body>
 </html>

@@ -1,18 +1,12 @@
 {% extends 'base.html' %}
-
+{% block title %} Данные с RFID {% endblock %}
 {% block content %}
 
-<!-- <div class="left-panel-wrapper">
-    <div class="left-panel">
-      some content some content some content some content some content some content some content some content some content
-    </div>
-</div> -->
-
 <div>
-    
+    <h5>Данные со считывателя №{{reader}} </h5>
     <div>
-        <table class="table table-striped table-hover">
-            <tr align="center" width = 100%>
+        <table class="table table-striped table-hover vertical-align: middle">
+            <tr align="center" width=100%>
                 <th>RFID метка</th>
                 <th>Серийный номер</th>
                 <th>Вес НЕТТО</th>
@@ -23,13 +17,15 @@
             </tr>
             {% for balloon in page_obj.object_list %}
             <tr align="center">
-                <td>{{ balloon.nfc_tag }}</td>
-                <td>{{ balloon.serial_number }}</td>
-                <td>{{ balloon.netto }}</td>
-                <td>{{ balloon.brutto }}</td>
-                <td>{{ balloon.status }}</td>
-                <td>{{ balloon.change_date }}</td>
-                <td>{{ balloon.change_time }}</td>
+                <td>
+                    <a href="{% url 'filling_station:balloon_passport' balloon.nfc_tag %}"> {{ balloon.nfc_tag }} </a>
+                </td>
+                <td>{{ balloon.serial_number|default_if_none:"-" }}</td>
+                <td>{{ balloon.netto|default_if_none:"-" }}</td>
+                <td>{{ balloon.brutto|default_if_none:"-" }}</td>
+                <td>{{ balloon.status|default_if_none:"-" }}</td>
+                <td>{{ balloon.change_date|default_if_none:"-" }}</td>
+                <td>{{ balloon.change_time|default_if_none:"-" }}</td>
             </tr>
             {% endfor %}
         </table>
@@ -53,18 +49,20 @@
         </span>
     </div>
 
-    <div > 
-        <p>Количество баллонов за текущую смену: RFID-считыватель - {{ current_quantity_by_reader }}, оптический датчик - {{ current_quantity_by_sensor }}</p>
-        <p>Количество баллонов за прошлую смену: RFID-считыватель - {{ previous_quantity_by_reader }}, оптический датчик - {{ previous_quantity_by_sensor }}</p>
+    <div>
+        <p>Количество баллонов за текущую смену: RFID-считыватель - {{ current_quantity_by_reader }}, оптический датчик
+            - {{ current_quantity_by_sensor }}</p>
+        <p>Количество баллонов за прошлую смену: RFID-считыватель - {{ previous_quantity_by_reader }}, оптический датчик
+            - {{ previous_quantity_by_sensor }}</p>
     </div>
-    
-    <div >
+
+    <div>
         <form method="post" enctype="multipart/form-data">
-           {% csrf_token %}
-           {{ form }}
-           <button class="btn btn-primary" style="margin: 5% 2% 5% 5%;" type="submit">Выгрузить отчёт за дату</button>
+            {% csrf_token %}
+            {{ form }}
+            <button class="btn btn-primary" style="margin: 5% 2% 5% 5%;" type="submit">Выгрузить баллоны за дату</button>
         </form>
-   </div>
+    </div>
 
 </div>
 
