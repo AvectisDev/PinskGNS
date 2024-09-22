@@ -1,0 +1,42 @@
+{% extends 'base.html' %}
+{% block title %} Детали ж/д цистерны {% endblock %}
+
+{% block content %}
+
+<div class="container text-center">
+    <div class="row">
+        <div class="col text-end">
+            <p>Номер</p>
+            <p>Вес пустой цистерны</p>
+            <p>Вес полной цистерны</p>
+            <p>Количество газа</p>
+            <p>Находится на станции</p>
+            <p>Дата въезда</p>
+            <p>Время въезда</p>
+            <p>Дата выезда</p>
+            <p>Время выезда</p>
+        </div>
+        <div class="col text-start">
+            <p>{{ railway.number }}</p>
+            <p>{{ railway.empty_weight|floatformat:2|default_if_none:"-" }}</p>
+            <p>{{ railway.full_weight|floatformat:2|default_if_none:"-" }}</p>
+            <p>{{ railway.gas_amount|floatformat:2|default_if_none:"-" }}</p>
+            <p>{% if railway.is_on_station %}Да{% else %}Нет{% endif %}</p>
+            <p>{{ railway.entry_date|default_if_none:"-" }}</p>
+            <p>{{ railway.entry_time|default_if_none:"-" }}</p>
+            <p>{{ railway.departure_date|default_if_none:"-" }}</p>
+            <p>{{ railway.departure_time|default_if_none:"-" }}</p>
+        </div>
+    </div>
+</div>
+
+<div class="container text-center">
+    <button type="button" class="btn" style="background-color: #3CBBD9; color: white;"
+            onclick="location.href='{% url 'filling_station:railway_tank_list' %}'">Назад</button>
+    <button type="button" class="btn" style="background-color: #3CBBD9; color: white;"
+            onclick="location.href = '{{ railway.get_update_url }}'">Редактировать</button>
+    <button type="button" class="btn btn-danger" onclick="location.href = '{{ railway.get_update_url }}'">Удалить
+    </button>
+</div>
+
+{% endblock content %}

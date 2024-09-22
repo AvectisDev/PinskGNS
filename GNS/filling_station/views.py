@@ -1,14 +1,16 @@
 from django.shortcuts import render, get_object_or_404, redirect
 from django.http import HttpResponse
 from django.core.paginator import Paginator
-from .models import (Balloon, Truck, Trailer, RailwayTanks, TTN, BalloonsLoadingBatch, BalloonsUnloadingBatch,
+from django.urls import reverse_lazy
+from django.views import generic
+
+from .models import (Balloon, Truck, Trailer, RailwayTank, TTN, BalloonsLoadingBatch, BalloonsUnloadingBatch,
                      RailwayLoadingBatch, BalloonAmount, GasLoadingBatch, GasUnloadingBatch)
 from .admin import BalloonResources
-from .forms import (GetBalloonsAmount, BalloonPassportForm, TruckForm, TrailerForm, RailwayTanksForm, TTNForm,
+from .forms import (GetBalloonsAmount, BalloonForm, TruckForm, TrailerForm, RailwayTankForm, TTNForm,
                     BalloonsLoadingBatchForm, BalloonsUnloadingBatchForm, RailwayLoadingBatchForm, GasLoadingBatchForm,
                     GasUnloadingBatchForm)
 from datetime import datetime, timedelta
-from django.http import Http404
 
 STATUS_LIST = {
     '1': 'Регистрация пустого баллона на складе (из кассеты)',
@@ -21,43 +23,33 @@ STATUS_LIST = {
     '8': 'Наполнение баллона сжиженным газом',
 }
 
-def balloons(request):
-    nfc_tag_filter = request.GET.get('nfc_tag', '')
-    if nfc_tag_filter:
-        balloons_list = Balloon.objects.filter(nfc_tag=nfc_tag_filter)
-    else:
-        balloons_list = Balloon.objects.all()
-    #
-    paginator = Paginator(balloons_list, 15)
-    page_num = request.GET.get('page', 1)
-    page_obj = paginator.get_page(page_num)
 
-    context = {
-        "page_obj": page_obj,
-        "nfc_tag_filter": nfc_tag_filter
-    }
-    return render(request, "balloons_table.html", context)
+class BalloonListView(generic.ListView):
+    model = Balloon
+    paginate_by = 15
 
+    def get_queryset(self):
+        nfc_tag_filter = self.request.GET.get('nfc_tag', '')
 
-def balloon_passport(request, nfc_tag):
-    try:
-        balloon = Balloon.objects.filter(nfc_tag=nfc_tag).first()
-
-        if request.method == 'POST':
-            form = BalloonPassportForm(request.POST, instance=balloon)
-            if form.is_valid():
-                balloon = form.save()
-                return redirect('filling_station:balloons_list')
+        if nfc_tag_filter:
+            return Balloon.objects.filter(nfc_tag=nfc_tag_filter)
         else:
-            form = BalloonPassportForm(instance=balloon)
+            return Balloon.objects.all()
 
-            context = {
-                "balloon": balloon,
-                'form': form
-            }
-            return render(request, "balloon_passport.html", context)
-    except:
-        raise Http404("No Balloon found")
+
+class BalloonDetailView(generic.DetailView):
+    model = Balloon
+
+
+class BalloonUpdateView(generic.UpdateView):
+    model = Balloon
+    form_class = BalloonForm
+    template_name = 'filling_station/_equipment_form.html'
+
+
+class BalloonDeleteView(generic.DeleteView):
+    model = Balloon
+    success_url = reverse_lazy("balloon_list")
 
 
 def reader_info(request, reader='1'):
@@ -66,362 +58,239 @@ def reader_info(request, reader='1'):
 
     if request.method == "POST":
         required_date = request.POST.get("date")
-        format_required_date = datetime.strptime(required_date, '%d.%m.%Y')
-        dataset = BalloonResources().export(Balloon.objects.order_by('-id').filter(status=STATUS_LIST[reader],
-                                                                                   change_date=format_required_date))
+        format_required_date = datetime.strptime(required_date, '%Y-%m-%d')
+
+        dataset = BalloonResources().export(Balloon.objects.filter(status=STATUS_LIST[reader], change_date=format_required_date))
         response = HttpResponse(dataset.xls, content_type='xls')
-        response['Content-Disposition'] = f'attachment; filename="RFID_1_{datetime.strftime(format_required_date, '%Y.%m.%d')}.xls"'
+        response['Content-Disposition'] = f'attachment; filename="RFID_1_{required_date}.xls"'
+
         return response
     else:
         date_process = GetBalloonsAmount()
 
-    balloons_list = Balloon.objects.order_by('-id').filter(status=STATUS_LIST[reader])
-    current_quantity_by_sensor = BalloonAmount.objects.filter(reader_id=reader, change_date=current_date)
-    previous_quantity_by_sensor = BalloonAmount.objects.filter(reader_id=reader, change_date=previous_date)
-    current_quantity_by_reader = len(balloons_list.filter(change_date=current_date))
-    previous_quantity_by_reader = len(balloons_list.filter(change_date=previous_date))
+    balloons_list = Balloon.objects.order_by('-change_date', '-change_time').filter(status=STATUS_LIST[reader])
+    current_quantity = BalloonAmount.objects.filter(reader_id=reader, change_date=current_date).first()
+    previous_quantity = BalloonAmount.objects.filter(reader_id=reader, change_date=previous_date).first()
 
     paginator = Paginator(balloons_list, 15)
     page_num = request.GET.get('page', 1)
     page_obj = paginator.get_page(page_num)
 
-    current_quantity_by_sensor_item = previous_quantity_by_sensor_item = 0
-    for amount in current_quantity_by_sensor:
-        current_quantity_by_sensor_item = amount.amount_of_balloons
-    for amount in previous_quantity_by_sensor:
-        previous_quantity_by_sensor_item = amount.amount_of_balloons
-
     context = {
         "page_obj": page_obj,
-        'current_quantity_by_reader': current_quantity_by_reader,
-        'previous_quantity_by_reader': previous_quantity_by_reader,
-        'current_quantity_by_sensor': current_quantity_by_sensor_item,
-        'previous_quantity_by_sensor': previous_quantity_by_sensor_item,
+        'current_quantity_by_reader': current_quantity.amount_of_rfid,
+        'previous_quantity_by_reader': previous_quantity.amount_of_rfid,
+        'current_quantity_by_sensor': current_quantity.amount_of_balloons,
+        'previous_quantity_by_sensor': previous_quantity.amount_of_balloons,
         'form': date_process,
         'reader': reader
     }
     return render(request, "rfid_tables.html", context)
 
 
-def balloons_loading_batch(request):
-    batch_list = BalloonsLoadingBatch.objects.all()
+# Партии приёмки баллонов
+class BalloonLoadingBatchListView(generic.ListView):
+    model = BalloonsLoadingBatch
+    paginate_by = 15
+    template_name = 'filling_station/balloon_batch_list.html'
 
-    paginator = Paginator(batch_list, 15)
-    page_num = request.GET.get('page', 1)
-    page_obj = paginator.get_page(page_num)
 
-    context = {
-        "page_obj": page_obj,
-    }
-    return render(request, "balloons_loading_batch.html", context)
+class BalloonLoadingBatchDetailView(generic.DetailView):
+    model = BalloonsLoadingBatch
+    context_object_name = 'batch'
+    template_name = 'filling_station/balloon_batch_detail.html'
 
 
-def balloons_loading_batch_details(request, number: int):
-    try:
+class BalloonLoadingBatchUpdateView(generic.UpdateView):
+    model = BalloonsLoadingBatch
+    form_class = BalloonsLoadingBatchForm
+    template_name = 'filling_station/_equipment_form.html'
 
-        batch = get_object_or_404(BalloonsLoadingBatch, id=number)
 
-        if request.method == 'POST':
-            form = BalloonsLoadingBatchForm(request.POST, instance=batch)
-            if form.is_valid():
-                form.save()
-                return redirect('filling_station:balloons_loading_batch')
-        else:
-            form = BalloonsLoadingBatchForm(instance=batch)
+class BalloonLoadingBatchDeleteView(generic.DeleteView):
+    model = BalloonsLoadingBatch
+    success_url = reverse_lazy("filling_station:balloons_loading_batch")
 
-        context = {
-            'batch': batch,
-            'form': form
-        }
-        return render(request, "balloons_batch_details.html", context)
 
-    except BalloonsLoadingBatch.DoesNotExist:
-        raise Http404("Партия не найдена")
+# Партии отгрузки баллонов
+class BalloonUnloadingBatchListView(generic.ListView):
+    model = BalloonsUnloadingBatch
+    paginate_by = 15
+    template_name = 'filling_station/balloon_batch_list.html'
 
 
-def balloons_unloading_batch(request):
-    batch_list = BalloonsUnloadingBatch.objects.all()
+class BalloonUnloadingBatchDetailView(generic.DetailView):
+    model = BalloonsUnloadingBatch
+    context_object_name = 'batch'
+    template_name = 'filling_station/balloon_batch_detail.html'
 
-    paginator = Paginator(batch_list, 15)
-    page_num = request.GET.get('page', 1)
-    page_obj = paginator.get_page(page_num)
 
-    context = {
-        'page_obj': page_obj,
-    }
-    return render(request, "balloons_unloading_batch.html", context)
+class BalloonUnloadingBatchUpdateView(generic.UpdateView):
+    model = BalloonsUnloadingBatch
+    form_class = BalloonsUnloadingBatchForm
+    template_name = 'filling_station/_equipment_form.html'
 
 
-def balloons_unloading_batch_details(request, number: int):
-    try:
+class BalloonUnloadingBatchDeleteView(generic.DeleteView):
+    model = BalloonsUnloadingBatch
+    success_url = reverse_lazy("filling_station:balloons_unloading_batch")
 
-        batch = get_object_or_404(BalloonsUnloadingBatch, id=number)
 
-        if request.method == 'POST':
-            form = BalloonsUnloadingBatchForm(request.POST, instance=batch)
-            if form.is_valid():
-                form.save()
-                return redirect('filling_station:balloons_unloading_batch')
-        else:
-            form = BalloonsUnloadingBatchForm(instance=batch)
+# Партии приёмки газа в автоцистернах
+class GasLoadingBatchListView(generic.ListView):
+    model = GasLoadingBatch
+    paginate_by = 15
+    template_name = 'filling_station/auto_batch_list.html'
 
-        context = {
-            'batch': batch,
-            'form': form
-        }
-        return render(request, "balloons_batch_details.html", context)
 
-    except BalloonsUnloadingBatch.DoesNotExist:
-        raise Http404("Партия не найдена")
+class GasLoadingBatchDetailView(generic.DetailView):
+    model = GasLoadingBatch
+    context_object_name = 'batch'
+    template_name = 'filling_station/auto_batch_detail.html'
 
 
-def gas_loading_batch(request):
-    batch_list = GasLoadingBatch.objects.all()
+class GasLoadingBatchUpdateView(generic.UpdateView):
+    model = GasLoadingBatch
+    form_class = GasLoadingBatchForm
+    template_name = 'filling_station/_equipment_form.html'
 
-    paginator = Paginator(batch_list, 15)
-    page_num = request.GET.get('page', 1)
-    page_obj = paginator.get_page(page_num)
 
-    context = {
-        "page_obj": page_obj,
-    }
-    return render(request, "auto_gas_loading_batch.html", context)
+class GasLoadingBatchDeleteView(generic.DeleteView):
+    model = GasLoadingBatch
+    success_url = reverse_lazy("filling_station:auto_gas_loading_batch")
 
 
-def gas_loading_batch_details(request, number: int):
-    try:
+# Партии отгрузки газа в автоцистернах
+class GasUnloadingBatchListView(generic.ListView):
+    model = GasUnloadingBatch
+    paginate_by = 15
+    template_name = 'filling_station/auto_batch_list.html'
 
-        batch = get_object_or_404(GasLoadingBatch, id=number)
 
-        if request.method == 'POST':
-            form = GasLoadingBatchForm(request.POST, instance=batch)
-            if form.is_valid():
-                form.save()
-                return redirect('filling_station:auto_gas_loading_batch')
-        else:
-            form = GasLoadingBatchForm(instance=batch)
+class GasUnloadingBatchDetailView(generic.DetailView):
+    model = GasUnloadingBatch
+    context_object_name = 'batch'
+    template_name = 'filling_station/auto_batch_detail.html'
 
-        context = {
-            'batch': batch,
-            'form': form
-        }
-        return render(request, "auto_gas_batch_details.html", context)
 
-    except GasLoadingBatch.DoesNotExist:
-        raise Http404("Партия не найдена")
+class GasUnloadingBatchUpdateView(generic.UpdateView):
+    model = GasUnloadingBatch
+    form_class = GasUnloadingBatchForm
+    template_name = 'filling_station/_equipment_form.html'
 
 
-def gas_unloading_batch(request):
-    batch_list = GasUnloadingBatch.objects.all()
+class GasUnloadingBatchDeleteView(generic.DeleteView):
+    model = GasUnloadingBatch
+    success_url = reverse_lazy("filling_station:auto_gas_unloading_batch")
 
-    paginator = Paginator(batch_list, 15)
-    page_num = request.GET.get('page', 1)
-    page_obj = paginator.get_page(page_num)
 
-    context = {
-        "page_obj": page_obj,
-    }
-    return render(request, "auto_gas_unloading_batch.html", context)
+# Партии приёмки газа в ж/д цистернах
+class RailwayLoadingBatchListView(generic.ListView):
+    model = RailwayLoadingBatch
+    paginate_by = 15
+    template_name = 'filling_station/railway_batch_list.html'
 
 
-def gas_unloading_batch_details(request, number: int):
-    try:
+class RailwayLoadingBatchDetailView(generic.DetailView):
+    model = RailwayLoadingBatch
+    context_object_name = 'batch'
+    template_name = 'filling_station/railway_batch_detail.html'
 
-        batch = get_object_or_404(GasUnloadingBatch, id=number)
 
-        if request.method == 'POST':
-            form = GasUnloadingBatchForm(request.POST, instance=batch)
-            if form.is_valid():
-                form.save()
-                return redirect('filling_station:auto_gas_unloading_batch')
-        else:
-            form = GasUnloadingBatchForm(instance=batch)
+class RailwayLoadingBatchUpdateView(generic.UpdateView):
+    model = RailwayLoadingBatch
+    form_class = RailwayLoadingBatchForm
+    template_name = 'filling_station/_equipment_form.html'
 
-        context = {
-            'batch': batch,
-            'form': form
-        }
-        return render(request, "auto_gas_batch_details.html", context)
 
-    except GasUnloadingBatch.DoesNotExist:
-        raise Http404("Партия не найдена")
+class RailwayLoadingBatchDeleteView(generic.DeleteView):
+    model = RailwayLoadingBatch
+    success_url = reverse_lazy("filling_station:railway_loading_batch")
 
 
-def railway_loading_batch(request):
-    batch_list = RailwayLoadingBatch.objects.all()
+# Грузовики
+class TruckView(generic.ListView):
+    model = Truck
+    paginate_by = 15
 
-    paginator = Paginator(batch_list, 15)
-    page_num = request.GET.get('page', 1)
-    page_obj = paginator.get_page(page_num)
 
-    context = {
-        "page_obj": page_obj,
-    }
-    return render(request, "railway_loading_batch.html", context)
+class TruckDetailView(generic.DetailView):
+    model = Truck
+    paginate_by = 15
 
 
-def railway_loading_batch_details(request, number: int):
-    try:
+class TruckUpdateView(generic.UpdateView):
+    model = Truck
+    form_class = TruckForm
+    template_name = 'filling_station/_equipment_form.html'
 
-        batch = get_object_or_404(RailwayLoadingBatch, id=number)
 
-        if request.method == 'POST':
-            form = RailwayLoadingBatchForm(request.POST, instance=batch)
-            if form.is_valid():
-                form.save()
-                return redirect('filling_station:railway_loading_batch')
-        else:
-            form = RailwayLoadingBatchForm(instance=batch)
+class TruckDeleteView(generic.DeleteView):
+    model = Truck
+    success_url = reverse_lazy("filling_station:truck_list")
 
-        context = {
-            'batch': batch,
-            'form': form
-        }
-        return render(request, "railway_loading_batch_details.html", context)
 
-    except RailwayLoadingBatch.DoesNotExist:
-        raise Http404("Партия не найдена")
+# Прицепы
+class TrailerView(generic.ListView):
+    model = Trailer
+    paginate_by = 15
 
 
-def get_trucks(request):
-    truck_list = Truck.objects.all()
+class TrailerDetailView(generic.DetailView):
+    model = Trailer
+    paginate_by = 15
 
-    paginator = Paginator(truck_list, 15)
-    page_num = request.GET.get('page', 1)
-    page_obj = paginator.get_page(page_num)
 
-    context = {
-        'page_obj': page_obj,
-    }
-    return render(request, "trucks_table.html", context)
+class TrailerUpdateView(generic.UpdateView):
+    model = Trailer
+    form_class = TrailerForm
+    template_name = 'filling_station/_equipment_form.html'
 
 
-def get_trucks_details(request, number: str):
-    try:
+class TrailerDeleteView(generic.DeleteView):
+    model = Trailer
+    success_url = reverse_lazy("filling_station:trailer_list")
 
-        truck = get_object_or_404(Truck, registration_number=number)
 
-        if request.method == 'POST':
-            form = TruckForm(request.POST, instance=truck)
-            if form.is_valid():
-                form.save()
-                return redirect('filling_station:trucks')
-        else:
-            form = TruckForm(instance=truck)
+# ж/д цистерны
+class RailwayTankView(generic.ListView):
+    model = RailwayTank
+    paginate_by = 15
 
-        context = {
-            'truck': truck,
-            'form': form
-        }
-        return render(request, "transport_details.html", context)
 
-    except Truck.DoesNotExist:
-        raise Http404("Грузовик не найден")
+class RailwayTankDetailView(generic.DetailView):
+    model = RailwayTank
+    paginate_by = 15
 
 
-def get_trailers(request):
-    trailers_list = Trailer.objects.all()
+class RailwayTankUpdateView(generic.UpdateView):
+    model = RailwayTank
+    form_class = RailwayTankForm
+    template_name = 'filling_station/_equipment_form.html'
 
-    paginator = Paginator(trailers_list, 15)
-    page_num = request.GET.get('page', 1)
-    page_obj = paginator.get_page(page_num)
 
-    context = {
-        'page_obj': page_obj,
-    }
-    return render(request, "trailers_table.html", context)
+class RailwayTankDeleteView(generic.DeleteView):
+    model = RailwayTank
+    success_url = reverse_lazy("filling_station:railway_tank_list")
 
 
-def get_trailers_details(request, number: str):
-    try:
+# ТТН
+class TTNView(generic.ListView):
+    model = TTN
+    paginate_by = 15
 
-        trailer = get_object_or_404(Trailer, registration_number=number)
 
-        if request.method == 'POST':
-            form = TrailerForm(request.POST, instance=trailer)
-            if form.is_valid():
-                form.save()
-                return redirect('filling_station:trailers')
-        else:
-            form = TrailerForm(instance=trailer)
+class TTNDetailView(generic.DetailView):
+    model = TTN
+    paginate_by = 15
 
-        context = {
-            'trailer': trailer,
-            'form': form
-        }
-        return render(request, "transport_details.html", context)
 
-    except Trailer.DoesNotExist:
-        raise Http404("Прицеп не найден")
+class TTNUpdateView(generic.UpdateView):
+    model = TTN
+    form_class = TTNForm
+    template_name = 'filling_station/_equipment_form.html'
 
 
-def get_railway_tanks(request):
-    railway_tanks_list = RailwayTanks.objects.all()
-
-    paginator = Paginator(railway_tanks_list, 15)
-    page_num = request.GET.get('page', 1)
-    page_obj = paginator.get_page(page_num)
-
-    context = {
-        'page_obj': page_obj,
-    }
-    return render(request, "railway_tanks_table.html", context)
-
-
-def get_railway_tanks_details(request, number: int):
-    try:
-
-        railway_tank = get_object_or_404(RailwayTanks, id=number)
-
-        if request.method == 'POST':
-            form = RailwayTanksForm(request.POST, instance=railway_tank)
-            if form.is_valid():
-                form.save()
-                return redirect('filling_station:railway_tanks')
-        else:
-            form = RailwayTanksForm(instance=railway_tank)
-
-        context = {
-            'railway_tank': railway_tank,
-            'form': form
-        }
-        return render(request, "transport_details.html", context)
-
-    except RailwayTanks.DoesNotExist:
-        raise Http404("Цистерна не найдена")
-
-
-def get_ttn(request):
-    ttn_list = TTN.objects.all()
-
-    paginator = Paginator(ttn_list, 15)
-    page_num = request.GET.get('page', 1)
-    page_obj = paginator.get_page(page_num)
-
-    context = {
-        'page_obj': page_obj,
-    }
-    return render(request, "ttn_table.html", context)
-
-
-def get_ttn_details(request, number: int):
-    try:
-
-        ttn = get_object_or_404(TTN, id=number)
-
-        if request.method == 'POST':
-            form = TTNForm(request.POST, instance=ttn)
-            if form.is_valid():
-                form.save()
-                return redirect('filling_station:get_ttn')
-        else:
-            form = TTNForm(instance=ttn)
-
-        context = {
-            'ttn': ttn,
-            'form': form
-        }
-        return render(request, "ttn_details.html", context)
-
-    except TTN.DoesNotExist:
-        raise Http404("ТТН не найдена")
+class TTNDeleteView(generic.DeleteView):
+    model = TTN
+    success_url = reverse_lazy("filling_station:ttn_list")

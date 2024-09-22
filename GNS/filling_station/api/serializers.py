@@ -1,53 +1,43 @@
 from rest_framework import serializers
-from ..models import (Balloon, Truck, Trailer, RailwayTanks, TTN, BalloonsLoadingBatch, BalloonsUnloadingBatch,
+from ..models import (Balloon, Truck, Trailer, RailwayTank, TTN, BalloonsLoadingBatch, BalloonsUnloadingBatch,
                       RailwayLoadingBatch, GasLoadingBatch, GasUnloadingBatch)
 
 
 class BalloonSerializer(serializers.ModelSerializer):
     class Meta:
         model = Balloon
-        fields = ['nfc_tag', 'serial_number', 'creation_date', 'size', 'netto', 'brutto',
+        fields = ['id', 'nfc_tag', 'serial_number', 'creation_date', 'size', 'netto', 'brutto',
                   'current_examination_date', 'next_examination_date', 'status', 'manufacturer', 'wall_thickness',
                   'filling_status', 'update_passport_required']
 
 
-# class TruckSerializer(serializers.ModelSerializer):
-#     class Meta:
-#         model = Truck
-#         fields = ['car_brand', 'registration_number', 'type', 'max_capacity_cylinders_by_type',
-#                   'max_weight_of_transported_cylinders', 'max_mass_of_transported_gas', 'empty_weight',
-#                   'full_weight', 'is_on_station', 'entry_date', 'entry_time', 'departure_date', 'departure_time']
 class TruckSerializer(serializers.ModelSerializer):
     class Meta:
         model = Truck
-        fields = ['id', 'car_brand', 'registration_number', 'type', 'entry_date', 'entry_time', 'departure_date',
-                  'departure_time', 'is_on_station']
+        fields = ['id', 'car_brand', 'registration_number', 'type', 'max_capacity_cylinders_by_type',
+                  'max_weight_of_transported_cylinders', 'max_mass_of_transported_gas', 'empty_weight',
+                  'full_weight', 'is_on_station', 'entry_date', 'entry_time', 'departure_date', 'departure_time']
 
 
-# class TrailerSerializer(serializers.ModelSerializer):
-#     class Meta:
-#         model = Trailer
-#         fields = ['trailer_brand', 'registration_number', 'type', 'max_capacity_cylinders_by_type',
-#                   'max_weight_of_transported_cylinders', 'max_mass_of_transported_gas', 'empty_weight',
-#                   'full_weight', 'is_on_station']
 class TrailerSerializer(serializers.ModelSerializer):
     class Meta:
         model = Trailer
-        fields = ['id', 'trailer_brand', 'registration_number', 'type', 'truck', 'is_on_station', 'entry_date',
-                  'entry_time', 'departure_date', 'departure_time']
+        fields = ['id', 'trailer_brand', 'registration_number', 'type', 'truck', 'max_capacity_cylinders_by_type',
+                  'max_weight_of_transported_cylinders', 'max_mass_of_transported_gas', 'empty_weight',
+                  'full_weight', 'is_on_station', 'entry_date', 'entry_time', 'departure_date', 'departure_time']
 
 
 class RailwayTanksSerializer(serializers.ModelSerializer):
     class Meta:
-        model = RailwayTanks
-        fields = ['number', 'empty_weight', 'full_weight', 'is_on_station', 'entry_date', 'entry_time',
-                  'departure_date', 'departure_time']
+        model = RailwayTank
+        fields = ['id', 'number', 'empty_weight', 'full_weight', 'gas_amount', 'is_on_station', 'entry_date',
+                  'entry_time', 'departure_date', 'departure_time']
 
 
 class TTNSerializer(serializers.ModelSerializer):
     class Meta:
         model = TTN
-        fields = ['number', 'contract', 'name_of_supplier', 'gas_amount', 'balloons_amount', 'date']
+        fields = ['id', 'number', 'contract', 'name_of_supplier', 'gas_amount', 'balloons_amount', 'date']
 
 
 class BalloonsLoadingBatchSerializer(serializers.ModelSerializer):
@@ -75,10 +65,12 @@ class RailwayLoadingBatchSerializer(serializers.ModelSerializer):
 class GasLoadingBatchSerializer(serializers.ModelSerializer):
     class Meta:
         model = GasLoadingBatch
-        fields = ['id', 'end_date', 'end_time', 'truck', 'trailer', 'gas_amount', 'is_active', 'ttn']
+        fields = ['id', 'end_date', 'end_time', 'truck', 'trailer', 'gas_amount', 'weight_gas_amount',
+                  'is_active', 'ttn']
 
 
 class GasUnloadingBatchSerializer(serializers.ModelSerializer):
     class Meta:
         model = GasUnloadingBatch
-        fields = ['id', 'end_date', 'end_time', 'truck', 'trailer', 'gas_amount', 'is_active', 'ttn']
+        fields = ['id', 'end_date', 'end_time', 'truck', 'trailer', 'gas_amount', 'weight_gas_amount',
+                  'is_active', 'ttn']

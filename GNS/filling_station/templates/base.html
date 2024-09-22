@@ -7,95 +7,100 @@
     <link rel="shortcut icon" type="image/ico" href='/static/filling_station/media/Gas.ico'/>
     <script type="text/javascript" src="/static/filling_station/bootstrap/js/bootstrap.bundle.min.js"></script>
     <link rel="stylesheet" href="/static/filling_station/bootstrap/css/bootstrap.min.css">
+    <!--    <style>-->
+    <!--        body {-->
+    <!--            background-color: #BBBCC4;-->
+    <!--        }-->
+    <!--    </style>-->
 </head>
-<body>
+<body class="bg-white">
 
-<!-- <div class="left-panel-wrapper">
-    <div class="left-panel">
-      some content some content some content some content some content some content some content some content some content
-    </div>
-</div> -->
-
-<div class="container">
-    <header class="d-flex flex-wrap align-items-center justify-content-center justify-content-md-between py-3 mb-4 border-bottom">
+<div class="container-fluid">
+    <header class="d-flex flex-wrap align-items-center justify-content-center justify-content-md-between py-3 mb-1">
         <div class="col-md-3 mb-2 mb-md-0">
             <a href="/" class="d-inline-flex link-body-emphasis text-decoration-none">
-                <img src="/static/filling_station/media/logo.svg" width="100%" alt="oops">
+                <img src="/static/filling_station/media/logo_dark.svg" width="30%" alt="oops">
             </a>
         </div>
 
         <ul class="nav nav-tabs">
             <li class="nav-item">
-                <a class="nav-link" href="/">Архив баллонов</a>
+                <a class="nav-link" href="/" style="color: #051831;">Архив баллонов</a>
             </li>
             <!--            <li class="nav-item">-->
             <!--                <a class="nav-link active" aria-current="page" href="#">Активная</a>-->
             <!--            </li>-->
             <li class="nav-item dropdown">
-                <a class="nav-link dropdown-toggle" data-bs-toggle="dropdown" href="#" role="button"
+                <a class="nav-link dropdown-toggle" data-bs-toggle="dropdown" href="#" style="color: #051831;"
+                   role="button"
                    aria-expanded="false">Считыватели</a>
                 <ul class="dropdown-menu">
-                    <li><a class="dropdown-item" href="/reader/1">RFID №1</a></li>
-                    <li><a class="dropdown-item" href="/reader/2">RFID №2</a></li>
-                    <li><a class="dropdown-item" href="/reader/3">RFID №3</a></li>
-                    <li><a class="dropdown-item" href="/reader/4">RFID №4</a></li>
-                    <li><a class="dropdown-item" href="/reader/5">RFID №5</a></li>
-                    <li><a class="dropdown-item" href="/reader/6">RFID №6</a></li>
-                    <li><a class="dropdown-item" href="/reader/7">RFID №7</a></li>
+                    <li><a class="dropdown-item" href="/reader/1" style="color: #051831;">RFID №1</a></li>
+                    <li><a class="dropdown-item" href="/reader/2" style="color: #051831;">RFID №2</a></li>
+                    <li><a class="dropdown-item" href="/reader/3" style="color: #051831;">RFID №3</a></li>
+                    <li><a class="dropdown-item" href="/reader/4" style="color: #051831;">RFID №4</a></li>
+                    <li><a class="dropdown-item" href="/reader/5" style="color: #051831;">RFID №5</a></li>
+                    <li><a class="dropdown-item" href="/reader/6" style="color: #051831;">RFID №6</a></li>
+                    <li><a class="dropdown-item" href="/reader/7" style="color: #051831;">RFID №7</a></li>
                     <li><a class="dropdown-item" href="/reader/8">RFID №8</a></li>
-                    <!--      <li><hr class="dropdown-divider"></li>-->
-                    <!--      <li><a class="dropdown-item" href="#">Отделенная ссылка</a></li>-->
                 </ul>
             </li>
             <li class="nav-item dropdown">
-                <a class="nav-link dropdown-toggle" data-bs-toggle="dropdown" href="#" role="button"
+                <a class="nav-link dropdown-toggle" data-bs-toggle="dropdown" href="#" style="color: #051831;"
+                   role="button"
                    aria-expanded="false">Партии</a>
                 <ul class="dropdown-menu">
-                    <li><a class="dropdown-item" href="{% url 'filling_station:railway_loading_batch' %}">Приёмка ж/д
-                        цистерн</a></li>
+                    <li><a class="dropdown-item" href="{% url 'filling_station:railway_loading_batch_list' %}"
+                           style="color: #051831;">Приёмка ж/д цистерн</a></li>
                     <li>
                         <hr class="dropdown-divider">
                     </li>
-                    <li><a class="dropdown-item" href="{% url 'filling_station:balloons_loading_batch' %}">Приёмка
-                        баллонов</a></li>
-                    <li><a class="dropdown-item" href="{% url 'filling_station:balloons_unloading_batch' %}">Отгрузка
-                        баллонов</a></li>
+                    <li><a class="dropdown-item" href="{% url 'filling_station:balloon_loading_batch_list' %}"
+                           style="color: #051831;">Приёмка баллонов</a></li>
+                    <li><a class="dropdown-item" href="{% url 'filling_station:balloon_unloading_batch_list' %}"
+                           style="color: #051831;">Отгрузка баллонов</a></li>
                     <li>
                         <hr class="dropdown-divider">
                     </li>
-                    <li><a class="dropdown-item" href="{% url 'filling_station:auto_gas_loading_batch' %}">Приёмка
-                        автоцистерн</a></li>
-                    <li><a class="dropdown-item" href="{% url 'filling_station:auto_gas_unloading_batch' %}">Отгрузка
-                        автоцистерн</a></li>
+                    <li><a class="dropdown-item" href="{% url 'filling_station:gas_loading_batch_list' %}"
+                           style="color: #051831;">Приёмка автоцистерн</a></li>
+                    <li><a class="dropdown-item" href="{% url 'filling_station:gas_unloading_batch_list' %}"
+                           style="color: #051831;">Отгрузка автоцистерн</a></li>
                 </ul>
             </li>
             <li class="nav-item dropdown">
-                <a class="nav-link dropdown-toggle" data-bs-toggle="dropdown" href="#" role="button"
+                <a class="nav-link dropdown-toggle" data-bs-toggle="dropdown" href="#" style="color: #051831;"
+                   role="button"
                    aria-expanded="false">Транспорт</a>
                 <ul class="dropdown-menu">
-                    <li><a class="dropdown-item" href="{% url 'filling_station:trucks' %}">Грузовики</a></li>
-                    <li><a class="dropdown-item" href="{% url 'filling_station:trailers' %}">Прицепы</a></li>
-                    <li><a class="dropdown-item" href="{% url 'filling_station:railway_tanks' %}">Ж/д цистерны</a></li>
+                    <li><a class="dropdown-item" href="{% url 'filling_station:truck_list' %}"
+                           style="color: #051831;">Грузовики</a></li>
+                    <li><a class="dropdown-item" href="{% url 'filling_station:trailer_list' %}"
+                           style="color: #051831;">Прицепы</a></li>
+                    <li><a class="dropdown-item" href="{% url 'filling_station:railway_tank_list' %}"
+                           style="color: #051831;">Ж/д цистерны</a>
+                    </li>
                 </ul>
             </li>
             <li class="nav-item">
-                <a class="nav-link" href="{% url 'filling_station:get_ttn' %}">ТТН</a>
+                <a class="nav-link" href="{% url 'filling_station:ttn_list' %}" style="color: #051831;">ТТН</a>
             </li>
-            <!--  <li class="nav-item">-->
-            <!--    <a class="nav-link disabled">Заглушка</a>-->
-            <!--  </li>-->
         </ul>
 
         <div class="col-md-3 text-end">
-            <button type="button" class="btn btn-outline-primary me-2">Войти</button>
+            {% if user.is_authenticated %}
+            <p style="color: #051831;">Текущий пользователь - {{ user.get_username }}!</p>
+            <!--            <button type="button" class="btn" style="background-color: #3CBBD9; color: white;">Войти</button>-->
+            {% endif %}
         </div>
+
     </header>
 </div>
-
-<div class="d-flex justify-content-center" style="flex-direction: column; align-items: center;">
+<div class="container-fluid">
+    <!--    <div class="d-flex justify-content-center" style="flex-direction: column; align-items: center;">-->
     {% block content %}
     {% endblock content %}
+    <!--    </div>-->
 </div>
-
 </body>
 </html>

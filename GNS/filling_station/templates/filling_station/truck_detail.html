@@ -1,0 +1,49 @@
+{% extends 'base.html' %}
+{% block title %} Детали грузовика {% endblock %}
+
+{% block content %}
+
+<div class="container text-center">
+    <div class="row">
+        <div class="col text-end">
+            <p>Марка авто</p>
+            <p>Гос.номер</p>
+            <p>Тип</p>
+            <p>Макс. вместимость баллонов</p>
+            <p>Макс. масса перевозимых баллонов</p>
+            <p>Макс. масса перевозимого газа</p>
+            <p>Вес пустого т/с</p>
+            <p>Вес полного т/с</p>
+            <p>Находится на станции</p>
+            <p>Дата въезда</p>
+            <p>Время въезда</p>
+            <p>Дата выезда</p>
+            <p>Время выезда</p>
+        </div>
+        <div class="col text-start">
+            <p>{{ truck.car_brand|default_if_none:"-" }}</p>
+            <p>{{ truck.registration_number }}</p>
+            <p>{{ truck.type|default_if_none:"-" }}</p>
+            <p>{{ truck.max_capacity_cylinders_by_type|default_if_none:"-" }}</p>
+            <p>{{ truck.max_weight_of_transported_cylinders|default_if_none:"-" }}</p>
+            <p>{{ truck.max_mass_of_transported_gas|default_if_none:"-" }}</p>
+            <p>{{ truck.empty_weight|floatformat:2|default_if_none:"-" }}</p>
+            <p>{{ truck.full_weight|floatformat:2|default_if_none:"-" }}</p>
+            <p>{% if truck.is_on_station %}Да{% else %}Нет{% endif %}</p>
+            <p>{{ truck.entry_date|default_if_none:"-" }}</p>
+            <p>{{ truck.entry_time|default_if_none:"-" }}</p>
+            <p>{{ truck.departure_date|default_if_none:"-" }}</p>
+            <p>{{ truck.departure_time|default_if_none:"-" }}</p>
+        </div>
+    </div>
+</div>
+
+<div class="container text-center">
+    <button type="button" class="btn" style="background-color: #3CBBD9; color: white;"
+            onclick="location.href='{% url 'filling_station:truck_list' %}'">Назад</button>
+    <button type="button" class="btn" style="background-color: #3CBBD9; color: white;"
+            onclick="location.href = '{{ truck.get_update_url }}'">Редактировать</button>
+    <button type="button" class="btn btn-danger" onclick="location.href = '{{ truck.get_update_url }}'">Удалить</button>
+</div>
+
+{% endblock content %}

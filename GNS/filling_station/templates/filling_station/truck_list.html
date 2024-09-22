@@ -1,0 +1,42 @@
+{% extends 'base.html' %}
+{% block title %} Список грузовиков {% endblock %}
+
+{% block content %}
+
+<h5>Список грузовиков</h5>
+
+<table class="table table-striped table-hover vertical-align: middle" style="border-radius: 5px; overflow: hidden;">
+    <tr class="table-dark" align="center" style="background-color: #051831 !important; color: white !important;">
+        <th>Марка авто</th>
+        <th>Гос.номер</th>
+        <th>Тип</th>
+        <th>Макс. вместимость баллонов</th>
+        <th>Вес пустого т/с</th>
+        <th>Вес полного т/с</th>
+        <th>Находится на станции</th>
+        <th>Дата въезда</th>
+        <th>Время въезда</th>
+        <th>Дата выезда</th>
+        <th>Время выезда</th>
+    </tr>
+    {% for truck in page_obj.object_list %}
+    <tr align="center">
+        <td>{{ truck.car_brand }}</td>
+        <td>
+            <a href="{{ truck.get_absolute_url }}" style="color: #051831;"> {{ truck.registration_number }} </a>
+        </td>
+        <td>{{ truck.type|default_if_none:"-" }}</td>
+        <td>{{ truck.max_capacity_cylinders_by_type|default_if_none:"-" }}</td>
+        <td>{{ truck.empty_weight|floatformat:2|default_if_none:"-" }}</td>
+        <td>{{ truck.full_weight|floatformat:2|default_if_none:"-" }}</td>
+        <td>{% if truck.is_on_station %}Да{% else %}Нет{% endif %}</td>
+        <td>{{ truck.entry_date|default_if_none:"-" }}</td>
+        <td>{{ truck.entry_time|default_if_none:"-" }}</td>
+        <td>{{ truck.departure_date|default_if_none:"-" }}</td>
+        <td>{{ truck.departure_time|default_if_none:"-" }}</td>
+    </tr>
+    {% endfor %}
+</table>
+
+{% include 'filling_station/_paginator.html' %}
+{% endblock content %}

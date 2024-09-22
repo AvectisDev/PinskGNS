@@ -1,4 +1,4 @@
-from ..models import (Balloon, Truck, Trailer, RailwayTanks, TTN, BalloonsLoadingBatch, BalloonsUnloadingBatch,
+from ..models import (Balloon, Truck, Trailer, RailwayTank, TTN, BalloonsLoadingBatch, BalloonsUnloadingBatch,
                       RailwayLoadingBatch, GasLoadingBatch, GasUnloadingBatch)
 from rest_framework import generics, status
 from rest_framework.views import APIView
@@ -25,7 +25,7 @@ USER_STATUS_LIST = [
     'Опорожнение(слив) баллона',
     'Контрольное взвешивание'
 ]
-BALLOONS_LOADING_READER_LIST = [5]
+BALLOONS_LOADING_READER_LIST = [6]
 BALLOONS_UNLOADING_READER_LIST = [3, 4]
 
 
@@ -157,10 +157,10 @@ class RailwayTanksView(APIView):
 
     def get(self, request):
         if request.GET.get('on_station') == "True":
-            railway_tanks = RailwayTanks.objects.filter(is_on_station=True)
+            railway_tanks = RailwayTank.objects.filter(is_on_station=True)
         else:
             number = request.GET.get('number')
-            railway_tanks = RailwayTanks.objects.filter(number=number)
+            railway_tanks = RailwayTank.objects.filter(number=number)
 
         if not railway_tanks:
             return Response(status=status.HTTP_404_NOT_FOUND)
@@ -177,7 +177,7 @@ class RailwayTanksView(APIView):
 
     def patch(self, request):
         railway_tank_id = request.data['id']
-        railway_tank = RailwayTanks.objects.get(id=railway_tank_id)
+        railway_tank = RailwayTank.objects.get(id=railway_tank_id)
 
         if railway_tank is None:
             return Response(status=status.HTTP_404_NOT_FOUND)

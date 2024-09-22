@@ -1,0 +1,42 @@
+{% extends 'base.html' %}
+{% block title %} Список прицепов {% endblock %}
+
+{% block content %}
+
+<h5>Список прицепов</h5>
+
+<table class="table table-striped table-hover vertical-align: middle" style="border-radius: 5px; overflow: hidden;">
+    <tr class="table-dark" align="center" style="background-color: #051831 !important; color: white !important;">
+        <th>Марка авто</th>
+        <th>Гос.номер</th>
+        <th>Тип</th>
+        <th>Макс. вместимость баллонов</th>
+        <th>Вес пустого т/с</th>
+        <th>Вес полного т/с</th>
+        <th>Находится на станции</th>
+        <th>Дата въезда</th>
+        <th>Время въезда</th>
+        <th>Дата выезда</th>
+        <th>Время выезда</th>
+    </tr>
+    {% for trailer in page_obj.object_list %}
+    <tr align="center">
+        <td>{{ trailer.trailer_brand|default_if_none:"-" }}</td>
+        <td>
+            <a href="{{ trailer.get_absolute_url }}" style="color: #051831;"> {{ trailer.registration_number }} </a>
+        </td>
+        <td>{{ trailer.type|default_if_none:"-" }}</td>
+        <td>{{ trailer.max_capacity_cylinders_by_type|default_if_none:"-" }}</td>
+        <td>{{ trailer.empty_weight|floatformat:2|default_if_none:"-" }}</td>
+        <td>{{ trailer.full_weight|floatformat:2|default_if_none:"-" }}</td>
+        <td>{% if trailer.is_on_station %}Да{% else %}Нет{% endif %}</td>
+        <td>{{ trailer.entry_date|default_if_none:"-" }}</td>
+        <td>{{ trailer.entry_time|default_if_none:"-" }}</td>
+        <td>{{ trailer.departure_date|default_if_none:"-" }}</td>
+        <td>{{ trailer.departure_time|default_if_none:"-" }}</td>
+    </tr>
+    {% endfor %}
+</table>
+
+{% include 'filling_station/_paginator.html' %}
+{% endblock content %}

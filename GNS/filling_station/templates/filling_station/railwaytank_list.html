@@ -1,0 +1,38 @@
+{% extends 'base.html' %}
+{% block title %} Список ж/д цистерн {% endblock %}
+
+{% block content %}
+
+<h5>Список ж/д цистерн</h5>
+
+<table class="table table-striped table-hover vertical-align: middle" style="border-radius: 5px; overflow: hidden;">
+    <tr class="table-dark" align="center" style="background-color: #051831 !important; color: white !important;">
+        <th>Номер</th>
+        <th>Вес пустой цистерны</th>
+        <th>Вес полной цистерны</th>
+        <th>Количество газа</th>
+        <th>Находится на станции</th>
+        <th>Дата въезда</th>
+        <th>Время въезда</th>
+        <th>Дата выезда</th>
+        <th>Время выезда</th>
+    </tr>
+    {% for railway in page_obj.object_list %}
+    <tr align="center">
+        <td>
+        <a href="{{ railway.get_absolute_url }}" style="color: #051831;"> {{ railway.number }} </a>
+        </td>
+        <td>{{ railway.empty_weight|floatformat:2|default_if_none:"-" }}</td>
+        <td>{{ railway.full_weight|floatformat:2|default_if_none:"-" }}</td>
+        <td>{{ railway.gas_amount|floatformat:2|default_if_none:"-" }}</td>
+        <td>{% if railway.is_on_station %}Да{% else %}Нет{% endif %}</td>
+        <td>{{ railway.entry_date|default_if_none:"-" }}</td>
+        <td>{{ railway.entry_time|default_if_none:"-" }}</td>
+        <td>{{ railway.departure_date|default_if_none:"-" }}</td>
+        <td>{{ railway.departure_time|default_if_none:"-" }}</td>
+    </tr>
+    {% endfor %}
+</table>
+
+{% include 'filling_station/_paginator.html' %}
+{% endblock content %}

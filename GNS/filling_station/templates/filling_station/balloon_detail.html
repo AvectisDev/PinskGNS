@@ -1,0 +1,52 @@
+{% extends 'base.html' %}
+{% block title %} Паспорт баллона {% endblock %}
+
+{% block content %}
+
+<div class="container text-center">
+    <div class="row">
+        <div class="col text-end">
+            <p>RFID метка</p>
+            <p>Серийный номер</p>
+            <p>Дата производства</p>
+            <p>Объём</p>
+            <p>Вес нетто</p>
+            <p>Вес брутто</p>
+            <p>Дата освидетельствования</p>
+            <p>Дата следующего освидетельствования</p>
+            <p>Статус</p>
+            <p>Производитель</p>
+            <p>Толщина стенок</p>
+            <p>Готов к наполнению</p>
+            <p>Дата изменения</p>
+            <p>Время изменения</p>
+        </div>
+        <div class="col text-start">
+            <p>{{ balloon.nfc_tag}}</p>
+            <p>{{ balloon.serial_number|default_if_none:"-" }}</p>
+            <p>{{ balloon.creation_date|default_if_none:"-" }}</p>
+            <p>{{ balloon.size|default_if_none:"-" }}</p>
+            <p>{{ balloon.netto|default_if_none:"-" }}</p>
+            <p>{{ balloon.brutto|default_if_none:"-" }}</p>
+            <p>{{ balloon.current_examination_date|default_if_none:"-" }}</p>
+            <p>{{ balloon.next_examination_date|default_if_none:"-" }}</p>
+            <p>{{ balloon.status|default_if_none:"-" }}</p>
+            <p>{{ balloon.manufacturer|default_if_none:"-" }}</p>
+            <p>{{ balloon.wall_thickness|default_if_none:"-" }}</p>
+            <p>{% if balloon.filling_status %}Да{% else %}Нет{% endif %}</p>
+            <p>{{ balloon.change_date|default_if_none:"-" }}</p>
+            <p>{{ balloon.change_time|default_if_none:"-" }}</p>
+        </div>
+    </div>
+</div>
+
+<div class="container text-center">
+    <button type="button" class="btn" style="background-color: #3CBBD9; color: white;"
+            onclick="location.href='{% url 'filling_station:balloon_list' %}'">Назад</button>
+    <button type="button" class="btn" style="background-color: #3CBBD9; color: white;"
+            onclick="location.href = '{{ balloon.get_update_url }}'">Редактировать</button>
+    <button type="button" class="btn btn-danger" onclick="location.href = '{{ balloon.get_update_url }}'">Удалить
+    </button>
+</div>
+
+{% endblock content %}

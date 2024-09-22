@@ -1,6 +1,7 @@
 from django.db import models
 from django.contrib.auth.models import User
 from django.contrib.postgres.fields import ArrayField
+from django.urls import reverse
 import pghistory
 
 
@@ -17,7 +18,7 @@ class Balloon(models.Model):
     status = models.CharField(null=True, blank=True, max_length=100, verbose_name="Статус")
     manufacturer = models.CharField(null=True, blank=True, max_length=30, verbose_name="Производитель")
     wall_thickness = models.FloatField(null=True, blank=True, verbose_name="Толщина стенок")
-    filling_status = models.IntegerField(null=True, blank=True, verbose_name="Готов к наполнению")
+    filling_status = models.BooleanField(null=True, blank=True, verbose_name="Готов к наполнению")
     update_passport_required = models.BooleanField(null=True, blank=True, verbose_name="Требуется обновление паспорта")
     change_date = models.DateField(null=True, blank=True, auto_now=True, verbose_name="Дата изменений")
     change_time = models.TimeField(null=True, blank=True, auto_now=True, verbose_name="Время изменений")
@@ -29,10 +30,19 @@ class Balloon(models.Model):
     class Meta:
         verbose_name = "Баллон"
         verbose_name_plural = "Баллоны"
-        ordering = ['-id']
+        ordering = ['-change_date', '-change_time']
         indexes = [
             models.Index(fields=['-nfc_tag', '-serial_number']),
         ]
+
+    def get_absolute_url(self):
+        return reverse('filling_station:balloon_detail', args=[self.pk])
+
+    def get_update_url(self):
+        return reverse('filling_station:balloon_update', args=[self.pk])
+
+    def get_delete_url(self):
+        return reverse('filling_station:balloon_delete', args=[self.pk])
 
 
 class Truck(models.Model):
@@ -41,12 +51,12 @@ class Truck(models.Model):
     type = models.CharField(null=True, blank=True, max_length=50, verbose_name="Тип")
     max_capacity_cylinders_by_type = models.IntegerField(null=True, blank=True,
                                                          verbose_name="Максимальная вместимость баллонов")
-    max_weight_of_transported_cylinders = models.IntegerField(null=True, blank=True,
-                                                              verbose_name="Максимальная масса перевозимых баллонов")
-    max_mass_of_transported_gas = models.IntegerField(null=True, blank=True,
-                                                      verbose_name="Максимальная масса перевозимого газа")
-    empty_weight = models.IntegerField(null=True, blank=True, verbose_name="Вес пустого т/с")
-    full_weight = models.IntegerField(null=True, blank=True, verbose_name="Вес полного т/с")
+    max_weight_of_transported_cylinders = models.FloatField(null=True, blank=True,
+                                                            verbose_name="Максимальная масса перевозимых баллонов")
+    max_mass_of_transported_gas = models.FloatField(null=True, blank=True,
+                                                    verbose_name="Максимальная масса перевозимого газа")
+    empty_weight = models.FloatField(null=True, blank=True, verbose_name="Вес пустого т/с")
+    full_weight = models.FloatField(null=True, blank=True, verbose_name="Вес полного т/с")
     is_on_station = models.BooleanField(null=True, blank=True, verbose_name="Находится на станции")
     entry_date = models.DateField(null=True, blank=True, verbose_name="Дата въезда")
     entry_time = models.TimeField(null=True, blank=True, verbose_name="Время въезда")
@@ -61,6 +71,12 @@ class Truck(models.Model):
         verbose_name_plural = "Грузовики"
         ordering = ['id']
 
+    def get_absolute_url(self):
+        return reverse('filling_station:truck_detail', args=[self.pk])
+
+    def get_update_url(self):
+        return reverse('filling_station:truck_update', args=[self.pk])
+
 
 class Trailer(models.Model):
     truck = models.ForeignKey(Truck, on_delete=models.DO_NOTHING, verbose_name="Автомобиль", related_name='trailer',
@@ -70,10 +86,10 @@ class Trailer(models.Model):
     type = models.CharField(null=True, blank=True, max_length=50, verbose_name="Тип")
     max_capacity_cylinders_by_type = models.IntegerField(null=True, blank=True,
                                                          verbose_name="Максимальная вместимость баллонов")
-    max_weight_of_transported_cylinders = models.IntegerField(null=True, blank=True,
-                                                              verbose_name="Максимальная масса перевозимых баллонов")
-    max_mass_of_transported_gas = models.IntegerField(null=True, blank=True,
-                                                      verbose_name="Максимальная масса перевозимого газа")
+    max_weight_of_transported_cylinders = models.FloatField(null=True, blank=True,
+                                                            verbose_name="Максимальная масса перевозимых баллонов")
+    max_mass_of_transported_gas = models.FloatField(null=True, blank=True,
+                                                    verbose_name="Максимальная масса перевозимого газа")
     empty_weight = models.FloatField(null=True, blank=True, verbose_name="Вес пустого т/с")
     full_weight = models.FloatField(null=True, blank=True, verbose_name="Вес полного т/с")
     is_on_station = models.BooleanField(null=True, blank=True, verbose_name="Находится на станции")
@@ -90,11 +106,18 @@ class Trailer(models.Model):
         verbose_name_plural = "Прицепы"
         ordering = ['id']
 
+    def get_absolute_url(self):
+        return reverse('filling_station:trailer_detail', args=[self.pk])
 
-class RailwayTanks(models.Model):
+    def get_update_url(self):
+        return reverse('filling_station:trailer_update', args=[self.pk])
+
+
+class RailwayTank(models.Model):
     number = models.CharField(blank=False, max_length=10, verbose_name="Номер ж/д цистерны")
     empty_weight = models.FloatField(null=True, blank=True, verbose_name="Вес пустой цистерны")
     full_weight = models.FloatField(null=True, blank=True, verbose_name="Вес полной цистерны")
+    gas_amount = models.FloatField(null=True, blank=True, verbose_name="Количество газа")
     is_on_station = models.BooleanField(null=True, blank=True, verbose_name="Находится на станции")
     entry_date = models.DateField(null=True, blank=True, verbose_name="Дата въезда")
     entry_time = models.TimeField(null=True, blank=True, verbose_name="Время въезда")
@@ -109,10 +132,18 @@ class RailwayTanks(models.Model):
         verbose_name_plural = "Ж/д цистерны"
         ordering = ['-id']
 
+    def get_absolute_url(self):
+        return reverse('filling_station:railway_tank_detail', args=[self.pk])
+
+    def get_update_url(self):
+        return reverse('filling_station:railway_tank_update', args=[self.pk])
+
 
 class BalloonAmount(models.Model):
     reader_id = models.IntegerField(null=True, blank=True, verbose_name="Номер считывателя")
+    reader_status = models.CharField(null=True, blank=True, max_length=50, verbose_name="Статус")
     amount_of_balloons = models.IntegerField(null=True, blank=True, verbose_name="Количество баллонов по датчику")
+    amount_of_rfid = models.IntegerField(null=True, blank=True, verbose_name="Количество баллонов по считывателю")
     change_date = models.DateField(null=True, blank=True, auto_now=True, verbose_name="Дата обновления")
     change_time = models.TimeField(null=True, blank=True, auto_now=True, verbose_name="Время обновления")
 
@@ -129,9 +160,15 @@ class TTN(models.Model):
         return self.number
 
     class Meta:
-        verbose_name = "Баллон"
-        verbose_name_plural = "Баллоны"
+        verbose_name = "ТТН"
+        verbose_name_plural = "ТТН"
         ordering = ['-id']
+
+    def get_absolute_url(self):
+        return reverse('filling_station:ttn_detail', args=[self.pk])
+
+    def get_update_url(self):
+        return reverse('filling_station:ttn_update', args=[self.pk])
 
 
 class BalloonsLoadingBatch(models.Model):
@@ -158,6 +195,12 @@ class BalloonsLoadingBatch(models.Model):
         verbose_name_plural = "Партии приёмки баллонов"
         ordering = ['-id']
 
+    def get_absolute_url(self):
+        return reverse('filling_station:balloon_loading_batch_detail', args=[self.pk])
+
+    def get_update_url(self):
+        return reverse('filling_station:balloon_loading_batch_update', args=[self.pk])
+
 
 class BalloonsUnloadingBatch(models.Model):
     begin_date = models.DateField(null=True, blank=True, auto_now_add=True, verbose_name="Дата начала отгрузки")
@@ -183,6 +226,12 @@ class BalloonsUnloadingBatch(models.Model):
         verbose_name_plural = "Партии отгрузки баллонов"
         ordering = ['-id']
 
+    def get_absolute_url(self):
+        return reverse('filling_station:balloon_unloading_batch_detail', args=[self.pk])
+
+    def get_update_url(self):
+        return reverse('filling_station:balloon_unloading_batch_update', args=[self.pk])
+
 
 class RailwayLoadingBatch(models.Model):
     begin_date = models.DateField(null=True, blank=True, auto_now_add=True, verbose_name="Дата начала приёмки")
@@ -200,6 +249,12 @@ class RailwayLoadingBatch(models.Model):
         verbose_name_plural = "Партии приёмки жд цистерн"
         ordering = ['-id']
 
+    def get_absolute_url(self):
+        return reverse('filling_station:railway_loading_batch_detail', args=[self.pk])
+
+    def get_update_url(self):
+        return reverse('filling_station:railway_loading_batch_update', args=[self.pk])
+
 
 class GasLoadingBatch(models.Model):
     begin_date = models.DateField(null=True, blank=True, auto_now_add=True, verbose_name="Дата начала приёмки")
@@ -210,6 +265,7 @@ class GasLoadingBatch(models.Model):
     trailer = models.ForeignKey(Trailer, on_delete=models.DO_NOTHING, null=True, blank=True, default=0,
                                 verbose_name="Прицеп")
     gas_amount = models.FloatField(null=True, blank=True, verbose_name="Количество принятого газа")
+    weight_gas_amount = models.FloatField(null=True, blank=True, verbose_name="Количество принятого газа (весовая)")
     is_active = models.BooleanField(null=True, blank=True, verbose_name="В работе")
     ttn = models.ForeignKey(TTN, on_delete=models.DO_NOTHING, default=0, verbose_name="ТТН")
     user = models.ForeignKey(User, on_delete=models.DO_NOTHING, default=1, verbose_name="Пользователь")
@@ -218,6 +274,12 @@ class GasLoadingBatch(models.Model):
         verbose_name = "Партия приёмки автоцистерн"
         verbose_name_plural = "Партии приёмки автоцистерн"
         ordering = ['-id']
+
+    def get_absolute_url(self):
+        return reverse('filling_station:gas_loading_batch_detail', args=[self.pk])
+
+    def get_update_url(self):
+        return reverse('filling_station:gas_loading_batch_update', args=[self.pk])
 
 
 class GasUnloadingBatch(models.Model):
@@ -229,6 +291,7 @@ class GasUnloadingBatch(models.Model):
     trailer = models.ForeignKey(Trailer, on_delete=models.DO_NOTHING, null=True, blank=True, default=0,
                                 verbose_name="Прицеп")
     gas_amount = models.FloatField(null=True, blank=True, verbose_name="Количество отгруженного газа")
+    weight_gas_amount = models.FloatField(null=True, blank=True, verbose_name="Количество отгруженного газа (весовая)")
     is_active = models.BooleanField(null=True, blank=True, verbose_name="В работе")
     ttn = models.ForeignKey(TTN, on_delete=models.DO_NOTHING, default=0, verbose_name="ТТН")
     user = models.ForeignKey(User, on_delete=models.DO_NOTHING, default=1, verbose_name="Пользователь")
@@ -237,3 +300,9 @@ class GasUnloadingBatch(models.Model):
         verbose_name = "Партия отгрузки автоцистерн"
         verbose_name_plural = "Партии отгрузки автоцистерн"
         ordering = ['-id']
+
+    def get_absolute_url(self):
+        return reverse('filling_station:gas_unloading_batch_detail', args=[self.pk])
+
+    def get_update_url(self):
+        return reverse('filling_station:gas_unloading_batch_update', args=[self.pk])

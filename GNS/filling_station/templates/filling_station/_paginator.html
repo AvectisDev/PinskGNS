@@ -1,0 +1,31 @@
+{% if page_obj.has_other_pages %}
+
+<nav aria-label="Page navigation example">
+    <ul class="pagination justify-content-center">
+
+        {% if page_obj.has_previous %}
+        <li class="page-item"><a class="page-link" href="?page=1" style="color: #051831;">Начало</a></li>
+        {% endif %}
+
+        {% for p in page_obj.paginator.page_range %}
+
+        {% if page_obj.number == p %}
+        <li class="page-item active" aria-current="page">
+            <a class="page-link" href="?page={{ p }}" >{{ p }}</a>
+        </li>
+        {% elif p > page_obj.number|add:-4 and p < page_obj.number|add:4 %}
+        <li class="page-item">
+            <a class="page-link" href="?page={{ p }}" style="color: #051831;">{{ p }}</a>
+        </li>
+        {% endif %}
+
+        {% endfor %}
+
+        {% if page_obj.has_next %}
+        <li class="page-item"><a class="page-link" href="?page={{ page_obj.paginator.num_pages }}"
+                                 style="color: #051831;">Конец</a></li>
+        {% endif %}
+
+    </ul>
+</nav>
+{% endif %}

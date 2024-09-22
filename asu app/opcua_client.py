@@ -1,6 +1,6 @@
 import sys
 from opcua import Client
-import schedule
+from schedule import every, repeat, run_pending
 
 sys.path.insert(0, "..")
 RAILWAY = {
@@ -25,7 +25,8 @@ def get_opc_value(addrstr):
     return var.get_value()
 
 
-def periodic_data():
+@repeat(every(5).seconds)
+def get_opc_tags():
     global RAILWAY, AUTO
 
     try:
@@ -47,10 +48,8 @@ def periodic_data():
         print('no connection to OPC server')
 
 
-#schedule.every(5).seconds.do(periodic_data)
-
 if __name__ == "__main__":
     client = Client("opc.tcp://127.0.0.1:4841")
+
     while True:
-        periodic_data()
-        #schedule.run_pending()
+        run_pending()

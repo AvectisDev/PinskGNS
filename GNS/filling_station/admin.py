@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import (Balloon, Truck, Trailer, RailwayTanks, TTN, BalloonsLoadingBatch, BalloonsUnloadingBatch,
+from .models import (Balloon, Truck, Trailer, RailwayTank, TTN, BalloonsLoadingBatch, BalloonsUnloadingBatch,
                      RailwayLoadingBatch, GasLoadingBatch, GasUnloadingBatch)
 from import_export import resources
 
@@ -38,7 +38,7 @@ class TrailerAdmin(admin.ModelAdmin):
     ordering = ['id']
 
 
-@admin.register(RailwayTanks)
+@admin.register(RailwayTank)
 class RailwayTanksAdmin(admin.ModelAdmin):
     list_display = ['id', 'number', 'empty_weight', 'full_weight', 'is_on_station', 'entry_date', 'entry_time',
                     'departure_date', 'departure_time']
