@@ -10,7 +10,8 @@
         <th>Номер</th>
         <th>Вес пустой цистерны</th>
         <th>Вес полной цистерны</th>
-        <th>Количество газа</th>
+        <th>Масса перевозимого газа</th>
+        <th>Тип газа</th>
         <th>Находится на станции</th>
         <th>Дата въезда</th>
         <th>Время въезда</th>
@@ -24,7 +25,8 @@
         </td>
         <td>{{ railway.empty_weight|floatformat:2|default_if_none:"-" }}</td>
         <td>{{ railway.full_weight|floatformat:2|default_if_none:"-" }}</td>
-        <td>{{ railway.gas_amount|floatformat:2|default_if_none:"-" }}</td>
+        <td>{{ railway.gas_weight|floatformat:2|default_if_none:"-" }}</td>
+        <td>{{ railway.gas_type|default_if_none:"-" }}</td>
         <td>{% if railway.is_on_station %}Да{% else %}Нет{% endif %}</td>
         <td>{{ railway.entry_date|default_if_none:"-" }}</td>
         <td>{{ railway.entry_time|default_if_none:"-" }}</td>

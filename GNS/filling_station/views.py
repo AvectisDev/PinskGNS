@@ -1,15 +1,14 @@
-from django.shortcuts import render, get_object_or_404, redirect
+from django.shortcuts import render, get_object_or_404
 from django.http import HttpResponse
 from django.core.paginator import Paginator
 from django.urls import reverse_lazy
 from django.views import generic
 
 from .models import (Balloon, Truck, Trailer, RailwayTank, TTN, BalloonsLoadingBatch, BalloonsUnloadingBatch,
-                     RailwayLoadingBatch, BalloonAmount, GasLoadingBatch, GasUnloadingBatch)
+                     RailwayBatch, BalloonAmount, AutoGasBatch)
 from .admin import BalloonResources
 from .forms import (GetBalloonsAmount, BalloonForm, TruckForm, TrailerForm, RailwayTankForm, TTNForm,
-                    BalloonsLoadingBatchForm, BalloonsUnloadingBatchForm, RailwayLoadingBatchForm, GasLoadingBatchForm,
-                    GasUnloadingBatchForm)
+                    BalloonsLoadingBatchForm, BalloonsUnloadingBatchForm, RailwayBatchForm, AutoGasBatchForm)
 from datetime import datetime, timedelta
 
 STATUS_LIST = {
@@ -49,7 +48,8 @@ class BalloonUpdateView(generic.UpdateView):
 
 class BalloonDeleteView(generic.DeleteView):
     model = Balloon
-    success_url = reverse_lazy("balloon_list")
+    success_url = reverse_lazy("filling_station:balloon_list")
+    template_name = 'filling_station/balloon_confirm_delete.html'
 
 
 def reader_info(request, reader='1'):
@@ -72,16 +72,30 @@ def reader_info(request, reader='1'):
     current_quantity = BalloonAmount.objects.filter(reader_id=reader, change_date=current_date).first()
     previous_quantity = BalloonAmount.objects.filter(reader_id=reader, change_date=previous_date).first()
 
+    if current_quantity is not None:
+        current_quantity_rfid = current_quantity.amount_of_rfid
+        current_quantity_balloons = current_quantity.amount_of_balloons
+    else:
+        current_quantity_rfid = 0
+        current_quantity_balloons = 0
+
+    if previous_quantity is not None:
+        previous_quantity_rfid = previous_quantity.amount_of_rfid
+        previous_quantity_balloons = previous_quantity.amount_of_balloons
+    else:
+        previous_quantity_rfid = 0
+        previous_quantity_balloons = 0
+
     paginator = Paginator(balloons_list, 15)
     page_num = request.GET.get('page', 1)
     page_obj = paginator.get_page(page_num)
 
     context = {
         "page_obj": page_obj,
-        'current_quantity_by_reader': current_quantity.amount_of_rfid,
-        'previous_quantity_by_reader': previous_quantity.amount_of_rfid,
-        'current_quantity_by_sensor': current_quantity.amount_of_balloons,
-        'previous_quantity_by_sensor': previous_quantity.amount_of_balloons,
+        'current_quantity_by_reader': current_quantity_rfid,
+        'previous_quantity_by_reader': previous_quantity_rfid,
+        'current_quantity_by_sensor': current_quantity_balloons,
+        'previous_quantity_by_sensor': previous_quantity_balloons,
         'form': date_process,
         'reader': reader
     }
@@ -109,7 +123,8 @@ class BalloonLoadingBatchUpdateView(generic.UpdateView):
 
 class BalloonLoadingBatchDeleteView(generic.DeleteView):
     model = BalloonsLoadingBatch
-    success_url = reverse_lazy("filling_station:balloons_loading_batch")
+    success_url = reverse_lazy("filling_station:balloon_loading_batch_list")
+    template_name = 'filling_station/balloons_loading_batch_confirm_delete.html'
 
 
 # Партии отгрузки баллонов
@@ -133,79 +148,58 @@ class BalloonUnloadingBatchUpdateView(generic.UpdateView):
 
 class BalloonUnloadingBatchDeleteView(generic.DeleteView):
     model = BalloonsUnloadingBatch
-    success_url = reverse_lazy("filling_station:balloons_unloading_batch")
+    success_url = reverse_lazy("filling_station:balloon_unloading_batch_list")
+    template_name = 'filling_station/balloons_unloading_batch_confirm_delete.html'
 
 
-# Партии приёмки газа в автоцистернах
-class GasLoadingBatchListView(generic.ListView):
-    model = GasLoadingBatch
+# Партии автоцистерн
+class AutoGasBatchListView(generic.ListView):
+    model = AutoGasBatch
     paginate_by = 15
     template_name = 'filling_station/auto_batch_list.html'
 
 
-class GasLoadingBatchDetailView(generic.DetailView):
-    model = GasLoadingBatch
+class AutoGasBatchDetailView(generic.DetailView):
+    model = AutoGasBatch
     context_object_name = 'batch'
     template_name = 'filling_station/auto_batch_detail.html'
 
 
-class GasLoadingBatchUpdateView(generic.UpdateView):
-    model = GasLoadingBatch
-    form_class = GasLoadingBatchForm
+class AutoGasBatchUpdateView(generic.UpdateView):
+    model = AutoGasBatch
+    form_class = AutoGasBatchForm
     template_name = 'filling_station/_equipment_form.html'
 
 
-class GasLoadingBatchDeleteView(generic.DeleteView):
-    model = GasLoadingBatch
-    success_url = reverse_lazy("filling_station:auto_gas_loading_batch")
-
-
-# Партии отгрузки газа в автоцистернах
-class GasUnloadingBatchListView(generic.ListView):
-    model = GasUnloadingBatch
-    paginate_by = 15
-    template_name = 'filling_station/auto_batch_list.html'
-
-
-class GasUnloadingBatchDetailView(generic.DetailView):
-    model = GasUnloadingBatch
-    context_object_name = 'batch'
-    template_name = 'filling_station/auto_batch_detail.html'
-
-
-class GasUnloadingBatchUpdateView(generic.UpdateView):
-    model = GasUnloadingBatch
-    form_class = GasUnloadingBatchForm
-    template_name = 'filling_station/_equipment_form.html'
-
-
-class GasUnloadingBatchDeleteView(generic.DeleteView):
-    model = GasUnloadingBatch
-    success_url = reverse_lazy("filling_station:auto_gas_unloading_batch")
+class AutoGasBatchDeleteView(generic.DeleteView):
+    model = AutoGasBatch
+    success_url = reverse_lazy("filling_station:auto_gas_batch_list")
+    template_name = 'filling_station/auto_batch_confirm_delete.html'
 
 
 # Партии приёмки газа в ж/д цистернах
-class RailwayLoadingBatchListView(generic.ListView):
-    model = RailwayLoadingBatch
+class RailwayBatchListView(generic.ListView):
+    model = RailwayBatch
     paginate_by = 15
     template_name = 'filling_station/railway_batch_list.html'
 
 
-class RailwayLoadingBatchDetailView(generic.DetailView):
-    model = RailwayLoadingBatch
+class RailwayBatchDetailView(generic.DetailView):
+    model = RailwayBatch
     context_object_name = 'batch'
     template_name = 'filling_station/railway_batch_detail.html'
 
 
-class RailwayLoadingBatchUpdateView(generic.UpdateView):
-    model = RailwayLoadingBatch
-    form_class = RailwayLoadingBatchForm
+class RailwayBatchUpdateView(generic.UpdateView):
+    model = RailwayBatch
+    form_class = RailwayBatchForm
     template_name = 'filling_station/_equipment_form.html'
 
 
-class RailwayLoadingBatchDeleteView(generic.DeleteView):
-    model = RailwayLoadingBatch
-    success_url = reverse_lazy("filling_station:railway_loading_batch")
+class RailwayBatchDeleteView(generic.DeleteView):
+    model = RailwayBatch
+    success_url = reverse_lazy("filling_station:railway_batch_list")
+    template_name = 'filling_station/railway_batch_confirm_delete.html'
 
 
 # Грузовики
@@ -216,7 +210,6 @@ class TruckView(generic.ListView):
 
 class TruckDetailView(generic.DetailView):
     model = Truck
-    paginate_by = 15
 
 
 class TruckUpdateView(generic.UpdateView):
@@ -228,6 +221,7 @@ class TruckUpdateView(generic.UpdateView):
 class TruckDeleteView(generic.DeleteView):
     model = Truck
     success_url = reverse_lazy("filling_station:truck_list")
+    template_name = 'filling_station/truck_confirm_delete.html'
 
 
 # Прицепы
@@ -238,7 +232,6 @@ class TrailerView(generic.ListView):
 
 class TrailerDetailView(generic.DetailView):
     model = Trailer
-    paginate_by = 15
 
 
 class TrailerUpdateView(generic.UpdateView):
@@ -250,6 +243,7 @@ class TrailerUpdateView(generic.UpdateView):
 class TrailerDeleteView(generic.DeleteView):
     model = Trailer
     success_url = reverse_lazy("filling_station:trailer_list")
+    template_name = 'filling_station/trailer_confirm_delete.html'
 
 
 # ж/д цистерны
@@ -260,7 +254,6 @@ class RailwayTankView(generic.ListView):
 
 class RailwayTankDetailView(generic.DetailView):
     model = RailwayTank
-    paginate_by = 15
 
 
 class RailwayTankUpdateView(generic.UpdateView):
@@ -282,7 +275,6 @@ class TTNView(generic.ListView):
 
 class TTNDetailView(generic.DetailView):
     model = TTN
-    paginate_by = 15
 
 
 class TTNUpdateView(generic.UpdateView):
@@ -294,3 +286,4 @@ class TTNUpdateView(generic.UpdateView):
 class TTNDeleteView(generic.DeleteView):
     model = TTN
     success_url = reverse_lazy("filling_station:ttn_list")
+    template_name = 'filling_station/ttn_confirm_delete.html'

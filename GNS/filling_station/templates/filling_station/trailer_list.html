@@ -10,9 +10,6 @@
         <th>Марка авто</th>
         <th>Гос.номер</th>
         <th>Тип</th>
-        <th>Макс. вместимость баллонов</th>
-        <th>Вес пустого т/с</th>
-        <th>Вес полного т/с</th>
         <th>Находится на станции</th>
         <th>Дата въезда</th>
         <th>Время въезда</th>
@@ -26,9 +23,6 @@
             <a href="{{ trailer.get_absolute_url }}" style="color: #051831;"> {{ trailer.registration_number }} </a>
         </td>
         <td>{{ trailer.type|default_if_none:"-" }}</td>
-        <td>{{ trailer.max_capacity_cylinders_by_type|default_if_none:"-" }}</td>
-        <td>{{ trailer.empty_weight|floatformat:2|default_if_none:"-" }}</td>
-        <td>{{ trailer.full_weight|floatformat:2|default_if_none:"-" }}</td>
         <td>{% if trailer.is_on_station %}Да{% else %}Нет{% endif %}</td>
         <td>{{ trailer.entry_date|default_if_none:"-" }}</td>
         <td>{{ trailer.entry_time|default_if_none:"-" }}</td>

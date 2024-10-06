@@ -69,18 +69,26 @@ async def balloon_passport_processing(nfc_tag: str, status: str):
     passport_ok_flag = False
 
     # проверка наличия паспорта в базе данных
-    passport_found, passport = await django_balloon_api.get_balloon(nfc_tag)
+    try:
+        passport = await django_balloon_api.get_balloon(nfc_tag)
+    except Exception as error:
+        passport = None
+        print(status, error)
 
-    if passport_found:  # если данные паспорта есть в базе данных
+    if passport:  # если данные паспорта есть в базе данных
         passport['status'] = status  # присваиваем новый статус баллону
 
         if passport['serial_number'] is None or passport['netto'] is None or passport['brutto'] is None:
             passport['update_passport_required'] = True
 
             # если нет основных данных - запрашиваем их в мириаде
-            miriada_status, miriada_data = await get_balloon(nfc_tag)
+            try:
+                miriada_data = await get_balloon(nfc_tag)
+            except Exception as error:
+                miriada_data = None
+                print('miriada error', error)
 
-            if miriada_status:  # если получили данные из мириады
+            if miriada_data:  # если получили данные из мириады
                 passport['serial_number'] = miriada_data['number']
                 passport['netto'] = float(miriada_data['netto'])
                 passport['brutto'] = float(miriada_data['brutto'])
@@ -91,7 +99,10 @@ async def balloon_passport_processing(nfc_tag: str, status: str):
             passport_ok_flag = True
 
         # обновляем паспорт в базе данных
-        await django_balloon_api.update_balloon(nfc_tag, passport)
+        try:
+            passport = await django_balloon_api.update_balloon(nfc_tag, passport)
+        except Exception as error:
+            print('update_balloon error', error)
 
     else:  # если данных паспорта нет в базе данных
         passport = {
@@ -100,9 +111,12 @@ async def balloon_passport_processing(nfc_tag: str, status: str):
             'update_passport_required': True
         }
         # создание нового паспорта в базе данных
-        await django_balloon_api.create_balloon(passport)
+        try:
+            passport = await django_balloon_api.create_balloon(passport)
+        except Exception as error:
+            print('create_balloon error', error)
 
-    return passport_ok_flag
+    return passport_ok_flag, passport
 
 
 async def read_nfc_tag(reader: dict):
@@ -115,32 +129,32 @@ async def read_nfc_tag(reader: dict):
         nfc_tag = byte_reversal(data[32:48])  # из буфера получаем номер метки (old - data[14:30])
 
         if nfc_tag not in reader['previous_nfc_tags']:  # метка отличается от недавно считанных
-            balloon_passport_status = await balloon_passport_processing(nfc_tag, reader['status'])
+            try:
+                balloon_passport_status, balloon_passport = await balloon_passport_processing(nfc_tag, reader['status'])
 
-            await db.write_balloons_amount(reader, 'rfid')  # сохраняем значение в бд
+                await db.write_balloons_amount(reader, 'rfid')  # сохраняем значение в бд
 
-            # ****************************************
-            if balloon_passport_status:  # если паспорт заполнен
-                # зажигаем зелёную лампу на считывателе
-                await data_exchange_with_reader(reader, 'read_complete')
-            else:
-                # мигание зелёной лампы на считывателе
-                await data_exchange_with_reader(reader, 'read_complete_with_error')
-            # ****************************************
-
-            if reader['function'] is not None:  # если производится приёмка/отгрузка баллонов
-                batch_status, batch_id = await django_balloon_api.get_batch_balloons(reader['function'])
-
-                if batch_status:  # если партия активна - заполняем её списком пройденных баллонов
-                    reader['batch']['batch_id'] = batch_id
-                    reader['batch']['balloons_list'].append(nfc_tag)
-                    await django_balloon_api.update_batch_balloons(reader['function'], reader)
+                # ****************************************
+                if balloon_passport_status:  # если паспорт заполнен
+                    # зажигаем зелёную лампу на считывателе
+                    await data_exchange_with_reader(reader, 'read_complete')
                 else:
-                    reader['batch']['batch_id'] = 0
-                    reader['batch']['balloons_list'].clear()
+                    # мигание зелёной лампы на считывателе
+                    await data_exchange_with_reader(reader, 'read_complete_with_error')
+                # ****************************************
 
-        # сохраняем метку в кэше считанных меток
-        work_with_nfc_tag_list(nfc_tag, reader['previous_nfc_tags'])
+                if reader['function'] is not None:  # если производится приёмка/отгрузка баллонов
+                    batch_data = await django_balloon_api.get_batch_balloons(reader['function'])
+
+                    if batch_data:  # если партия активна - заполняем её списком пройденных баллонов
+                        reader['batch']['batch_id'] = batch_data['id']
+                        reader['batch']['balloon_id'] = balloon_passport['id']
+                        await django_balloon_api.add_balloon_to_batch(reader)
+            except Exception as error:
+                print('balloon_passport_processing', error)
+
+            # сохраняем метку в кэше считанных меток
+            work_with_nfc_tag_list(nfc_tag, reader['previous_nfc_tags'])
         print(reader['ip'], reader['previous_nfc_tags'])
 
     # очищаем буферную память считывателя
@@ -183,7 +197,7 @@ async def main():
         except Exception as error:
             print(f"Error while reading NFC tags: {error}")
 
-        await asyncio.sleep(0.1)
+        await asyncio.sleep(0.5)
 
         try:
             # Задачи для считывания состояния входов
@@ -196,7 +210,7 @@ async def main():
         except Exception as error:
             print(f"Error while reading input status: {error}")
 
-        await asyncio.sleep(0.1)
+        await asyncio.sleep(0.5)
 
 
 if __name__ == "__main__":

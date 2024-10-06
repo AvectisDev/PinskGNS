@@ -12,8 +12,9 @@
             <p>Макс. вместимость баллонов</p>
             <p>Макс. масса перевозимых баллонов</p>
             <p>Макс. масса перевозимого газа</p>
-            <p>Вес пустого т/с</p>
-            <p>Вес полного т/с</p>
+            <p>Макс. объём перевозимого газа</p>
+            <p>Вес пустого т/с (техпаспорт)</p>
+            <p>Вес полного т/с (техпаспорт)</p>
             <p>Находится на станции</p>
             <p>Дата въезда</p>
             <p>Время въезда</p>
@@ -24,9 +25,10 @@
             <p>{{ truck.car_brand|default_if_none:"-" }}</p>
             <p>{{ truck.registration_number }}</p>
             <p>{{ truck.type|default_if_none:"-" }}</p>
-            <p>{{ truck.max_capacity_cylinders_by_type|default_if_none:"-" }}</p>
+            <p>{{ truck.capacity_cylinders|default_if_none:"-" }}</p>
             <p>{{ truck.max_weight_of_transported_cylinders|default_if_none:"-" }}</p>
             <p>{{ truck.max_mass_of_transported_gas|default_if_none:"-" }}</p>
+            <p>{{ truck.max_gas_volume|default_if_none:"-" }}</p>
             <p>{{ truck.empty_weight|floatformat:2|default_if_none:"-" }}</p>
             <p>{{ truck.full_weight|floatformat:2|default_if_none:"-" }}</p>
             <p>{% if truck.is_on_station %}Да{% else %}Нет{% endif %}</p>
@@ -43,7 +45,7 @@
             onclick="location.href='{% url 'filling_station:truck_list' %}'">Назад</button>
     <button type="button" class="btn" style="background-color: #3CBBD9; color: white;"
             onclick="location.href = '{{ truck.get_update_url }}'">Редактировать</button>
-    <button type="button" class="btn btn-danger" onclick="location.href = '{{ truck.get_update_url }}'">Удалить</button>
+    <button type="button" class="btn btn-danger" onclick="location.href = '{{ truck.get_delete_url }}'">Удалить</button>
 </div>
 
 {% endblock content %}

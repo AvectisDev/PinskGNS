@@ -12,7 +12,8 @@
         <th>Время начала</th>
         <th>Дата окончания</th>
         <th>Время окончания</th>
-        <th>Принято газа</th>
+        <th>Принято СПБТ газа</th>
+        <th>Принято ПБА газа</th>
         <th>В работе</th>
         <th>ТТН</th>
     </tr>
@@ -25,7 +26,8 @@
         <td>{{ batch.begin_time|default_if_none:"-" }}</td>
         <td>{{ batch.end_date|default_if_none:"-" }}</td>
         <td>{{ batch.end_time|default_if_none:"-" }}</td>
-        <td>{{ batch.gas_amount|floatformat:2|default_if_none:"-" }}</td>
+        <td>{{ batch.gas_amount_spbt|floatformat:2|default_if_none:"-" }}</td>
+        <td>{{ batch.gas_amount_pba|floatformat:2|default_if_none:"-" }}</td>
         <td>{% if batch.is_active %}Активна{% else %}Завершена{% endif %}</td>
         <td>{{ batch.ttn|default_if_none:"-" }}</td>
     </tr>

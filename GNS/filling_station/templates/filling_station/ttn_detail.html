@@ -6,20 +6,22 @@
 <div class="container text-center">
     <div class="row">
         <div class="col text-end">
-            <p>№ п/п</p>
             <p>Номер ТТН</p>
             <p>Номер договора</p>
-            <p>Поставщик</p>
+            <p>Грузоотправитель</p>
+            <p>Грузополучатель</p>
             <p>Количество газа</p>
+            <p>Тип газа</p>
             <p>Количество баллонов</p>
             <p>Дата формирования накладной</p>
         </div>
         <div class="col text-start">
-            <p>{{ ttn.id }}</p>
             <p>{{ ttn.number }}</p>
             <p>{{ ttn.contract }}</p>
-            <p>{{ ttn.name_of_supplier }}</p>
+            <p>{{ ttn.shipper }}</p>
+            <p>{{ ttn.consignee }}</p>
             <p>{{ ttn.gas_amount|floatformat:2|default_if_none:"-" }}</p>
+            <p>{{ ttn.gas_type|default_if_none:"-" }}</p>
             <p>{{ ttn.balloons_amount|default_if_none:"-" }}</p>
             <p>{{ ttn.date|default_if_none:"-" }}</p>
         </div>
@@ -31,7 +33,7 @@
             onclick="location.href='{% url 'filling_station:ttn_list' %}'">Назад</button>
     <button type="button" class="btn" style="background-color: #3CBBD9; color: white;"
             onclick="location.href = '{{ ttn.get_update_url }}'">Редактировать</button>
-    <button type="button" class="btn btn-danger" onclick="location.href = '{{ ttn.get_update_url }}'">Удалить
+    <button type="button" class="btn btn-danger" onclick="location.href = '{{ ttn.get_delete_url }}'">Удалить
     </button>
 </div>
 

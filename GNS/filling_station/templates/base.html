@@ -50,7 +50,7 @@
                    role="button"
                    aria-expanded="false">Партии</a>
                 <ul class="dropdown-menu">
-                    <li><a class="dropdown-item" href="{% url 'filling_station:railway_loading_batch_list' %}"
+                    <li><a class="dropdown-item" href="{% url 'filling_station:railway_batch_list' %}"
                            style="color: #051831;">Приёмка ж/д цистерн</a></li>
                     <li>
                         <hr class="dropdown-divider">
@@ -62,10 +62,8 @@
                     <li>
                         <hr class="dropdown-divider">
                     </li>
-                    <li><a class="dropdown-item" href="{% url 'filling_station:gas_loading_batch_list' %}"
-                           style="color: #051831;">Приёмка автоцистерн</a></li>
-                    <li><a class="dropdown-item" href="{% url 'filling_station:gas_unloading_batch_list' %}"
-                           style="color: #051831;">Отгрузка автоцистерн</a></li>
+                    <li><a class="dropdown-item" href="{% url 'filling_station:auto_gas_batch_list' %}"
+                           style="color: #051831;">Автоколонка</a></li>
                 </ul>
             </li>
             <li class="nav-item dropdown">

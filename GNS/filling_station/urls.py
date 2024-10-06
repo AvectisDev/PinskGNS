@@ -46,46 +46,18 @@ urlpatterns = [
     path('batch/balloons-unloading/<pk>/delete/', views.BalloonUnloadingBatchDeleteView.as_view(),
          name="balloon_unloading_batch_delete"),
 
-    path('batch/railway-loading', views.RailwayLoadingBatchListView.as_view(),
-         name="railway_loading_batch_list"),
-    path('batch/railway-loading/<pk>/', views.RailwayLoadingBatchDetailView.as_view(),
-         name="railway_loading_batch_detail"),
-    path('batch/railway-loading/<pk>/update/', views.RailwayLoadingBatchUpdateView.as_view(extra_context={
+    path('batch/railway', views.RailwayBatchListView.as_view(), name="railway_batch_list"),
+    path('batch/railway/<pk>/', views.RailwayBatchDetailView.as_view(), name="railway_batch_detail"),
+    path('batch/railway/<pk>/update/', views.RailwayBatchUpdateView.as_view(extra_context={
         "title": "Редактирование партии приёмки газа в цистернах"
     }),
-         name="railway_loading_batch_update"),
-    path('batch/railway-loading/<pk>/delete/', views.RailwayLoadingBatchDeleteView.as_view(),
-         name="railway_loading_batch_delete"),
+         name="railway_batch_update"),
+    path('batch/railway/<pk>/delete/', views.RailwayBatchDeleteView.as_view(), name="railway_batch_delete"),
 
-    path('batch/auto-gas-loading', views.GasLoadingBatchListView.as_view(extra_context={
-        "title": "Партии приёмки газа в авто-цистернах"
-    }),
-         name="gas_loading_batch_list"),
-    path('batch/auto-gas-loading/<pk>/', views.GasLoadingBatchDetailView.as_view(extra_context={
-        "main_list": "loading"
-    }),
-         name="gas_loading_batch_detail"),
-    path('batch/auto-gas-loading/<pk>/update/', views.GasLoadingBatchUpdateView.as_view(extra_context={
-        "title": "Редактирование партии приёмки газа в авто-цистернах"
-    }),
-         name="gas_loading_batch_update"),
-    path('batch/auto-gas-loading/<pk>/delete/', views.GasLoadingBatchDeleteView.as_view(),
-         name="gas_loading_batch_delete"),
-
-    path('batch/auto-gas-unloading', views.GasUnloadingBatchListView.as_view(extra_context={
-        "title": "Партии отгрузки газа в авто-цистернах"
-    }),
-         name="gas_unloading_batch_list"),
-    path('batch/auto-gas-unloading/<pk>/', views.GasUnloadingBatchDetailView.as_view(extra_context={
-        "main_list": "unloading"
-    }),
-         name="gas_unloading_batch_detail"),
-    path('batch/auto-gas-unloading/<pk>/update/', views.GasUnloadingBatchUpdateView.as_view(extra_context={
-        "title": "Редактирование партии отгрузки газа в авто-цистернах"
-    }),
-         name="gas_unloading_batch_update"),
-    path('batch/auto-gas-unloading/<pk>/delete/', views.GasUnloadingBatchDeleteView.as_view(),
-         name="gas_unloading_batch_delete"),
+    path('batch/auto-gas', views.AutoGasBatchListView.as_view(), name="auto_gas_batch_list"),
+    path('batch/auto-gas/<pk>/', views.AutoGasBatchDetailView.as_view(), name="auto_gas_batch_detail"),
+    path('batch/auto-gas/<pk>/update/', views.AutoGasBatchUpdateView.as_view(), name="auto_gas_batch_update"),
+    path('batch/auto-gas/<pk>/delete/', views.AutoGasBatchDeleteView.as_view(), name="auto_gas_batch_delete"),
 
     path('ttn', views.TTNView.as_view(), name="ttn_list"),
     path('ttn/<pk>', views.TTNDetailView.as_view(), name="ttn_detail"),

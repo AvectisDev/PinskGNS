@@ -9,19 +9,21 @@ async def get_balloon_by_nfc_tag(nfc_tag: str):
 
     async with aiohttp.ClientSession() as session:
         try:
-            async with session.get(url, timeout=1) as response:
-                if response.status == 200:
-                    response_data = await response.json()
-                    if response_data.get('status') == "Ok":
-                        return True, response_data['List']
-                    else:
-                        return False, response_data.get('error', "Unknown error")
+            async with session.get(url, timeout=2) as response:
+                response.raise_for_status()  # Поднимает исключение для 4xx и 5xx
+                result = await response.json()
+
+                if result.get('status') == "Ok":
+                    return result['List']
                 else:
-                    return False, {"status": response.status}
-        except asyncio.TimeoutError:
-            return False, {"status": "request timed out"}
-        except Exception as e:
-            return False, {"status": str(e)}
+                    return []
+
+        except (aiohttp.ClientError, asyncio.TimeoutError) as error:
+            print(f'get_balloon_by_nfc_tag function error: {error}')
+            return None
+        except Exception as error:
+            print(f'get_balloon_by_nfc_tag function error: {error}')
+            return None
 
 
 async def search_balloon_by_nfc_tag(nfc_tag):
@@ -33,17 +35,18 @@ async def search_balloon_by_nfc_tag(nfc_tag):
 
     async with aiohttp.ClientSession() as session:
         try:
-            async with session.get(url, headers=headers, timeout=1) as response:
-                if response.status == 200:
-                    response_data = await response.json()
-                    if response_data.get('status') == "Ok":
-                        return True, response_data.get('List', [])
-                    else:
-                        return False, response_data.get('error', "Unknown error")
-                else:
-                    return False, {"status": response.status}
+            async with session.get(url, headers=headers, timeout=2) as response:
+                response.raise_for_status()  # Поднимает исключение для 4xx и 5xx
+                result = await response.json()
 
-        except asyncio.TimeoutError:
-            return False, {"status": "request timed out"}
-        except Exception as e:
-            return False, {"status": str(e)}
+                if result.get('status') == "Ok":
+                    return result['List']
+                else:
+                    return []
+
+        except (aiohttp.ClientError, asyncio.TimeoutError) as error:
+            print(f'get_balloon_by_nfc_tag function error: {error}')
+            return None
+        except Exception as error:
+            print(f'get_balloon_by_nfc_tag function error: {error}')
+            return None

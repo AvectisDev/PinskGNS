@@ -6,14 +6,16 @@
 <div class="container text-center">
     <div class="row">
         <div class="col text-end">
-            <p>Марка</p>
+            <p>Марка прицепа</p>
             <p>Гос.номер</p>
-            <p>Тип</p>
+            <p>Тип прицепа</p>
+            <p>Грузовик</p>
             <p>Макс. вместимость баллонов</p>
             <p>Макс. масса перевозимых баллонов</p>
             <p>Макс. масса перевозимого газа</p>
-            <p>Вес пустого т/с</p>
-            <p>Вес полного т/с</p>
+            <p>Макс. объём перевозимого газа</p>
+            <p>Вес пустого т/с (техпаспорт)</p>
+            <p>Вес полного т/с (техпаспорт)</p>
             <p>Находится на станции</p>
             <p>Дата въезда</p>
             <p>Время въезда</p>
@@ -24,9 +26,11 @@
             <p>{{ trailer.trailer_brand|default_if_none:"-" }}</p>
             <p>{{ trailer.registration_number }}</p>
             <p>{{ trailer.type|default_if_none:"-" }}</p>
-            <p>{{ trailer.max_capacity_cylinders_by_type|default_if_none:"-" }}</p>
+            <p>{{ trailer.truck|default_if_none:"-" }}</p>
+            <p>{{ trailer.capacity_cylinders|default_if_none:"-" }}</p>
             <p>{{ trailer.max_weight_of_transported_cylinders|default_if_none:"-" }}</p>
             <p>{{ trailer.max_mass_of_transported_gas|default_if_none:"-" }}</p>
+            <p>{{ trailer.gas_volume|default_if_none:"-" }}</p>
             <p>{{ trailer.empty_weight|floatformat:2|default_if_none:"-" }}</p>
             <p>{{ trailer.full_weight|floatformat:2|default_if_none:"-" }}</p>
             <p>{% if trailer.is_on_station %}Да{% else %}Нет{% endif %}</p>
@@ -43,7 +47,7 @@
             onclick="location.href='{% url 'filling_station:trailer_list' %}'">Назад</button>
     <button type="button" class="btn" style="background-color: #3CBBD9; color: white;"
             onclick="location.href = '{{ trailer.get_update_url }}'">Редактировать</button>
-    <button type="button" class="btn btn-danger" onclick="location.href = '{{ trailer.get_update_url }}'">Удалить
+    <button type="button" class="btn btn-danger" onclick="location.href = '{{ trailer.get_delete_url }}'">Удалить
     </button>
 </div>
 

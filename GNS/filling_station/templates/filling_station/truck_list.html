@@ -10,9 +10,6 @@
         <th>Марка авто</th>
         <th>Гос.номер</th>
         <th>Тип</th>
-        <th>Макс. вместимость баллонов</th>
-        <th>Вес пустого т/с</th>
-        <th>Вес полного т/с</th>
         <th>Находится на станции</th>
         <th>Дата въезда</th>
         <th>Время въезда</th>
@@ -26,9 +23,6 @@
             <a href="{{ truck.get_absolute_url }}" style="color: #051831;"> {{ truck.registration_number }} </a>
         </td>
         <td>{{ truck.type|default_if_none:"-" }}</td>
-        <td>{{ truck.max_capacity_cylinders_by_type|default_if_none:"-" }}</td>
-        <td>{{ truck.empty_weight|floatformat:2|default_if_none:"-" }}</td>
-        <td>{{ truck.full_weight|floatformat:2|default_if_none:"-" }}</td>
         <td>{% if truck.is_on_station %}Да{% else %}Нет{% endif %}</td>
         <td>{{ truck.entry_date|default_if_none:"-" }}</td>
         <td>{{ truck.entry_time|default_if_none:"-" }}</td>

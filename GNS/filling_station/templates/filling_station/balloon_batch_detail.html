@@ -32,7 +32,7 @@
             <p>{{ batch.gas_amount|floatformat:2|default_if_none:"-" }}</p>
             <p>{{ batch.amount_of_rfid|default_if_none:"-" }}</p>
             <p>{{ batch.amount_of_5_liters|default_if_none:"-" }}</p>
-            <p>{{ batch.amount_of_20_liters|default_if_none:"-" }}</p>
+            <p>{{ batch.amount_of_27_liters|default_if_none:"-" }}</p>
             <p>{{ batch.amount_of_50_liters|default_if_none:"-" }}</p>
             <p>{% if batch.is_active %}Активна{% else %}Завершена{% endif %}</p>
             <p>{{ batch.ttn|default_if_none:"-" }}</p>
@@ -54,7 +54,7 @@
     <button type="button" class="btn" style="background-color: #3CBBD9; color: white;"
             onclick="location.href = '{{ batch.get_update_url }}'">Редактировать
     </button>
-    <button type="button" class="btn btn-danger" onclick="location.href = '{{ batch.get_update_url }}'">Удалить
+    <button type="button" class="btn btn-danger" onclick="location.href = '{{ batch.get_delete_url }}'">Удалить
     </button>
 </div>
 

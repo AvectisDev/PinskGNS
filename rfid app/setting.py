@@ -9,8 +9,8 @@ READER_LIST[0] = {
     'status': 'Регистрация пустого баллона на складе (из кассеты)',
     'input_state': 0,
     'previous_nfc_tags': [],
-    'function': None,
-    'batch': {'batch_id': 0, 'balloons_list': []}
+    'function': 'loading',
+    'batch': {'batch_id': 0, 'balloon_id': 0}
 }
 
 # Г-образный
@@ -21,8 +21,8 @@ READER_LIST[1] = {
     'status': 'Погрузка полного баллона в кассету',
     'input_state': 0,
     'previous_nfc_tags': [],
-    'function': None,
-    'batch': {'batch_id': 0, 'balloons_list': []}
+    'function': 'unloading',
+    'batch': {'batch_id': 0, 'balloon_id': 0}
 }
 
 # Считыватели на отгрузке
@@ -34,7 +34,7 @@ READER_LIST[2] = {
     'input_state': 0,
     'previous_nfc_tags': [],
     'function': 'unloading',
-    'batch': {'batch_id': 0, 'balloons_list': []}
+    'batch': {'batch_id': 0, 'balloon_id': 0}
 }
 
 READER_LIST[3] = {
@@ -45,7 +45,7 @@ READER_LIST[3] = {
     'input_state': 0,
     'previous_nfc_tags': [],
     'function': 'unloading',
-    'batch': {'batch_id': 0, 'balloons_list': []}
+    'batch': {'batch_id': 0, 'balloon_id': 0}
 }
 
 READER_LIST[4] = {
@@ -56,7 +56,7 @@ READER_LIST[4] = {
     'input_state': 0,
     'previous_nfc_tags': [],
     'function': None,
-    'batch': {'batch_id': 0, 'balloons_list': []}
+    'batch': {'batch_id': 0, 'balloon_id': 0}
 }
 
 READER_LIST[5] = {
@@ -67,7 +67,7 @@ READER_LIST[5] = {
     'input_state': 0,
     'previous_nfc_tags': [],
     'function': 'loading',
-    'batch': {'batch_id': 0, 'balloons_list': []}
+    'batch': {'batch_id': 0, 'balloon_id': 0}
 }
 
 # Считыватели в цеху
@@ -79,7 +79,7 @@ READER_LIST[6] = {
     'input_state': 0,
     'previous_nfc_tags': [],
     'function': None,
-    'batch': {'batch_id': 0, 'balloons_list': []}
+    'batch': {'batch_id': 0, 'balloon_id': 0}
 }
 
 READER_LIST[7] = {
@@ -90,7 +90,7 @@ READER_LIST[7] = {
     'input_state': 0,
     'previous_nfc_tags': [],
     'function': None,
-    'batch': {'batch_id': 0, 'balloons_list': []}
+    'batch': {'batch_id': 0, 'balloon_id': 0}
 }
 
 # Команды, посылаемые на считыватель
@@ -102,6 +102,6 @@ COMMANDS = {
     'inputs_read': '020007FF746660',  # чтение состояния входов
     'all_buffer_read': '02000AFF2B0000FF89EB',  # чтение всего буфера
     'read_last_item_from_buffer': '02000AFF2B00FFFF4914',
-    'clean_buffer': '020007FF325447'    # команда очистки буфера
+    'clean_buffer': '020007FF325447'  # команда очистки буфера
 }
 # 02 00 08 FF B0 84 4F DB   Reader: RF-Warning - если нет данных с ридера

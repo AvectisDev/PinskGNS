@@ -7,27 +7,35 @@
     <div class="row">
         <div class="col text-end">
             <p>Номер партии</p>
+            <p>Тип партии</p>
             <p>Дата начала</p>
             <p>Время начала</p>
             <p>Дата окончания</p>
             <p>Время окончания</p>
             <p>Автомобиль</p>
             <p>Прицеп</p>
-            <p>Принято газа (массомер)</p>
+            <p>Вес пустого т/с (весы)</p>
+            <p>Вес полного т/с (весы)</p>
             <p>Принято газа (весы)</p>
+            <p>Принято газа (массомер)</p>
+            <p>Тип газа</p>
             <p>В работе</p>
             <p>ТТН</p>
         </div>
         <div class="col text-start">
             <p>{{ batch.id }}</p>
+            <p>{% if batch.batch_type == 'l' %}Приёмка{% else %}Отгрузка{% endif %}</p>
             <p>{{ batch.begin_date|default_if_none:"-" }}</p>
             <p>{{ batch.begin_time|default_if_none:"-" }}</p>
             <p>{{ batch.end_date|default_if_none:"-" }}</p>
             <p>{{ batch.end_time|default_if_none:"-" }}</p>
             <p>{{ batch.truck|default_if_none:"-" }}</p>
             <p>{{ batch.trailer|default_if_none:"-" }}</p>
-            <p>{{ batch.gas_amount|floatformat:2|default_if_none:"-" }}</p>
+            <p>{{ batch.scale_empty_weight|floatformat:2|default_if_none:"-" }}</p>
+            <p>{{ batch.scale_full_weight|floatformat:2|default_if_none:"-" }}</p>
             <p>{{ batch.weight_gas_amount|floatformat:2|default_if_none:"-" }}</p>
+            <p>{{ batch.gas_amount|floatformat:2|default_if_none:"-" }}</p>
+            <p>{{ batch.gas_type|default_if_none:"-" }}</p>
             <p>{% if batch.is_active %}Активна{% else %}Завершена{% endif %}</p>
             <p>{{ batch.ttn|default_if_none:"-" }}</p>
         </div>
@@ -35,17 +43,13 @@
 </div>
 
 <div class="container text-center">
-    {% if main_list == 'loading' %}
     <button type="button" class="btn" style="background-color: #3CBBD9; color: white;"
-            onclick="location.href='{{ batch.get_absolute_url }}'">Назад
+            onclick="location.href='{% url 'filling_station:auto_gas_batch_list' %}'">Назад
     </button>
-    {% endif %}
-    {% if main_list == 'unloading' %}
     <button type="button" class="btn" style="background-color: #3CBBD9; color: white;"
             onclick="location.href = '{{ batch.get_update_url }}'">Редактировать
     </button>
-    {% endif %}
-    <button type="button" class="btn btn-danger" onclick="location.href = '{{ batch.get_update_url }}'">Удалить
+    <button type="button" class="btn btn-danger" onclick="location.href = '{{ batch.get_delete_url }}'">Удалить
     </button>
 </div>
 

@@ -7,23 +7,25 @@
 
 <table class="table table-striped table-hover vertical-align: middle" style="border-radius: 5px; overflow: hidden;">
     <tr class="table-dark" align="center" style="background-color: #051831 !important; color: white !important;">
-        <th>№ п/п</th>
         <th>Номер ТТН</th>
         <th>Номер договора</th>
-        <th>Поставщик</th>
+        <th>Грузоотправитель</th>
+        <th>Грузополучатель</th>
         <th>Количество газа</th>
+        <th>Тип газа</th>
         <th>Количество баллонов</th>
         <th>Дата формирования накладной</th>
     </tr>
     {% for ttn in page_obj.object_list %}
     <tr align="center">
         <td>
-            <a href="{{ ttn.get_absolute_url }}" style="color: #051831;"> {{ ttn.id }} </a>
+            <a href="{{ ttn.get_absolute_url }}" style="color: #051831;"> {{ ttn.number }} </a>
         </td>
-        <td>{{ ttn.number }}</td>
         <td>{{ ttn.contract }}</td>
-        <td>{{ ttn.name_of_supplier }}</td>
+        <td>{{ ttn.shipper }}</td>
+        <td>{{ ttn.consignee }}</td>
         <td>{{ ttn.gas_amount|floatformat:2|default_if_none:"-" }}</td>
+        <td>{{ ttn.gas_type|default_if_none:"-" }}</td>
         <td>{{ ttn.balloons_amount|default_if_none:"-" }}</td>
         <td>{{ ttn.date|default_if_none:"-" }}</td>
     </tr>

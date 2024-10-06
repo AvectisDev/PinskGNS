@@ -45,7 +45,7 @@
             onclick="location.href='{% url 'filling_station:balloon_list' %}'">Назад</button>
     <button type="button" class="btn" style="background-color: #3CBBD9; color: white;"
             onclick="location.href = '{{ balloon.get_update_url }}'">Редактировать</button>
-    <button type="button" class="btn btn-danger" onclick="location.href = '{{ balloon.get_update_url }}'">Удалить
+    <button type="button" class="btn btn-danger" onclick="location.href = '{{ balloon.get_delete_url }}'">Удалить
     </button>
 </div>
 
