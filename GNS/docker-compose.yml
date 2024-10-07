@@ -40,5 +40,25 @@ services:
       DB_PASSWORD: ${DB_PASSWORD}
       DB_HOST: ${DB_HOST}
 
+  rfid:
+    build: ../rfid app
+    container_name: rfid
+    restart: always
+    ports:
+      - 8001:8001
+    env_file:
+      - ./.env
+    depends_on:
+      - db
+    environment:
+      DB_NAME: ${DB_NAME}
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_HOST: ${DB_HOST}
+
 volumes:
   postgres_data:
+
+networks:
+    app_network:
+        name: 'app_network'
