@@ -8,13 +8,15 @@ services:
     env_file:
       - ./.env
     environment:
-      POSTGRES_DB: ${DB_NAME}
-      POSTGRES_USER: ${DB_USER}
-      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: postgres
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
     ports:
       - 5432:5432
     volumes:
-      - postgres_data:/var/lib/postgresql/data/
+      - brest_postgres_data:/var/lib/postgresql/data/
+    networks:
+      - app_network
 
   adminer:
       image: adminer
@@ -22,11 +24,13 @@ services:
       restart: always
       ports:
         - 8080:8080
+      networks:
+        - app_network
 
   django_backend:
     build: .
     container_name: django
-    command: python manage.py runserver 0.0.0.0:8000
+    command: daphne -p 8000 GNS.asgi:application --bind 0.0.0.0
     restart: always
     ports:
       - 8000:8000
@@ -35,10 +39,12 @@ services:
     depends_on:
       - db
     environment:
-      DB_NAME: ${DB_NAME}
-      DB_USER: ${DB_USER}
-      DB_PASSWORD: ${DB_PASSWORD}
-      DB_HOST: ${DB_HOST}
+      DB_NAME: postgres
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      DB_HOST: db
+    networks:
+      - app_network
 
   rfid:
     build: ../rfid app
@@ -51,14 +57,17 @@ services:
     depends_on:
       - db
     environment:
-      DB_NAME: ${DB_NAME}
-      DB_USER: ${DB_USER}
-      DB_PASSWORD: ${DB_PASSWORD}
-      DB_HOST: ${DB_HOST}
+      DB_NAME: postgres
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      DB_HOST: db
+    networks:
+      - app_network
 
 volumes:
-  postgres_data:
+  brest_postgres_data:
 
 networks:
     app_network:
         name: 'app_network'
+        driver: bridge

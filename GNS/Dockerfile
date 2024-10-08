@@ -10,4 +10,4 @@ COPY ./requirements.txt .
 RUN pip install -r requirements.txt
 COPY . /app
 
-# CMD python manage.py migrate
+# RUN python manage.py migrate && python manage.py collectstatic --noinput

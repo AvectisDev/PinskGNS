@@ -1,92 +1,12 @@
-READER_LIST = [{} for i in range(8)]
+READER_LIST = [{} for i in range(1)]
 
 # Считыватели на приёмке
 # Г-образный
 READER_LIST[0] = {
-    'ip': '10.10.2.20',
+    'ip': '192.168.0.20',
     'port': 10001,
     'number': 1,
     'status': 'Регистрация пустого баллона на складе (из кассеты)',
-    'input_state': 0,
-    'previous_nfc_tags': [],
-    'function': 'loading',
-    'batch': {'batch_id': 0, 'balloon_id': 0}
-}
-
-# Г-образный
-READER_LIST[1] = {
-    'ip': '10.10.2.21',
-    'port': 10001,
-    'number': 2,
-    'status': 'Погрузка полного баллона в кассету',
-    'input_state': 0,
-    'previous_nfc_tags': [],
-    'function': 'unloading',
-    'batch': {'batch_id': 0, 'balloon_id': 0}
-}
-
-# Считыватели на отгрузке
-READER_LIST[2] = {
-    'ip': '10.10.2.22',
-    'port': 10001,
-    'number': 3,
-    'status': 'Погрузка полного баллона на трал 1',
-    'input_state': 0,
-    'previous_nfc_tags': [],
-    'function': 'unloading',
-    'batch': {'batch_id': 0, 'balloon_id': 0}
-}
-
-READER_LIST[3] = {
-    'ip': '10.10.2.23',
-    'port': 10001,
-    'number': 4,
-    'status': 'Погрузка полного баллона на трал 2',  # в торце рампы
-    'input_state': 0,
-    'previous_nfc_tags': [],
-    'function': 'unloading',
-    'batch': {'batch_id': 0, 'balloon_id': 0}
-}
-
-READER_LIST[4] = {
-    'ip': '10.10.2.24',
-    'port': 10001,
-    'number': 5,
-    'status': 'Регистрация полного баллона на складе',
-    'input_state': 0,
-    'previous_nfc_tags': [],
-    'function': None,
-    'batch': {'batch_id': 0, 'balloon_id': 0}
-}
-
-READER_LIST[5] = {
-    'ip': '10.10.2.25',
-    'port': 10001,
-    'number': 6,
-    'status': 'Регистрация пустого баллона на складе (рампа)',
-    'input_state': 0,
-    'previous_nfc_tags': [],
-    'function': 'loading',
-    'batch': {'batch_id': 0, 'balloon_id': 0}
-}
-
-# Считыватели в цеху
-READER_LIST[6] = {
-    'ip': '10.10.2.26',
-    'port': 10001,
-    'number': 7,
-    'status': 'Регистрация пустого баллона на складе (цех)',
-    'input_state': 0,
-    'previous_nfc_tags': [],
-    'function': None,
-    'batch': {'batch_id': 0, 'balloon_id': 0}
-}
-
-READER_LIST[7] = {
-    'ip': '10.10.2.27',
-    'port': 10001,
-    'number': 8,
-    'status': 'Наполнение баллона сжиженным газом',
     'input_state': 0,
     'previous_nfc_tags': [],
     'function': None,
