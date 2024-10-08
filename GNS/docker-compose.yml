@@ -15,6 +15,8 @@ services:
       - 5432:5432
     volumes:
       - postgres_data:/var/lib/postgresql/data/
+    networks:
+      - app_network
 
   adminer:
       image: adminer
@@ -26,7 +28,7 @@ services:
   django_backend:
     build: .
     container_name: django
-    command: python manage.py runserver 0.0.0.0:8000
+    command: daphne -p 8000 GNS.asgi:application --bind 0.0.0.0
     restart: always
     ports:
       - 8000:8000
@@ -39,6 +41,8 @@ services:
       DB_USER: ${DB_USER}
       DB_PASSWORD: ${DB_PASSWORD}
       DB_HOST: ${DB_HOST}
+    networks:
+      - app_network
 
   rfid:
     build: ../rfid app
@@ -55,6 +59,8 @@ services:
       DB_USER: ${DB_USER}
       DB_PASSWORD: ${DB_PASSWORD}
       DB_HOST: ${DB_HOST}
+    networks:
+      - app_network
 
 volumes:
   postgres_data:
@@ -62,3 +68,4 @@ volumes:
 networks:
     app_network:
         name: 'app_network'
+        driver: bridge
