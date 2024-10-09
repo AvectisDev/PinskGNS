@@ -3,10 +3,10 @@ READER_LIST = [{} for i in range(1)]
 # Считыватели на приёмке
 # Г-образный
 READER_LIST[0] = {
-    'ip': '192.168.0.20',
+    'ip': '192.168.10.10',
     'port': 10001,
     'number': 1,
-    'status': 'Регистрация пустого баллона на складе (из кассеты)',
+    'status': 'Регистрация пустого баллона',
     'input_state': 0,
     'previous_nfc_tags': [],
     'function': None,
