@@ -1,9 +1,9 @@
 import aiohttp
 import asyncio
 
-BASE_URL = "http://10.10.12.253:8000/api"  # server address
-USERNAME = "reader"
-PASSWORD = "rfid-device"
+BASE_URL = "http://192.168.10.155:8000/api"  # server address
+USERNAME = "root"
+PASSWORD = "brest"
 
 
 async def get_balloon(nfc_tag):
