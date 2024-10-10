@@ -3,7 +3,7 @@ import aiohttp
 from datetime import datetime, timedelta
 import django_video_api
 from opcua import Client, ua
-from setting import INTELLECT_SERVER_LIST, AUTO_BATCH, RAILWAY_BATCH
+from settings import INTELLECT_SERVER_LIST, AUTO_BATCH, RAILWAY_BATCH
 from intellect_functions import (separation_string_date, get_registration_number_list, check_on_station,
                                  get_transport_type)
 

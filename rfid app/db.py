@@ -1,18 +1,20 @@
+import os
 import asyncpg
 from datetime import datetime
+from dotenv import load_dotenv
 
-DB_CRD = {'name': 'PinskGNS', 'host': 'localhost', 'user': 'postgres', 'password': '.avectis1', 'port': '5432'}
+load_dotenv()
 
 
 async def write_balloons_amount(reader: dict, from_who: str):
     """Функция записывает в базу данных количество баллонов, пройденных через каждый считыватель"""
     try:
         conn = await asyncpg.connect(
-            database=DB_CRD['name'],
-            host=DB_CRD['host'],
-            user=DB_CRD['user'],
-            password=DB_CRD['password'],
-            port=DB_CRD['port']
+            database=os.environ.get('DB_NAME'),
+            host=os.environ.get('DB_HOST'),
+            user=os.environ.get('DB_USER'),
+            password=os.environ.get('DB_PASSWORD'),
+            port='5432'
         )
 
         current_date = datetime.now()

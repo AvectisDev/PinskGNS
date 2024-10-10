@@ -2,7 +2,7 @@ import asyncio
 import socket
 import db
 import binascii
-from setting import READER_LIST, COMMANDS
+from settings import READER_LIST, COMMANDS
 from miriada import get_balloon_by_nfc_tag as get_balloon
 import django_balloon_api
 

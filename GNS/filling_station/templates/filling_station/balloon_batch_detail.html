@@ -16,6 +16,7 @@
             <p>Количество газа</p>
             <p>Баллонов с RFID</p>
             <p>Баллонов 5л</p>
+            <p>Баллонов 12л</p>
             <p>Баллонов 27л</p>
             <p>Баллонов 50л</p>
             <p>В работе</p>
@@ -29,9 +30,10 @@
             <p>{{ batch.end_time|default_if_none:"-" }}</p>
             <p>{{ batch.truck|default_if_none:"-" }}</p>
             <p>{{ batch.trailer|default_if_none:"-" }}</p>
-            <p>{{ batch.gas_amount|floatformat:2|default_if_none:"-" }}</p>
+            <p>{{ batch.gas_amount|default_if_none:"-" }}</p>
             <p>{{ batch.amount_of_rfid|default_if_none:"-" }}</p>
             <p>{{ batch.amount_of_5_liters|default_if_none:"-" }}</p>
+            <p>{{ batch.amount_of_12_liters|default_if_none:"-" }}</p>
             <p>{{ batch.amount_of_27_liters|default_if_none:"-" }}</p>
             <p>{{ batch.amount_of_50_liters|default_if_none:"-" }}</p>
             <p>{% if batch.is_active %}Активна{% else %}Завершена{% endif %}</p>

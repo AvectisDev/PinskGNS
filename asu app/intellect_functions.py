@@ -1,7 +1,7 @@
 import asyncio
 import aiohttp
 from datetime import datetime, timedelta
-from setting import INTELLECT_URL
+from settings import INTELLECT_URL
 
 
 async def get_intellect_data(data) -> list:

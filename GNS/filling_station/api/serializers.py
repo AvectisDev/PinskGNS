@@ -46,16 +46,16 @@ class BalloonsLoadingBatchSerializer(serializers.ModelSerializer):
     class Meta:
         model = BalloonsLoadingBatch
         fields = ['id', 'begin_date', 'begin_time', 'end_date', 'end_time', 'truck', 'trailer', 'reader_number',
-                  'amount_of_rfid', 'amount_of_5_liters', 'amount_of_27_liters', 'amount_of_50_liters', 'gas_amount',
-                  'is_active', 'ttn']
+                  'amount_of_rfid', 'amount_of_5_liters', 'amount_of_12_liters', 'amount_of_27_liters',
+                  'amount_of_50_liters', 'gas_amount', 'is_active', 'ttn']
 
 
 class BalloonsUnloadingBatchSerializer(serializers.ModelSerializer):
     class Meta:
         model = BalloonsUnloadingBatch
         fields = ['id', 'begin_date', 'begin_time', 'end_date', 'end_time', 'truck', 'trailer', 'reader_number',
-                  'amount_of_rfid', 'amount_of_5_liters', 'amount_of_27_liters', 'amount_of_50_liters', 'gas_amount',
-                  'is_active', 'ttn']
+                  'amount_of_rfid', 'amount_of_5_liters', 'amount_of_12_liters', 'amount_of_27_liters',
+                  'amount_of_50_liters', 'gas_amount', 'is_active', 'ttn']
 
 
 # Кастомные сериализаторы для партий приёмки/отгрузки баллонов

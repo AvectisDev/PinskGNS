@@ -210,8 +210,8 @@ class BalloonsLoadingBatchForm(forms.ModelForm):
     class Meta:
         model = BalloonsLoadingBatch
         fields = ['end_date', 'end_time', 'truck', 'trailer', 'reader_number',
-                  'amount_of_rfid', 'amount_of_5_liters', 'amount_of_27_liters', 'amount_of_50_liters', 'gas_amount',
-                  'is_active', 'ttn']
+                  'amount_of_rfid', 'amount_of_5_liters', 'amount_of_12_liters', 'amount_of_27_liters',
+                  'amount_of_50_liters', 'gas_amount', 'is_active', 'ttn']
         widgets = {
             'end_date': forms.DateInput(format='%Y-%m-%d', attrs={'type': 'date'}),
             'end_time': forms.TimeInput(attrs={'type': 'time'}),
@@ -220,6 +220,7 @@ class BalloonsLoadingBatchForm(forms.ModelForm):
             'reader_number': forms.NumberInput(attrs={'class': 'form-control'}),
             'amount_of_rfid': forms.NumberInput(attrs={'class': 'form-control'}),
             'amount_of_5_liters': forms.NumberInput(attrs={'class': 'form-control'}),
+            'amount_of_12_liters': forms.NumberInput(attrs={'class': 'form-control'}),
             'amount_of_27_liters': forms.NumberInput(attrs={'class': 'form-control'}),
             'amount_of_50_liters': forms.NumberInput(attrs={'class': 'form-control'}),
             'gas_amount': forms.NumberInput(attrs={'class': 'form-control'}),
@@ -241,8 +242,8 @@ class BalloonsUnloadingBatchForm(forms.ModelForm):
     class Meta:
         model = BalloonsUnloadingBatch
         fields = ['end_date', 'end_time', 'truck', 'trailer', 'reader_number',
-                  'amount_of_rfid', 'amount_of_5_liters', 'amount_of_27_liters', 'amount_of_50_liters', 'gas_amount',
-                  'is_active', 'ttn']
+                  'amount_of_rfid', 'amount_of_5_liters', 'amount_of_12_liters', 'amount_of_27_liters',
+                  'amount_of_50_liters', 'gas_amount', 'is_active', 'ttn']
         widgets = {
             'end_date': forms.DateInput(format='%Y-%m-%d', attrs={'type': 'date'}),
             'end_time': forms.TimeInput(attrs={'type': 'time'}),
@@ -251,6 +252,7 @@ class BalloonsUnloadingBatchForm(forms.ModelForm):
             'reader_number': forms.NumberInput(attrs={'class': 'form-control'}),
             'amount_of_rfid': forms.NumberInput(attrs={'class': 'form-control'}),
             'amount_of_5_liters': forms.NumberInput(attrs={'class': 'form-control'}),
+            'amount_of_12_liters': forms.NumberInput(attrs={'class': 'form-control'}),
             'amount_of_27_liters': forms.NumberInput(attrs={'class': 'form-control'}),
             'amount_of_50_liters': forms.NumberInput(attrs={'class': 'form-control'}),
             'gas_amount': forms.NumberInput(attrs={'class': 'form-control'}),

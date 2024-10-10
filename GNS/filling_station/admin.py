@@ -54,8 +54,8 @@ class TTNAdmin(admin.ModelAdmin):
 @admin.register(BalloonsLoadingBatch)
 class BalloonsLoadingBatchAdmin(admin.ModelAdmin):
     list_display = ['id', 'begin_date', 'begin_time', 'end_date', 'end_time', 'truck', 'trailer', 'reader_number',
-                    'amount_of_rfid', 'amount_of_5_liters', 'amount_of_27_liters', 'amount_of_50_liters', 'gas_amount',
-                    'is_active', 'ttn']
+                    'amount_of_rfid', 'amount_of_5_liters', 'amount_of_12_liters', 'amount_of_27_liters',
+                    'amount_of_50_liters', 'gas_amount', 'is_active', 'ttn']
     list_filter = ['begin_date', 'end_date', 'is_active']
     search_fields = ['begin_date', 'end_date', 'truck', 'is_active', 'ttn']
 
@@ -63,8 +63,8 @@ class BalloonsLoadingBatchAdmin(admin.ModelAdmin):
 @admin.register(BalloonsUnloadingBatch)
 class BalloonsUnloadingBatchAdmin(admin.ModelAdmin):
     list_display = ['id', 'begin_date', 'begin_time', 'end_date', 'end_time', 'truck', 'trailer', 'reader_number',
-                    'amount_of_rfid', 'amount_of_5_liters', 'amount_of_27_liters', 'amount_of_50_liters', 'gas_amount',
-                    'is_active', 'ttn']
+                    'amount_of_rfid', 'amount_of_5_liters', 'amount_of_12_liters', 'amount_of_27_liters',
+                    'amount_of_50_liters', 'gas_amount', 'is_active', 'ttn']
     list_filter = ['begin_date', 'end_date', 'is_active']
     search_fields = ['begin_date', 'end_date', 'truck', 'is_active', 'ttn']
 
