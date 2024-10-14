@@ -1,5 +1,7 @@
 import asyncio
 import socket
+import random
+from datetime import datetime, timedelta
 import db
 import binascii
 from setting import READER_LIST, COMMANDS
@@ -67,9 +69,17 @@ async def balloon_passport_processing(nfc_tag: str, status: str):
     """
     passport_ok_flag = False
 
+    start_date = datetime(1980, 1, 1)
+    end_date = datetime(2024, 1, 1)
+    random_date = start_date + timedelta(days=random.randint(0, (end_date - start_date).days))
     # если данных паспорта нет в базе данных
     passport = {
         'nfc_tag': nfc_tag,
+        'serial_number': random.randint(1058, 172953),
+        'netto': random.randint(15, 26) + round(random.random(), 1),
+        'brutto': random.randint(46, 50) + round(random.random(), 1),
+        'creation_date': random_date.strftime(format='%Y-%m-%d'),
+        'size': 50.0,
         'status': status,
         'update_passport_required': True
     }
@@ -114,7 +124,7 @@ async def read_nfc_tag(reader: dict):
         # print(reader['ip'], reader['previous_nfc_tags'])
 
     # очищаем буферную память считывателя
-    await asyncio.sleep(3)
+    await asyncio.sleep(6)
     await data_exchange_with_reader(reader, 'clean_buffer')
 
 
@@ -131,7 +141,7 @@ async def main():
         except Exception as error:
             print(f"Error while reading NFC tags: {error}")
 
-        await asyncio.sleep(1)
+        await asyncio.sleep(2.5)
 
 
 if __name__ == "__main__":
