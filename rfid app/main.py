@@ -3,7 +3,6 @@ import socket
 import db
 import binascii
 from setting import READER_LIST, COMMANDS
-from miriada import get_balloon_by_nfc_tag as get_balloon
 import django_balloon_api
 
 
@@ -90,7 +89,7 @@ async def read_nfc_tag(reader: dict):
     data = await data_exchange_with_reader(reader, 'read_last_item_from_buffer')
 
     if len(data) > 24:  # если со считывателя пришли данные с меткой
-        nfc_tag = byte_reversal(data[32:48])  # из буфера получаем номер метки (old - data[14:30])
+        nfc_tag = byte_reversal(data[32:48])
 
         if nfc_tag not in reader['previous_nfc_tags']:  # метка отличается от недавно считанных
             try:
