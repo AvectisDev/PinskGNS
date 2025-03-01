@@ -12,7 +12,7 @@ from concurrent.futures import ThreadPoolExecutor
 logging.basicConfig(
     level=logging.INFO,  # Уровень логирования
     format='%(asctime)s - %(levelname)s - %(message)s',
-    filename='rfid_app_logs.log',
+    filename='rfid_app.log',
     filemode='w',
     encoding='utf-8'
 )
@@ -31,9 +31,12 @@ async def data_exchange_with_reader(controller: dict, command: str):
         writer.write(binascii.unhexlify(COMMANDS[command]))
         await writer.drain()
 
-        data = await reader.read(2048)
+        data = await asyncio.wait_for(reader.read(2048), timeout=1)
         buffer = binascii.hexlify(data).decode()
         return buffer
+    except asyncio.TimeoutError:
+        logger.error(f'Таймаут при ожидании ответа от контроллера {controller["ip"]}:{controller["port"]}')
+        return []
     except Exception as error:
         logger.debug(f'Нет связи с контроллером {controller["ip"]}:{controller["port"]}: {error}')
         return []
@@ -101,7 +104,7 @@ async def read_nfc_tag(reader: dict):
     data = await data_exchange_with_reader(reader, 'read_last_item_from_buffer')
 
     # if reader["ip"] == '10.10.2.23':
-    #     logger.debug(f'{reader["ip"]} rfid 1.чтение метки из буфера. Данные - {data}')
+        # logger.debug(f'{reader["ip"]} rfid 1.чтение метки из буфера. Данные - {data}')
 
     if len(data) > 24:  # если со считывателя пришли данные с меткой
         nfc_tag = byte_reversal(data[32:48])
