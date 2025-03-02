@@ -52,6 +52,8 @@ class Command(BaseCommand):
             truck_type = TruckType.objects.get(type="Цистерна")
             trailer_type = TrailerType.objects.get(type="Полуприцеп цистерна")
 
+            logger.debug(f'Автоколонка. truck_type-{truck_type}/ trailer_type-{trailer_type}')
+
             auto_batch_truck = Truck.objects.filter(
                 registration_number__in=registration_number_list,
                 type=truck_type).first()

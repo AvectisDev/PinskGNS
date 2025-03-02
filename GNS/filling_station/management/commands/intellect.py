@@ -13,7 +13,6 @@ logger = logging.getLogger('filling_station')
     - Камера 27 (Распознавание номеров КПП Выезд) -> "id": "4", direction = 1 - от камеры, 2 - к камере
     - Камера 28 (Распознавание номеров КПП Въезд) -> "id": "5", direction = 1 - от камеры, 2 - к камере
 """
-INTELLECT_URL = "http://10.10.0.252:10001/lprserver/GetProtocolNumbers"  # intellect server address
 INTELLECT_SERVER_LIST = [
     {
         'id': '1',
@@ -21,7 +20,7 @@ INTELLECT_SERVER_LIST = [
     },
     {
         'id': '2,3',
-        'delta_minutes': 4320
+        'delta_minutes': 4000
     },
     {
         'id': '4,5',
@@ -36,7 +35,8 @@ def get_intellect_data(data) -> list:
     return: JSON-ответ в виде списка при успешном запросе; пустой список при ошибке.
     """
     try:
-        response = requests.post(INTELLECT_URL, json=data, timeout=5)
+        intellect_url = "http://10.10.0.252:10001/lprserver/GetProtocolNumbers"  # intellect server address
+        response = requests.post(intellect_url, json=data, timeout=5)
         response.raise_for_status()
 
         result = response.json()

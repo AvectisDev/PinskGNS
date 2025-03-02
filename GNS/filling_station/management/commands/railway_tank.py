@@ -83,7 +83,7 @@ class Command(BaseCommand):
                         }
                     )
                     if image_data:
-                        image_name = f"{image_data}.jpg"
+                        image_name = f"{registration_number}.jpg"
                         railway_tank.registration_number_img.save(
                             image_name,
                             ContentFile(image_data),
