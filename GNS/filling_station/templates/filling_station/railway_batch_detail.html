@@ -2,6 +2,11 @@
 {% block title %} {{ title }} {% endblock %}
 
 {% block content %}
+<div class="col-md-3 mb-3 mb-md-0">
+    <h5>Детали партии приёмки жд цистерн</h5>
+</div>
+
+{% load custom_filters %}
 
 <h5>{{ title }}</h5>
 
@@ -11,6 +16,7 @@
             <p>Номер партии</p>
             <p>Дата начала</p>
             <p>Дата окончания</p>
+            <p>Количество цистерн</p>
             <p>Принято СПБТ газа</p>
             <p>Принято ПБА газа</p>
             <p>В работе</p>
@@ -21,8 +27,9 @@
             <p>{{ batch.id }}</p>
             <p>{{ batch.begin_date|default_if_none:"-" }}</p>
             <p>{{ batch.end_date|default_if_none:"-" }}</p>
-            <p>{{ batch.gas_amount_spbt|floatformat:2|default_if_none:"-" }}</p>
-            <p>{{ batch.gas_amount_pba|default_if_none:"-"|floatformat:2 }}</p>
+            <p>{{ batch.railway_tank_list.count }}</p>
+            <p>{{ batch.gas_amount_spbt|format_gas_amount }}</p>
+            <p>{{ batch.gas_amount_pba|format_gas_amount }}</p>
             <p>{% if batch.is_active %}Активна{% else %}Завершена{% endif %}</p>
             <p>{{ batch.import_ttn|default_if_none:"-" }}</p>
             <p>{{ batch.export_ttn|default_if_none:"-" }}</p>

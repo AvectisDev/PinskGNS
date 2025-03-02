@@ -16,15 +16,15 @@ logger = logging.getLogger('filling_station')
 INTELLECT_SERVER_LIST = [
     {
         'id': '1',
-        'delta_minutes': 1200
+        'delta_minutes': 10
     },
     {
         'id': '2,3',
-        'delta_minutes': 4000
+        'delta_minutes': 30
     },
     {
         'id': '4,5',
-        'delta_minutes': 3
+        'delta_minutes': 5
     }
 ]
 

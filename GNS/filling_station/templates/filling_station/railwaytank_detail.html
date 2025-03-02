@@ -35,13 +35,25 @@
             <p>{{ railwaytank.departure_time|default_if_none:"-" }}</p>
         </div>
     </div>
+    <div class="row mt-4">
+        <div class="col">
+            <h6>Фото номера цистерны:</h6>
+            {% if railwaytank.registration_number_img %}
+            <img src="{{ railwaytank.registration_number_img.url }}" alt="Фото номера цистерны" class="img-fluid">
+            {% else %}
+            <p>Фото отсутствует.</p>
+            {% endif %}
+        </div>
+    </div>
 </div>
 
-<div class="container text-center">
+<div class="container text-center mt-4">
     <button type="button" class="btn" style="background-color: #3CBBD9; color: white;"
-            onclick="location.href='{% url 'filling_station:railway_tank_list' %}'">Назад</button>
+            onclick="location.href='{% url 'filling_station:railway_tank_list' %}'">Назад
+    </button>
     <button type="button" class="btn" style="background-color: #3CBBD9; color: white;"
-            onclick="location.href = '{{ railwaytank.get_update_url }}'">Редактировать</button>
+            onclick="location.href = '{{ railwaytank.get_update_url }}'">Редактировать
+    </button>
     <button type="button" class="btn btn-danger" onclick="location.href = '{{ railwaytank.get_delete_url }}'">Удалить
     </button>
 </div>

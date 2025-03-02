@@ -46,7 +46,6 @@ class Command(BaseCommand):
                 self.set_opc_value("ns=4; s=Address Space.PLC_SU1.tank.camera_worked", False)
 
                 # получаем от "Интеллекта" список номеров с данными фотофиксации
-                logger.debug(f'Запрос номера в Интеллекте {tank_weight}')
                 railway_tank_list = get_registration_number_list(INTELLECT_SERVER_LIST[0])
                 logger.debug(f'Запрос прошёл. Список номеров {railway_tank_list}')
 

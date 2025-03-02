@@ -330,7 +330,7 @@ class RailwayTank(models.Model):
     entry_time = models.TimeField(null=True, blank=True, verbose_name="Время въезда")
     departure_date = models.DateField(null=True, blank=True, verbose_name="Дата выезда")
     departure_time = models.TimeField(null=True, blank=True, verbose_name="Время выезда")
-    registration_number_img = models.ImageField(null=True, blank=True, verbose_name="Фото номера")
+    registration_number_img = models.ImageField(null=True, blank=True, upload_to='railway_tanks/', verbose_name="Фото номера")
     user = models.ForeignKey(User, on_delete=models.DO_NOTHING, default=1, verbose_name="Пользователь")
 
     def __str__(self):
