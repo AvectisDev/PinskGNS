@@ -46,7 +46,7 @@ class Command(BaseCommand):
                 return
 
             # формируем список считанных номеров для фильтрации по базе
-            registration_number_list = [transport['registration_number'] for transport in transport_list]
+            registration_number_list = [transport['number'] for transport in transport_list]
 
             # Находим объект TruckType с типом "Цистерна" и объект TrailerType с типом "Полуприцеп цистерна"
             truck_type = TruckType.objects.get(type="Цистерна")

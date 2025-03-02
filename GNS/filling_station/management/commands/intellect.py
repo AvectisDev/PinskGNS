@@ -17,11 +17,11 @@ INTELLECT_URL = "http://10.10.0.252:10001/lprserver/GetProtocolNumbers"  # intel
 INTELLECT_SERVER_LIST = [
     {
         'id': '1',
-        'delta_minutes': 1
+        'delta_minutes': 1200
     },
     {
         'id': '2,3',
-        'delta_minutes': 30
+        'delta_minutes': 4320
     },
     {
         'id': '4,5',
@@ -40,7 +40,7 @@ def get_intellect_data(data) -> list:
         response.raise_for_status()
 
         result = response.json()
-
+        logger.debug(f'Ответ intellect - {result}')
         if result['Status'] == "OK":
             item_list = result.get('Protocols', [])
             return item_list
@@ -92,19 +92,25 @@ def get_registration_number_list(server: dict) -> list:
         "validaty_from": "5" if server.get('id') == '1' else "90"
     }
     intellect_data = get_intellect_data(data_for_request)
+    return intellect_data
 
-    out_list = []
-    if len(intellect_data) > 0:
 
-        for item in intellect_data:
-            out_list.append({
-                'registration_number': item['number'],
-                'date': item['date'],
-                'direction': item['direction'],
-                "camera": item["camera"]
-            })
+def get_plate_image(plate_id):
+    """
+    Функция для получения изображения по plate_numbers.id.
+    """
+    image_url = f"http://10.10.0.252:10001/lprserver/GetImage/Plate_numbers/{plate_id}"
+    try:
+        response = requests.get(image_url, timeout=5)
+        response.raise_for_status()
 
-    return out_list
+        if response.headers['Content-Type'] == 'image/jpeg':
+            return response.content  # Возвращаем бинарные данные изображения
+        return None
+
+    except Exception as error:
+        logger.error(f'Ошибка при получении изображения - {error}')
+        return None
 
 
 def check_on_station(transport: dict) -> bool:

@@ -330,6 +330,7 @@ class RailwayTank(models.Model):
     entry_time = models.TimeField(null=True, blank=True, verbose_name="Время въезда")
     departure_date = models.DateField(null=True, blank=True, verbose_name="Дата выезда")
     departure_time = models.TimeField(null=True, blank=True, verbose_name="Время выезда")
+    registration_number_img = models.ImageField(null=True, blank=True, verbose_name="Фото номера")
     user = models.ForeignKey(User, on_delete=models.DO_NOTHING, default=1, verbose_name="Пользователь")
 
     def __str__(self):
@@ -361,7 +362,7 @@ class RailwayBatch(models.Model):
                                    related_name='import_ttn')
     export_ttn = models.ForeignKey(TTN, on_delete=models.DO_NOTHING, default=0, verbose_name="Возвратная ТТН",
                                    related_name='export_ttn')
-    user = models.ForeignKey(User, on_delete=models.DO_NOTHING, default=0, verbose_name="Пользователь")
+    user = models.ForeignKey(User, on_delete=models.DO_NOTHING, default=1, verbose_name="Пользователь")
 
     class Meta:
         verbose_name = "Партия приёмки жд цистерн"
