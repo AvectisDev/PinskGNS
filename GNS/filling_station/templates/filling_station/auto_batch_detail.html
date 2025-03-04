@@ -2,6 +2,11 @@
 {% block title %} {{ title }} {% endblock %}
 
 {% block content %}
+<div class="col-md-3 mb-3 mb-md-0">
+    <h5>Детали партии приёмки авто цистерн</h5>
+</div>
+
+{% load custom_filters %}
 
 <div class="container text-center">
     <div class="row">
@@ -31,10 +36,10 @@
             <p>{{ batch.end_time|default_if_none:"-" }}</p>
             <p>{{ batch.truck|default_if_none:"-" }}</p>
             <p>{{ batch.trailer|default_if_none:"-" }}</p>
-            <p>{{ batch.scale_empty_weight|floatformat:2|default_if_none:"-" }}</p>
-            <p>{{ batch.scale_full_weight|floatformat:2|default_if_none:"-" }}</p>
-            <p>{{ batch.weight_gas_amount|floatformat:2|default_if_none:"-" }}</p>
-            <p>{{ batch.gas_amount|floatformat:2|default_if_none:"-" }}</p>
+            <p>{{ batch.scale_empty_weight|float_format }}</p>
+            <p>{{ batch.scale_full_weight|float_format }}</p>
+            <p>{{ batch.weight_gas_amount|float_format }}</p>
+            <p>{{ batch.gas_amount|float_format }}</p>
             <p>{{ batch.gas_type|default_if_none:"-" }}</p>
             <p>{% if batch.is_active %}Активна{% else %}Завершена{% endif %}</p>
             <p>{{ batch.ttn|default_if_none:"-" }}</p>

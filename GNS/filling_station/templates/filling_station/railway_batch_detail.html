@@ -28,8 +28,8 @@
             <p>{{ batch.begin_date|default_if_none:"-" }}</p>
             <p>{{ batch.end_date|default_if_none:"-" }}</p>
             <p>{{ batch.railway_tank_list.count }}</p>
-            <p>{{ batch.gas_amount_spbt|format_gas_amount }}</p>
-            <p>{{ batch.gas_amount_pba|format_gas_amount }}</p>
+            <p>{{ batch.gas_amount_spbt|float_format }}</p>
+            <p>{{ batch.gas_amount_pba|float_format }}</p>
             <p>{% if batch.is_active %}Активна{% else %}Завершена{% endif %}</p>
             <p>{{ batch.import_ttn|default_if_none:"-" }}</p>
             <p>{{ batch.export_ttn|default_if_none:"-" }}</p>

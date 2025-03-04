@@ -1,4 +1,5 @@
 import logging
+import time
 from django.core.cache import cache
 from django.core.files.base import ContentFile
 from opcua import Client, ua
@@ -28,6 +29,28 @@ class Command(BaseCommand):
         var = self.client.get_node(addr_str)
         return var.set_attribute(ua.AttributeIds.Value, ua.DataValue(value))
 
+    def get_railway_tank_data(self):
+        """
+        Функция отправляет запрос в Интеллект. В ответ приходит JSON ответ со списком словарей. Каждый словарь - это
+        описание одной записи (цистерны)
+        """
+        logger.debug(f'Выполняется запрос к Интеллекту...')
+        railway_tank_list = get_registration_number_list(INTELLECT_SERVER_LIST[0])
+
+        if not railway_tank_list:
+            # Если цистерна не определена, то создаём цистерну без номера
+            logger.info('ЖД цистерна не определена')
+            number = 'Не определён'
+            photo_of_number = None
+        else:
+            # работаем с номером последней цистерны
+            railway_tank = railway_tank_list[-1]
+            number = railway_tank['number']
+            plate_image = railway_tank['plate_numbers.id']
+            # Получаем изображение номера
+            photo_of_number = get_plate_image(plate_image)
+        return number, photo_of_number
+
     def handle(self, *args, **kwargs):
         try:
             self.client.connect()
@@ -45,22 +68,9 @@ class Command(BaseCommand):
                 current_time = datetime.now().time()
                 self.set_opc_value("ns=4; s=Address Space.PLC_SU1.tank.camera_worked", False)
 
-                # получаем от "Интеллекта" список номеров с данными фотофиксации
-                railway_tank_list = get_registration_number_list(INTELLECT_SERVER_LIST[0])
-                logger.debug(f'Запрос прошёл. Список номеров {railway_tank_list}')
-
-                if not railway_tank_list:
-                    # Если цистерна не определена, то создаём цистерну без номера
-                    logger.info('ЖД цистерна не определена')
-                    registration_number = 'Не определён'
-                    image_data = None
-                else:
-                    # работаем с номером последней цистерны
-                    railway_tank = railway_tank_list[-1]
-                    registration_number = railway_tank['number']
-                    registration_number_img = railway_tank['plate_numbers.id']
-                    # Получаем изображение номера
-                    image_data = get_plate_image(registration_number_img)
+                # Приостанавливаем выполнение на 2 секунды, чтобы в интеллекте появилась запись с номером цистерны
+                time.sleep(2)
+                registration_number, image_data = self.get_railway_tank_data()
 
                 if registration_number != self.last_number:
                     cache.set('last_tank_number', self.last_number)
@@ -104,7 +114,8 @@ class Command(BaseCommand):
                             railway_tank.departure_date = current_date
                             railway_tank.departure_time = current_time
                             railway_tank.empty_weight = tank_weight
-                            railway_tank.gas_weight = railway_tank.full_weight or 0 - tank_weight
+                            if railway_tank.full_weight is not None:
+                                railway_tank.gas_weight = railway_tank.full_weight - tank_weight
                         railway_tank.save()
 
                     logger.info(f'ЖД весовая. Обработка завершена. Цистерна № {registration_number}')

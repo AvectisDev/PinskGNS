@@ -350,6 +350,10 @@ class RailwayTank(models.Model):
     def get_delete_url(self):
         return reverse('filling_station:railway_tank_delete', args=[self.pk])
 
+    def generate_filename(self, filename):
+        # Возвращаем только имя файла без дополнительных символов для сохранения пути к фото
+        return f"{self.registration_number}.jpg"
+
 
 class RailwayBatch(models.Model):
     begin_date = models.DateTimeField(null=True, blank=True, auto_now_add=True, verbose_name="Дата начала приёмки")

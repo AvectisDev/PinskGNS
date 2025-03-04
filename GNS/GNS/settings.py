@@ -175,15 +175,15 @@ CELERY_BEAT_SCHEDULE = {
     # },
     'railway_tank_processing': {
         'task': 'filling_station.tasks.railway_tank_processing',
-        'schedule': 5.0,  # каждые 5 сек
+        'schedule': 10.0,  # каждые 10 сек
     },
     'railway_batch_processing': {
         'task': 'filling_station.tasks.railway_batch_processing',
-        'schedule': crontab(),  #minute=20 каждые 20 мин
+        'schedule': crontab(minute='*/20'),  # задача выполняется каждые 20 минут, начиная с 0 минут каждого часа
     },
     'auto_gas_processing': {
         'task': 'filling_station.tasks.auto_gas_processing',
-        'schedule': 5.0,  # каждые 5 сек
+        'schedule': 10.0,
     },
 }
 

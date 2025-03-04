@@ -3,6 +3,8 @@
 
 {% block content %}
 
+{% load custom_filters %}
+
 <div class="container-fluid">
     <header class="d-flex flex-wrap align-items-center justify-content-between py-3 mb-4 border-bottom">
         <div class="col-md-3 mb-2 mb-md-0">
@@ -36,8 +38,8 @@
         <td>{{ batch.begin_date|default_if_none:"-" }}</td>
         <td>{{ batch.end_date|default_if_none:"-" }}</td>
         <td>{{ batch.railway_tank_list.count }}</td>
-        <td>{{ batch.gas_amount_spbt|floatformat:2|default_if_none:"-" }}</td>
-        <td>{{ batch.gas_amount_pba|floatformat:2|default_if_none:"-" }}</td>
+        <td>{{ batch.gas_amount_spbt|float_format }}</td>
+        <td>{{ batch.gas_amount_pba|float_format }}</td>
         <td>{% if batch.is_active %}Активна{% else %}Завершена{% endif %}</td>
         <td>{{ batch.ttn|default_if_none:"-" }}</td>
     </tr>

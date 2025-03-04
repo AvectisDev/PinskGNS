@@ -3,6 +3,8 @@
 
 {% block content %}
 
+{% load custom_filters %}
+
 <div class="container-fluid">
     <header class="d-flex flex-wrap align-items-center justify-content-between py-3 mb-4 border-bottom">
         <div class="col-md-3 mb-2 mb-md-0">
@@ -35,9 +37,9 @@
         <td>
         <a href="{{ railway.get_absolute_url }}" style="color: #051831;"> {{ railway.registration_number }} </a>
         </td>
-        <td>{{ railway.full_weight|floatformat:2|default_if_none:"-" }}</td>
-        <td>{{ railway.empty_weight|floatformat:2|default_if_none:"-" }}</td>
-        <td>{{ railway.gas_weight|floatformat:2|default_if_none:"-" }}</td>
+        <td>{{ railway.full_weight|float_format }}</td>
+        <td>{{ railway.empty_weight|float_format }}</td>
+        <td>{{ railway.gas_weight|float_format }}</td>
         <td>{{ railway.gas_type|default_if_none:"-" }}</td>
         <td>{% if railway.is_on_station %}Да{% else %}Нет{% endif %}</td>
         <td>{{ railway.entry_date|default_if_none:"-" }}</td>

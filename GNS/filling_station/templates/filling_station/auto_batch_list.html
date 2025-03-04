@@ -2,8 +2,11 @@
 {% block title %} {{ title }} {% endblock %}
 
 {% block content %}
+<div class="col-md-3 mb-3 mb-md-0">
+    <h5>Партии приёмки/отгрузки автоцистерн</h5>
+</div>
 
-<h5>Партии приёмки/отгрузки автоцистерн</h5>
+{% load custom_filters %}
 
 <table class="table table-striped table-hover vertical-align: middle" style="border-radius: 5px; overflow: hidden;">
     <tr class="table-dark" align="center" style="background-color: #051831 !important; color: white !important;">
@@ -35,10 +38,10 @@
         <td>{{ batch.end_time|default_if_none:"-" }}</td>
         <td>{{ batch.truck|default_if_none:"-" }}</td>
         <td>{{ batch.trailer|default_if_none:"-" }}</td>
-        <td>{{ batch.scale_empty_weight|floatformat:2|default_if_none:"-" }}</td>
-        <td>{{ batch.scale_full_weight|floatformat:2|default_if_none:"-" }}</td>
-        <td>{{ batch.weight_gas_amount|floatformat:2|default_if_none:"-" }}</td>
-        <td>{{ batch.gas_amount|floatformat:2|default_if_none:"-" }}</td>
+        <td>{{ batch.scale_empty_weight|float_format }}</td>
+        <td>{{ batch.scale_full_weight|float_format }}</td>
+        <td>{{ batch.weight_gas_amount|float_format }}</td>
+        <td>{{ batch.gas_amount|float_format }}</td>
         <td>{{ batch.gas_type|default_if_none:"-" }}</td>
         <td>{% if batch.is_active %}Активна{% else %}Завершена{% endif %}</td>
         <td>{{ batch.ttn|default_if_none:"-" }}</td>
