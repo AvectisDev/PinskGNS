@@ -5,7 +5,7 @@ from .models import (Balloon, Truck, Trailer, RailwayTank, TTN, BalloonsLoadingB
                      RailwayBatch, AutoGasBatch)
 from .models import GAS_TYPE_CHOICES, BATCH_TYPE_CHOICES, BALLOON_SIZE_CHOICES
 from crispy_forms.helper import FormHelper
-from crispy_forms.layout import Submit, Layout
+from crispy_forms.layout import Submit
 
 USER_STATUS_LIST = [
     ('Создание паспорта баллона', 'Создание паспорта баллона'),
@@ -26,14 +26,22 @@ USER_STATUS_LIST = [
 class GetBalloonsAmount(forms.Form):
     start_date = forms.DateField(
         label="Начальная дата",
-        widget=forms.DateInput(attrs={'type': 'date'}),
+        widget=forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
         initial=timezone.now().date()
     )
     end_date = forms.DateField(
         label="Конечная дата",
-        widget=forms.DateInput(attrs={'type': 'date'}),
+        widget=forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
         initial=timezone.now().date()
     )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.helper = FormHelper()
+        self.helper.form_class = 'form-horizontal'
+        self.helper.label_class = 'col-lg-4'
+        self.helper.field_class = 'col-lg-8'
+        self.helper.form_method = 'POST'
 
 
 class BalloonForm(forms.ModelForm):

@@ -56,51 +56,65 @@ class BalloonDeleteView(generic.DeleteView):
 
 def reader_info(request, reader=1):
     current_date = datetime.now().date()
-    previous_date = current_date - timedelta(days=1)
 
     if request.method == "POST":
-        required_date = request.POST.get("date")
-        format_required_date = datetime.strptime(required_date, '%Y-%m-%d')
+        form = GetBalloonsAmount(request.POST)
+        if form.is_valid():
+            start_date = form.cleaned_data['start_date']
+            end_date = form.cleaned_data['end_date']
+        else:
+            start_date = current_date
+            end_date = current_date
 
-        # Экспортируем данные в Excel
-        dataset = BalloonResources().export(Reader.objects.filter(number=reader, change_date=format_required_date))
-        response = HttpResponse(dataset.xlsx, content_type='xlsx')
-        response['Content-Disposition'] = f'attachment; filename="RFID_{reader}_{required_date}.xlsx"'
+        action = request.POST.get('action')
 
-        return response
+        if action == 'export':
+            # Экспортируем данные в Excel
+            dataset = BalloonResources().export(
+                Reader.objects.filter(
+                    number=reader,
+                    change_date__range=(start_date, end_date)
+                )
+            )
+            response = HttpResponse(dataset.xlsx, content_type='xlsx')
+            response['Content-Disposition'] = f'attachment; filename="RFID_{reader}_{start_date}-{end_date}.xlsx"'
+            return response
+
+        elif action == 'show':
+            # Показываем данные на странице
+            pass
+
     else:
-        date_process = GetBalloonsAmount()
+        form = GetBalloonsAmount()
+        start_date = current_date
+        end_date = current_date
+
+    # Получаем общее количество баллонов для каждого ридера за период
+    current_quantity = BalloonAmount.objects.filter(
+        reader_id=reader,
+        change_date__range=(start_date, end_date)
+    ).aggregate(
+        total_rfid=Sum('amount_of_rfid'),
+        total_balloons=Sum('amount_of_balloons')
+    )
 
     balloons_list = Reader.objects.order_by('-change_date', '-change_time').filter(number=reader)
-    current_quantity = BalloonAmount.objects.filter(reader_id=reader, change_date=current_date).first()
-    previous_quantity = BalloonAmount.objects.filter(reader_id=reader, change_date=previous_date).first()
 
-    if current_quantity is not None:
-        current_quantity_rfid = current_quantity.amount_of_rfid
-        current_quantity_balloons = current_quantity.amount_of_balloons
-    else:
-        current_quantity_rfid = 0
-        current_quantity_balloons = 0
+    current_quantity_rfid = current_quantity['total_rfid'] or 0
+    current_quantity_balloons = current_quantity['total_balloons'] or 0
 
-    if previous_quantity is not None:
-        previous_quantity_rfid = previous_quantity.amount_of_rfid
-        previous_quantity_balloons = previous_quantity.amount_of_balloons
-    else:
-        previous_quantity_rfid = 0
-        previous_quantity_balloons = 0
-
-    paginator = Paginator(balloons_list, 15)
+    paginator = Paginator(balloons_list, 12)
     page_num = request.GET.get('page', 1)
     page_obj = paginator.get_page(page_num)
 
     context = {
         "page_obj": page_obj,
         'current_quantity_by_reader': current_quantity_rfid,
-        'previous_quantity_by_reader': previous_quantity_rfid,
         'current_quantity_by_sensor': current_quantity_balloons,
-        'previous_quantity_by_sensor': previous_quantity_balloons,
-        'form': date_process,
+        'form': form,
         'reader': reader,
+        'start_date': start_date,
+        'end_date': end_date,
         'reader_status': STATUS_LIST[reader]
     }
     return render(request, "rfid_tables.html", context)

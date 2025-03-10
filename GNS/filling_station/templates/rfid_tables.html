@@ -1,23 +1,26 @@
 {% extends 'base.html' %}
+{% load crispy_forms_tags %}
 {% block title %} Данные с RFID {% endblock %}
 
 {% block content %}
 
 <div>
     <div class="container-fluid">
-    <header class="d-flex flex-wrap align-items-center justify-content-center justify-content-md-between py-3 mb-4 border-bottom">
-        <div class="col-md-7 mb-2 mb-md-0">
-            <h5>Данные со считывателя №{{ reader }} - {{ reader_status }}</h5>
-        </div>
+        <header class="d-flex flex-wrap align-items-center justify-content-center justify-content-md-between py-3 mb-4 border-bottom">
+            <div class="col-md-7 mb-2 mb-md-0">
+                <h5>Данные со считывателя №{{ reader }} - {{ reader_status }}</h5>
+            </div>
 
-        <div class="col-md-4 mb-2 mb-md-0">
-            <form method="get" action="{% url 'filling_station:balloon_list' %}" class="d-flex">
-                 <input type="text" name="query" class="form-control me-2" placeholder="Введите номер метки или серийный номер" value="{{ request.GET.query }}">
-                <button type="submit" class="btn" style="background-color: #3CBBD9; color: white;">Фильтровать</button>
-            </form>
-        </div>
-    </header>
-</div>
+            <div class="col-md-4 mb-2 mb-md-0">
+                <form method="get" action="{% url 'filling_station:balloon_list' %}" class="d-flex">
+                    <input type="text" name="query" class="form-control me-2"
+                           placeholder="Введите номер метки или серийный номер" value="{{ request.GET.query }}">
+                    <button type="submit" class="btn" style="background-color: #3CBBD9; color: white;">Фильтровать
+                    </button>
+                </form>
+            </div>
+        </header>
+    </div>
     <div>
         <table class="table table-striped table-hover vertical-align: middle"
                style="border-radius: 5px; overflow: hidden;">
@@ -49,21 +52,27 @@
 
     {% include 'filling_station/_paginator.html' %}
     <div>
-        <p>Количество баллонов за текущую смену: RFID-считыватель - {{ current_quantity_by_reader }}, оптический датчик
-            - {{ current_quantity_by_sensor }}</p>
-        <p>Количество баллонов за прошлую смену: RFID-считыватель - {{ previous_quantity_by_reader }}, оптический датчик
-            - {{ previous_quantity_by_sensor }}</p>
+         <p>Количество баллонов за период с <strong>{{ start_date|date:"j E Y" }}</strong> по <strong>{{ end_date|date:"j E Y" }}</strong></p>
+        <p>RFID-считыватель - {{ current_quantity_by_reader }}, оптический датчик - {{ current_quantity_by_sensor }}</p>
     </div>
 
-    <div class="container-fluid">
+    <div class="container-fluid mb-3">
         <form method="post" enctype="multipart/form-data" class="row align-items-center">
             {% csrf_token %}
             <div class="col-auto">
-                {{ form }}
+                {{ form.start_date }}
             </div>
             <div class="col-auto">
-                <button class="btn" style="margin: 2% 2% 2% 2%; background-color: #3CBBD9; color: white;" type="submit">
-                    Выгрузить список баллонов
+                {{ form.end_date }}
+            </div>
+            <div class="col-auto">
+                <button type="submit" name="action" value="show" class="btn"
+                        style="background-color: #3CBBD9; color: white;">
+                    Показать
+                </button>
+                <button type="submit" name="action" value="export" class="btn"
+                        style="background-color: #3CBBD9; color: white;">
+                    Выгрузить список
                 </button>
             </div>
         </form>

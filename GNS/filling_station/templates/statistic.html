@@ -7,7 +7,7 @@
         <header class="d-flex flex-wrap align-items-center justify-content-center justify-content-md-between py-3 mb-4 border-bottom">
             <div class="col-md-3 mb-2 mb-md-0">
                 <h5 style="white-space: nowrap;">
-                    Статистика по ГНС за период с {{ start_date|date:"j E Y" }} по {{ end_date|date:"j E Y" }}
+                    Статистика по ГНС за период с <strong>{{ start_date|date:"j E Y" }}</strong> по <strong>{{ end_date|date:"j E Y" }}</strong>
                 </h5>
             </div>
 
@@ -17,7 +17,7 @@
                     <div class="me-2">
                         {{ form.start_date }}
                     </div>
-                    <div class="me-2">  <!-- Отступ справа для полей ввода -->
+                    <div class="me-2">
                         {{ form.end_date }}
                     </div>
                     <button class="btn" style="background-color: #3CBBD9; color: white;" type="submit">
@@ -31,9 +31,7 @@
     <div class="container">
         <div class="row justify-content-center">
             <div class="col-md-8">
-                <!-- Контейнер для строк -->
                 <div class="d-flex flex-column">
-                    <!-- Каждая строка -->
                     <div class="d-flex justify-content-between align-items-center mb-2">
                         <p class="text-end" style="flex: 0 0 100px;">{{ balloons_quantity_by_reader_1 }}</p>
                         <p class="text-start ms-3" style="flex: 1;">Количество баллонов RFID-считыватель №1 (Регистрация
