@@ -5,42 +5,6 @@ from filling_station.management.commands.intellect import (separation_string_dat
                                                            get_transport_type)
 
 
-def get_opc_data():
-
-    try:
-        client.connect()
-        logger.warning('Connect to OPC server successful')
-
-        if AUTO['response_number_detect']:
-            set_opc_value("ns=4; s=Address Space.PLC_SU2.batch.response_number_detect", True)
-            AUTO['response_number_detect'] = False
-        if AUTO['response_batch_complete']:
-            set_opc_value("ns=4; s=Address Space.PLC_SU2.batch.response_batch_complete", True)
-            AUTO['response_batch_complete'] = False
-
-        AUTO['batch_type'] = get_opc_value("ns=4; s=Address Space.PLC_SU2.batch.batch_type")
-        AUTO['gas_type'] = get_opc_value("ns=4; s=Address Space.PLC_SU2.batch.gas_type")
-
-        AUTO['initial_mass_meter'] = get_opc_value("ns=4; s=Address Space.PLC_SU2.batch.initial_mass_meter")
-        AUTO['final_mass_meter'] = get_opc_value("ns=4; s=Address Space.PLC_SU2.batch.final_mass_meter")
-        AUTO['gas_amount'] = get_opc_value("ns=4; s=Address Space.PLC_SU2.batch.gas_amount")
-
-        AUTO['truck_full_weight'] = get_opc_value("ns=4; s=Address Space.PLC_SU2.batch.truck_full_weight")
-        AUTO['truck_empty_weight'] = get_opc_value("ns=4; s=Address Space.PLC_SU2.batch.truck_empty_weight")
-        AUTO['weight_gas_amount'] = get_opc_value("ns=4; s=Address Space.PLC_SU2.batch.weight_gas_amount")
-
-        AUTO['request_number_identification'] = get_opc_value("ns=4; s=Address Space.PLC_SU2.batch.request_number_identification")
-        AUTO['request_batch_complete'] = get_opc_value("ns=4; s=Address Space.PLC_SU2.batch.request_batch_complete")
-
-        logger.warning(f'Auto:{AUTO}')
-
-    except Exception as error:
-        logger.error(f'No connection to OPC server: {error}')
-    finally:
-        client.disconnect()
-        logger.warning('Disconnect from OPC server')
-
-
 async def transport_process(transport: dict):
     registration_number = transport['registration_number']
     date, time = separation_string_date(transport['date'])
