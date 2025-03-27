@@ -16,4 +16,5 @@ class Command(BaseCommand):
             for batch in railway_batch:
                 if batch.begin_date < current_datetime - timedelta(hours=1):
                     batch.is_active = False
+                    batch.end_date = current_datetime
                     batch.save()

@@ -3,7 +3,6 @@ import db
 import binascii
 from datetime import datetime
 from settings import READER_LIST, COMMANDS
-from miriada import get_balloon_by_nfc_tag as get_balloon
 import balloon_api
 import logging
 from concurrent.futures import ThreadPoolExecutor

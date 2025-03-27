@@ -1,3 +1,4 @@
+from typing import Optional
 import requests
 import logging
 from datetime import datetime, timedelta
@@ -36,11 +37,10 @@ def get_intellect_data(data) -> list:
     """
     try:
         intellect_url = "http://10.10.0.252:10001/lprserver/GetProtocolNumbers"  # intellect server address
-        response = requests.post(intellect_url, json=data, timeout=5)
+        response = requests.post(intellect_url, json=data, timeout=2)
         response.raise_for_status()
 
         result = response.json()
-        logger.debug(f'Ответ intellect - {result}')
         if result['Status'] == "OK":
             item_list = result.get('Protocols', [])
             return item_list
@@ -83,16 +83,15 @@ def separation_string_date(date_string: str = '') -> tuple:
 def get_registration_number_list(server: dict) -> list:
     """
     Функция формирует тело запроса к базе данных "Интеллект".
-    Возвращает номер и дату прибывших/убывших машин и прицепов в виде списка словарей.
+    Возвращает данные машин, прицепов и цистерн в виде списка словарей.
     """
 
     data_for_request = {
         "id": server.get('id'),
         "time_from": get_start_time(server.get('delta_minutes')),
-        "validaty_from": "5" if server.get('id') == '1' else "90"
+        "validaty_from": "" if server.get('id') == '1' else "85"
     }
-    intellect_data = get_intellect_data(data_for_request)
-    return intellect_data
+    return get_intellect_data(data_for_request)
 
 
 def get_plate_image(plate_id):
@@ -101,7 +100,7 @@ def get_plate_image(plate_id):
     """
     image_url = f"http://10.10.0.252:10001/lprserver/GetImage/Plate_numbers/{plate_id}"
     try:
-        response = requests.get(image_url, timeout=5)
+        response = requests.get(image_url, timeout=2)
         response.raise_for_status()
 
         if response.headers['Content-Type'] == 'image/jpeg':
@@ -113,15 +112,15 @@ def get_plate_image(plate_id):
         return None
 
 
-def check_on_station(transport: dict) -> bool:
+def check_on_station(transport: dict) -> Optional[bool]:
     """
     Функция обрабатывает направление движения транспорта, определённое "Интеллектом", и возвращает статус
     return:
         True - транспорт въёхал на территорию ГНС
         False - транспорт выехал с территории ГНС
     """
-    camera = transport['camera']
-    direction = transport['direction']
+    camera = transport.get('camera')
+    direction = transport.get('direction')
 
     if camera == 'Камера 27':
         if direction == '1':

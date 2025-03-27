@@ -119,9 +119,15 @@ ipython_config.py
 # PEP 582; used by e.g. github.com/David-OConnor/pyflow and github.com/pdm-project/pdm
 __pypackages__/
 
+# media files
+GNS/media/
+
 # Celery stuff
 celerybeat-schedule
 celerybeat.pid
+*.bak
+*.dat
+*.dir
 
 # SageMath parsed files
 *.sage.py

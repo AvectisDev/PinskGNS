@@ -19,7 +19,7 @@ services:
       resources:
         limits:
           cpus: '8'
-          memory: 10G
+          memory: 5G
 
   adminer:
       image: adminer
@@ -33,7 +33,7 @@ services:
   django_backend:
     build: .
     container_name: django
-    command: gunicorn GNS.wsgi:application --bind 0.0.0.0:8000 --workers 8 --threads 4 --access-logfile -
+    command: gunicorn GNS.wsgi:application --bind 0.0.0.0:8000 --workers 10 --access-logfile -
     restart: unless-stopped
     ports:
       - 8000:8000
@@ -51,13 +51,14 @@ services:
       REDIS_URL: redis://redis:6379/0
     volumes:
       - static_volume:/app/static
+      - media_volume:/app/media
     networks:
       - app_network
     deploy:
       resources:
         limits:
           cpus: '8'
-          memory: 10G
+          memory: 5G
 
   redis:
     image: redis:latest
@@ -83,6 +84,8 @@ services:
       DB_HOST: ${DB_HOST}
       DB_PORT: ${DB_PORT}
       REDIS_URL: redis://redis:6379/0
+    volumes:
+      - media_volume:/app/media
     networks:
       - app_network
 
@@ -129,6 +132,7 @@ services:
 volumes:
   postgres_data:
   static_volume:
+  media_volume:
 
 networks:
     app_network:

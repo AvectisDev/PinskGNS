@@ -185,6 +185,10 @@ CELERY_BEAT_SCHEDULE = {
         'task': 'filling_station.tasks.auto_gas_processing',
         'schedule': 10.0,
     },
+    'kpp_processing': {
+        'task': 'filling_station.tasks.kpp_processing',
+        'schedule': 60.0,
+    },
 }
 
 LOGGING = {
