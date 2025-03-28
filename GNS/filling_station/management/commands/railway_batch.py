@@ -14,7 +14,8 @@ class Command(BaseCommand):
             current_datetime = datetime.now(timezone.utc)
 
             for batch in railway_batch:
-                if batch.begin_date < current_datetime - timedelta(hours=1):
+                logger.debug(f'Есть активная партия: {batch}')
+                if batch.begin_date < current_datetime - timedelta(minutes=30):
                     batch.is_active = False
                     batch.end_date = current_datetime
                     batch.save()

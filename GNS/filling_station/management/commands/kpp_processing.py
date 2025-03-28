@@ -10,16 +10,15 @@ logger = logging.getLogger('filling_station')
 
 
 class Command(BaseCommand):
-    CACHE_TIMEOUT = 5  # Время хранения номера в кэше в секундах
+    CACHE_TIMEOUT = 300  # Время хранения номера в кэше в секундах
 
     def get_transport_data(self):
         """
         Функция отправляет запрос в Интеллект. В ответ приходит JSON ответ со списком словарей. Каждый словарь - это
         описание одной записи (цистерны)
         """
-        logger.debug(f'КПП. Выполняется запрос к Интеллекту...')
         transport_list = get_registration_number_list(INTELLECT_SERVER_LIST[2])
-        logger.debug(f'КПП. Список номеров: {transport_list}')
+        logger.debug(f'КПП. Список номеров c интеллекта: {transport_list}')
         return transport_list
 
     def transport_process(self, registration_number, is_on_station, current_date, current_time, model):
@@ -49,7 +48,6 @@ class Command(BaseCommand):
 
     def handle(self, *args, **kwargs):
         try:
-            logger.info('КПП. Обработка регистрационных номеров')
             current_date, current_time = datetime.now().date(), datetime.now().time()
 
             registration_number_list = self.get_transport_data()

@@ -2,6 +2,7 @@ import logging
 from opcua import Client, ua
 from django.core.exceptions import ObjectDoesNotExist, MultipleObjectsReturned
 from django.core.management.base import BaseCommand
+from django.db.models import Q
 from datetime import datetime
 from filling_station.models import AutoGasBatch, Truck, TruckType, Trailer, TrailerType
 from .intellect import get_registration_number_list, INTELLECT_SERVER_LIST
@@ -40,10 +41,11 @@ class Command(BaseCommand):
         self._trailer_type = None
 
     @property
-    def truck_type(self):
-        if not self._truck_type:
-            self._truck_type = TruckType.objects.get(type="Цистерна")
-        return self._truck_type
+    def truck_type_filter(self):
+        """Возвращает готовый фильтр для queryset"""
+        if not hasattr(self, '_truck_type_filter'):
+            self._truck_type_filter = Q(type__type="Цистерна") | Q(type__type="Седельный тягач")
+        return self._truck_type_filter
 
     @property
     def trailer_type(self):
@@ -83,20 +85,21 @@ class Command(BaseCommand):
             transport_list = get_registration_number_list(INTELLECT_SERVER_LIST[1])
             logger.debug(f'Автовесовая. Список номеров: {transport_list}')
             if not transport_list:
-                logger.debug('Автоколонка. Машина не определена')
+                logger.debug('Автовесовая. Машина не определена')
                 return []
             return [transport['number'] for transport in transport_list]
         except Exception as e:
-            logger.error(f'Автоколонка. Ошибка при получении списка номеров: {e}', exc_info=True)
+            logger.error(f'Автовесовая. Ошибка при получении списка номеров: {e}', exc_info=True)
             return []
 
     def find_transports(self, registration_numbers):
         """Найти грузовик и прицеп по списку номеров."""
         try:
             truck = Truck.objects.filter(
-                registration_number__in=registration_numbers,
-                type=self.truck_type
-            ).first()
+                registration_number__in=registration_numbers
+            ).filter(
+                self.truck_type_filter
+            ).select_related('type').first()
 
             trailer = Trailer.objects.filter(
                 registration_number__in=registration_numbers,
@@ -105,19 +108,19 @@ class Command(BaseCommand):
 
             return truck, trailer
         except Exception as e:
-            logger.error(f'Автоколонка. Ошибка при поиске транспорта: {e}', exc_info=True)
+            logger.error(f'Автовесовая. Ошибка при поиске транспорта: {e}', exc_info=True)
             return None, None
 
     def create_batch(self, batch_type, gas_type_code):
         """Создать новую партию."""
         registration_numbers = self.get_transport_numbers()
         if not registration_numbers:
-            logger.warning('Автоколонка. Список номеров отсутствует')
+            logger.warning('Автовесовая. Список номеров отсутствует')
             return
 
         truck, trailer = self.find_transports(registration_numbers)
         if not truck:
-            logger.error('Автоколонка. Не найден подходящий грузовик')
+            logger.error('Автовесовая. Не найден подходящий грузовик')
             return
 
         try:
@@ -130,7 +133,7 @@ class Command(BaseCommand):
             )
             self.set_opc_value("response_batch_create", True)
         except Exception as e:
-            logger.error(f'Автоколонка. Ошибка при создании партии: {e}', exc_info=True)
+            logger.error(f'Автовесовая. Ошибка при создании партии: {e}', exc_info=True)
 
     def complete_batch(self, batch_data):
         """Завершить текущую активную партию."""
@@ -172,6 +175,6 @@ class Command(BaseCommand):
                 self.complete_batch(opc_values)
 
         except Exception as error:
-            logger.error(f'Ошибка в основном цикле: {error}', exc_info=True)
+            logger.error(f'Автовесовая. Ошибка в основном цикле: {error}', exc_info=True)
         finally:
             self.client.disconnect()
