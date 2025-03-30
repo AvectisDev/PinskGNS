@@ -126,11 +126,22 @@ class Command(BaseCommand):
         try:
             AutoGasBatch.objects.create(
                 batch_type='l' if batch_type == 'loading' else 'u',
-                truck=truck.id,
-                trailer=trailer.id if trailer else None,
+                truck=truck,
+                trailer=trailer,
                 is_active=True,
                 gas_type=self.GAS_TYPES.get(gas_type_code)
             )
+
+            # Определяем показатель вместимости цистерны
+            if truck.type.type == "Цистерна":
+                capacity_value = truck.max_gas_volume
+            elif truck.type.type == "Седельный тягач" and trailer:
+                capacity_value = trailer.max_gas_volume
+            else:
+                capacity_value = 0.0
+                logger.warning(f'Не удалось определить емкость для {truck.registration_number}')
+            
+            self.set_opc_value("truck_capacity", capacity_value)
             self.set_opc_value("response_batch_create", True)
         except Exception as e:
             logger.error(f'Автовесовая. Ошибка при создании партии: {e}', exc_info=True)
