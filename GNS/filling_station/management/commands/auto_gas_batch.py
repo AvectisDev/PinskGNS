@@ -21,6 +21,7 @@ class Command(BaseCommand):
         "truck_full_weight": "ns=4; s=Address Space.PLC_SU2.batch.truck_full_weight",
         "truck_empty_weight": "ns=4; s=Address Space.PLC_SU2.batch.truck_empty_weight",
         "weight_gas_amount": "ns=4; s=Address Space.PLC_SU2.batch.weight_gas_amount",
+        "truck_capacity ": "ns=4; s=Address Space.PLC_SU2.batch.truck_capacity",
         "request_batch_create": "ns=4; s=Address Space.PLC_SU2.batch.request_number_identification",
         "response_batch_create": "ns=4; s=Address Space.PLC_SU2.batch.response_number_detect",
         "request_batch_complete": "ns=4; s=Address Space.PLC_SU2.batch.request_batch_complete",
