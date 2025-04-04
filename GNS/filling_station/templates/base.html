@@ -32,14 +32,22 @@
                    role="button"
                    aria-expanded="false">Считыватели</a>
                 <ul class="dropdown-menu">
-                    <li><a class="dropdown-item" href="/reader/1" style="color: #051831;">1 - Регистрация пустого баллона на складе (из кассеты)</a></li>
-                    <li><a class="dropdown-item" href="/reader/2" style="color: #051831;">2 - Погрузка полного баллона в кассету</a></li>
-                    <li><a class="dropdown-item" href="/reader/3" style="color: #051831;">3 - Погрузка полного баллона на трал 1</a></li>
-                    <li><a class="dropdown-item" href="/reader/4" style="color: #051831;">4 - Погрузка полного баллона на трал 2</a></li>
-                    <li><a class="dropdown-item" href="/reader/5" style="color: #051831;">5 - Регистрация полного баллона на складе</a></li>
-                    <li><a class="dropdown-item" href="/reader/6" style="color: #051831;">6 - Регистрация пустого баллона на складе (рампа)</a></li>
-                    <li><a class="dropdown-item" href="/reader/7" style="color: #051831;">7 - Регистрация пустого баллона на складе (цех)</a></li>
-                    <li><a class="dropdown-item" href="/reader/8" style="color: #051831;">8 - Наполнение баллона сжиженным газом</a></li>
+                    <li><a class="dropdown-item" href="/reader/1" style="color: #051831;">1 - Регистрация пустого
+                        баллона на складе (из кассеты)</a></li>
+                    <li><a class="dropdown-item" href="/reader/2" style="color: #051831;">2 - Погрузка полного баллона в
+                        кассету</a></li>
+                    <li><a class="dropdown-item" href="/reader/3" style="color: #051831;">3 - Погрузка полного баллона
+                        на трал 1</a></li>
+                    <li><a class="dropdown-item" href="/reader/4" style="color: #051831;">4 - Погрузка полного баллона
+                        на трал 2</a></li>
+                    <li><a class="dropdown-item" href="/reader/5" style="color: #051831;">5 - Регистрация полного
+                        баллона на складе</a></li>
+                    <li><a class="dropdown-item" href="/reader/6" style="color: #051831;">6 - Регистрация пустого
+                        баллона на складе (рампа)</a></li>
+                    <li><a class="dropdown-item" href="/reader/7" style="color: #051831;">7 - Регистрация пустого
+                        баллона на складе (цех)</a></li>
+                    <li><a class="dropdown-item" href="/reader/8" style="color: #051831;">8 - Наполнение баллона
+                        сжиженным газом</a></li>
                 </ul>
             </li>
             <li class="nav-item dropdown">
@@ -82,6 +90,13 @@
             </li>
             <li class="nav-item">
                 <a class="nav-link" href="{% url 'filling_station:statistic' %}" style="color: #051831;">Статистика</a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" href="/carousel/1" style="color: #051831;">УНБ</a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" href="{% url 'filling_station:carousel_settings_detail' %}" style="color: #051831;">Настройки
+                    карусели</a>
             </li>
         </ul>
 

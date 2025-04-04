@@ -1,14 +1,15 @@
-from django.shortcuts import render, get_object_or_404
+from django.shortcuts import render
 from django.http import HttpResponse
 from django.core.paginator import Paginator
-from django.urls import reverse_lazy
+from django.urls import reverse_lazy, reverse
 from django.views import generic
 from django.db.models import Q, Sum
 from .models import (Balloon, Truck, Trailer, RailwayTank, TTN, BalloonsLoadingBatch, BalloonsUnloadingBatch,
-                     RailwayBatch, BalloonAmount, AutoGasBatch, Reader)
+                     RailwayBatch, BalloonAmount, AutoGasBatch, Reader, Carousel, CarouselSettings)
 from .admin import BalloonResources
 from .forms import (GetBalloonsAmount, BalloonForm, TruckForm, TrailerForm, RailwayTankForm, TTNForm,
-                    BalloonsLoadingBatchForm, BalloonsUnloadingBatchForm, RailwayBatchForm, AutoGasBatchForm)
+                    BalloonsLoadingBatchForm, BalloonsUnloadingBatchForm, RailwayBatchForm, AutoGasBatchForm,
+                    CarouselSettingsForm)
 from datetime import datetime, timedelta
 
 STATUS_LIST = {
@@ -118,6 +119,95 @@ def reader_info(request, reader=1):
         'reader_status': STATUS_LIST[reader]
     }
     return render(request, "rfid_tables.html", context)
+
+# Обработка карусели
+def carousel_info(request, carousel_number=1):
+    current_date = datetime.now().date()
+
+    if request.method == "POST":
+        form = GetCarouselBalloonsAmount(request.POST)
+        if form.is_valid():
+            start_date = form.cleaned_data['start_date']
+            end_date = form.cleaned_data['end_date']
+            size = form.cleaned_data['size']
+        else:
+            start_date = current_date
+            end_date = current_date
+            size = None
+
+        action = request.POST.get('action')
+
+        if action == 'export':
+            queryset = Carousel.objects.filter(
+                carousel_number=carousel_number,
+                change_date__range=(start_date, end_date)
+            )
+            if size:
+                queryset = queryset.filter(size=size)
+
+            dataset = CarouselResources().export(queryset)
+            response = HttpResponse(dataset.xlsx, content_type='xlsx')
+            response[
+                'Content-Disposition'] = f'attachment; filename="Carousel_{carousel_number}_{start_date}-{end_date}.xlsx"'
+            return response
+
+    else:
+        form = GetCarouselBalloonsAmount()
+        start_date = current_date
+        end_date = current_date
+        size = None
+
+    carousel_list = Carousel.objects.all()
+
+    if size:
+        total_count = carousel_list.filter(
+            carousel_number=carousel_number,
+            change_date__range=(start_date, end_date),
+            size=size
+        ).count()
+    else:
+        total_count = carousel_list.filter(
+            carousel_number=carousel_number,
+            change_date__range=(start_date, end_date)
+        ).count()
+
+    paginator = Paginator(carousel_list, 13)
+    page_num = request.GET.get('page', 1)
+    page_obj = paginator.get_page(page_num)
+
+    context = {
+        "page_obj": page_obj,
+        'form': form,
+        'carousel_number': carousel_number,
+        'start_date': start_date,
+        'end_date': end_date,
+        'selected_size': size,
+        'total_count': total_count
+    }
+    return render(request, "filling_station/carousel_list.html", context)
+
+
+class CarouselSettingsDetailView(generic.DetailView):
+    model = CarouselSettings
+    template_name = 'filling_station/carousel_settings_detail.html'
+    context_object_name = 'carousel_settings'
+
+    def get_object(self, queryset=None):
+        # Получаем единственный объект настроек карусели
+        return CarouselSettings.objects.first()
+
+class CarouselSettingsUpdateView(generic.UpdateView):
+    model = CarouselSettings
+    form_class = CarouselSettingsForm
+    # template_name = 'carousel_settings_form.html'
+    template_name = 'filling_station/_equipment_form.html'
+
+    def get_object(self, queryset=None):
+        # Получаем единственный объект настроек карусели
+        return CarouselSettings.objects.first()
+
+    def get_success_url(self):
+        return reverse('filling_station:carousel_settings_detail')
 
 
 # Партии приёмки баллонов

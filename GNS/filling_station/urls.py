@@ -96,6 +96,9 @@ urlpatterns = [
          name="railway_tank_update"),
     path('transport/railway_tanks/<pk>/delete/', views.RailwayTankDeleteView.as_view(), name="railway_tank_delete"),
 
-
     path('statistic', views.statistic, name="statistic"),
+
+    path('carousel/<int:carousel_number>/', views.carousel_info, name='carousel_info'),
+    path('carousel-settings/', views.CarouselSettingsDetailView.as_view(), name='carousel_settings_detail'),
+    path('carousel-settings/update/', views.CarouselSettingsUpdateView.as_view(), name='carousel_settings_update'),
 ]

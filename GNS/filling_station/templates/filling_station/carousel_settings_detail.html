@@ -1,0 +1,72 @@
+{% extends 'base.html' %}
+{% block title %} Настройки карусели {% endblock %}
+
+{% block content %}
+<div class="col-md-2 mb-2 mb-md-0">
+    <h5>Настройки карусели</h5>
+</div>
+
+<div class="container text-center">
+    <div class="row">
+        <div class="col text-end">
+            <p>Только чтение</p>
+            <p>Использовать коррекцию веса</p>
+            <p>Использовать общее значение коррекции веса</p>
+            <p>Значение корректировки веса</p>
+            <p>Корректор для 1 поста</p>
+            <p>Корректор для 2 поста</p>
+            <p>Корректор для 3 поста</p>
+            <p>Корректор для 4 поста</p>
+            <p>Корректор для 5 поста</p>
+            <p>Корректор для 6 поста</p>
+            <p>Корректор для 7 поста</p>
+            <p>Корректор для 8 поста</p>
+            <p>Корректор для 9 поста</p>
+            <p>Корректор для 10 поста</p>
+            <p>Корректор для 11 поста</p>
+            <p>Корректор для 12 поста</p>
+            <p>Корректор для 13 поста</p>
+            <p>Корректор для 14 поста</p>
+            <p>Корректор для 15 поста</p>
+            <p>Корректор для 16 поста</p>
+            <p>Корректор для 17 поста</p>
+            <p>Корректор для 18 поста</p>
+            <p>Корректор для 19 поста</p>
+            <p>Корректор для 20 поста</p>
+        </div>
+        <div class="col text-start">
+            <p>{% if carousel_settings.read_only %}Да{% else %}Нет{% endif %}</p>
+            <p>{% if carousel_settings.use_weight_management %}Да{% else %}Нет{% endif %}</p>
+            <p>{% if carousel_settings.use_common_correction %}Да{% else %}Нет{% endif %}</p>
+            <p>{{ carousel_settings.weight_correction_value|default_if_none:"-" }}</p>
+            <p>{{ carousel_settings.post_1_correction|default_if_none:"-" }}</p>
+            <p>{{ carousel_settings.post_2_correction|default_if_none:"-" }}</p>
+            <p>{{ carousel_settings.post_3_correction|default_if_none:"-" }}</p>
+            <p>{{ carousel_settings.post_4_correction|default_if_none:"-" }}</p>
+            <p>{{ carousel_settings.post_5_correction|default_if_none:"-" }}</p>
+            <p>{{ carousel_settings.post_6_correction|default_if_none:"-" }}</p>
+            <p>{{ carousel_settings.post_7_correction|default_if_none:"-" }}</p>
+            <p>{{ carousel_settings.post_8_correction|default_if_none:"-" }}</p>
+            <p>{{ carousel_settings.post_9_correction|default_if_none:"-" }}</p>
+            <p>{{ carousel_settings.post_10_correction|default_if_none:"-" }}</p>
+            <p>{{ carousel_settings.post_11_correction|default_if_none:"-" }}</p>
+            <p>{{ carousel_settings.post_12_correction|default_if_none:"-" }}</p>
+            <p>{{ carousel_settings.post_13_correction|default_if_none:"-" }}</p>
+            <p>{{ carousel_settings.post_14_correction|default_if_none:"-" }}</p>
+            <p>{{ carousel_settings.post_15_correction|default_if_none:"-" }}</p>
+            <p>{{ carousel_settings.post_16_correction|default_if_none:"-" }}</p>
+            <p>{{ carousel_settings.post_17_correction|default_if_none:"-" }}</p>
+            <p>{{ carousel_settings.post_18_correction|default_if_none:"-" }}</p>
+            <p>{{ carousel_settings.post_19_correction|default_if_none:"-" }}</p>
+            <p>{{ carousel_settings.post_20_correction|default_if_none:"-" }}</p>
+        </div>
+    </div>
+</div>
+
+<div class="container text-center mb-3">
+    <button type="button" class="btn" style="background-color: #3CBBD9; color: white;"
+            onclick="location.href='{% url 'filling_station:carousel_settings_update' %}'">Редактировать
+    </button>
+</div>
+
+{% endblock content %}
