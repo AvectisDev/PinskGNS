@@ -4,6 +4,7 @@ from .management.commands.generate_1C_file import Command as Generate1CFileComma
 from .management.commands.railway_tank import Command as RailwayTankHandleCommand
 from .management.commands.auto_gas_batch import Command as AutoGasBatchHandleCommand
 from .management.commands.railway_batch import Command as RailwayBatchHandleCommand
+from .management.commands.kpp_processing import Command as KppHandleCommand
 
 logger = logging.getLogger('filling_station')
 
@@ -21,11 +22,17 @@ def railway_tank_processing():
 @shared_task
 def railway_batch_processing():
     command = RailwayBatchHandleCommand()
-    logger.info('Проверка активных партий...')
+    logger.info('Проверка активных жд партий...')
     command.handle()
 
 @shared_task
 def auto_gas_processing():
     command = AutoGasBatchHandleCommand()
     logger.info('Начало обработки автоцистерн...')
+    command.handle()
+
+@shared_task
+def kpp_processing():
+    command = KppHandleCommand()
+    logger.info('Обработка номеров на КПП...')
     command.handle()

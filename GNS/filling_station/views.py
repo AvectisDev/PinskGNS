@@ -1,14 +1,15 @@
-from django.shortcuts import render, get_object_or_404
+from django.shortcuts import render
 from django.http import HttpResponse
 from django.core.paginator import Paginator
-from django.urls import reverse_lazy
+from django.urls import reverse_lazy, reverse
 from django.views import generic
 from django.db.models import Q, Sum
 from .models import (Balloon, Truck, Trailer, RailwayTank, TTN, BalloonsLoadingBatch, BalloonsUnloadingBatch,
-                     RailwayBatch, BalloonAmount, AutoGasBatch, Reader)
+                     RailwayBatch, BalloonAmount, AutoGasBatch, Reader, Carousel, CarouselSettings)
 from .admin import BalloonResources
 from .forms import (GetBalloonsAmount, BalloonForm, TruckForm, TrailerForm, RailwayTankForm, TTNForm,
-                    BalloonsLoadingBatchForm, BalloonsUnloadingBatchForm, RailwayBatchForm, AutoGasBatchForm)
+                    BalloonsLoadingBatchForm, BalloonsUnloadingBatchForm, RailwayBatchForm, AutoGasBatchForm,
+                    CarouselSettingsForm)
 from datetime import datetime, timedelta
 
 STATUS_LIST = {
@@ -56,54 +57,157 @@ class BalloonDeleteView(generic.DeleteView):
 
 def reader_info(request, reader=1):
     current_date = datetime.now().date()
-    previous_date = current_date - timedelta(days=1)
 
     if request.method == "POST":
-        required_date = request.POST.get("date")
-        format_required_date = datetime.strptime(required_date, '%Y-%m-%d')
+        form = GetBalloonsAmount(request.POST)
+        if form.is_valid():
+            start_date = form.cleaned_data['start_date']
+            end_date = form.cleaned_data['end_date']
+        else:
+            start_date = current_date
+            end_date = current_date
 
-        # Экспортируем данные в Excel
-        dataset = BalloonResources().export(Reader.objects.filter(number=reader, change_date=format_required_date))
-        response = HttpResponse(dataset.xlsx, content_type='xlsx')
-        response['Content-Disposition'] = f'attachment; filename="RFID_{reader}_{required_date}.xlsx"'
+        action = request.POST.get('action')
 
-        return response
+        if action == 'export':
+            # Экспортируем данные в Excel
+            dataset = BalloonResources().export(
+                Reader.objects.filter(
+                    number=reader,
+                    change_date__range=(start_date, end_date)
+                )
+            )
+            response = HttpResponse(dataset.xlsx, content_type='xlsx')
+            response['Content-Disposition'] = f'attachment; filename="RFID_{reader}_{start_date}-{end_date}.xlsx"'
+            return response
+
+        elif action == 'show':
+            # Показываем данные на странице
+            pass
+
     else:
-        date_process = GetBalloonsAmount()
+        form = GetBalloonsAmount()
+        start_date = current_date
+        end_date = current_date
+
+    # Получаем общее количество баллонов для каждого ридера за период
+    current_quantity = BalloonAmount.objects.filter(
+        reader_id=reader,
+        change_date__range=(start_date, end_date)
+    ).aggregate(
+        total_rfid=Sum('amount_of_rfid'),
+        total_balloons=Sum('amount_of_balloons')
+    )
 
     balloons_list = Reader.objects.order_by('-change_date', '-change_time').filter(number=reader)
-    current_quantity = BalloonAmount.objects.filter(reader_id=reader, change_date=current_date).first()
-    previous_quantity = BalloonAmount.objects.filter(reader_id=reader, change_date=previous_date).first()
 
-    if current_quantity is not None:
-        current_quantity_rfid = current_quantity.amount_of_rfid
-        current_quantity_balloons = current_quantity.amount_of_balloons
-    else:
-        current_quantity_rfid = 0
-        current_quantity_balloons = 0
+    current_quantity_rfid = current_quantity['total_rfid'] or 0
+    current_quantity_balloons = current_quantity['total_balloons'] or 0
 
-    if previous_quantity is not None:
-        previous_quantity_rfid = previous_quantity.amount_of_rfid
-        previous_quantity_balloons = previous_quantity.amount_of_balloons
-    else:
-        previous_quantity_rfid = 0
-        previous_quantity_balloons = 0
-
-    paginator = Paginator(balloons_list, 15)
+    paginator = Paginator(balloons_list, 12)
     page_num = request.GET.get('page', 1)
     page_obj = paginator.get_page(page_num)
 
     context = {
         "page_obj": page_obj,
         'current_quantity_by_reader': current_quantity_rfid,
-        'previous_quantity_by_reader': previous_quantity_rfid,
         'current_quantity_by_sensor': current_quantity_balloons,
-        'previous_quantity_by_sensor': previous_quantity_balloons,
-        'form': date_process,
+        'form': form,
         'reader': reader,
+        'start_date': start_date,
+        'end_date': end_date,
         'reader_status': STATUS_LIST[reader]
     }
     return render(request, "rfid_tables.html", context)
+
+# Обработка карусели
+def carousel_info(request, carousel_number=1):
+    current_date = datetime.now().date()
+
+    if request.method == "POST":
+        form = GetCarouselBalloonsAmount(request.POST)
+        if form.is_valid():
+            start_date = form.cleaned_data['start_date']
+            end_date = form.cleaned_data['end_date']
+            size = form.cleaned_data['size']
+        else:
+            start_date = current_date
+            end_date = current_date
+            size = None
+
+        action = request.POST.get('action')
+
+        if action == 'export':
+            queryset = Carousel.objects.filter(
+                carousel_number=carousel_number,
+                change_date__range=(start_date, end_date)
+            )
+            if size:
+                queryset = queryset.filter(size=size)
+
+            dataset = CarouselResources().export(queryset)
+            response = HttpResponse(dataset.xlsx, content_type='xlsx')
+            response[
+                'Content-Disposition'] = f'attachment; filename="Carousel_{carousel_number}_{start_date}-{end_date}.xlsx"'
+            return response
+
+    else:
+        form = GetCarouselBalloonsAmount()
+        start_date = current_date
+        end_date = current_date
+        size = None
+
+    carousel_list = Carousel.objects.all()
+
+    if size:
+        total_count = carousel_list.filter(
+            carousel_number=carousel_number,
+            change_date__range=(start_date, end_date),
+            size=size
+        ).count()
+    else:
+        total_count = carousel_list.filter(
+            carousel_number=carousel_number,
+            change_date__range=(start_date, end_date)
+        ).count()
+
+    paginator = Paginator(carousel_list, 13)
+    page_num = request.GET.get('page', 1)
+    page_obj = paginator.get_page(page_num)
+
+    context = {
+        "page_obj": page_obj,
+        'form': form,
+        'carousel_number': carousel_number,
+        'start_date': start_date,
+        'end_date': end_date,
+        'selected_size': size,
+        'total_count': total_count
+    }
+    return render(request, "filling_station/carousel_list.html", context)
+
+
+class CarouselSettingsDetailView(generic.DetailView):
+    model = CarouselSettings
+    template_name = 'filling_station/carousel_settings_detail.html'
+    context_object_name = 'carousel_settings'
+
+    def get_object(self, queryset=None):
+        # Получаем единственный объект настроек карусели
+        return CarouselSettings.objects.first()
+
+class CarouselSettingsUpdateView(generic.UpdateView):
+    model = CarouselSettings
+    form_class = CarouselSettingsForm
+    # template_name = 'carousel_settings_form.html'
+    template_name = 'filling_station/_equipment_form.html'
+
+    def get_object(self, queryset=None):
+        # Получаем единственный объект настроек карусели
+        return CarouselSettings.objects.first()
+
+    def get_success_url(self):
+        return reverse('filling_station:carousel_settings_detail')
 
 
 # Партии приёмки баллонов

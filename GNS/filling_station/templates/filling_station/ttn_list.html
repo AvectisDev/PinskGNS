@@ -39,7 +39,7 @@
         <td>{{ ttn.shipper }}</td>
         <td>{{ ttn.consignee }}</td>
         <td>{{ ttn.carrier }}</td>
-        <td>{{ ttn.gas_amount|format_gas_amount }}</td>
+        <td>{{ ttn.gas_amount|float_format }}</td>
         <td>{{ ttn.gas_type|default_if_none:"-" }}</td>
         <td>{{ ttn.balloons_amount|default_if_none:"-" }}</td>
         <td>{{ ttn.date|default_if_none:"-" }}</td>

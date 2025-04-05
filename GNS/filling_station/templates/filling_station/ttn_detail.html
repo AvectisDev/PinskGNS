@@ -21,16 +21,16 @@
             <p>Количество баллонов</p>
             <p>Дата формирования накладной</p>
         </div>
-        <div class="col text-start">
-            <p>{{ ttn.number|default_if_none:"-" }}</p>
-            <p>{{ ttn.contract|default_if_none:"-" }}</p>
-            <p>{{ ttn.shipper|default_if_none:"-" }}</p>
-            <p>{{ ttn.consignee|default_if_none:"-" }}</p>
-            <p>{{ ttn.carrier|default_if_none:"-" }}</p>
-            <p>{{ ttn.gas_amount|format_gas_amount }}</p>
-            <p>{{ ttn.gas_type|default_if_none:"-" }}</p>
-            <p>{{ ttn.balloons_amount|default_if_none:"-" }}</p>
-            <p>{{ ttn.date|default_if_none:"-" }}</p>
+         <div class="col text-start">
+            <p>{{ ttn.number|default_dash }}</p>
+            <p>{{ ttn.contract|default_dash }}</p>
+            <p>{{ ttn.shipper|default_dash }}</p>
+            <p>{{ ttn.consignee|default_dash }}</p>
+            <p>{{ ttn.carrier|default_dash }}</p>
+            <p>{{ ttn.gas_amount|float_format }}</p>
+            <p>{{ ttn.gas_type|default_dash }}</p>
+            <p>{{ ttn.balloons_amount|default_dash }}</p>
+            <p>{{ ttn.date|default_dash }}</p>
         </div>
     </div>
 </div>

@@ -2,130 +2,191 @@ import logging
 from opcua import Client, ua
 from django.core.exceptions import ObjectDoesNotExist, MultipleObjectsReturned
 from django.core.management.base import BaseCommand
+from django.db.models import Q
 from datetime import datetime
 from filling_station.models import AutoGasBatch, Truck, TruckType, Trailer, TrailerType
-from .intellect import get_registration_number_list, INTELLECT_SERVER_LIST, get_transport_type
+from .intellect import get_registration_number_list, INTELLECT_SERVER_LIST
 
 logger = logging.getLogger('filling_station')
 
 
 class Command(BaseCommand):
+    OPC_SERVER_URL = "opc.tcp://host.docker.internal:4841"
+    OPC_NODE_PATHS = {
+        "batch_type": "ns=4; s=Address Space.PLC_SU2.batch.batch_type",
+        "gas_type": "ns=4; s=Address Space.PLC_SU2.batch.gas_type",
+        "initial_mass_meter": "ns=4; s=Address Space.PLC_SU2.batch.initial_mass_meter",
+        "final_mass_meter": "ns=4; s=Address Space.PLC_SU2.batch.final_mass_meter",
+        "gas_amount": "ns=4; s=Address Space.PLC_SU2.batch.gas_amount",
+        "truck_full_weight": "ns=4; s=Address Space.PLC_SU2.batch.truck_full_weight",
+        "truck_empty_weight": "ns=4; s=Address Space.PLC_SU2.batch.truck_empty_weight",
+        "weight_gas_amount": "ns=4; s=Address Space.PLC_SU2.batch.weight_gas_amount",
+        "truck_capacity ": "ns=4; s=Address Space.PLC_SU2.batch.truck_capacity",
+        "request_batch_create": "ns=4; s=Address Space.PLC_SU2.batch.request_number_identification",
+        "response_batch_create": "ns=4; s=Address Space.PLC_SU2.batch.response_number_detect",
+        "request_batch_complete": "ns=4; s=Address Space.PLC_SU2.batch.request_batch_complete",
+        "response_batch_complete": "ns=4; s=Address Space.PLC_SU2.batch.response_batch_complete",
+    }
+
+    GAS_TYPES = {
+        2: 'СПБТ',
+        3: 'ПБА',
+    }
+
+    DEFAULT_GAS_TYPE = 'Не выбран'
+
     def __init__(self):
         super().__init__()
-        self.client = Client("opc.tcp://host.docker.internal:4841")
-        # self.client = Client("opc.tcp://127.0.0.1:4841")
+        self.client = Client(self.OPC_SERVER_URL)
+        self._truck_type = None
+        self._trailer_type = None
 
-    def get_opc_value(self, addr_str):
-        """Получить значение с OPC UA сервера по адресу."""
-        var = self.client.get_node(addr_str)
-        return var.get_value()
+    @property
+    def truck_type_filter(self):
+        """Возвращает готовый фильтр для queryset"""
+        if not hasattr(self, '_truck_type_filter'):
+            self._truck_type_filter = Q(type__type="Цистерна") | Q(type__type="Седельный тягач")
+        return self._truck_type_filter
 
-    def set_opc_value(self, addr_str, value):
-        """Установить значение на OPC UA сервере по адресу."""
-        var = self.client.get_node(addr_str)
-        return var.set_attribute(ua.AttributeIds.Value, ua.DataValue(value))
+    @property
+    def trailer_type(self):
+        if not self._trailer_type:
+            self._trailer_type = TrailerType.objects.get(type="Полуприцеп цистерна")
+        return self._trailer_type
 
-    def get_gas_type(self, gas_type):
-        if gas_type == 2:
-            return 'СПБТ'
-        elif gas_type == 3:
-            return 'ПБА'
-        else:
-            return 'Не выбран'
-
-    def batch_create(self, batch_type, from_opc_gas_type):
+    def get_opc_value(self, node_key):
+        """Получить значение с OPC UA сервера по ключу."""
+        node_path = self.OPC_NODE_PATHS.get(node_key)
+        if not node_path:
+            logger.error(f"Invalid OPC node key: {node_key}")
+            return None
         try:
-            logger.debug('Автовесовая. Запрос определения номера. Начало партии приёмки')
+            return self.client.get_node(node_path).get_value()
+        except Exception as error:
+            logger.error(f"Error getting OPC value for {node_key}: {error}", exc_info=True)
+            return None
 
-            # Поиск машины в базе Интеллект
+    def set_opc_value(self, node_key, value):
+        """Установить значение на OPC UA сервере."""
+        node_path = self.OPC_NODE_PATHS.get(node_key)
+        if not node_path:
+            logger.error(f"Invalid OPC node key: {node_key}")
+            return False
+        try:
+            node = self.client.get_node(node_path)
+            node.set_attribute(ua.AttributeIds.Value, ua.DataValue(value))
+            return True
+        except Exception as error:
+            logger.error(f"Error setting OPC value for {node_key}: {error}", exc_info=True)
+            return False
+
+    def get_transport_numbers(self):
+        """Получить список номеров из Интеллекта."""
+        try:
             transport_list = get_registration_number_list(INTELLECT_SERVER_LIST[1])
             logger.debug(f'Автовесовая. Список номеров: {transport_list}')
-
             if not transport_list:
-                logger.debug('Автоколонка. Машина не определена')
-                return
+                logger.debug('Автовесовая. Машина не определена')
+                return []
+            return [transport['number'] for transport in transport_list]
+        except Exception as e:
+            logger.error(f'Автовесовая. Ошибка при получении списка номеров: {e}', exc_info=True)
+            return []
 
-            # формируем список считанных номеров для фильтрации по базе
-            registration_number_list = [transport['registration_number'] for transport in transport_list]
+    def find_transports(self, registration_numbers):
+        """Найти грузовик и прицеп по списку номеров."""
+        try:
+            truck = Truck.objects.filter(
+                registration_number__in=registration_numbers
+            ).filter(
+                self.truck_type_filter
+            ).select_related('type').first()
 
-            # Находим объект TruckType с типом "Цистерна" и объект TrailerType с типом "Полуприцеп цистерна"
-            truck_type = TruckType.objects.get(type="Цистерна")
-            trailer_type = TrailerType.objects.get(type="Полуприцеп цистерна")
+            trailer = Trailer.objects.filter(
+                registration_number__in=registration_numbers,
+                type=self.trailer_type
+            ).first()
 
-            auto_batch_truck = Truck.objects.filter(
-                registration_number__in=registration_number_list,
-                type=truck_type).first()
-            auto_batch_trailer = Trailer.objects.filter(
-                registration_number__in=registration_number_list,
-                type=trailer_type).first()
+            return truck, trailer
+        except Exception as e:
+            logger.error(f'Автовесовая. Ошибка при поиске транспорта: {e}', exc_info=True)
+            return None, None
 
-            logger.debug(f'Номер грузовика - {auto_batch_truck.registration_number}. '
-                         f'Номер прицепа - {auto_batch_trailer.registration_number}')
+    def create_batch(self, batch_type, gas_type_code):
+        """Создать новую партию."""
+        registration_numbers = self.get_transport_numbers()
+        if not registration_numbers:
+            logger.warning('Автовесовая. Список номеров отсутствует')
+            return
 
-            batch_gas_type = self.get_gas_type(from_opc_gas_type)
+        truck, trailer = self.find_transports(registration_numbers)
+        if not truck:
+            logger.error('Автовесовая. Не найден подходящий грузовик')
+            return
 
-            # Создаём партию
+        try:
             AutoGasBatch.objects.create(
                 batch_type='l' if batch_type == 'loading' else 'u',
-                truck=auto_batch_truck.id,
-                trailer=auto_batch_trailer.id if auto_batch_trailer else 0,
+                truck=truck,
+                trailer=trailer,
                 is_active=True,
-                gas_type=batch_gas_type
+                gas_type=self.GAS_TYPES.get(gas_type_code)
             )
 
-            # Маркер завершения создания партии
-            self.set_opc_value("ns=4; s=Address Space.PLC_SU2.batch.response_number_detect", True)
+            # Определяем показатель вместимости цистерны
+            if truck.type.type == "Цистерна":
+                capacity_value = truck.max_gas_volume
+            elif truck.type.type == "Седельный тягач" and trailer:
+                capacity_value = trailer.max_gas_volume
+            else:
+                capacity_value = 0.0
+                logger.warning(f'Не удалось определить емкость для {truck.registration_number}')
+            
+            self.set_opc_value("truck_capacity", capacity_value)
+            self.set_opc_value("response_batch_create", True)
+        except Exception as e:
+            logger.error(f'Автовесовая. Ошибка при создании партии: {e}', exc_info=True)
 
-        except Exception as error:
-            logger.error(f'Автоколонка. ошибка в функции batch_create - {error}')
+    def complete_batch(self, batch_data):
+        """Завершить текущую активную партию."""
+        current_date, current_time = datetime.now().date(), datetime.now().time()
+        try:
+            AutoGasBatch.objects.filter(is_active=True).update(
+                gas_amount=batch_data.get('gas_amount'),
+                scale_empty_weight=batch_data.get('truck_empty_weight'),
+                scale_full_weight=batch_data.get('truck_full_weight'),
+                weight_gas_amount=batch_data.get('weight_gas_amount'),
+                is_active=False,
+                end_date=current_date,
+                end_time=current_time
+            )
+            self.set_opc_value("response_batch_complete", True)
+        except Exception as e:
+            logger.error(f'Ошибка при завершении партии: {e}', exc_info=True)
 
     def handle(self, *args, **kwargs):
         try:
             self.client.connect()
-            logger.info('Connect to OPC server successful')
 
-            batch_type = self.get_opc_value("ns=4; s=Address Space.PLC_SU2.batch.batch_type")
-            gas_type = self.get_opc_value("ns=4; s=Address Space.PLC_SU2.batch.gas_type")
+            # Получаем все значения OPC
+            opc_values = {key: self.get_opc_value(key) for key in self.OPC_NODE_PATHS.keys()}
 
-            initial_mass_meter = self.get_opc_value("ns=4; s=Address Space.PLC_SU2.batch.initial_mass_meter")
-            final_mass_meter = self.get_opc_value("ns=4; s=Address Space.PLC_SU2.batch.final_mass_meter")
-            gas_amount = self.get_opc_value("ns=4; s=Address Space.PLC_SU2.batch.gas_amount")
+            logger.info(
+                f'Тип партии={opc_values["batch_type"]}, '
+                f'Тип газа={opc_values["gas_type"]},'
+                f'Запрос создания={opc_values["request_batch_create"]}, '
+                f'Запрос завершения={opc_values["request_batch_complete"]}'
+            )
 
-            truck_full_weight = self.get_opc_value("ns=4; s=Address Space.PLC_SU2.batch.truck_full_weight")
-            truck_empty_weight = self.get_opc_value("ns=4; s=Address Space.PLC_SU2.batch.truck_empty_weight")
-            weight_gas_amount = self.get_opc_value("ns=4; s=Address Space.PLC_SU2.batch.weight_gas_amount")
+            # Обработка создания партии
+            if opc_values["request_batch_create"] and not opc_values["response_batch_create"]:
+                self.create_batch(opc_values["batch_type"], opc_values["gas_type"])
 
-            request_batch_create = self.get_opc_value("ns=4; s=Address Space.PLC_SU2.batch.request_number_identification")
-            response_batch_create = self.get_opc_value("ns=4; s=Address Space.PLC_SU2.batch.response_number_detect")
-            request_batch_complete = self.get_opc_value("ns=4; s=Address Space.PLC_SU2.batch.request_batch_complete")
-            response_batch_complete = self.get_opc_value("ns=4; s=Address Space.PLC_SU2.batch.response_batch_complete")
-
-            logger.info(f'batch_type={batch_type}, gas_type={gas_type},'
-                        f'request_number_identification={request_batch_create}, '
-                        f'request_batch_complete={request_batch_complete}')
-
-            # Создание партии
-            if request_batch_create and not response_batch_create:
-                self.batch_create(batch_type, gas_type)
-
-            # Завершение партии
-            if request_batch_complete and not response_batch_complete:
-                current_date = datetime.now()
-
-                AutoGasBatch.objects.filter(is_active=True).update(
-                    gas_amount=gas_amount,
-                    scale_empty_weight=truck_empty_weight,
-                    scale_full_weight=truck_full_weight,
-                    weight_gas_amount=weight_gas_amount,
-                    is_active=False,
-                    end_date=current_date.date(),
-                    end_time=current_date.time()
-                )
-                # Маркер завершения партии
-                self.set_opc_value("ns=4; s=Address Space.PLC_SU2.batch.response_batch_complete", True)
+            # Обработка завершения партии
+            if opc_values["request_batch_complete"] and not opc_values["response_batch_complete"]:
+                self.complete_batch(opc_values)
 
         except Exception as error:
-            logger.error(f'No connection to OPC server: {error}')
+            logger.error(f'Автовесовая. Ошибка в основном цикле: {error}', exc_info=True)
         finally:
             self.client.disconnect()
-            logger.info('Disconnect from OPC server')

@@ -2,12 +2,15 @@ import os
 import asyncpg
 from datetime import datetime
 from dotenv import load_dotenv
+from typing import Optional
 
 load_dotenv()
 
 
 async def write_balloons_amount(reader: dict, from_who: str):
-    """Функция записывает в базу данных количество баллонов, пройденных через каждый считыватель"""
+    """
+    Функция записывает в базу данных количество баллонов, пройденных через каждый считыватель
+    """
     try:
         conn = await asyncpg.connect(
             database=os.environ.get('DB_NAME'),
@@ -56,3 +59,36 @@ async def write_balloons_amount(reader: dict, from_who: str):
 
     finally:
         await conn.close()
+
+
+async def fetch_carousel_settings() -> Optional[dict]:
+    """
+    Асинхронная функция получает все данные из таблицы CarouselSettings и возвращает их в виде словаря
+    """
+    conn = None
+    try:
+        # Подключение к базе данных
+        conn = await asyncpg.connect(
+            database=os.environ.get('DB_NAME'),
+            host=os.environ.get('DB_HOST'),
+            user=os.environ.get('DB_USER'),
+            password=os.environ.get('DB_PASSWORD'),
+            port=os.environ.get('DB_PORT')
+        )
+
+        # Выполняем запрос для получения всех данных из таблицы CarouselSettings
+        query = "SELECT * FROM public.filling_station_carouselsettings"
+        records = await conn.fetch(query)
+
+        if records:
+            # Преобразуем первую запись в словарь
+            return dict(records[0])
+        return None
+
+    except Exception as error:
+        print('Can`t establish connection to database:', error)
+        return None
+
+    finally:
+        if conn:
+            await conn.close()

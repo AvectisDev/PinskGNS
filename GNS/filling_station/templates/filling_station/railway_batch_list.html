@@ -3,6 +3,8 @@
 
 {% block content %}
 
+{% load custom_filters %}
+
 <div class="container-fluid">
     <header class="d-flex flex-wrap align-items-center justify-content-between py-3 mb-4 border-bottom">
         <div class="col-md-3 mb-2 mb-md-0">
@@ -21,9 +23,8 @@
     <tr class="table-dark" align="center" style="background-color: #051831 !important; color: white !important;">
         <th>Номер партии</th>
         <th>Дата начала</th>
-        <th>Время начала</th>
         <th>Дата окончания</th>
-        <th>Время окончания</th>
+        <th>Количество цистерн</th>
         <th>Принято СПБТ газа</th>
         <th>Принято ПБА газа</th>
         <th>В работе</th>
@@ -35,11 +36,10 @@
             <a href="{{ batch.get_absolute_url }}" style="color: #051831;"> {{ batch.id }} </a>
         </td>
         <td>{{ batch.begin_date|default_if_none:"-" }}</td>
-        <td>{{ batch.begin_time|default_if_none:"-" }}</td>
         <td>{{ batch.end_date|default_if_none:"-" }}</td>
-        <td>{{ batch.end_time|default_if_none:"-" }}</td>
-        <td>{{ batch.gas_amount_spbt|floatformat:2|default_if_none:"-" }}</td>
-        <td>{{ batch.gas_amount_pba|floatformat:2|default_if_none:"-" }}</td>
+        <td>{{ batch.railway_tank_list.count }}</td>
+        <td>{{ batch.gas_amount_spbt|float_format }}</td>
+        <td>{{ batch.gas_amount_pba|float_format }}</td>
         <td>{% if batch.is_active %}Активна{% else %}Завершена{% endif %}</td>
         <td>{{ batch.ttn|default_if_none:"-" }}</td>
     </tr>

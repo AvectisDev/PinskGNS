@@ -1,3 +1,4 @@
+from typing import Optional
 import requests
 import logging
 from datetime import datetime, timedelta
@@ -13,11 +14,10 @@ logger = logging.getLogger('filling_station')
     - Камера 27 (Распознавание номеров КПП Выезд) -> "id": "4", direction = 1 - от камеры, 2 - к камере
     - Камера 28 (Распознавание номеров КПП Въезд) -> "id": "5", direction = 1 - от камеры, 2 - к камере
 """
-INTELLECT_URL = "http://10.10.0.252:10001/lprserver/GetProtocolNumbers"  # intellect server address
 INTELLECT_SERVER_LIST = [
     {
         'id': '1',
-        'delta_minutes': 1
+        'delta_minutes': 10
     },
     {
         'id': '2,3',
@@ -25,7 +25,7 @@ INTELLECT_SERVER_LIST = [
     },
     {
         'id': '4,5',
-        'delta_minutes': 3
+        'delta_minutes': 5
     }
 ]
 
@@ -36,11 +36,11 @@ def get_intellect_data(data) -> list:
     return: JSON-ответ в виде списка при успешном запросе; пустой список при ошибке.
     """
     try:
-        response = requests.post(INTELLECT_URL, json=data, timeout=5)
+        intellect_url = "http://10.10.0.252:10001/lprserver/GetProtocolNumbers"  # intellect server address
+        response = requests.post(intellect_url, json=data, timeout=2)
         response.raise_for_status()
 
         result = response.json()
-
         if result['Status'] == "OK":
             item_list = result.get('Protocols', [])
             return item_list
@@ -83,39 +83,44 @@ def separation_string_date(date_string: str = '') -> tuple:
 def get_registration_number_list(server: dict) -> list:
     """
     Функция формирует тело запроса к базе данных "Интеллект".
-    Возвращает номер и дату прибывших/убывших машин и прицепов в виде списка словарей.
+    Возвращает данные машин, прицепов и цистерн в виде списка словарей.
     """
 
     data_for_request = {
         "id": server.get('id'),
         "time_from": get_start_time(server.get('delta_minutes')),
-        "validaty_from": "5" if server.get('id') == '1' else "90"
+        "validaty_from": "" if server.get('id') == '1' else "85"
     }
-    intellect_data = get_intellect_data(data_for_request)
-
-    out_list = []
-    if len(intellect_data) > 0:
-
-        for item in intellect_data:
-            out_list.append({
-                'registration_number': item['number'],
-                'date': item['date'],
-                'direction': item['direction'],
-                "camera": item["camera"]
-            })
-
-    return out_list
+    return get_intellect_data(data_for_request)
 
 
-def check_on_station(transport: dict) -> bool:
+def get_plate_image(plate_id):
+    """
+    Функция для получения изображения по plate_numbers.id.
+    """
+    image_url = f"http://10.10.0.252:10001/lprserver/GetImage/Plate_numbers/{plate_id}"
+    try:
+        response = requests.get(image_url, timeout=2)
+        response.raise_for_status()
+
+        if response.headers['Content-Type'] == 'image/jpeg':
+            return response.content  # Возвращаем бинарные данные изображения
+        return None
+
+    except Exception as error:
+        logger.error(f'Ошибка при получении изображения - {error}')
+        return None
+
+
+def check_on_station(transport: dict) -> Optional[bool]:
     """
     Функция обрабатывает направление движения транспорта, определённое "Интеллектом", и возвращает статус
     return:
         True - транспорт въёхал на территорию ГНС
         False - транспорт выехал с территории ГНС
     """
-    camera = transport['camera']
-    direction = transport['direction']
+    camera = transport.get('camera')
+    direction = transport.get('direction')
 
     if camera == 'Камера 27':
         if direction == '1':
