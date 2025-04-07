@@ -1,0 +1,106 @@
+/* Вертикальное выравнивание для всей таблицы */
+.table thead th,
+.table tbody td {
+    vertical-align: middle !important;
+    text-align: center;
+}
+
+/* Специальные стили для заголовков */
+.table thead th {
+    background-color: #051831;
+    color: white;
+    font-weight: 500;
+}
+
+/* Для кнопок действий сохраняем выравнивание */
+.table .btn-group {
+    justify-content: center;
+}
+
+/* Кастомные стили кнопок */
+.btn-custom {
+    background-color: #3CBBD9;
+    color: white;
+    border: none;
+}
+.btn-custom:hover {
+    background-color: #2CA9C7;
+    color: white;
+}
+
+.btn-outline-custom {
+    color: #3CBBD9;
+    border-color: #3CBBD9;
+}
+.btn-outline-custom:hover {
+    background-color: #3CBBD9;
+    color: white;
+}
+
+/* Стили для ссылок */
+a.custom-link,
+.table a.custom-link,
+.table-hover a.custom-link {
+    color: #051831 !important;
+    text-decoration: none;
+}
+a.custom-link:hover {
+    color: #051831 !important;
+    text-decoration: underline;
+}
+
+/* Стили для контейнера кнопок */
+.action-buttons {
+    display: flex;
+    justify-content: center;
+    gap: 0.5rem;
+}
+
+/* Стили для иконок кнопок */
+.btn-icon {
+    padding: 0.375rem 0.5rem;
+    border: 1px solid transparent;
+    border-radius: 0.25rem;
+    background-color: transparent;
+    transition: all 0.2s;
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.btn-edit {
+    color: #3CBBD9;
+    border-color: #3CBBD9;
+}
+.btn-edit:hover {
+    background-color: #3CBBD9;
+    color: white;
+}
+.btn-delete {
+    color: #dc3545;
+    border-color: #dc3545;
+}
+.btn-delete:hover {
+    background-color: #dc3545;
+    color: white;
+}
+.btn-group-sm .btn-icon {
+    margin-right: 0.25rem;
+}
+/* Стили для заголовка карточки */
+.card-header-custom {
+    background-color: #051831;
+    color: white !important;
+}
+
+/* Стили для текста в заголовке карточки */
+.card-header-custom h4,
+.card-header-custom .badge {
+    color: white !important;
+}
+
+/* Стили для миниатюр изображений */
+.img-thumbnail-custom {
+    max-height: 100px;
+}
