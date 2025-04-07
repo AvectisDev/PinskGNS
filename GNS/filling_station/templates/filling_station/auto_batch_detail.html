@@ -1,61 +1,102 @@
 {% extends 'base.html' %}
-{% block title %} {{ title }} {% endblock %}
-
-{% block content %}
-<div class="col-md-3 mb-3 mb-md-0">
-    <h5>Детали партии приёмки авто цистерн</h5>
-</div>
-
 {% load custom_filters %}
 
-<div class="container text-center">
-    <div class="row">
-        <div class="col text-end">
-            <p>Номер партии</p>
-            <p>Тип партии</p>
-            <p>Дата начала</p>
-            <p>Время начала</p>
-            <p>Дата окончания</p>
-            <p>Время окончания</p>
-            <p>Автомобиль</p>
-            <p>Прицеп</p>
-            <p>Вес пустого т/с (весы)</p>
-            <p>Вес полного т/с (весы)</p>
-            <p>Принято газа (весы)</p>
-            <p>Принято газа (массомер)</p>
-            <p>Тип газа</p>
-            <p>В работе</p>
-            <p>ТТН</p>
+{% block title %}Партия автоцистерн №{{ batch.id }}{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="card shadow-sm">
+        <div class="card-header card-header-custom">
+            <div class="d-flex justify-content-between align-items-center">
+                <h4 class="mb-0">Партия автоцистерн №{{ batch.id }}</h4>
+                <div>
+                    <span class="badge bg-{% if batch.is_active %}success{% else %}secondary{% endif %}">
+                        {% if batch.is_active %}Активна{% else %}Завершена{% endif %}
+                    </span>
+                </div>
+            </div>
         </div>
-        <div class="col text-start">
-            <p>{{ batch.id }}</p>
-            <p>{% if batch.batch_type == 'l' %}Приёмка{% else %}Отгрузка{% endif %}</p>
-            <p>{{ batch.begin_date|default_if_none:"-" }}</p>
-            <p>{{ batch.begin_time|default_if_none:"-" }}</p>
-            <p>{{ batch.end_date|default_if_none:"-" }}</p>
-            <p>{{ batch.end_time|default_if_none:"-" }}</p>
-            <p>{{ batch.truck|default_if_none:"-" }}</p>
-            <p>{{ batch.trailer|default_if_none:"-" }}</p>
-            <p>{{ batch.scale_empty_weight|float_format }}</p>
-            <p>{{ batch.scale_full_weight|float_format }}</p>
-            <p>{{ batch.weight_gas_amount|float_format }}</p>
-            <p>{{ batch.gas_amount|float_format }}</p>
-            <p>{{ batch.gas_type|default_if_none:"-" }}</p>
-            <p>{% if batch.is_active %}Активна{% else %}Завершена{% endif %}</p>
-            <p>{{ batch.ttn|default_if_none:"-" }}</p>
+
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-6">
+                    <dl class="row">
+                        <dt class="col-sm-6">Тип партии:</dt>
+                        <dd class="col-sm-6">
+                            {% if batch.batch_type == 'l' %}
+                                <span class="badge bg-primary">Приёмка</span>
+                            {% else %}
+                                <span class="badge bg-warning text-dark">Отгрузка</span>
+                            {% endif %}
+                        </dd>
+
+                        <dt class="col-sm-6">Дата и время начала:</dt>
+                        <dd class="col-sm-6">
+                            {% if batch.begin_date %}
+                            <div>{{ batch.begin_date|date:"d.m.Y" }}</div>
+                            <small class="text-muted">{{ batch.begin_time|time:"H:i" }}</small>
+                            {% else %}
+                            -
+                            {% endif %}
+                        </dd>
+
+                        <dt class="col-sm-6">Дата и время окончания:</dt>
+                        <dd class="col-sm-6">
+                            {% if batch.end_date %}
+                            <div>{{ batch.end_date|date:"d.m.Y" }}</div>
+                            <small class="text-muted">{{ batch.end_time|time:"H:i" }}</small>
+                            {% else %}
+                            <span class="text-muted">Не завершена</span>
+                            {% endif %}
+                        </dd>
+
+                        <dt class="col-sm-6">Автомобиль:</dt>
+                        <dd class="col-sm-6">{{ batch.truck|default:"-" }}</dd>
+
+                        <dt class="col-sm-6">Прицеп:</dt>
+                        <dd class="col-sm-6">{{ batch.trailer|default:"-" }}</dd>
+                    </dl>
+                </div>
+
+                <div class="col-md-6">
+                    <dl class="row">
+                        <dt class="col-sm-6">Вес пустого ТС (весы):</dt>
+                        <dd class="col-sm-6">{{ batch.scale_empty_weight|float_format|default:"-" }} кг</dd>
+
+                        <dt class="col-sm-6">Вес полного ТС (весы):</dt>
+                        <dd class="col-sm-6">{{ batch.scale_full_weight|float_format|default:"-" }} кг</dd>
+
+                        <dt class="col-sm-6">Количество газа (весы):</dt>
+                        <dd class="col-sm-6">{{ batch.weight_gas_amount|float_format|default:"-" }} кг</dd>
+
+                        <dt class="col-sm-6">Количество газа (массомер):</dt>
+                        <dd class="col-sm-6">{{ batch.gas_amount|float_format|default:"-" }} кг</dd>
+
+                        <dt class="col-sm-6">Тип газа:</dt>
+                        <dd class="col-sm-6">{{ batch.get_gas_type_display|default:"-" }}</dd>
+
+                        <dt class="col-sm-6">ТТН:</dt>
+                        <dd class="col-sm-6">{{ batch.ttn|default:"Не указана" }}</dd>
+                    </dl>
+                </div>
+            </div>
+        </div>
+
+        <div class="card-footer bg-light">
+            <div class="d-flex justify-content-between">
+                <a href="{% url 'filling_station:auto_gas_batch_list' %}" class="btn btn-custom">
+                    <i class="bi bi-arrow-left"></i> Назад
+                </a>
+                <div>
+                    <a href="{{ batch.get_update_url }}" class="btn btn-custom me-2">
+                        <i class="bi bi-pencil"></i> Редактировать
+                    </a>
+                    <a href="{{ batch.get_delete_url }}" class="btn btn-danger">
+                        <i class="bi bi-trash"></i> Удалить
+                    </a>
+                </div>
+            </div>
         </div>
     </div>
 </div>
-
-<div class="container text-center">
-    <button type="button" class="btn" style="background-color: #3CBBD9; color: white;"
-            onclick="location.href='{% url 'filling_station:auto_gas_batch_list' %}'">Назад
-    </button>
-    <button type="button" class="btn" style="background-color: #3CBBD9; color: white;"
-            onclick="location.href = '{{ batch.get_update_url }}'">Редактировать
-    </button>
-    <button type="button" class="btn btn-danger" onclick="location.href = '{{ batch.get_delete_url }}'">Удалить
-    </button>
-</div>
-
-{% endblock content %}
+{% endblock %}

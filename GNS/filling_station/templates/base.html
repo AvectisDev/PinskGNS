@@ -1,11 +1,16 @@
 <!DOCTYPE html>
 
 <html lang="en">
+
+{% load static %}
+
 <head>
     <meta charset="UTF-8">
     <title>{% block title %} Газонаполнительная станция {% endblock %}</title>
     <link rel="shortcut icon" type="image/ico" href='/static/filling_station/media/Gas.ico'/>
     <link rel="stylesheet" href="/static/filling_station/bootstrap/css/bootstrap.min.css">
+    <link rel="stylesheet" href="/static/filling_station/bootstrap/icons/font/bootstrap-icons.css">
+    <link rel="stylesheet" href="{% static 'filling_station/css/tables.css' %}">
     <script src="/static/filling_station/bootstrap/jquery-3.5.1.slim.min.js"></script>
     <script type="text/javascript" src="/static/filling_station/bootstrap/js/bootstrap.bundle.min.js"></script>
 </head>
@@ -56,7 +61,7 @@
                    aria-expanded="false">Партии</a>
                 <ul class="dropdown-menu">
                     <li><a class="dropdown-item" href="{% url 'filling_station:railway_batch_list' %}"
-                           style="color: #051831;">Приёмка ж/д цистерн</a></li>
+                           style="color: #051831;">Журнал ж/д цистерн</a></li>
                     <li>
                         <hr class="dropdown-divider">
                     </li>
@@ -85,19 +90,30 @@
                     </li>
                 </ul>
             </li>
-            <li class="nav-item">
-                <a class="nav-link" href="{% url 'filling_station:ttn_list' %}" style="color: #051831;">ТТН</a>
+            <li class="nav-item dropdown">
+                <a class="nav-link dropdown-toggle" data-bs-toggle="dropdown" href="#" style="color: #051831;"
+                   role="button"
+                   aria-expanded="false">ТТН</a>
+                <ul class="dropdown-menu">
+                    <li><a class="dropdown-item" href="{% url 'filling_station:ttn_list' %}"
+                           style="color: #051831;">Баллоны</a></li>
+<!--                    <li><a class="dropdown-item" href="{% url 'filling_station:trailer_list' %}"-->
+<!--                           style="color: #051831;">Автоцистерны</a></li>-->
+                    <li><a class="dropdown-item" href="{% url 'filling_station:railway_ttn_list' %}"
+                           style="color: #051831;">Ж/д цистерны</a>
+                    </li>
+                </ul>
             </li>
             <li class="nav-item">
                 <a class="nav-link" href="{% url 'filling_station:statistic' %}" style="color: #051831;">Статистика</a>
             </li>
-            <li class="nav-item">
-                <a class="nav-link" href="/carousel/1" style="color: #051831;">УНБ</a>
-            </li>
-            <li class="nav-item">
-                <a class="nav-link" href="{% url 'filling_station:carousel_settings_detail' %}" style="color: #051831;">Настройки
-                    карусели</a>
-            </li>
+            <!--            <li class="nav-item">-->
+            <!--                <a class="nav-link" href="/carousel/1" style="color: #051831;">УНБ</a>-->
+            <!--            </li>-->
+            <!--            <li class="nav-item">-->
+            <!--                <a class="nav-link" href="{% url 'filling_station:carousel_settings_detail' %}" style="color: #051831;">Настройки-->
+            <!--                    карусели</a>-->
+            <!--            </li>-->
         </ul>
 
         <div class="col-md-3 text-end">

@@ -1,54 +1,93 @@
 {% extends 'base.html' %}
-{% block title %} Детали грузовика {% endblock %}
+{% load custom_filters %}
+
+{% block title %}Грузовик {{ truck.registration_number }}{% endblock %}
 
 {% block content %}
-<div class="col-md-2 mb-2 mb-md-0">
-    <h5>Детали грузовика</h5>
-</div>
-
-<div class="container text-center">
-    <div class="row">
-        <div class="col text-end">
-            <p>Марка авто</p>
-            <p>Гос.номер</p>
-            <p>Тип</p>
-            <p>Макс. вместимость баллонов</p>
-            <p>Макс. масса перевозимых баллонов</p>
-            <p>Макс. масса перевозимого газа</p>
-            <p>Макс. объём перевозимого газа</p>
-            <p>Вес пустого т/с (техпаспорт)</p>
-            <p>Вес полного т/с (техпаспорт)</p>
-            <p>Находится на станции</p>
-            <p>Дата въезда</p>
-            <p>Время въезда</p>
-            <p>Дата выезда</p>
-            <p>Время выезда</p>
+<div class="container mt-4">
+    <div class="card shadow-sm">
+        <div class="card-header card-header-custom">
+            <div class="d-flex justify-content-between align-items-center">
+                <h4 class="mb-0">Грузовик {{ truck.registration_number }}</h4>
+                <div>
+                    <span class="badge bg-{% if truck.is_on_station %}success{% else %}secondary{% endif %}">
+                        {% if truck.is_on_station %}На станции{% else %}Отсутствует{% endif %}
+                    </span>
+                </div>
+            </div>
         </div>
-        <div class="col text-start">
-            <p>{{ truck.car_brand|default_if_none:"-" }}</p>
-            <p>{{ truck.registration_number }}</p>
-            <p>{{ truck.type|default_if_none:"-" }}</p>
-            <p>{{ truck.capacity_cylinders|default_if_none:"-" }}</p>
-            <p>{{ truck.max_weight_of_transported_cylinders|default_if_none:"-" }}</p>
-            <p>{{ truck.max_mass_of_transported_gas|default_if_none:"-" }}</p>
-            <p>{{ truck.max_gas_volume|default_if_none:"-" }}</p>
-            <p>{{ truck.empty_weight|default_if_none:"-" }}</p>
-            <p>{{ truck.full_weight|default_if_none:"-" }}</p>
-            <p>{% if truck.is_on_station %}Да{% else %}Нет{% endif %}</p>
-            <p>{{ truck.entry_date|default_if_none:"-" }}</p>
-            <p>{{ truck.entry_time|default_if_none:"-" }}</p>
-            <p>{{ truck.departure_date|default_if_none:"-" }}</p>
-            <p>{{ truck.departure_time|default_if_none:"-" }}</p>
+
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-6">
+                    <dl class="row">
+                        <dt class="col-sm-6">Марка авто:</dt>
+                        <dd class="col-sm-6">{{ truck.car_brand|default:"-" }}</dd>
+
+                        <dt class="col-sm-6">Тип:</dt>
+                        <dd class="col-sm-6">{{ truck.type|default:"-" }}</dd>
+
+                        <dt class="col-sm-6">Вместимость баллонов:</dt>
+                        <dd class="col-sm-6">{{ truck.capacity_cylinders|default:"-" }}</dd>
+
+                        <dt class="col-sm-6">Макс. масса баллонов:</dt>
+                        <dd class="col-sm-6">{{ truck.max_weight_of_transported_cylinders|float_format|default:"-" }} кг</dd>
+
+                        <dt class="col-sm-6">Макс. масса газа:</dt>
+                        <dd class="col-sm-6">{{ truck.max_mass_of_transported_gas|float_format|default:"-" }} кг</dd>
+                    </dl>
+                </div>
+
+                <div class="col-md-6">
+                    <dl class="row">
+                        <dt class="col-sm-6">Макс. объём газа:</dt>
+                        <dd class="col-sm-6">{{ truck.max_gas_volume|float_format|default:"-" }} л</dd>
+
+                        <dt class="col-sm-6">Вес пустого:</dt>
+                        <dd class="col-sm-6">{{ truck.empty_weight|float_format|default:"-" }} кг</dd>
+
+                        <dt class="col-sm-6">Вес полного:</dt>
+                        <dd class="col-sm-6">{{ truck.full_weight|float_format|default:"-" }} кг</dd>
+
+                        <dt class="col-sm-6">Дата и время въезда:</dt>
+                        <dd class="col-sm-6">
+                            {% if truck.entry_date %}
+                            <div>{{ truck.entry_date|date:"d.m.Y" }}</div>
+                            <small class="text-muted">{{ truck.entry_time|time:"H:i" }}</small>
+                            {% else %}
+                            -
+                            {% endif %}
+                        </dd>
+
+                        <dt class="col-sm-6">Дата и время выезда:</dt>
+                        <dd class="col-sm-6">
+                            {% if truck.departure_date %}
+                            <div>{{ truck.departure_date|date:"d.m.Y" }}</div>
+                            <small class="text-muted">{{ truck.departure_time|time:"H:i" }}</small>
+                            {% else %}
+                            -
+                            {% endif %}
+                        </dd>
+                    </dl>
+                </div>
+            </div>
+        </div>
+
+        <div class="card-footer bg-light">
+            <div class="d-flex justify-content-between">
+                <a href="{% url 'filling_station:truck_list' %}" class="btn btn-custom">
+                    <i class="bi bi-arrow-left"></i> Назад
+                </a>
+                <div>
+                    <a href="{{ truck.get_update_url }}" class="btn btn-custom me-2">
+                        <i class="bi bi-pencil"></i> Редактировать
+                    </a>
+                    <a href="{{ truck.get_delete_url }}" class="btn btn-danger">
+                        <i class="bi bi-trash"></i> Удалить
+                    </a>
+                </div>
+            </div>
         </div>
     </div>
 </div>
-
-<div class="container text-center">
-    <button type="button" class="btn" style="background-color: #3CBBD9; color: white;"
-            onclick="location.href='{% url 'filling_station:truck_list' %}'">Назад</button>
-    <button type="button" class="btn" style="background-color: #3CBBD9; color: white;"
-            onclick="location.href = '{{ truck.get_update_url }}'">Редактировать</button>
-    <button type="button" class="btn btn-danger" onclick="location.href = '{{ truck.get_delete_url }}'">Удалить</button>
-</div>
-
-{% endblock content %}
+{% endblock %}
