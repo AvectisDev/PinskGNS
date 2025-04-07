@@ -1,14 +1,17 @@
-from django.shortcuts import render
+from django.shortcuts import render, redirect
 from django.http import HttpResponse
 from django.core.paginator import Paginator
 from django.urls import reverse_lazy, reverse
 from django.views import generic
 from django.db.models import Q, Sum
 from django.contrib import messages
+from django.views.decorators.http import require_POST
+from django.contrib.auth.decorators import login_required
 from .models import (Balloon, Truck, Trailer, RailwayTank, TTN, BalloonsLoadingBatch, BalloonsUnloadingBatch, NewTTN,
-                     RailwayBatch, BalloonAmount, AutoGasBatch, Reader, Carousel, CarouselSettings, RailwayTtn)
+                     RailwayBatch, BalloonAmount, AutoGasBatch, Reader, Carousel, CarouselSettings, RailwayTtn, AutoTtn,
+                     AutoGasBatchSettings)
 from .admin import BalloonResources, CarouselResources
-from .forms import (GetBalloonsAmount, BalloonForm, TruckForm, TrailerForm, RailwayTankForm, TTNForm,
+from .forms import (GetBalloonsAmount, BalloonForm, TruckForm, TrailerForm, RailwayTankForm, TTNForm, AutoTtnForm,
                     BalloonsLoadingBatchForm, BalloonsUnloadingBatchForm, RailwayBatchForm, AutoGasBatchForm,
                     CarouselSettingsForm, GetCarouselBalloonsAmount, RailwayTtnForm)
 from datetime import datetime, timedelta
@@ -498,6 +501,99 @@ class RailwayTtnDeleteView(generic.DeleteView):
     model = RailwayTtn
     success_url = reverse_lazy("filling_station:railway_ttn_list")
     template_name = 'filling_station/railwayttn_confirm_delete.html'
+
+
+# ТТН для автоцистерн
+@require_POST
+# @login_required
+def update_weight_source(request):
+    weight_source = request.POST.get('weight_source', 's')  # 'f' если чекбокс отмечен, иначе 's'
+    settings, _ = AutoGasBatchSettings.objects.get_or_create()
+    settings.weight_source = weight_source
+    settings.save()
+    return redirect('filling_station:auto_ttn_list')
+
+
+class AutoTtnView(generic.ListView):
+    model = AutoTtn
+    paginate_by = 10
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        settings = AutoGasBatchSettings.objects.first()
+        context['weight_source'] = settings.weight_source if settings else 'f'
+        return context
+
+
+class AutoTtnDetailView(generic.DetailView):
+    model = AutoTtn
+
+
+class AutoTtnCreateView(generic.CreateView):
+    model = AutoTtn
+    form_class = AutoTtnForm
+    template_name = 'filling_station/_equipment_form.html'
+
+    def form_valid(self, form):
+        response = super().form_valid(form)
+
+        self.update_ttn_values()
+
+        return response
+
+    def get_success_url(self):
+        return self.object.get_absolute_url()
+
+    def update_ttn_values(self):
+        batch = self.object.batch
+        if batch:
+            settings = AutoGasBatchSettings.objects.first()
+
+            # Определяем источник данных и значение количества газа
+            if settings and settings.weight_source == 'f':  # Расходомер
+                gas_amount = batch.gas_amount
+                source = 'Расходомер'
+            else:  # Весы
+                gas_amount = batch.weight_gas_amount
+                source = 'Весы'
+
+            # Обновляем поля в сохраненной ТТН
+            self.object.total_gas_amount = gas_amount
+            self.object.source_gas_amount = source
+            self.object.gas_type = batch.gas_type  # Копируем тип газа из партии
+            self.object.save()
+
+
+class AutoTtnUpdateView(generic.UpdateView):
+    model = AutoTtn
+    form_class = AutoTtnForm
+    template_name = 'filling_station/_equipment_form.html'
+
+    def form_valid(self, form):
+        response = super().form_valid(form)
+        self.update_ttn_values()
+        return response
+
+    def update_ttn_values(self):
+        batch = self.object.batch
+        if batch:
+            settings = AutoGasBatchSettings.objects.first()
+
+            if settings and settings.weight_source == 'f':
+                self.object.total_gas_amount = batch.gas_amount
+                self.object.source_gas_amount = 'Расходомер'
+            else:
+                self.object.total_gas_amount = batch.weight_gas_amount
+                self.object.source_gas_amount = 'Весы'
+
+            self.object.gas_type = batch.gas_type
+            self.object.save()
+
+
+class AutoTtnDeleteView(generic.DeleteView):
+    model = AutoTtn
+    success_url = reverse_lazy("filling_station:auto_ttn_list")
+    template_name = 'filling_station/autottn_confirm_delete.html'
 
 
 # Обработка данных для вкладки "Статистика"

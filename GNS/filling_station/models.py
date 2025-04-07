@@ -734,6 +734,9 @@ class AutoGasBatch(models.Model):
         verbose_name="Пользователь"
     )
 
+    def __str__(self):
+        return str(self.id)
+
     class Meta:
         verbose_name = "Автоколонка"
         verbose_name_plural = "Автоколонка"
@@ -747,6 +750,78 @@ class AutoGasBatch(models.Model):
 
     def get_delete_url(self):
         return reverse('filling_station:auto_gas_batch_delete', args=[self.pk])
+
+
+WEIGHT_SOURCE_CHOICES = [
+    ('f', 'Расходомер'),
+    ('s', 'Весы'),
+]
+
+
+class AutoGasBatchSettings(models.Model):
+    weight_source = models.CharField(choices=WEIGHT_SOURCE_CHOICES, default='f', verbose_name="Источник веса для ТТН")
+
+    def __str__(self):
+        return 'Настройки автоколонки'
+
+    class Meta:
+        verbose_name = "Настройки автоколонки"
+        verbose_name_plural = "Настройки автоколонки"
+
+
+class AutoTtn(models.Model):
+    number = models.CharField(blank=False, max_length=100, verbose_name="Номер ТТН")
+    contract = models.CharField(blank=True, max_length=100, verbose_name="Номер договора")
+    shipper = models.ForeignKey(
+        Shipper,
+        on_delete=models.SET_NULL,
+        null=True,
+        verbose_name="Грузоотправитель",
+        related_name='auto_tank_shipper'
+    )
+    carrier = models.ForeignKey(
+        Carrier,
+        on_delete=models.SET_NULL,
+        null=True,
+        verbose_name="Перевозчик",
+        related_name='auto_tank_carrier'
+    )
+    consignee = models.ForeignKey(
+        Consignee,
+        on_delete=models.SET_NULL,
+        null=True,
+        verbose_name="Грузополучатель",
+        related_name='auto_tank_consignee'
+    )
+    batch = models.ForeignKey(
+        AutoGasBatch,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        verbose_name="Партия",
+        related_name='auto_batch_for_ttn'
+    )
+    total_gas_amount = models.FloatField(null=True, blank=True, verbose_name="Количество газа")
+    source_gas_amount = models.CharField(max_length=20, null=True, blank=True, verbose_name="Источник веса для ТТН")
+    gas_type = models.CharField(max_length=10, choices=GAS_TYPE_CHOICES, default='Не выбран', verbose_name="Тип газа")
+    date = models.DateField(null=True, blank=True, verbose_name="Дата формирования накладной")
+
+    def __str__(self):
+        return self.number
+
+    class Meta:
+        verbose_name = "ТТН на автоцистерны"
+        verbose_name_plural = "ТТН на автоцистерны"
+        ordering = ['-id', '-date']
+
+    def get_absolute_url(self):
+        return reverse('filling_station:auto_ttn_detail', args=[self.pk])
+
+    def get_update_url(self):
+        return reverse('filling_station:auto_ttn_update', args=[self.pk])
+
+    def get_delete_url(self):
+        return reverse('filling_station:auto_ttn_delete', args=[self.pk])
 
 
 class FilePath(models.Model):

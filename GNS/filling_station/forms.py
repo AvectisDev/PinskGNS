@@ -159,7 +159,8 @@ class TruckForm(forms.ModelForm):
     class Meta:
         model = models.Truck
         fields = ['car_brand', 'registration_number', 'type', 'capacity_cylinders',
-                  'max_weight_of_transported_cylinders', 'max_mass_of_transported_gas', 'max_gas_volume', 'empty_weight',
+                  'max_weight_of_transported_cylinders', 'max_mass_of_transported_gas', 'max_gas_volume',
+                  'empty_weight',
                   'full_weight', 'is_on_station', 'entry_date', 'entry_time', 'departure_date', 'departure_time']
         widgets = {
             'car_brand': forms.TextInput(attrs={'class': 'form-control'}),
@@ -192,7 +193,8 @@ class TrailerForm(forms.ModelForm):
     class Meta:
         model = models.Trailer
         fields = ['truck', 'trailer_brand', 'registration_number', 'type', 'capacity_cylinders',
-                  'max_weight_of_transported_cylinders', 'max_mass_of_transported_gas', 'max_gas_volume', 'empty_weight',
+                  'max_weight_of_transported_cylinders', 'max_mass_of_transported_gas', 'max_gas_volume',
+                  'empty_weight',
                   'full_weight', 'is_on_station', 'entry_date', 'entry_time', 'departure_date', 'departure_time']
         widgets = {
             'truck': forms.Select(attrs={'class': 'form-control'}),
@@ -473,24 +475,199 @@ class AutoGasBatchForm(forms.ModelForm):
         self.helper.add_input(Submit('Сохранить', 'Сохранить', css_class='btn btn-success'))
         self.helper.form_method = 'POST'
 
+        self.fields['truck'].empty_label = 'Выберите автомобиль'
+        self.fields['trailer'].empty_label = 'Выберите прицеп'
+
+        self.fields['end_date'].widget.attrs.update({'class': 'form-control'})
+        self.fields['end_time'].widget.attrs.update({'class': 'form-control'})
+
     class Meta:
         model = models.AutoGasBatch
-        fields = ['batch_type', 'end_date', 'end_time', 'truck', 'trailer', 'gas_amount', 'gas_type',
-                  'scale_empty_weight', 'scale_full_weight', 'weight_gas_amount', 'is_active', 'ttn']
+        fields = [
+            'batch_type',
+            'end_date',
+            'end_time',
+            'truck',
+            'trailer',
+            'gas_amount',
+            'gas_type',
+            'scale_empty_weight',
+            'scale_full_weight',
+            'weight_gas_amount',
+            'is_active'
+        ]
         widgets = {
-            'batch_type': forms.Select(choices=BATCH_TYPE_CHOICES, attrs={'class': 'form-control'}),
-            'end_date': forms.DateInput(format='%Y-%m-%d', attrs={'type': 'date'}),
-            'end_time': forms.TimeInput(attrs={'type': 'time'}),
-            'truck': forms.Select(attrs={'class': 'form-control'}),
-            'trailer': forms.Select(attrs={'class': 'form-control'}),
-            'gas_amount': forms.NumberInput(attrs={'class': 'form-control'}),
-            'gas_type': forms.Select(choices=GAS_TYPE_CHOICES, attrs={'class': 'form-control'}),
-            'scale_empty_weight': forms.NumberInput(attrs={'class': 'form-control'}),
-            'scale_full_weight': forms.NumberInput(attrs={'class': 'form-control'}),
-            'weight_gas_amount': forms.NumberInput(attrs={'class': 'form-control'}),
-            'is_active': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
-            'ttn': forms.Select(attrs={'class': 'form-control'})
+            'batch_type': forms.Select(attrs={
+                'class': 'form-control',
+            }),
+            'end_date': forms.DateInput(attrs={
+                'type': 'date',
+                'class': 'form-control'
+            }),
+            'end_time': forms.TimeInput(attrs={
+                'type': 'time',
+                'class': 'form-control'
+            }),
+            'truck': forms.Select(attrs={
+                'class': 'form-control',
+            }),
+            'trailer': forms.Select(attrs={
+                'class': 'form-control',
+            }),
+            'gas_amount': forms.NumberInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'Введите количество газа по массомеру',
+                'step': '0.01'
+            }),
+            'gas_type': forms.Select(attrs={
+                'class': 'form-control',
+            }),
+            'scale_empty_weight': forms.NumberInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'Вес пустого транспорта',
+                'step': '0.01'
+            }),
+            'scale_full_weight': forms.NumberInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'Вес груженого транспорта',
+                'step': '0.01'
+            }),
+            'weight_gas_amount': forms.NumberInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'Количество газа по весам',
+                'step': '0.01'
+            }),
+            'is_active': forms.CheckboxInput(attrs={
+                'class': 'form-check-input',
+            })
         }
+        labels = {
+            'weight_gas_amount': 'Количество газа (по весам)',
+            'gas_amount': 'Количество газа (по массомеру)'
+        }
+
+    def clean(self):
+        cleaned_data = super().clean()
+
+        # Проверка, что дата окончания не раньше даты начала
+        if self.instance.pk and cleaned_data.get('end_date'):
+            if cleaned_data['end_date'] < self.instance.begin_date:
+                raise forms.ValidationError(
+                    "Дата окончания не может быть раньше даты начала"
+                )
+
+        # Проверка весовых показателей
+        scale_empty = cleaned_data.get('scale_empty_weight')
+        scale_full = cleaned_data.get('scale_full_weight')
+        weight_gas = cleaned_data.get('weight_gas_amount')
+
+        if scale_empty and scale_full:
+            if scale_full <= scale_empty:
+                raise forms.ValidationError(
+                    "Вес груженого транспорта должен быть больше веса пустого"
+                )
+
+            calculated_gas = scale_full - scale_empty
+            if weight_gas and abs(weight_gas - calculated_gas) > 0.1:
+                raise forms.ValidationError(
+                    f"Расчетное количество газа ({calculated_gas:.2f}) не совпадает с введенным ({weight_gas:.2f})"
+                )
+
+        return cleaned_data
+
+
+class AutoTtnForm(forms.ModelForm):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.helper = FormHelper()
+        self.helper.form_class = 'form-horizontal'
+        self.helper.label_class = 'col-lg-4'
+        self.helper.field_class = 'col-lg-8'
+        self.helper.add_input(Submit('Сохранить', 'Сохранить', css_class='btn btn-success'))
+        self.helper.form_method = 'POST'
+
+        self.fields['shipper'].empty_label = 'Выберите грузоотправителя'
+        self.fields['carrier'].empty_label = 'Выберите перевозчика'
+        self.fields['consignee'].empty_label = 'Выберите грузополучателя'
+        self.fields['batch'].empty_label = 'Выберите номер партии'
+
+    class Meta:
+        model = models.AutoTtn
+        fields = [
+            'number',
+            'contract',
+            'shipper',
+            'carrier',
+            'consignee',
+            'batch',
+            'total_gas_amount',
+            'gas_type',
+            'date'
+        ]
+        widgets = {
+            'number': forms.TextInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'Введите номер ТТН'
+            }),
+            'contract': forms.TextInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'Номер договора'
+            }),
+            'shipper': forms.Select(attrs={
+                'class': 'form-control',
+            }),
+            'carrier': forms.Select(attrs={
+                'class': 'form-control',
+            }),
+            'consignee': forms.Select(attrs={
+                'class': 'form-control',
+            }),
+            'batch': forms.Select(attrs={
+                'class': 'form-control',
+            }),
+            'total_gas_amount': forms.NumberInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'Количество газа',
+                'step': '0.01'
+            }),
+            'gas_type': forms.Select(attrs={
+                'class': 'form-control',
+            }),
+            'date': forms.DateInput(attrs={
+                'type': 'date',
+                'class': 'form-control',
+                'placeholder': 'Дата формирования накладной'
+            }),
+        }
+        labels = {
+            'source_gas_amount': 'Источник данных о весе',
+            'gas_type': 'Тип газа'
+        }
+
+        def clean(self):
+            cleaned_data = super().clean()
+            batch = cleaned_data.get('batch')
+
+            if batch:
+                settings = models.AutoGasBatchSettings.objects.first()
+
+                # Проверка наличия данных о газе в партии
+                if settings and settings.weight_source == 'f' and not batch.gas_amount:
+                    raise forms.ValidationError(
+                        "В выбранной партии не указано количество газа по расходомеру"
+                    )
+                elif settings and settings.weight_source == 's' and not batch.weight_gas_amount:
+                    raise forms.ValidationError(
+                        "В выбранной партии не указано количество газа по весам"
+                    )
+
+                # Проверка наличия типа газа в партии
+                if not batch.gas_type or batch.gas_type == 'Не выбран':
+                    raise forms.ValidationError(
+                        "В выбранной партии не указан тип газа"
+                    )
+
+            return cleaned_data
 
 
 class RailwayTankForm(forms.ModelForm):
@@ -579,4 +756,3 @@ class RailwayTtnForm(forms.ModelForm):
             'carrier': forms.Select(attrs={'class': 'form-control'}),
             'consignee': forms.Select(attrs={'class': 'form-control'}),
         }
-

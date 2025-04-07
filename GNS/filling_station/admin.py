@@ -85,6 +85,18 @@ class AutoGasBatchAdmin(admin.ModelAdmin):
     search_fields = ['begin_date', 'end_date', 'truck', 'is_active', 'ttn']
 
 
+@admin.register(models.AutoGasBatchSettings)
+class AutoGasBatchSettingsAdmin(admin.ModelAdmin):
+    list_display = ['id', 'weight_source']
+
+
+@admin.register(models.AutoTtn)
+class AutoTtnAdmin(admin.ModelAdmin):
+    list_display = ['id', 'number', 'contract', 'shipper', 'consignee', 'total_gas_amount', 'gas_type', 'date']
+    search_fields = ['number', 'contract', 'shipper', 'consignee']
+    list_filter = ['date']
+
+
 @admin.register(models.FilePath)
 class FilePathAdmin(admin.ModelAdmin):
     list_display = ('path',)

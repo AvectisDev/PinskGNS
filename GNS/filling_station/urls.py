@@ -85,6 +85,18 @@ urlpatterns = [
          name="railway_ttn_update"),
     path('railway-ttn/<pk>/delete/', views.RailwayTtnDeleteView.as_view(), name="railway_ttn_delete"),
 
+    # ТТН для авто цистерн
+    path('auto-ttn', views.AutoTtnView.as_view(), name="auto_ttn_list"),
+    path('auto-ttn/create', views.AutoTtnCreateView.as_view(), name="auto_ttn_create"),
+    path('auto-ttn/<pk>', views.AutoTtnDetailView.as_view(), name="auto_ttn_detail"),
+    path('auto-ttn/<pk>/update/', views.AutoTtnUpdateView.as_view(extra_context={
+        "title": "Редактирование ТТН"
+    }),
+         name="auto_ttn_update"),
+    path('auto-ttn/<pk>/delete/', views.AutoTtnDeleteView.as_view(), name="auto_ttn_delete"),
+    # Установка параметра источника веса для ТТН
+    path('auto-ttn/update-weight-source/', views.update_weight_source, name="update_weight_source"),
+
     # Грузовики
     path('transport/trucks', views.TruckView.as_view(), name="truck_list"),
     path('transport/trucks/create', views.TruckCreateView.as_view(), name="truck_create"),
