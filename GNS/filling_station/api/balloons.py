@@ -144,25 +144,25 @@ class BalloonViewSet(viewsets.ViewSet):
                 brutto=balloon.brutto,
                 filling_status=balloon.filling_status
             )
-            # Сохраняем баллон в кэш на карусели наполнения)
-            if reader_number == 8:
-                cache_key = f'reader_{reader_number}_balloon_stack'
-                stack = cache.get(cache_key, [])
-                logger.debug(f'Метка на {reader_number} считывателе. Исходный стек = {stack}')
-                # Добавляем объект в стек
-                stack.insert(0, {
-                    'number': reader_balloon.number,
-                    'nfc_tag': reader_balloon.nfc_tag,
-                    'serial_number': reader_balloon.serial_number,
-                    'size': reader_balloon.size,
-                    'netto': reader_balloon.netto,
-                    'brutto': reader_balloon.brutto,
-                    'filling_status': reader_balloon.filling_status,
-                })
-                logger.debug(f'Стек считывателя {reader_number} = {stack}')
-
-                # Сохраняем обновленный стек в кэш
-                cache.set(cache_key, stack, timeout=None)
+            # # Сохраняем баллон в кэш на карусели наполнения
+            # if reader_number == 8:
+            #     cache_key = f'reader_{reader_number}_balloon_stack'
+            #     stack = cache.get(cache_key, [])
+            #     logger.debug(f'Метка на {reader_number} считывателе. Исходный стек = {stack}')
+            #     # Добавляем объект в стек
+            #     stack.insert(0, {
+            #         'number': reader_balloon.number,
+            #         'nfc_tag': reader_balloon.nfc_tag,
+            #         'serial_number': reader_balloon.serial_number,
+            #         'size': reader_balloon.size,
+            #         'netto': reader_balloon.netto,
+            #         'brutto': reader_balloon.brutto,
+            #         'filling_status': reader_balloon.filling_status,
+            #     })
+            #     logger.debug(f'Стек считывателя {reader_number} = {stack}')
+            #
+            #     # Сохраняем обновленный стек в кэш
+            #     cache.set(cache_key, stack, timeout=None)
 
         serializer = BalloonSerializer(balloon)
         return Response(serializer.data)

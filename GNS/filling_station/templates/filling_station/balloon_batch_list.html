@@ -20,7 +20,7 @@
                             <th>Прицеп</th>
                             <th>Баллонов (RFID)</th>
                             <th>Баллонов (без RFID)</th>
-                            <th>Количество газа</th>
+                            <th>Номер ТТН</th>
                             <th>Статус</th>
                             <th>Действия</th>
                         </tr>
@@ -53,7 +53,7 @@
                             <td>{{ batch.trailer|default:"-" }}</td>
                             <td>{{ batch.amount_of_rfid|default:"-" }}</td>
                             <td>{{ batch.get_amount_without_rfid|default:"-" }}</td>
-                            <td>{{ batch.gas_amount|float_format|default:"-" }} кг</td>
+                            <td>{{ batch.ttn|default:"-" }}</td>
                             <td>
                                 {% if batch.is_active %}
                                     <span class="badge bg-success">Активна</span>

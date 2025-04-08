@@ -102,6 +102,7 @@ class Reader(models.Model):
 
 class Shipper(models.Model):
     name = models.CharField(max_length=200, verbose_name="Грузоотправитель")
+    code = models.CharField(max_length=20, null=True, blank=True, verbose_name="Код")
 
     def __str__(self):
         return self.name
@@ -113,6 +114,7 @@ class Shipper(models.Model):
 
 class Carrier(models.Model):
     name = models.CharField(max_length=200, verbose_name="Перевозчик")
+    code = models.CharField(max_length=20, null=True, blank=True, verbose_name="Код")
 
     def __str__(self):
         return self.name
@@ -124,6 +126,7 @@ class Carrier(models.Model):
 
 class Consignee(models.Model):
     name = models.CharField(max_length=200, verbose_name="Грузополучатель")
+    code = models.CharField(max_length=20, null=True, blank=True, verbose_name="Код")
 
     def __str__(self):
         return self.name

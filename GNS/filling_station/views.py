@@ -217,7 +217,7 @@ class CarouselSettingsUpdateView(generic.UpdateView):
 # Партии приёмки баллонов
 class BalloonLoadingBatchListView(generic.ListView):
     model = BalloonsLoadingBatch
-    paginate_by = 10
+    paginate_by = 9
     template_name = 'filling_station/balloon_batch_list.html'
 
 
@@ -242,7 +242,7 @@ class BalloonLoadingBatchDeleteView(generic.DeleteView):
 # Партии отгрузки баллонов
 class BalloonUnloadingBatchListView(generic.ListView):
     model = BalloonsUnloadingBatch
-    paginate_by = 10
+    paginate_by = 9
     template_name = 'filling_station/balloon_batch_list.html'
 
 
@@ -267,7 +267,7 @@ class BalloonUnloadingBatchDeleteView(generic.DeleteView):
 # Партии автоцистерн
 class AutoGasBatchListView(generic.ListView):
     model = AutoGasBatch
-    paginate_by = 10
+    paginate_by = 9
     template_name = 'filling_station/auto_batch_list.html'
 
 
@@ -482,7 +482,6 @@ class RailwayTtnUpdateView(generic.UpdateView):
     def form_valid(self, form):
         new_railway_ttn = form.cleaned_data['railway_ttn']
 
-        # Сохраняем форму, но не коммитим в БД
         self.object = form.save(commit=False)
 
         # Обновляем суммы
@@ -550,17 +549,16 @@ class AutoTtnCreateView(generic.CreateView):
             settings = AutoGasBatchSettings.objects.first()
 
             # Определяем источник данных и значение количества газа
-            if settings and settings.weight_source == 'f':  # Расходомер
+            if settings and settings.weight_source == 'f':
                 gas_amount = batch.gas_amount
                 source = 'Расходомер'
-            else:  # Весы
+            else:
                 gas_amount = batch.weight_gas_amount
                 source = 'Весы'
 
-            # Обновляем поля в сохраненной ТТН
             self.object.total_gas_amount = gas_amount
             self.object.source_gas_amount = source
-            self.object.gas_type = batch.gas_type  # Копируем тип газа из партии
+            self.object.gas_type = batch.gas_type
             self.object.save()
 
 

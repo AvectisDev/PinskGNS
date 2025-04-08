@@ -158,18 +158,18 @@ class RailwayTtnAdmin(admin.ModelAdmin):
 
 @admin.register(models.Shipper)
 class ShipperAdmin(admin.ModelAdmin):
-    list_display = ['id', 'name']
-    search_fields = ['name']
+    list_display = ['id', 'name', 'code']
+    search_fields = ['name', 'code']
 
 
 @admin.register(models.Carrier)
 class CarrierAdmin(admin.ModelAdmin):
-    list_display = ['id', 'name']
-    search_fields = ['name']
+    list_display = ['id', 'name', 'code']
+    search_fields = ['name', 'code']
 
 
 @admin.register(models.Consignee)
 class ConsigneeAdmin(admin.ModelAdmin):
-    list_display = ['id', 'name']
-    search_fields = ['name']
+    list_display = ['id', 'name', 'code']
+    search_fields = ['name', 'code']
 

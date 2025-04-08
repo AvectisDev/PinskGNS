@@ -49,6 +49,12 @@
 
                         <dt class="col-sm-6">Количество газа:</dt>
                         <dd class="col-sm-6">{{ batch.gas_amount|float_format|default:"-" }} кг</dd>
+                        <hr>
+                        <dt class="col-sm-6">ТТН:</dt>
+                        <dd class="col-sm-6">{{ batch.ttn|default:"Не указана" }}</dd>
+
+                        <dt class="col-sm-6">Количество баллонов по ТТН:</dt>
+                        <dd class="col-sm-6">{{ batch.amount_of_ttn|default:"-" }}</dd>
                     </dl>
                 </div>
 
@@ -73,11 +79,6 @@
                         <dd class="col-sm-6">{{ batch.get_amount_without_rfid|default:"-" }}</dd>
                     </dl>
                 </div>
-            </div>
-
-            <div class="mt-4">
-                <h5 class="mb-3">ТТН</h5>
-                <p>{{ batch.ttn|default:"Не указана" }}</p>
             </div>
         </div>
 

@@ -225,12 +225,26 @@ class TTNForm(forms.ModelForm):
         self.helper.add_input(Submit('Сохранить', 'Сохранить', css_class='btn btn-success'))
         self.helper.form_method = 'POST'
 
-        # Добавляем пустые подписи для ForeignKey полей
         self.fields['shipper'].empty_label = 'Выберите грузоотправителя'
         self.fields['carrier'].empty_label = 'Выберите перевозчика'
         self.fields['consignee'].empty_label = 'Выберите грузополучателя'
         self.fields['loading_batch'].empty_label = 'Выберите партию приёмки'
         self.fields['unloading_batch'].empty_label = 'Выберите партию отгрузки'
+
+        self.fields['loading_batch'].label_from_instance = self.format_batch_choice
+        self.fields['unloading_batch'].label_from_instance = self.format_batch_choice
+
+    def format_batch_choice(self, obj):
+        """Форматирует отображение партии в выпадающем списке"""
+        if isinstance(obj, models.BalloonsLoadingBatch):
+            batch_type = 'Приёмка'
+        else:
+            batch_type = 'Отгрузка'
+
+        truck_number = obj.truck.registration_number if obj.truck else '---'
+        ttn_number = obj.ttn if obj.ttn else '---'
+
+        return f"{batch_type} №{obj.id} | Автомобиль: {truck_number} | ТТН: {ttn_number}"
 
     class Meta:
         model = models.NewTTN
@@ -317,6 +331,7 @@ class BalloonsLoadingBatchForm(forms.ModelForm):
             'amount_of_50_liters',
             'gas_amount',
             'is_active',
+            'ttn',
             'amount_of_ttn'
         ]
         widgets = {
@@ -365,6 +380,10 @@ class BalloonsLoadingBatchForm(forms.ModelForm):
             }),
             'is_active': forms.CheckboxInput(attrs={
                 'class': 'form-check-input'
+            }),
+            'ttn': forms.TextInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'Номер ТТН'
             }),
             'amount_of_ttn': forms.NumberInput(attrs={
                 'class': 'form-control',
@@ -405,6 +424,7 @@ class BalloonsUnloadingBatchForm(forms.ModelForm):
             'amount_of_50_liters',
             'gas_amount',
             'is_active',
+            'ttn',
             'amount_of_ttn'
         ]
         widgets = {
@@ -453,6 +473,10 @@ class BalloonsUnloadingBatchForm(forms.ModelForm):
             }),
             'is_active': forms.CheckboxInput(attrs={
                 'class': 'form-check-input'
+            }),
+            'ttn': forms.TextInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'Номер ТТН'
             }),
             'amount_of_ttn': forms.NumberInput(attrs={
                 'class': 'form-control',
