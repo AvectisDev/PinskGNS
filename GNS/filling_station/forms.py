@@ -300,6 +300,13 @@ class TTNForm(forms.ModelForm):
 
         if loading_batch and unloading_batch:
             raise forms.ValidationError("Выберите только партию приёмки ИЛИ партию отгрузки, не обе одновременно")
+
+        # Автоматически заполняем номер ТТН из выбранной партии
+        if loading_batch:
+            cleaned_data['number'] = loading_batch.ttn
+        elif unloading_batch:
+            cleaned_data['number'] = unloading_batch.ttn
+
         return cleaned_data
 
 

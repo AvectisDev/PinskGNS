@@ -466,7 +466,7 @@ class TTN(models.Model):
 
 
 class NewTTN(models.Model):
-    number = models.CharField(blank=False, max_length=100, verbose_name="Номер ТТН")
+    number = models.CharField(blank=True, max_length=100, verbose_name="Номер ТТН")
     contract = models.CharField(blank=True, max_length=100, verbose_name="Номер договора")
     shipper = models.ForeignKey(
         Contractor,

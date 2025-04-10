@@ -428,16 +428,9 @@ class TTNCreateView(generic.CreateView):
         return self.object.get_absolute_url()
 
     def form_valid(self, form):
-        self.object = form.save(commit=False)
-        batch_number = form.cleaned_data['loading_batch']
-
-        # Находим партию с выбранным номером
-        batch = get_object_or_404(BalloonsLoadingBatch, id=batch_number.id)
-        self.object.number = batch.ttn
-        self.object.save()
-
+        response = super().form_valid(form)
         messages.success(self.request, f'ТТН {self.object.number} успешно создана')
-        return super().form_valid(form)
+        return response
 
 
 class TTNUpdateView(generic.UpdateView):
@@ -449,16 +442,9 @@ class TTNUpdateView(generic.UpdateView):
         return self.object.get_absolute_url()
 
     def form_valid(self, form):
-        self.object = form.save(commit=False)
-        batch_number = form.cleaned_data['loading_batch']
-
-        # Находим партию с выбранным номером
-        batch = get_object_or_404(BalloonsLoadingBatch, id=batch_number.id)
-        self.object.number = batch.ttn
-        self.object.save()
-
-        messages.success(self.request, f'ТТН {self.object.number} успешно создана')
-        return super().form_valid(form)
+        response = super().form_valid(form)
+        messages.success(self.request, f'ТТН {self.object.number} успешно обновлена')
+        return response
 
 
 class TTNDeleteView(generic.DeleteView):
