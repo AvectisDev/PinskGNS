@@ -100,6 +100,18 @@ class Reader(models.Model):
         ordering = ['-change_date', '-change_time']
 
 
+class Contractor(models.Model):
+    name = models.CharField(max_length=200, verbose_name="Контрагент")
+    code = models.CharField(max_length=20, null=True, blank=True, verbose_name="Код")
+
+    def __str__(self):
+        return self.name
+
+    class Meta:
+        verbose_name = "Контрагент"
+        verbose_name_plural = "Контрагенты"
+
+
 class Shipper(models.Model):
     name = models.CharField(max_length=200, verbose_name="Грузоотправитель")
     code = models.CharField(max_length=20, null=True, blank=True, verbose_name="Код")

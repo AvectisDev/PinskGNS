@@ -5,6 +5,7 @@ from django.urls import reverse_lazy, reverse
 from django.views import generic
 from django.db.models import Q, Sum
 from django.contrib import messages
+from django.shortcuts import get_object_or_404
 from django.views.decorators.http import require_POST
 from django.contrib.auth.decorators import login_required
 from .models import (Balloon, Truck, Trailer, RailwayTank, TTN, BalloonsLoadingBatch, BalloonsUnloadingBatch, NewTTN,
@@ -426,11 +427,38 @@ class TTNCreateView(generic.CreateView):
     def get_success_url(self):
         return self.object.get_absolute_url()
 
+    def form_valid(self, form):
+        self.object = form.save(commit=False)
+        batch_number = form.cleaned_data['loading_batch']
+
+        # Находим партию с выбранным номером
+        batch = get_object_or_404(BalloonsLoadingBatch, id=batch_number.id)
+        self.object.number = batch.ttn
+        self.object.save()
+
+        messages.success(self.request, f'ТТН {self.object.number} успешно создана')
+        return super().form_valid(form)
+
 
 class TTNUpdateView(generic.UpdateView):
     model = NewTTN
     form_class = TTNForm
     template_name = 'filling_station/_equipment_form.html'
+
+    def get_success_url(self):
+        return self.object.get_absolute_url()
+
+    def form_valid(self, form):
+        self.object = form.save(commit=False)
+        batch_number = form.cleaned_data['loading_batch']
+
+        # Находим партию с выбранным номером
+        batch = get_object_or_404(BalloonsLoadingBatch, id=batch_number.id)
+        self.object.number = batch.ttn
+        self.object.save()
+
+        messages.success(self.request, f'ТТН {self.object.number} успешно создана')
+        return super().form_valid(form)
 
 
 class TTNDeleteView(generic.DeleteView):
