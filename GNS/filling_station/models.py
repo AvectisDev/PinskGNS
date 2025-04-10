@@ -112,42 +112,6 @@ class Contractor(models.Model):
         verbose_name_plural = "Контрагенты"
 
 
-class Shipper(models.Model):
-    name = models.CharField(max_length=200, verbose_name="Грузоотправитель")
-    code = models.CharField(max_length=20, null=True, blank=True, verbose_name="Код")
-
-    def __str__(self):
-        return self.name
-
-    class Meta:
-        verbose_name = "Грузоотправитель"
-        verbose_name_plural = "Грузоотправители"
-
-
-class Carrier(models.Model):
-    name = models.CharField(max_length=200, verbose_name="Перевозчик")
-    code = models.CharField(max_length=20, null=True, blank=True, verbose_name="Код")
-
-    def __str__(self):
-        return self.name
-
-    class Meta:
-        verbose_name = "Перевозчик"
-        verbose_name_plural = "Перевозчики"
-
-
-class Consignee(models.Model):
-    name = models.CharField(max_length=200, verbose_name="Грузополучатель")
-    code = models.CharField(max_length=20, null=True, blank=True, verbose_name="Код")
-
-    def __str__(self):
-        return self.name
-
-    class Meta:
-        verbose_name = "Грузополучатель"
-        verbose_name_plural = "Грузополучатели"
-
-
 class Carousel(models.Model):
     carousel_number = models.IntegerField(default=1, verbose_name="Номер карусели наполнения")
     is_empty = models.BooleanField(default=False, verbose_name="Принят запрос на наполнение баллона")
@@ -505,21 +469,21 @@ class NewTTN(models.Model):
     number = models.CharField(blank=False, max_length=100, verbose_name="Номер ТТН")
     contract = models.CharField(blank=True, max_length=100, verbose_name="Номер договора")
     shipper = models.ForeignKey(
-        Shipper,
+        Contractor,
         on_delete=models.SET_NULL,
         null=True,
         verbose_name="Грузоотправитель",
         related_name='balloons_shipper'
     )
     carrier = models.ForeignKey(
-        Carrier,
+        Contractor,
         on_delete=models.SET_NULL,
         null=True,
         verbose_name="Перевозчик",
         related_name='balloons_carrier'
     )
     consignee = models.ForeignKey(
-        Consignee,
+        Contractor,
         on_delete=models.SET_NULL,
         null=True,
         verbose_name="Грузополучатель",
@@ -661,21 +625,21 @@ class RailwayTtn(models.Model):
     )
     contract = models.CharField(blank=True, max_length=100, verbose_name="Номер договора")
     shipper = models.ForeignKey(
-        Shipper,
+        Contractor,
         on_delete=models.SET_NULL,
         null=True,
         verbose_name="Грузоотправитель",
         related_name='railway_tank_shipper'
     )
     carrier = models.ForeignKey(
-        Carrier,
+        Contractor,
         on_delete=models.SET_NULL,
         null=True,
         verbose_name="Перевозчик",
         related_name='railway_tank_carrier'
     )
     consignee = models.ForeignKey(
-        Consignee,
+        Contractor,
         on_delete=models.SET_NULL,
         null=True,
         verbose_name="Грузополучатель",
@@ -788,21 +752,21 @@ class AutoTtn(models.Model):
     number = models.CharField(blank=False, max_length=100, verbose_name="Номер ТТН")
     contract = models.CharField(blank=True, max_length=100, verbose_name="Номер договора")
     shipper = models.ForeignKey(
-        Shipper,
+        Contractor,
         on_delete=models.SET_NULL,
         null=True,
         verbose_name="Грузоотправитель",
         related_name='auto_tank_shipper'
     )
     carrier = models.ForeignKey(
-        Carrier,
+        Contractor,
         on_delete=models.SET_NULL,
         null=True,
         verbose_name="Перевозчик",
         related_name='auto_tank_carrier'
     )
     consignee = models.ForeignKey(
-        Consignee,
+        Contractor,
         on_delete=models.SET_NULL,
         null=True,
         verbose_name="Грузополучатель",

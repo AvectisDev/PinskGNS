@@ -156,24 +156,6 @@ class RailwayTtnAdmin(admin.ModelAdmin):
     list_filter = ['date', 'gas_type']
 
 
-@admin.register(models.Shipper)
-class ShipperAdmin(admin.ModelAdmin):
-    list_display = ['id', 'name', 'code']
-    search_fields = ['name', 'code']
-
-
-@admin.register(models.Carrier)
-class CarrierAdmin(admin.ModelAdmin):
-    list_display = ['id', 'name', 'code']
-    search_fields = ['name', 'code']
-
-
-@admin.register(models.Consignee)
-class ConsigneeAdmin(admin.ModelAdmin):
-    list_display = ['id', 'name', 'code']
-    search_fields = ['name', 'code']
-
-
 @admin.register(models.Contractor)
 class ContractorAdmin(admin.ModelAdmin):
     list_display = ['id', 'name', 'code']
