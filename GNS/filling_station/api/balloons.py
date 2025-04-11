@@ -91,6 +91,69 @@ class BalloonViewSet(viewsets.ViewSet):
             self.logger.error(f'Ошибка в методе получения паспорта баллона из Мириады: {error}')
             return None
 
+    def send_status_to_miriada(self, send_type: str, nfc_tag: str, send_data: dict = None):
+        """
+        Метод для отправки статусов баллонов по NFC-метке в Мириаду.
+        Поддерживается 3 основных типа отправки (send_type):
+        filling - Наполнение баллона
+        registering_in_warehouse - Регистрация баллона на склад
+        loading_into_truck - Погрузка баллона в машину
+        """
+        # miriada server address
+        BASE_URL = 'https://publicapi-brest.cloud.gas.by'
+        realm = "brestoblgas"
+        send_urls = {
+            'filling': f'{BASE_URL}/fillingballoon',
+            'registering_in_warehouse': f'{BASE_URL}/balloontosklad',
+            'loading_into_truck': f'{BASE_URL}/balloontocar',
+        }
+
+        AUTH_LOGIN = "pinskgns"
+        AUTH_PASSWORD = "AuSSFy5uRwF0r0xeNzakRZKJO1gOllgpyxIZ"
+
+        headers = {
+            'Accept': 'application/json',
+            'Content-Type': 'application/json'
+        }
+
+        payload = {
+            "nfctag": nfc_tag,
+            "realm": "brestoblgas"
+        }
+
+        if send_data is not None:
+            fulness = send_data.get('fulness')  # 1-полный, 0 — пустой
+            if fulness:
+                payload.update({"fulness": fulness})
+
+            number_auto = send_data.get('number_auto')  # "AM 7881-2" номер машины.(Номер должен быть добавлен в  ПК «Автопарк»
+            type_car = send_data.get('type_car')    # 0-кассета, 1 — трал
+            if number_auto and type_car:
+                payload.update({
+                    "fulness": fulness,
+                    "number_auto": number_auto,
+                    "type_car": type_car
+                })
+
+        try:
+            response = requests.post(
+                send_urls.get(send_type),
+                auth=(AUTH_LOGIN, AUTH_PASSWORD),
+                headers=headers,
+                json=payload,
+                timeout=2
+            )
+            response.raise_for_status()
+            result = response.json()
+            self.logger.info(f"Статус по {send_type} отправлен. Ответ {result}")
+            if response.status_code == 200:
+                self.logger.info(f"Статус по {send_type} успешно отправлен")
+            else:
+                self.logger.warning(f"Ошибка по {send_type}! Код: {response.status_code}, Описание: {response.reason}")
+
+        except Exception as error:
+            self.logger.error(f'Ошибка в методе отправки статуса баллона в Мириаду: {error}')
+
     @action(detail=False, methods=['post'], url_path='update-by-reader')
     def update_by_reader(self, request):
         """
@@ -115,6 +178,17 @@ class BalloonViewSet(viewsets.ViewSet):
         reader_number = request.data.get('reader_number')
         if reader_number is None:
             self.logger.error("Номер ридера отсутствует в теле запроса")
+        elif reader_number == 8:
+            self.send_status_to_miriada(nfc_tag=nfc_tag, send_type='filling')
+        elif reader_number == 6:
+            self.send_status_to_miriada(nfc_tag=nfc_tag, send_type='registering_in_warehouse', send_data={'fulness':0})
+        elif reader_number == 5:
+            self.send_status_to_miriada(nfc_tag=nfc_tag, send_type='registering_in_warehouse', send_data={'fulness':1})
+        elif reader_number in [3, 4]:
+            self.send_status_to_miriada(nfc_tag=nfc_tag, send_type='loading_into_truck', send_data={'fulness':1, "type_car": 1, "number_auto": '',})
+        elif reader_number == 2:
+            self.send_status_to_miriada(nfc_tag=nfc_tag, send_type='loading_into_truck', send_data={'fulness':1, "type_car": 0, "number_auto": '',})
+
 
         # Если требуется обновление паспорта или идёт приёмка новых баллонов - выполняем запрос в Мириаду
         if balloon.update_passport_required in (True, None) or reader_number in [1, 6]:
