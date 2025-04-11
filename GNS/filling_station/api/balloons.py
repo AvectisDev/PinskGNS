@@ -136,13 +136,37 @@ class BalloonViewSet(viewsets.ViewSet):
                 })
 
         try:
-            response = requests.post(
+            
+            #response = requests.post(
+            #    send_urls.get(send_type),
+            #    auth=(AUTH_LOGIN, AUTH_PASSWORD),
+            #    headers=headers,
+            #    json=payload,
+            #    timeout=2
+            #)
+            #self.logger.debug(f"Запрос requests = {requests} отправлен")
+            # Создаем запрос, но не отправляем
+            session = requests.Session()
+            req = requests.Request(
+                'POST',
                 send_urls.get(send_type),
                 auth=(AUTH_LOGIN, AUTH_PASSWORD),
                 headers=headers,
-                json=payload,
-                timeout=2
+                json=payload
             )
+            prepared = session.prepare_request(req)
+
+            # Логируем всё, что будет отправлено
+            self.logger.debug(
+                f"Подготовленный запрос:\n"
+                f"URL: {prepared.url}\n"
+                f"Headers: {prepared.headers}\n"
+                f"Body: {prepared.body}"
+            )
+
+            # Отправляем
+            response = session.send(prepared, timeout=2)
+            #
             response.raise_for_status()
             result = response.json()
             self.logger.info(f"Статус по {send_type} отправлен. Ответ {result}")
