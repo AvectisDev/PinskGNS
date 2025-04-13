@@ -176,11 +176,3 @@ a.custom-link:hover {
     padding: 5px 8px;
     border-radius: 4px;
 }
-
-.badge.bg-success {
-    background-color: #3CBBD9 !important;
-}
-
-.badge.bg-secondary {
-    background-color: #6c757d !important;
-}
