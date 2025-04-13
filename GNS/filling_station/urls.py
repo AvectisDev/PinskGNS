@@ -62,35 +62,47 @@ urlpatterns = [
     # Партии автоцистерн
     path('batch/auto-gas', views.AutoGasBatchListView.as_view(), name="auto_gas_batch_list"),
     path('batch/auto-gas/<pk>/', views.AutoGasBatchDetailView.as_view(), name="auto_gas_batch_detail"),
-    path('batch/auto-gas/<pk>/update/', views.AutoGasBatchUpdateView.as_view(), name="auto_gas_batch_update"),
+    path('batch/auto-gas/<pk>/update/', views.AutoGasBatchUpdateView.as_view(extra_context={
+        "title": "Редактирование партии приёмки/отгрузки газа в автоцистернах"
+    }),
+         name="auto_gas_batch_update"),
     path('batch/auto-gas/<pk>/delete/', views.AutoGasBatchDeleteView.as_view(), name="auto_gas_batch_delete"),
 
     # ТТН для баллонов
     path('ttn', views.TTNView.as_view(), name="ttn_list"),
-    path('ttn/create', views.TTNCreateView.as_view(), name="ttn_create"),
+    path('ttn/create', views.TTNCreateView.as_view(extra_context={
+        "title": "Создание ТТН на приёмку/отгрузку баллонов"
+    }),
+         name="ttn_create"),
     path('ttn/<pk>', views.TTNDetailView.as_view(), name="ttn_detail"),
     path('ttn/<pk>/update/', views.TTNUpdateView.as_view(extra_context={
-        "title": "Редактирование ТТН"
+        "title": "Редактирование ТТН на приёмку/отгрузку баллонов"
     }),
          name="ttn_update"),
     path('ttn/<pk>/delete/', views.TTNDeleteView.as_view(), name="ttn_delete"),
 
     # ТТН для ж/д цистерн
     path('railway-ttn', views.RailwayTtnView.as_view(), name="railway_ttn_list"),
-    path('railway-ttn/create', views.RailwayTtnCreateView.as_view(), name="railway_ttn_create"),
+    path('railway-ttn/create', views.RailwayTtnCreateView.as_view(extra_context={
+        "title": "Создание ж/д ТТН"
+    }),
+         name="railway_ttn_create"),
     path('railway-ttn/<pk>', views.RailwayTtnDetailView.as_view(), name="railway_ttn_detail"),
     path('railway-ttn/<pk>/update/', views.RailwayTtnUpdateView.as_view(extra_context={
-        "title": "Редактирование ТТН"
+        "title": "Редактирование ж/д ТТН"
     }),
          name="railway_ttn_update"),
     path('railway-ttn/<pk>/delete/', views.RailwayTtnDeleteView.as_view(), name="railway_ttn_delete"),
 
     # ТТН для авто цистерн
     path('auto-ttn', views.AutoTtnView.as_view(), name="auto_ttn_list"),
-    path('auto-ttn/create', views.AutoTtnCreateView.as_view(), name="auto_ttn_create"),
+    path('auto-ttn/create', views.AutoTtnCreateView.as_view(extra_context={
+        "title": "Создание ТТН на приёмку/отгрузку автоцистерн"
+    }),
+         name="auto_ttn_create"),
     path('auto-ttn/<pk>', views.AutoTtnDetailView.as_view(), name="auto_ttn_detail"),
     path('auto-ttn/<pk>/update/', views.AutoTtnUpdateView.as_view(extra_context={
-        "title": "Редактирование ТТН"
+        "title": "Редактирование ТТН на приёмку/отгрузку автоцистерн"
     }),
          name="auto_ttn_update"),
     path('auto-ttn/<pk>/delete/', views.AutoTtnDeleteView.as_view(), name="auto_ttn_delete"),
@@ -99,7 +111,10 @@ urlpatterns = [
 
     # Грузовики
     path('transport/trucks', views.TruckView.as_view(), name="truck_list"),
-    path('transport/trucks/create', views.TruckCreateView.as_view(), name="truck_create"),
+    path('transport/trucks/create', views.TruckCreateView.as_view(extra_context={
+        "title": "Создание грузовика"
+    }),
+         name="truck_create"),
     path('transport/trucks/<pk>', views.TruckDetailView.as_view(), name="truck_detail"),
     path('transport/trucks/<pk>/update/',
          views.TruckUpdateView.as_view(extra_context={
@@ -110,7 +125,10 @@ urlpatterns = [
 
     # Прицепы
     path('transport/trailers', views.TrailerView.as_view(), name="trailer_list"),
-    path('transport/trailers/create', views.TrailerCreateView.as_view(), name="trailer_create"),
+    path('transport/trailers/create', views.TrailerCreateView.as_view(extra_context={
+        "title": "Создание прицепа"
+    }),
+         name="trailer_create"),
     path('transport/trailers/<pk>', views.TrailerDetailView.as_view(), name="trailer_detail"),
     path('transport/trailers/<pk>/update/', views.TrailerUpdateView.as_view(extra_context={
         "title": "Редактирование прицепа"
@@ -120,7 +138,10 @@ urlpatterns = [
 
     # Ж/д цистерны
     path('transport/railway_tanks', views.RailwayTankView.as_view(), name="railway_tank_list"),
-    path('transport/railway_tanks/create', views.RailwayTankCreateView.as_view(), name="railway_tank_create"),
+    path('transport/railway_tanks/create', views.RailwayTankCreateView.as_view(extra_context={
+        "title": "Создание ж/д цистерны"
+    }),
+         name="railway_tank_create"),
     path('transport/railway_tanks/<pk>', views.RailwayTankDetailView.as_view(), name="railway_tank_detail"),
     path('transport/railway_tanks/<pk>/update/', views.RailwayTankUpdateView.as_view(extra_context={
         "title": "Редактирование ж/д цистерны"
@@ -134,5 +155,8 @@ urlpatterns = [
     # Карусель
     path('carousel/<int:carousel_number>/', views.carousel_info, name='carousel_info'),
     path('carousel-settings/', views.CarouselSettingsDetailView.as_view(), name='carousel_settings_detail'),
-    path('carousel-settings/update/', views.CarouselSettingsUpdateView.as_view(), name='carousel_settings_update'),
+    path('carousel-settings/update/', views.CarouselSettingsUpdateView.as_view(extra_context={
+        "title": "Редактирование настроек карусели наполнения баллонов"
+    }),
+         name='carousel_settings_update'),
 ]

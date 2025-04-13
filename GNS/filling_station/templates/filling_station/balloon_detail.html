@@ -1,55 +1,85 @@
 {% extends 'base.html' %}
-{% block title %} Паспорт баллона {% endblock %}
+{% load custom_filters %}
+
+{% block title %}Паспорт баллона {{ balloon.nfc_tag }}{% endblock %}
 
 {% block content %}
-<div class="col-md-2 mb-2 mb-md-0">
-    <h5>Паспорт баллона</h5>
-</div>
-
-<div class="container text-center">
-    <div class="row">
-        <div class="col text-end">
-            <p>RFID метка</p>
-            <p>Серийный номер</p>
-            <p>Дата производства</p>
-            <p>Объём</p>
-            <p>Вес нетто</p>
-            <p>Вес брутто</p>
-            <p>Дата освидетельствования</p>
-            <p>Дата следующего освидетельствования</p>
-            <p>Статус</p>
-            <p>Производитель</p>
-            <p>Толщина стенок</p>
-            <p>Готов к наполнению</p>
-            <p>Дата изменения</p>
-            <p>Время изменения</p>
+<div class="container mt-4">
+    <div class="card shadow-sm">
+        <div class="card-header card-header-custom">
+            <div class="d-flex justify-content-between align-items-center">
+                <h4 class="mb-0">Паспорт баллона {{ balloon.nfc_tag }}</h4>
+                <div>
+                    <span class="badge bg-{% if balloon.filling_status %}success{% else %}secondary{% endif %}">
+                        {% if balloon.filling_status %}Готов к наполнению{% else %}Не готов{% endif %}
+                    </span>
+                </div>
+            </div>
         </div>
-        <div class="col text-start">
-            <p>{{ balloon.nfc_tag}}</p>
-            <p>{{ balloon.serial_number|default_if_none:"-" }}</p>
-            <p>{{ balloon.creation_date|default_if_none:"-" }}</p>
-            <p>{{ balloon.size|default_if_none:"-" }}</p>
-            <p>{{ balloon.netto|default_if_none:"-" }}</p>
-            <p>{{ balloon.brutto|default_if_none:"-" }}</p>
-            <p>{{ balloon.current_examination_date|default_if_none:"-" }}</p>
-            <p>{{ balloon.next_examination_date|default_if_none:"-" }}</p>
-            <p>{{ balloon.status|default_if_none:"-" }}</p>
-            <p>{{ balloon.manufacturer|default_if_none:"-" }}</p>
-            <p>{{ balloon.wall_thickness|default_if_none:"-" }}</p>
-            <p>{% if balloon.filling_status %}Да{% else %}Нет{% endif %}</p>
-            <p>{{ balloon.change_date|default_if_none:"-" }}</p>
-            <p>{{ balloon.change_time|default_if_none:"-" }}</p>
+
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-6">
+                    <dl class="row">
+                        <dt class="col-sm-6">Серийный номер:</dt>
+                        <dd class="col-sm-6">{{ balloon.serial_number|default:"-" }}</dd>
+
+                        <dt class="col-sm-6">Дата производства:</dt>
+                        <dd class="col-sm-6">{{ balloon.creation_date|date:"d.m.Y"|default:"-" }}</dd>
+
+                        <dt class="col-sm-6">Объём:</dt>
+                        <dd class="col-sm-6">{{ balloon.size|default:"-" }} л</dd>
+
+                        <dt class="col-sm-6">Вес нетто:</dt>
+                        <dd class="col-sm-6">{{ balloon.netto|float_format|default:"-" }} кг</dd>
+
+                        <dt class="col-sm-6">Вес брутто:</dt>
+                        <dd class="col-sm-6">{{ balloon.brutto|float_format|default:"-" }} кг</dd>
+
+                        <dt class="col-sm-6">Статус:</dt>
+                        <dd class="col-sm-6">{{ balloon.status|default:"-" }}</dd>
+                    </dl>
+                </div>
+
+                <div class="col-md-6">
+                    <dl class="row">
+                        <dt class="col-sm-6">Дата освидетельствования:</dt>
+                        <dd class="col-sm-6">{{ balloon.current_examination_date|date:"d.m.Y"|default:"-" }}</dd>
+
+                        <dt class="col-sm-6">Следующее освидетельствование:</dt>
+                        <dd class="col-sm-6">{{ balloon.next_examination_date|date:"d.m.Y"|default:"-" }}</dd>
+
+                        <dt class="col-sm-6">Производитель:</dt>
+                        <dd class="col-sm-6">{{ balloon.manufacturer|default:"-" }}</dd>
+
+                        <dt class="col-sm-6">Толщина стенок:</dt>
+                        <dd class="col-sm-6">{{ balloon.wall_thickness|float_format|default:"-" }} мм</dd>
+
+                        <dt class="col-sm-6">Рабочее давление:</dt>
+                        <dd class="col-sm-6">{{ balloon.working_pressure|float_format|default:"-" }} бар</dd>
+
+                        <dt class="col-sm-6">Дата последней диагностики:</dt>
+                        <dd class="col-sm-6">{{ balloon.diagnostic_date|date:"d.m.Y"|default:"-" }}</dd>
+                    </dl>
+                </div>
+            </div>
+        </div>
+
+        <div class="card-footer bg-light">
+            <div class="d-flex justify-content-between">
+                <a href="{% url 'filling_station:balloon_list' %}" class="btn btn-custom">
+                    <i class="bi bi-arrow-left"></i> Назад
+                </a>
+                <div>
+                    <a href="{{ balloon.get_update_url }}" class="btn btn-custom me-2">
+                        <i class="bi bi-pencil"></i> Редактировать
+                    </a>
+                    <a href="{{ balloon.get_delete_url }}" class="btn btn-danger">
+                        <i class="bi bi-trash"></i> Удалить
+                    </a>
+                </div>
+            </div>
         </div>
     </div>
 </div>
-
-<div class="container text-center">
-    <button type="button" class="btn" style="background-color: #3CBBD9; color: white;"
-            onclick="location.href='{% url 'filling_station:balloon_list' %}'">Назад</button>
-    <button type="button" class="btn" style="background-color: #3CBBD9; color: white;"
-            onclick="location.href = '{{ balloon.get_update_url }}'">Редактировать</button>
-    <button type="button" class="btn btn-danger" onclick="location.href = '{{ balloon.get_delete_url }}'">Удалить
-    </button>
-</div>
-
-{% endblock content %}
+{% endblock %}

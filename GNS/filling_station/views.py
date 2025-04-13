@@ -31,7 +31,7 @@ STATUS_LIST = {
 
 class BalloonListView(generic.ListView):
     model = Balloon
-    paginate_by = 15
+    paginate_by = 10
 
     def get_queryset(self):
         query = self.request.GET.get('query', '')
@@ -109,7 +109,7 @@ def reader_info(request, reader=1):
     current_quantity_rfid = current_quantity['total_rfid'] or 0
     current_quantity_balloons = current_quantity['total_balloons'] or 0
 
-    paginator = Paginator(balloons_list, 12)
+    paginator = Paginator(balloons_list, 10)
     page_num = request.GET.get('page', 1)
     page_obj = paginator.get_page(page_num)
 
@@ -198,27 +198,35 @@ class CarouselSettingsDetailView(generic.DetailView):
     context_object_name = 'carousel_settings'
 
     def get_object(self, queryset=None):
-        # Получаем единственный объект настроек карусели
         return CarouselSettings.objects.first()
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['posts'] = list(range(1, 21))
+        return context
+
 
 class CarouselSettingsUpdateView(generic.UpdateView):
     model = CarouselSettings
     form_class = CarouselSettingsForm
-    # template_name = 'carousel_settings_form.html'
     template_name = 'filling_station/_equipment_form.html'
 
     def get_object(self, queryset=None):
-        # Получаем единственный объект настроек карусели
         return CarouselSettings.objects.first()
 
     def get_success_url(self):
         return reverse('filling_station:carousel_settings_detail')
 
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['posts'] = list(range(1, 21))
+        return context
+
 
 # Партии приёмки баллонов
 class BalloonLoadingBatchListView(generic.ListView):
     model = BalloonsLoadingBatch
-    paginate_by = 9
+    paginate_by = 10
     template_name = 'filling_station/balloon_batch_list.html'
 
 
@@ -243,7 +251,7 @@ class BalloonLoadingBatchDeleteView(generic.DeleteView):
 # Партии отгрузки баллонов
 class BalloonUnloadingBatchListView(generic.ListView):
     model = BalloonsUnloadingBatch
-    paginate_by = 9
+    paginate_by = 10
     template_name = 'filling_station/balloon_batch_list.html'
 
 
@@ -268,7 +276,7 @@ class BalloonUnloadingBatchDeleteView(generic.DeleteView):
 # Партии автоцистерн
 class AutoGasBatchListView(generic.ListView):
     model = AutoGasBatch
-    paginate_by = 9
+    paginate_by = 10
     template_name = 'filling_station/auto_batch_list.html'
 
 

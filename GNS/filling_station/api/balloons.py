@@ -1,5 +1,4 @@
 import logging
-import time
 import requests
 from ..models import (Balloon, Reader, BalloonAmount, BalloonsLoadingBatch, BalloonsUnloadingBatch, Carousel,
                       CarouselSettings)
@@ -9,6 +8,7 @@ from django.shortcuts import get_object_or_404
 from django.core.cache import cache
 from django.db.models.signals import post_save, post_delete
 from django.dispatch import receiver
+from django.conf import settings
 from rest_framework import generics, status, viewsets
 from rest_framework.response import Response
 from rest_framework.decorators import api_view, action
@@ -99,17 +99,11 @@ class BalloonViewSet(viewsets.ViewSet):
         registering_in_warehouse - Регистрация баллона на склад
         loading_into_truck - Погрузка баллона в машину
         """
-        # miriada server address
-        BASE_URL = 'https://publicapi-brest.cloud.gas.by'
-        realm = "brestoblgas"
         send_urls = {
-            'filling': f'{BASE_URL}/fillingballoon',
-            'registering_in_warehouse': f'{BASE_URL}/balloontosklad',
-            'loading_into_truck': f'{BASE_URL}/balloontocar',
+            'filling': f'{settings.MIRIADA_API_POST_URL}/fillingballoon',
+            'registering_in_warehouse': f'{settings.MIRIADA_API_POST_URL}/balloontosklad',
+            'loading_into_truck': f'{settings.MIRIADA_API_POST_URL}/balloontocar',
         }
-
-        AUTH_LOGIN = "pinskgns"
-        AUTH_PASSWORD = "AuSSFy5uRwF0r0xeNzakRZKJO1gOllgpyxIZ"
 
         headers = {
             'Accept': 'application/json',
@@ -136,27 +130,17 @@ class BalloonViewSet(viewsets.ViewSet):
                 })
 
         try:
-            
-            #response = requests.post(
-            #    send_urls.get(send_type),
-            #    auth=(AUTH_LOGIN, AUTH_PASSWORD),
-            #    headers=headers,
-            #    json=payload,
-            #    timeout=2
-            #)
-            #self.logger.debug(f"Запрос requests = {requests} отправлен")
-            # Создаем запрос, но не отправляем
+            # Создаем запрос в Мириаду
             session = requests.Session()
             req = requests.Request(
                 'POST',
                 send_urls.get(send_type),
-                auth=(AUTH_LOGIN, AUTH_PASSWORD),
+                auth=(settings.MIRIADA_AUTH_LOGIN, settings.MIRIADA_AUTH_PASSWORD),
                 headers=headers,
                 json=payload
             )
             prepared = session.prepare_request(req)
 
-            # Логируем всё, что будет отправлено
             self.logger.debug(
                 f"Подготовленный запрос:\n"
                 f"URL: {prepared.url}\n"
@@ -164,12 +148,8 @@ class BalloonViewSet(viewsets.ViewSet):
                 f"Body: {prepared.body}"
             )
 
-            # Отправляем
             response = session.send(prepared, timeout=2)
-            #
             response.raise_for_status()
-            result = response.json()
-            self.logger.info(f"Статус по {send_type} отправлен. Ответ {result}")
             if response.status_code == 200:
                 self.logger.info(f"Статус по {send_type} успешно отправлен")
             else:
@@ -213,7 +193,6 @@ class BalloonViewSet(viewsets.ViewSet):
         elif reader_number == 2:
             self.send_status_to_miriada(nfc_tag=nfc_tag, send_type='loading_into_truck', send_data={'fulness':1, "type_car": 0, "number_auto": '',})
 
-
         # Если требуется обновление паспорта или идёт приёмка новых баллонов - выполняем запрос в Мириаду
         if balloon.update_passport_required in (True, None) or reader_number in [1, 6]:
             balloon_passport_from_miriada = self.get_balloon_by_nfc_tag(nfc_tag)
@@ -224,7 +203,6 @@ class BalloonViewSet(viewsets.ViewSet):
                 balloon.netto = balloon_passport_from_miriada['netto']
                 balloon.brutto = balloon_passport_from_miriada['brutto']
                 balloon.filling_status = balloon_passport_from_miriada['status']
-                # Сохраняем модель
                 balloon.save()
 
         reader_function = request.data.get('reader_function')

@@ -16,3 +16,11 @@ def default_dash(value):
     if value is None or value == '':
         return '-'
     return value
+
+@register.simple_tag
+def get_post_correction(settings, post_num):
+    """
+    Для отображения корректоров карусели
+    """
+    return getattr(settings, f'post_{post_num}_correction', 0.0)
+

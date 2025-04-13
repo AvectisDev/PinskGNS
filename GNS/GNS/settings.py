@@ -13,7 +13,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/5.0/howto/deployment/checklist/
 
 SECRET_KEY = os.environ.get('SECRET_KEY')
-DEBUG = True
+DEBUG = os.environ.get('DEBUG')
 
 ALLOWED_HOSTS = ['localhost', '127.0.0.1', '0.0.0.0', '10.10.12.253', 'django']
 
@@ -216,3 +216,7 @@ LOGGING = {
         },
     },
 }
+
+MIRIADA_API_POST_URL = os.environ.get('MIRIADA_API_POST_URL')
+MIRIADA_AUTH_LOGIN = os.environ.get('MIRIADA_AUTH_LOGIN')
+MIRIADA_AUTH_PASSWORD = os.environ.get('MIRIADA_AUTH_PASSWORD')

@@ -1,6 +1,7 @@
 from crispy_forms.bootstrap import StrictButton
 from django import forms
 from django.utils import timezone
+from django.utils.html import format_html
 from filling_station import models
 from .models import GAS_TYPE_CHOICES, BATCH_TYPE_CHOICES, BALLOON_SIZE_CHOICES
 from crispy_forms.helper import FormHelper
@@ -231,8 +232,19 @@ class TTNForm(forms.ModelForm):
         self.fields['loading_batch'].empty_label = 'Выберите партию приёмки'
         self.fields['unloading_batch'].empty_label = 'Выберите партию отгрузки'
 
+        # Добавляем ID для JS, но оставляем поле редактируемым
+        self.fields['number'].widget.attrs.update({
+            'id': 'id_ttn_number',
+            'class': 'form-control',
+            'placeholder': 'Номер заполнится автоматически или введите вручную'
+        })
+
         self.fields['loading_batch'].label_from_instance = self.format_batch_choice
         self.fields['unloading_batch'].label_from_instance = self.format_batch_choice
+
+        # Добавляем data-атрибуты для выпадающих списков
+        self.fields['loading_batch'].widget.attrs['data-ttn-field'] = 'id_ttn_number'
+        self.fields['unloading_batch'].widget.attrs['data-ttn-field'] = 'id_ttn_number'
 
     def format_batch_choice(self, obj):
         """Форматирует отображение партии в выпадающем списке"""
@@ -244,7 +256,14 @@ class TTNForm(forms.ModelForm):
         truck_number = obj.truck.registration_number if obj.truck else '---'
         ttn_number = obj.ttn if obj.ttn else '---'
 
-        return f"{batch_type} №{obj.id} | Автомобиль: {truck_number} | ТТН: {ttn_number}"
+        return format_html(
+            '<span data-ttn="{}">{} №{} | Автомобиль: {} | ТТН: {}</span>',
+            ttn_number,
+            batch_type,
+            obj.id,
+            truck_number,
+            ttn_number
+        )
 
     class Meta:
         model = models.NewTTN
@@ -261,7 +280,7 @@ class TTNForm(forms.ModelForm):
         widgets = {
             'number': forms.TextInput(attrs={
                 'class': 'form-control',
-                'placeholder': 'Введите номер ТТН'
+                'placeholder': 'Номер заполнится автоматически'
             }),
             'contract': forms.TextInput(attrs={
                 'class': 'form-control',
@@ -288,10 +307,6 @@ class TTNForm(forms.ModelForm):
                 'placeholder': 'Дата формирования'
             }),
         }
-        labels = {
-            'loading_batch': 'Партия приёмки',
-            'unloading_batch': 'Партия отгрузки'
-        }
 
     def clean(self):
         cleaned_data = super().clean()
@@ -300,12 +315,6 @@ class TTNForm(forms.ModelForm):
 
         if loading_batch and unloading_batch:
             raise forms.ValidationError("Выберите только партию приёмки ИЛИ партию отгрузки, не обе одновременно")
-
-        # Автоматически заполняем номер ТТН из выбранной партии
-        if loading_batch:
-            cleaned_data['number'] = loading_batch.ttn
-        elif unloading_batch:
-            cleaned_data['number'] = unloading_batch.ttn
 
         return cleaned_data
 
