@@ -27,6 +27,8 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'filling_station.apps.FillingStationConfig',
+    'mobile.apps.MobileConfig',
+    'carousel.apps.CarouselConfig',
     'import_export',
     'rest_framework',
     'rest_framework_simplejwt',
@@ -82,7 +84,7 @@ ROOT_URLCONF = 'GNS.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [],
+        'DIRS': [os.path.join(BASE_DIR, 'templates')],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [

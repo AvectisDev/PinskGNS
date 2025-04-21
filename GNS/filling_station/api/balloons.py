@@ -1,7 +1,6 @@
 import logging
 import requests
-from ..models import (Balloon, Reader, BalloonAmount, BalloonsLoadingBatch, BalloonsUnloadingBatch, Carousel,
-                      CarouselSettings)
+from ..models import Balloon, Reader, BalloonAmount, BalloonsLoadingBatch, BalloonsUnloadingBatch
 from django.http import JsonResponse
 from django.db.models import Sum, Count
 from django.shortcuts import get_object_or_404
@@ -14,10 +13,11 @@ from rest_framework.response import Response
 from rest_framework.decorators import api_view, action
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from datetime import datetime, date
-from .serializers import (BalloonSerializer, BalloonAmountSerializer, CarouselSerializer, CarouselSettingsSerializer,
+from .serializers import (BalloonSerializer, BalloonAmountSerializer,
                           BalloonsLoadingBatchSerializer, BalloonsUnloadingBatchSerializer,
-                          ActiveLoadingBatchSerializer, ActiveUnloadingBatchSerializer,
                           BalloonAmountLoadingSerializer, BalloonAmountUnloadingSerializer)
+
+# from .serializers import ActiveLoadingBatchSerializer, ActiveUnloadingBatchSerializer
 
 logger = logging.getLogger('filling_station')
 
@@ -189,9 +189,9 @@ class BalloonViewSet(viewsets.ViewSet):
         elif reader_number == 5:
             self.send_status_to_miriada(nfc_tag=nfc_tag, send_type='registering_in_warehouse', send_data={'fulness':1})
         elif reader_number in [3, 4]:
-            self.send_status_to_miriada(nfc_tag=nfc_tag, send_type='loading_into_truck', send_data={'fulness':1, "type_car": 1, "number_auto": '',})
+            self.send_status_to_miriada(nfc_tag=nfc_tag, send_type='loading_into_truck', send_data={'fulness':1, "type_car": 1, "number_auto": ' ',})
         elif reader_number == 2:
-            self.send_status_to_miriada(nfc_tag=nfc_tag, send_type='loading_into_truck', send_data={'fulness':1, "type_car": 0, "number_auto": '',})
+            self.send_status_to_miriada(nfc_tag=nfc_tag, send_type='loading_into_truck', send_data={'fulness':1, "type_car": 0, "number_auto": ' ',})
 
         # Если требуется обновление паспорта или идёт приёмка новых баллонов - выполняем запрос в Мириаду
         if balloon.update_passport_required in (True, None) or reader_number in [1, 6]:
@@ -220,25 +220,24 @@ class BalloonViewSet(viewsets.ViewSet):
                 brutto=balloon.brutto,
                 filling_status=balloon.filling_status
             )
-            # # Сохраняем баллон в кэш на карусели наполнения
-            # if reader_number == 8:
-            #     cache_key = f'reader_{reader_number}_balloon_stack'
-            #     stack = cache.get(cache_key, [])
-            #     logger.debug(f'Метка на {reader_number} считывателе. Исходный стек = {stack}')
-            #     # Добавляем объект в стек
-            #     stack.insert(0, {
-            #         'number': reader_balloon.number,
-            #         'nfc_tag': reader_balloon.nfc_tag,
-            #         'serial_number': reader_balloon.serial_number,
-            #         'size': reader_balloon.size,
-            #         'netto': reader_balloon.netto,
-            #         'brutto': reader_balloon.brutto,
-            #         'filling_status': reader_balloon.filling_status,
-            #     })
-            #     logger.debug(f'Стек считывателя {reader_number} = {stack}')
-            #
-            #     # Сохраняем обновленный стек в кэш
-            #     cache.set(cache_key, stack, timeout=None)
+            # Сохраняем баллон в кэш на карусели наполнения
+            if reader_number == 8:
+                cache_key = f'reader_{reader_number}_balloon_stack'
+                stack = cache.get(cache_key, [])
+                # Добавляем объект в стек
+                stack.insert(0, {
+                    'number': reader_balloon.number,
+                    'nfc_tag': reader_balloon.nfc_tag,
+                    'serial_number': reader_balloon.serial_number,
+                    'size': reader_balloon.size,
+                    'netto': reader_balloon.netto,
+                    'brutto': reader_balloon.brutto,
+                    'filling_status': reader_balloon.filling_status,
+                })
+                logger.debug(f'Стек считывателя {reader_number} = {stack}')
+
+                # Сохраняем обновленный стек в кэш
+                cache.set(cache_key, stack, timeout=None)
 
         serializer = BalloonSerializer(balloon)
         return Response(serializer.data)
@@ -401,63 +400,6 @@ def clear_cache(sender, **kwargs):
     cache.delete('get_balloon_statistic')
 
 
-class CarouselViewSet(viewsets.ViewSet):
-    permission_classes = [AllowAny]
-
-    @action(detail=False, methods=['get'], url_path='get-parameter')
-    def get_parameter(self, request):
-        settings = CarouselSettings.objects.get(id=1)
-        serializer = CarouselSettingsSerializer(settings)
-        return Response(serializer.data)
-
-    def partial_update(self, request, pk=1):
-        """
-        Запись параметров карусели
-        :param request:
-        :param pk: номер карусели
-        :return:
-        """
-        carousel = get_object_or_404(CarouselSettings, id=pk)
-
-        serializer = CarouselSettingsSerializer(carousel, data=request.data, partial=True)
-        if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-    @action(detail=False, methods=['post'], url_path='balloon-update')
-    def update_from_carousel(self, request):
-        """
-
-        """
-        request_type = request.data.get('request_type')
-        post_number = request.data.get('post_number')
-
-        logger.debug(f"Обработка запроса от карусели: Тип - {request_type}, пост - {post_number}")
-        if not request_type:
-            logger.error("Тип запроса отсутствует в теле запроса")
-            return Response({"error": "Не указан тип запроса"}, status=status.HTTP_400_BAD_REQUEST)
-
-        if request_type == '0x7a':
-            # Валидируем и сохраняем данные через сериализатор
-            serializer = CarouselSerializer(data=request.data)
-            if serializer.is_valid():
-                serializer.save()
-                logger.debug(f"Данные по запросу 0x7a успешно сохранены")
-                return Response(serializer.data, status=status.HTTP_201_CREATED)
-        else:
-            try:
-                carousel_post = Carousel.objects.filter(post_number=post_number).first()
-                carousel_post.is_empty = False
-                carousel_post.full_weight = request.data.get('full_weight')
-                carousel_post.save()
-                logger.debug(f"Данные по запросу 0x70 успешно сохранены")
-                return Response(status=status.HTTP_200_OK)
-            except Exception as error:
-                logger.error(f'Ошибка при обработке запроса типа 0x70 - {error}')
-                return Response({"error": str(error)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-
 @api_view(['GET'])
 def get_balloon_status_options(request):
     return Response(USER_STATUS_LIST)
@@ -479,7 +421,8 @@ class BalloonsLoadingBatchViewSet(viewsets.ViewSet):
     @action(detail=False, methods=['get'], url_path='active')
     def is_active(self, request):
         batches = BalloonsLoadingBatch.objects.filter(is_active=True)
-        serializer = ActiveLoadingBatchSerializer(batches, many=True)
+        # serializer = ActiveLoadingBatchSerializer(batches, many=True)
+        serializer = BalloonsLoadingBatchSerializer(batches, many=True)
         return Response(serializer.data)
 
     @action(detail=False, methods=['get'], url_path='last-active')
@@ -561,7 +504,8 @@ class BalloonsUnloadingBatchViewSet(viewsets.ViewSet):
     @action(detail=False, methods=['get'], url_path='active')
     def is_active(self, request):
         batches = BalloonsUnloadingBatch.objects.filter(is_active=True)
-        serializer = ActiveUnloadingBatchSerializer(batches, many=True)
+        # serializer = ActiveUnloadingBatchSerializer(batches, many=True)
+        serializer = BalloonsUnloadingBatchSerializer(batches, many=True)
         return Response(serializer.data)
 
     @action(detail=False, methods=['get'], url_path='last-active')
