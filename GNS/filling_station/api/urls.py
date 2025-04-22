@@ -31,9 +31,7 @@ railway_tank_router.register(r'railway-tank', transport.RailwayTankView, basenam
 railway_batch_router = DefaultRouter()
 railway_batch_router.register(r'railway-batch', transport.RailwayBatchView, basename='railway-batch')
 
-#carousel urls
-carousel_router = DefaultRouter()
-carousel_router.register(r'carousel', balloons.CarouselViewSet, basename='carousel')
+
 
 urlpatterns = [
     path('', include(balloons_router.urls)),
@@ -54,8 +52,6 @@ urlpatterns = [
 
     path('', include(railway_tank_router.urls)),
     path('', include(railway_batch_router.urls)),
-
-    path('', include(carousel_router.urls)),
 
     path('token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
     path('token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),

@@ -1,7 +1,0 @@
-<div style="display: flex">
-    {% if user.is_authenticated %}
-    <p style="font-size: inherit; margin-right: 5px; font-weight: 100;">Текущий пользователь - {{ user.get_username}}!</p>
-    <a style="font-size: inherit; font-weight: 100;" href="{% url 'logout' %}?next=http://127.0.0.1:8080/"><p>Выйти</p>
-    </a>
-    {% endif %}
-</div>

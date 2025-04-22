@@ -23,7 +23,10 @@ from django.conf.urls.static import static
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('', include("filling_station.urls", namespace='filling_station')),
+    path('', include("carousel.urls", namespace='carousel')),
     path('api/', include("filling_station.api.urls", namespace='api')),
+    path('api/', include("mobile.urls", namespace='api')),
+    path('api/', include("carousel.api.urls", namespace='api')),
 ] + debug_toolbar_urls()
 
 urlpatterns += [

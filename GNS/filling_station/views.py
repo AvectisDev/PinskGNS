@@ -1,15 +1,20 @@
-from django.shortcuts import render
+from django.shortcuts import render, redirect
 from django.http import HttpResponse
 from django.core.paginator import Paginator
 from django.urls import reverse_lazy, reverse
 from django.views import generic
 from django.db.models import Q, Sum
-from .models import (Balloon, Truck, Trailer, RailwayTank, TTN, BalloonsLoadingBatch, BalloonsUnloadingBatch,
-                     RailwayBatch, BalloonAmount, AutoGasBatch, Reader, Carousel, CarouselSettings)
+from django.contrib import messages
+from django.shortcuts import get_object_or_404
+from django.views.decorators.http import require_POST
+from django.contrib.auth.decorators import login_required
+from .models import (Balloon, Truck, Trailer, RailwayTank, TTN, BalloonsLoadingBatch, BalloonsUnloadingBatch, NewTTN,
+                     RailwayBatch, BalloonAmount, AutoGasBatch, Reader, RailwayTtn, AutoTtn,
+                     AutoGasBatchSettings)
 from .admin import BalloonResources
-from .forms import (GetBalloonsAmount, BalloonForm, TruckForm, TrailerForm, RailwayTankForm, TTNForm,
+from .forms import (GetBalloonsAmount, BalloonForm, TruckForm, TrailerForm, RailwayTankForm, TTNForm, AutoTtnForm,
                     BalloonsLoadingBatchForm, BalloonsUnloadingBatchForm, RailwayBatchForm, AutoGasBatchForm,
-                    CarouselSettingsForm)
+                    RailwayTtnForm)
 from datetime import datetime, timedelta
 
 STATUS_LIST = {
@@ -26,7 +31,7 @@ STATUS_LIST = {
 
 class BalloonListView(generic.ListView):
     model = Balloon
-    paginate_by = 15
+    paginate_by = 10
 
     def get_queryset(self):
         query = self.request.GET.get('query', '')
@@ -104,7 +109,7 @@ def reader_info(request, reader=1):
     current_quantity_rfid = current_quantity['total_rfid'] or 0
     current_quantity_balloons = current_quantity['total_balloons'] or 0
 
-    paginator = Paginator(balloons_list, 12)
+    paginator = Paginator(balloons_list, 10)
     page_num = request.GET.get('page', 1)
     page_obj = paginator.get_page(page_num)
 
@@ -120,100 +125,11 @@ def reader_info(request, reader=1):
     }
     return render(request, "rfid_tables.html", context)
 
-# Обработка карусели
-def carousel_info(request, carousel_number=1):
-    current_date = datetime.now().date()
-
-    if request.method == "POST":
-        form = GetCarouselBalloonsAmount(request.POST)
-        if form.is_valid():
-            start_date = form.cleaned_data['start_date']
-            end_date = form.cleaned_data['end_date']
-            size = form.cleaned_data['size']
-        else:
-            start_date = current_date
-            end_date = current_date
-            size = None
-
-        action = request.POST.get('action')
-
-        if action == 'export':
-            queryset = Carousel.objects.filter(
-                carousel_number=carousel_number,
-                change_date__range=(start_date, end_date)
-            )
-            if size:
-                queryset = queryset.filter(size=size)
-
-            dataset = CarouselResources().export(queryset)
-            response = HttpResponse(dataset.xlsx, content_type='xlsx')
-            response[
-                'Content-Disposition'] = f'attachment; filename="Carousel_{carousel_number}_{start_date}-{end_date}.xlsx"'
-            return response
-
-    else:
-        form = GetCarouselBalloonsAmount()
-        start_date = current_date
-        end_date = current_date
-        size = None
-
-    carousel_list = Carousel.objects.all()
-
-    if size:
-        total_count = carousel_list.filter(
-            carousel_number=carousel_number,
-            change_date__range=(start_date, end_date),
-            size=size
-        ).count()
-    else:
-        total_count = carousel_list.filter(
-            carousel_number=carousel_number,
-            change_date__range=(start_date, end_date)
-        ).count()
-
-    paginator = Paginator(carousel_list, 13)
-    page_num = request.GET.get('page', 1)
-    page_obj = paginator.get_page(page_num)
-
-    context = {
-        "page_obj": page_obj,
-        'form': form,
-        'carousel_number': carousel_number,
-        'start_date': start_date,
-        'end_date': end_date,
-        'selected_size': size,
-        'total_count': total_count
-    }
-    return render(request, "filling_station/carousel_list.html", context)
-
-
-class CarouselSettingsDetailView(generic.DetailView):
-    model = CarouselSettings
-    template_name = 'filling_station/carousel_settings_detail.html'
-    context_object_name = 'carousel_settings'
-
-    def get_object(self, queryset=None):
-        # Получаем единственный объект настроек карусели
-        return CarouselSettings.objects.first()
-
-class CarouselSettingsUpdateView(generic.UpdateView):
-    model = CarouselSettings
-    form_class = CarouselSettingsForm
-    # template_name = 'carousel_settings_form.html'
-    template_name = 'filling_station/_equipment_form.html'
-
-    def get_object(self, queryset=None):
-        # Получаем единственный объект настроек карусели
-        return CarouselSettings.objects.first()
-
-    def get_success_url(self):
-        return reverse('filling_station:carousel_settings_detail')
-
 
 # Партии приёмки баллонов
 class BalloonLoadingBatchListView(generic.ListView):
     model = BalloonsLoadingBatch
-    paginate_by = 15
+    paginate_by = 10
     template_name = 'filling_station/balloon_batch_list.html'
 
 
@@ -238,7 +154,7 @@ class BalloonLoadingBatchDeleteView(generic.DeleteView):
 # Партии отгрузки баллонов
 class BalloonUnloadingBatchListView(generic.ListView):
     model = BalloonsUnloadingBatch
-    paginate_by = 15
+    paginate_by = 10
     template_name = 'filling_station/balloon_batch_list.html'
 
 
@@ -263,7 +179,7 @@ class BalloonUnloadingBatchDeleteView(generic.DeleteView):
 # Партии автоцистерн
 class AutoGasBatchListView(generic.ListView):
     model = AutoGasBatch
-    paginate_by = 15
+    paginate_by = 10
     template_name = 'filling_station/auto_batch_list.html'
 
 
@@ -288,12 +204,13 @@ class AutoGasBatchDeleteView(generic.DeleteView):
 # Партии приёмки газа в ж/д цистернах
 class RailwayBatchListView(generic.ListView):
     model = RailwayBatch
-    paginate_by = 15
+    paginate_by = 10
     template_name = 'filling_station/railway_batch_list.html'
 
 
 class RailwayBatchDetailView(generic.DetailView):
     model = RailwayBatch
+    queryset = RailwayBatch.objects.prefetch_related('railway_tank_list')
     context_object_name = 'batch'
     template_name = 'filling_station/railway_batch_detail.html'
 
@@ -313,7 +230,7 @@ class RailwayBatchDeleteView(generic.DeleteView):
 # Грузовики
 class TruckView(generic.ListView):
     model = Truck
-    paginate_by = 15
+    paginate_by = 10
 
 
 class TruckDetailView(generic.DetailView):
@@ -324,7 +241,9 @@ class TruckCreateView(generic.CreateView):
     model = Truck
     form_class = TruckForm
     template_name = 'filling_station/_equipment_form.html'
-    success_url = reverse_lazy("filling_station:truck_list")
+
+    def get_success_url(self):
+        return self.object.get_absolute_url()
 
 
 class TruckUpdateView(generic.UpdateView):
@@ -342,7 +261,7 @@ class TruckDeleteView(generic.DeleteView):
 # Прицепы
 class TrailerView(generic.ListView):
     model = Trailer
-    paginate_by = 15
+    paginate_by = 10
 
 
 class TrailerDetailView(generic.DetailView):
@@ -353,7 +272,9 @@ class TrailerCreateView(generic.CreateView):
     model = Trailer
     form_class = TrailerForm
     template_name = 'filling_station/_equipment_form.html'
-    success_url = reverse_lazy("filling_station:trailer_list")
+
+    def get_success_url(self):
+        return self.object.get_absolute_url()
 
 
 class TrailerUpdateView(generic.UpdateView):
@@ -371,7 +292,7 @@ class TrailerDeleteView(generic.DeleteView):
 # ж/д цистерны
 class RailwayTankView(generic.ListView):
     model = RailwayTank
-    paginate_by = 15
+    paginate_by = 10
 
 
 class RailwayTankDetailView(generic.DetailView):
@@ -382,7 +303,9 @@ class RailwayTankCreateView(generic.CreateView):
     model = RailwayTank
     form_class = RailwayTankForm
     template_name = 'filling_station/_equipment_form.html'
-    success_url = reverse_lazy("filling_station:railway_tank_list")
+
+    def get_success_url(self):
+        return self.object.get_absolute_url()
 
 
 class RailwayTankUpdateView(generic.UpdateView):
@@ -397,33 +320,204 @@ class RailwayTankDeleteView(generic.DeleteView):
     template_name = 'filling_station/railway_tank_confirm_delete.html'
 
 
-# ТТН
+# ТТН для баллонов
 class TTNView(generic.ListView):
-    model = TTN
-    paginate_by = 15
+    model = NewTTN
+    paginate_by = 10
 
 
 class TTNDetailView(generic.DetailView):
-    model = TTN
+    model = NewTTN
 
 
 class TTNCreateView(generic.CreateView):
-    model = TTN
+    model = NewTTN
     form_class = TTNForm
     template_name = 'filling_station/_equipment_form.html'
-    success_url = reverse_lazy("filling_station:ttn_list")
+
+    def get_success_url(self):
+        return self.object.get_absolute_url()
+
+    def form_valid(self, form):
+        response = super().form_valid(form)
+        messages.success(self.request, f'ТТН {self.object.number} успешно создана')
+        return response
 
 
 class TTNUpdateView(generic.UpdateView):
-    model = TTN
+    model = NewTTN
     form_class = TTNForm
     template_name = 'filling_station/_equipment_form.html'
 
+    def get_success_url(self):
+        return self.object.get_absolute_url()
+
+    def form_valid(self, form):
+        response = super().form_valid(form)
+        messages.success(self.request, f'ТТН {self.object.number} успешно обновлена')
+        return response
+
 
 class TTNDeleteView(generic.DeleteView):
-    model = TTN
+    model = NewTTN
     success_url = reverse_lazy("filling_station:ttn_list")
-    template_name = 'filling_station/ttn_confirm_delete.html'
+    template_name = 'filling_station/newttn_confirm_delete.html'
+
+
+# ТТН для жд цистерн
+class RailwayTtnView(generic.ListView):
+    model = RailwayTtn
+    paginate_by = 10
+
+
+class RailwayTtnDetailView(generic.DetailView):
+    model = RailwayTtn
+
+
+class RailwayTtnCreateView(generic.CreateView):
+    model = RailwayTtn
+    form_class = RailwayTtnForm
+    template_name = 'filling_station/_equipment_form.html'
+
+    def get_success_url(self):
+        return self.object.get_absolute_url()
+
+    def form_valid(self, form):
+        self.object = form.save(commit=False)
+        railway_ttn_number = form.cleaned_data['railway_ttn']
+
+        # Находим все цистерны с этим номером накладной и суммируем значения
+        tanks = RailwayTank.objects.filter(railway_ttn=railway_ttn_number)
+        self.object.total_gas_amount_by_scales = tanks.aggregate(total=Sum('gas_weight'))['total'] or 0
+        self.object.total_gas_amount_by_ttn = tanks.aggregate(total=Sum('netto_weight_ttn'))['total'] or 0
+        self.object.save()
+
+        # Добавляем цистерны в ManyToMany связь
+        self.object.railway_tank_list.set(tanks)
+
+        messages.success(self.request, f'ТТН {self.object.number} успешно создана')
+        return super().form_valid(form)
+
+
+class RailwayTtnUpdateView(generic.UpdateView):
+    model = RailwayTtn
+    form_class = RailwayTtnForm
+    template_name = 'filling_station/_equipment_form.html'
+
+    def form_valid(self, form):
+        new_railway_ttn = form.cleaned_data['railway_ttn']
+
+        self.object = form.save(commit=False)
+
+        # Обновляем суммы
+        tanks = RailwayTank.objects.filter(railway_ttn=new_railway_ttn)
+        self.object.total_gas_amount_by_scales = tanks.aggregate(total=Sum('gas_weight'))['total'] or 0
+        self.object.total_gas_amount_by_ttn = tanks.aggregate(total=Sum('netto_weight_ttn'))['total'] or 0
+
+        # Обновляем ManyToMany связь
+        self.object.railway_tank_list.set(tanks)
+
+        self.object.save()
+        return super().form_valid(form)
+
+
+class RailwayTtnDeleteView(generic.DeleteView):
+    model = RailwayTtn
+    success_url = reverse_lazy("filling_station:railway_ttn_list")
+    template_name = 'filling_station/railwayttn_confirm_delete.html'
+
+
+# ТТН для автоцистерн
+@require_POST
+# @login_required
+def update_weight_source(request):
+    weight_source = request.POST.get('weight_source', 's')  # 'f' если чекбокс отмечен, иначе 's'
+    settings, _ = AutoGasBatchSettings.objects.get_or_create()
+    settings.weight_source = weight_source
+    settings.save()
+    return redirect('filling_station:auto_ttn_list')
+
+
+class AutoTtnView(generic.ListView):
+    model = AutoTtn
+    paginate_by = 10
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        settings = AutoGasBatchSettings.objects.first()
+        context['weight_source'] = settings.weight_source if settings else 'f'
+        return context
+
+
+class AutoTtnDetailView(generic.DetailView):
+    model = AutoTtn
+
+
+class AutoTtnCreateView(generic.CreateView):
+    model = AutoTtn
+    form_class = AutoTtnForm
+    template_name = 'filling_station/_equipment_form.html'
+
+    def form_valid(self, form):
+        response = super().form_valid(form)
+
+        self.update_ttn_values()
+
+        return response
+
+    def get_success_url(self):
+        return self.object.get_absolute_url()
+
+    def update_ttn_values(self):
+        batch = self.object.batch
+        if batch:
+            settings = AutoGasBatchSettings.objects.first()
+
+            # Определяем источник данных и значение количества газа
+            if settings and settings.weight_source == 'f':
+                gas_amount = batch.gas_amount
+                source = 'Расходомер'
+            else:
+                gas_amount = batch.weight_gas_amount
+                source = 'Весы'
+
+            self.object.total_gas_amount = gas_amount
+            self.object.source_gas_amount = source
+            self.object.gas_type = batch.gas_type
+            self.object.save()
+
+
+class AutoTtnUpdateView(generic.UpdateView):
+    model = AutoTtn
+    form_class = AutoTtnForm
+    template_name = 'filling_station/_equipment_form.html'
+
+    def form_valid(self, form):
+        response = super().form_valid(form)
+        self.update_ttn_values()
+        return response
+
+    def update_ttn_values(self):
+        batch = self.object.batch
+        if batch:
+            settings = AutoGasBatchSettings.objects.first()
+
+            if settings and settings.weight_source == 'f':
+                self.object.total_gas_amount = batch.gas_amount
+                self.object.source_gas_amount = 'Расходомер'
+            else:
+                self.object.total_gas_amount = batch.weight_gas_amount
+                self.object.source_gas_amount = 'Весы'
+
+            self.object.gas_type = batch.gas_type
+            self.object.save()
+
+
+class AutoTtnDeleteView(generic.DeleteView):
+    model = AutoTtn
+    success_url = reverse_lazy("filling_station:auto_ttn_list")
+    template_name = 'filling_station/autottn_confirm_delete.html'
+
 
 # Обработка данных для вкладки "Статистика"
 def statistic(request):

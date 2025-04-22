@@ -30,7 +30,7 @@ logger.setLevel(logging.DEBUG)
 session = requests.Session()
 
 # Подключение к Redis
-redis_client = redis.Redis(host='localhost', port=6379, db=1, decode_responses=False)
+redis_client = redis.Redis(host='django', port=6379, db=1, decode_responses=False)
 CACHE_KEY = ':1:reader_8_balloon_stack'
 POST_NUMBER_CACHE_KEY = 'previous_post_number'
 
@@ -89,6 +89,7 @@ def post_processing(post_number: int):
     :param post_number: Номер текущего поста наполнения
     :return: bool: указывает нужно ли обрабатывать текущий запрос на наполнение
     """
+    cache_timeout = 5
     previous_post_number = redis_client.get(POST_NUMBER_CACHE_KEY)
     logger.debug(f"Последний номер поста в кеше - {previous_post_number}.")
 
@@ -96,8 +97,8 @@ def post_processing(post_number: int):
         process_value = int(previous_post_number) - post_number
         logger.debug(f"Значение process_value = {process_value}")
 
-        if process_value in [0, 1, 2, 3, -19]:  # также разрешается повторный запрос с поста - значение 0
-            redis_client.set(POST_NUMBER_CACHE_KEY, post_number)
+        if process_value in [0, 1, -19]:  # также разрешается повторный запрос с поста - значение 0
+            redis_client.set(POST_NUMBER_CACHE_KEY, post_number, ex=cache_timeout)
             logger.debug(f"Значение {post_number} сохранено в Redis по ключу {POST_NUMBER_CACHE_KEY}")
             return True
         else:
@@ -143,7 +144,7 @@ def check_balloon_size(weight: int) -> int:
     :return: int: Объём баллона
     """
     balloon_size = 50
-    if weight <= 14000:
+    if weight <= 12000:
         balloon_size = 27
     elif 14000 < weight < 25000:
         balloon_size = 50
@@ -158,21 +159,17 @@ def request_caching(request_type: str, post_number: int, weight: int) -> bool:
     :return: bool: требуется обработка запроса
     """
     request_processing_required = True
-    logger.debug(f"Функция request_caching : {request_type} {post_number} {weight}")
     cache_key = f"carousel_request_{request_type}_{post_number}_{weight}"
     cache_time = 1
-    logger.debug(f"Функция request_caching - cache_key: {cache_key}")
+
     cached_value = redis_client.get(cache_key)
     if cached_value is not None:
         request_processing_required = False
         logger.debug(f"Запрос уже обрабатывается: {request_type} {post_number} {weight}")
-        logger.debug(f"Функция request_caching - request_processing_required: {request_processing_required} {type(request_processing_required)}")
         return request_processing_required
 
     redis_client.set(cache_key, "1", cache_time)
     logger.debug(f"Запрос от поста сохранен в Redis по ключу {cache_key}")
-    logger.debug(
-        f"Функция request_caching - request_processing_required: {request_processing_required} {type(request_processing_required)}")
     return request_processing_required
 
 
@@ -200,11 +197,15 @@ def request_processing(request_type: str, post_number: int, weight: int) -> tupl
             logger.debug("Пост не прошел проверку очередности")
             return response_required, full_weight, {'error': 'post_order_failed'}
 
-        if process_data_to_server.get('size') == 50:
-            balloon_from_cache = get_and_remove_last_balloon()
-            logger.debug(f"Данные кеша с 8 считывателя - {balloon_from_cache}.")
-        else:
-            balloon_from_cache = None
+        # Временно исключаем обработку баллонов по весу - есть пересечение веса пустых баллонов
+        # if process_data_to_server.get('size') == 50:
+        #     balloon_from_cache = get_and_remove_last_balloon()
+        #     logger.debug(f"Данные кеша с 8 считывателя - {balloon_from_cache}.")
+        # else:
+        #     balloon_from_cache = None
+
+        # Сейчас сразу забираем данные по баллонам из кэша - если метка считалась, значит баллон 50л
+        balloon_from_cache = get_and_remove_last_balloon()
 
         if not balloon_from_cache:
             logger.debug("Нет данных в кеше")
@@ -217,7 +218,6 @@ def request_processing(request_type: str, post_number: int, weight: int) -> tupl
         # Обработка данных баллона
         if balloon_from_cache.get('filling_status') and (brutto := balloon_from_cache.get('brutto')):
             response_required, weight_correction = check_settings(post_number)
-            logger.debug(f"Настройки: response required={response_required}, weight correction={weight_correction}")
             if response_required:
                 full_weight = int((brutto + weight_correction) * 1000)
                 logger.debug(f"Полный вес баллона по паспорту: {brutto} кг. Коррекция веса: {weight_correction} кг")
@@ -269,17 +269,12 @@ def serial_exchange():
                              f"Номер поста: {post_number}. Масса баллона: {weight_combined}")
 
                 # Обработка запроса с поста
-                logger.debug(f"Вход request_caching. {request_type_in_str}. "
-                             f"Номер поста: {post_number}. Масса баллона: {weight_combined}")
-                temp_srt = request_caching(request_type_in_str, post_number, weight_combined)
-                logger.debug (f'request_caching result{temp_srt}')
-
                 if request_caching(request_type_in_str, post_number, weight_combined):
-
                     response_required, full_weight, process_data_to_server = request_processing(
                         request_type_in_str,
                         post_number,
-                        weight_combined)
+                        weight_combined
+                    )
 
                     if response_required:
                         # Формируем ответ

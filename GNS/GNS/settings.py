@@ -13,7 +13,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/5.0/howto/deployment/checklist/
 
 SECRET_KEY = os.environ.get('SECRET_KEY')
-DEBUG = True
+DEBUG = os.environ.get('DEBUG')
 
 ALLOWED_HOSTS = ['localhost', '127.0.0.1', '0.0.0.0', '10.10.12.253', 'django']
 
@@ -27,6 +27,8 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'filling_station.apps.FillingStationConfig',
+    'mobile.apps.MobileConfig',
+    'carousel.apps.CarouselConfig',
     'import_export',
     'rest_framework',
     'rest_framework_simplejwt',
@@ -82,7 +84,7 @@ ROOT_URLCONF = 'GNS.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [],
+        'DIRS': [os.path.join(BASE_DIR, 'templates')],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
@@ -216,3 +218,7 @@ LOGGING = {
         },
     },
 }
+
+MIRIADA_API_POST_URL = os.environ.get('MIRIADA_API_POST_URL')
+MIRIADA_AUTH_LOGIN = os.environ.get('MIRIADA_AUTH_LOGIN')
+MIRIADA_AUTH_PASSWORD = os.environ.get('MIRIADA_AUTH_PASSWORD')

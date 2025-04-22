@@ -1,48 +1,89 @@
 {% extends 'base.html' %}
-{% block title %} Список прицепов {% endblock %}
+{% load custom_filters %}
+
+{% block title %}Список прицепов{% endblock %}
 
 {% block content %}
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h4 class="mb-0">Прицепы</h4>
+        <a href="{% url 'filling_station:trailer_create' %}" class="btn btn-custom">
+            <i class="bi bi-plus-circle"></i> Добавить прицеп
+        </a>
+    </div>
 
-<div class="container-fluid">
-    <header class="d-flex flex-wrap align-items-center justify-content-between py-3 mb-4 border-bottom">
-        <div class="col-md-3 mb-2 mb-md-0">
-            <h5>Список прицепов</h5>
-        </div>
+    <div class="card shadow-sm">
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-hover align-middle">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Марка</th>
+                            <th>Гос. номер</th>
+                            <th>Тип</th>
+                            <th>Грузовик</th>
+                            <th>Статус</th>
+                            <th>Дата и время въезда</th>
+                            <th>Дата и время выезда</th>
+                            <th>Действия</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for trailer in page_obj.object_list %}
+                        <tr>
+                            <td>{{ trailer.trailer_brand|default:"-" }}</td>
+                            <td>
+                                <a href="{{ trailer.get_absolute_url }}" class="custom-link fw-bold">
+                                    {{ trailer.registration_number }}
+                                </a>
+                            </td>
+                            <td>{{ trailer.type|default:"-" }}</td>
+                            <td>{{ trailer.truck|default:"-" }}</td>
+                            <td>
+                                {% if trailer.is_on_station %}
+                                    <span class="badge bg-success">На станции</span>
+                                {% else %}
+                                    <span class="badge bg-secondary">Отсутствует</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if trailer.entry_date %}
+                                <div>{{ trailer.entry_date|date:"d.m.Y" }}</div>
+                                <small class="text-muted">{{ trailer.entry_time|time:"H:i" }}</small>
+                                {% else %}
+                                -
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if trailer.departure_date %}
+                                <div>{{ trailer.departure_date|date:"d.m.Y" }}</div>
+                                <small class="text-muted">{{ trailer.departure_time|time:"H:i" }}</small>
+                                {% else %}
+                                -
+                                {% endif %}
+                            </td>
+                            <td>
+                                <div class="action-buttons">
+                                    <a href="{{ trailer.get_update_url }}" class="btn-icon btn-edit" title="Редактировать">
+                                        <i class="bi bi-pencil"></i>
+                                    </a>
+                                    <a href="{{ trailer.get_delete_url }}" class="btn-icon btn-delete" title="Удалить">
+                                        <i class="bi bi-trash"></i>
+                                    </a>
+                                </div>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="8" class="text-center py-4 text-muted">Нет данных о прицепах</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
 
-        <div class="col-md-1 mb-2 mb-md-0 ml-auto">
-            <button type="button" class="btn" style="background-color: #3CBBD9; color: white;"
-                    onclick="location.href='{% url 'filling_station:trailer_create' %}'">Создать
-            </button>
+            {% include 'filling_station/_paginator.html' %}
         </div>
-    </header>
+    </div>
 </div>
-
-<table class="table table-striped table-hover vertical-align: middle" style="border-radius: 5px; overflow: hidden;">
-    <tr class="table-dark" align="center" style="background-color: #051831 !important; color: white !important;">
-        <th>Марка авто</th>
-        <th>Гос.номер</th>
-        <th>Тип</th>
-        <th>Находится на станции</th>
-        <th>Дата въезда</th>
-        <th>Время въезда</th>
-        <th>Дата выезда</th>
-        <th>Время выезда</th>
-    </tr>
-    {% for trailer in page_obj.object_list %}
-    <tr align="center">
-        <td>{{ trailer.trailer_brand|default_if_none:"-" }}</td>
-        <td>
-            <a href="{{ trailer.get_absolute_url }}" style="color: #051831;"> {{ trailer.registration_number }} </a>
-        </td>
-        <td>{{ trailer.type|default_if_none:"-" }}</td>
-        <td>{% if trailer.is_on_station %}Да{% else %}Нет{% endif %}</td>
-        <td>{{ trailer.entry_date|default_if_none:"-" }}</td>
-        <td>{{ trailer.entry_time|default_if_none:"-" }}</td>
-        <td>{{ trailer.departure_date|default_if_none:"-" }}</td>
-        <td>{{ trailer.departure_time|default_if_none:"-" }}</td>
-    </tr>
-    {% endfor %}
-</table>
-
-{% include 'filling_station/_paginator.html' %}
-{% endblock content %}
+{% endblock %}

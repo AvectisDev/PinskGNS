@@ -1,0 +1,81 @@
+{% extends 'base.html' %}
+{% load custom_filters %}
+
+{% block title %}ТТН {{ newttn.number }}{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="card shadow-sm">
+        <div class="card-header card-header-custom">
+            <div class="d-flex justify-content-between align-items-center">
+                <h4 class="mb-0">ТТН {{ newttn.number }}</h4>
+                <div>
+                    {% if newttn.batch_type == 'loading' %}
+                        <span class="badge bg-primary">Приёмка</span>
+                    {% elif newttn.batch_type == 'unloading' %}
+                        <span class="badge bg-warning text-dark">Отгрузка</span>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-6">
+                    <dl class="row">
+                        <dt class="col-sm-6">Номер договора:</dt>
+                        <dd class="col-sm-6">{{ newttn.contract|default:"-" }}</dd>
+
+                        <dt class="col-sm-6">Грузоотправитель:</dt>
+                        <dd class="col-sm-6">{{ newttn.shipper|default:"-" }}</dd>
+
+                        <dt class="col-sm-6">Грузополучатель:</dt>
+                        <dd class="col-sm-6">{{ newttn.consignee|default:"-" }}</dd>
+
+                        <dt class="col-sm-6">Перевозчик:</dt>
+                        <dd class="col-sm-6">{{ newttn.carrier|default:"-" }}</dd>
+                    </dl>
+                </div>
+
+                <div class="col-md-6">
+                    <dl class="row">
+                        <dt class="col-sm-6">Дата формирования:</dt>
+                        <dd class="col-sm-6">{{ newttn.date|date:"d.m.Y"|default:"-" }}</dd>
+
+                        <dt class="col-sm-6">Тип партии:</dt>
+                        <dd class="col-sm-6">
+                            {% if newttn.loading_batch %}
+                                <a href="{{ newttn.loading_batch.get_absolute_url }}" class="custom-link">
+                                    Приёмка #{{ newttn.loading_batch.id }}
+                                </a>
+                            {% elif newttn.unloading_batch %}
+                                <a href="{{ newttn.unloading_batch.get_absolute_url }}" class="custom-link">
+                                    Отгрузка #{{ newttn.unloading_batch.id }}
+                                </a>
+                            {% else %}
+                                -
+                            {% endif %}
+                        </dd>
+                    </dl>
+                </div>
+            </div>
+        </div>
+
+        <div class="card-footer bg-light">
+            <div class="d-flex justify-content-between">
+                <a href="{% url 'filling_station:ttn_list' %}" class="btn btn-custom">
+                    <i class="bi bi-arrow-left"></i> Назад
+                </a>
+                <div>
+                    <a href="{{ newttn.get_update_url }}" class="btn btn-custom me-2">
+                        <i class="bi bi-pencil"></i> Редактировать
+                    </a>
+                    <a href="{{ newttn.get_delete_url }}" class="btn btn-danger">
+                        <i class="bi bi-trash"></i> Удалить
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

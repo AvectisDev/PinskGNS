@@ -1,54 +1,101 @@
 {% extends 'base.html' %}
-{% block title %} Список ж/д цистерн {% endblock %}
+{% load custom_filters %}
+
+{% block title %}Список ж/д цистерн{% endblock %}
 
 {% block content %}
 
-{% load custom_filters %}
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h4 class="mb-0">Железнодорожные цистерны</h4>
+        <a href="{% url 'filling_station:railway_tank_create' %}" class="btn btn-custom">
+            <i class="bi bi-plus-circle"></i> Добавить цистерну
+        </a>
+    </div>
 
-<div class="container-fluid">
-    <header class="d-flex flex-wrap align-items-center justify-content-between py-3 mb-4 border-bottom">
-        <div class="col-md-3 mb-2 mb-md-0">
-            <h5>Список ж/д цистерн</h5>
-        </div>
+    <div class="card shadow-sm">
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-hover align-middle">
+                    <thead class="table-light">
+                    <tr>
+                        <th>Номер</th>
+                        <th>Тип газа</th>
+                        <th>Вес полной</th>
+                        <th>Вес пустой</th>
+                        <th>Вес газа</th>
+                        <th>Статус</th>
+                        <th>Дата въезда</th>
+                        <th>Дата выезда</th>
+                        <th>Ж/д накладная</th>
+                        <th>Действия</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    {% for tank in page_obj.object_list %}
+                    <tr>
+                        <td>
+                            <a href="{{ tank.get_absolute_url }}" class="custom-link fw-bold" style="color: #051831">
+                                {{ tank.registration_number }}
+                            </a>
+                        </td>
+                        <td>{{ tank.get_gas_type_display|default:"-" }}</td>
+                        <td>{{ tank.full_weight|float_format|default:"-" }} т</td>
+                        <td>{{ tank.empty_weight|float_format|default:"-" }} т</td>
+                        <td>{{ tank.gas_weight|float_format|default:"-" }} т</td>
+                        <td>
+                            {% if tank.is_on_station %}
+                            <span class="badge bg-success">На станции</span>
+                            {% else %}
+                            <span class="badge bg-secondary">Отгружена</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if tank.entry_date %}
+                            <div>{{ tank.entry_date|date:"d.m.Y" }}</div>
+                            <small class="text-muted">{{ tank.entry_time|time:"H:i" }}</small>
+                            {% else %}
+                            -
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if tank.departure_date %}
+                            <div>{{ tank.departure_date|date:"d.m.Y" }}</div>
+                            <small class="text-muted">{{ tank.departure_time|time:"H:i" }}</small>
+                            {% else %}
+                            -
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if tank.railway_ttn %}
+                            <div><span class="badge bg-success">Введена</span></div>
+                            <small class="text-muted">№ {{ tank.railway_ttn }}</small>
+                            {% else %}
+                            <span class="badge bg-secondary">Отсутствует</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <div class="action-buttons">
+                                <a href="{{ tank.get_update_url }}" class="btn-icon btn-edit" title="Редактировать">
+                                    <i class="bi bi-pencil"></i>
+                                </a>
+                                <a href="{{ tank.get_delete_url }}" class="btn-icon btn-delete" title="Удалить">
+                                    <i class="bi bi-trash"></i>
+                                </a>
+                            </div>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="7" class="text-center py-4 text-muted">Нет данных о цистернах</td>
+                    </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
 
-        <div class="col-md-1 mb-2 mb-md-0 ml-auto">
-            <button type="button" class="btn" style="background-color: #3CBBD9; color: white;"
-                    onclick="location.href='{% url 'filling_station:railway_tank_create' %}'">Создать
-            </button>
+            {% include 'filling_station/_paginator.html' %}
         </div>
-    </header>
+    </div>
 </div>
-
-<table class="table table-striped table-hover vertical-align: middle" style="border-radius: 5px; overflow: hidden;">
-    <tr class="table-dark" align="center" style="background-color: #051831 !important; color: white !important;">
-        <th>Номер</th>
-        <th>Вес полной цистерны</th>
-        <th>Вес пустой цистерны</th>
-        <th>Масса перевозимого газа</th>
-        <th>Тип газа</th>
-        <th>Находится на станции</th>
-        <th>Дата въезда</th>
-        <th>Время въезда</th>
-        <th>Дата выезда</th>
-        <th>Время выезда</th>
-    </tr>
-    {% for railway in page_obj.object_list %}
-    <tr align="center">
-        <td>
-        <a href="{{ railway.get_absolute_url }}" style="color: #051831;"> {{ railway.registration_number }} </a>
-        </td>
-        <td>{{ railway.full_weight|float_format }}</td>
-        <td>{{ railway.empty_weight|float_format }}</td>
-        <td>{{ railway.gas_weight|float_format }}</td>
-        <td>{{ railway.gas_type|default_if_none:"-" }}</td>
-        <td>{% if railway.is_on_station %}Да{% else %}Нет{% endif %}</td>
-        <td>{{ railway.entry_date|default_if_none:"-" }}</td>
-        <td>{{ railway.entry_time|default_if_none:"-" }}</td>
-        <td>{{ railway.departure_date|default_if_none:"-" }}</td>
-        <td>{{ railway.departure_time|default_if_none:"-" }}</td>
-    </tr>
-    {% endfor %}
-</table>
-
-{% include 'filling_station/_paginator.html' %}
-{% endblock content %}
+{% endblock %}

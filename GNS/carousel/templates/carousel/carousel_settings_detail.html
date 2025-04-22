@@ -1,0 +1,102 @@
+{% extends 'base.html' %}
+
+{% block title %}Настройки карусели{% endblock %}
+
+{% load custom_filters %}
+{% block content %}
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h4 class="mb-0">Настройки карусели</h4>
+    </div>
+
+    <div class="card shadow-sm mb-4">
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-6">
+                    <dl class="row">
+                        <dt class="col-sm-8">Только чтение:</dt>
+                        <dd class="col-sm-4">
+                            <span class="badge bg-{% if carousel_settings.read_only %}success{% else %}secondary{% endif %}">
+                                {% if carousel_settings.read_only %}Да{% else %}Нет{% endif %}
+                            </span>
+                        </dd>
+
+                        <dt class="col-sm-8">Использовать коррекцию веса:</dt>
+                        <dd class="col-sm-4">
+                            <span class="badge bg-{% if carousel_settings.use_weight_management %}success{% else %}secondary{% endif %}">
+                                {% if carousel_settings.use_weight_management %}Да{% else %}Нет{% endif %}
+                            </span>
+                        </dd>
+
+                        <dt class="col-sm-8">Использовать общее значение коррекции:</dt>
+                        <dd class="col-sm-4">
+                            <span class="badge bg-{% if carousel_settings.use_common_correction %}success{% else %}secondary{% endif %}">
+                                {% if carousel_settings.use_common_correction %}Да{% else %}Нет{% endif %}
+                            </span>
+                        </dd>
+
+                        <dt class="col-sm-8">Значение корректировки веса:</dt>
+                        <dd class="col-sm-4">{{ carousel_settings.weight_correction_value|floatformat:2 }}</dd>
+                    </dl>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card shadow-sm mb-4">
+        <div class="card-body">
+            <h5 class="card-title mb-4">Корректоры постов</h5>
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Пост</th>
+                                    <th>Корректор</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for i in posts|slice:":10" %}
+                                <tr>
+                                    <td>Пост {{ i }}</td>
+                                    <td>{% get_post_correction carousel_settings i %}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div class="col-md-6">
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Пост</th>
+                                    <th>Корректор</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for i in posts|slice:"10:" %}
+                                <tr>
+                                    <td>Пост {{ i }}</td>
+                                    <td>{% get_post_correction carousel_settings i %}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="d-flex justify-content-end">
+        <a href="{% url 'carousel:carousel_settings_update' %}" class="btn btn-custom">
+            <i class="bi bi-pencil"></i> Редактировать
+        </a>
+    </div>
+</div>
+
+{% endblock %}

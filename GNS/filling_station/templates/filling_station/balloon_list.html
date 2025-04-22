@@ -1,49 +1,84 @@
 {% extends 'base.html' %}
-{% block title %} Архив баллонов {% endblock %}
+{% load custom_filters %}
+
+{% block title %}Архив баллонов{% endblock %}
 
 {% block content %}
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h4 class="mb-0">Архив баллонов</h4>
 
-<div class="container-fluid">
-    <header class="d-flex flex-wrap align-items-center justify-content-center justify-content-md-between py-3 mb-4 border-bottom">
-        <div class="col-md-3 mb-2 mb-md-0">
-            <h5>Архив баллонов</h5>
-        </div>
-
-
-        <div class="col-md-4 mb-2 mb-md-0">
-            <form method="get" action="{% url 'filling_station:balloon_list' %}" class="d-flex">
-                 <input type="text" name="query" class="form-control me-2" placeholder="Введите номер метки или серийный номер" value="{{ request.GET.query }}">
-                <button type="submit" class="btn" style="background-color: #3CBBD9; color: white;">Фильтровать</button>
+     <div class="col-md-6">
+            <form method="get" action="{% url 'filling_station:balloon_list' %}" class="row g-2 align-items-center">
+                <div class="col-md-8">
+                    <input type="text" name="query" class="form-control"
+                           placeholder="Номер метки или серийный номер" value="{{ request.GET.query }}">
+                </div>
+                <div class="col-md-4">
+                    <button type="submit" class="btn btn-custom w-100">
+                        <i class="bi bi-funnel"></i> Фильтровать
+                    </button>
+                </div>
             </form>
         </div>
-    </header>
+    </div>
+
+    <div class="card shadow-sm">
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-hover align-middle">
+                    <thead class="table-light">
+                    <tr>
+                        <th>RFID метка</th>
+                        <th>Серийный номер</th>
+                        <th>Объём</th>
+                        <th>Вес нетто</th>
+                        <th>Вес брутто</th>
+                        <th>Статус</th>
+                        <th>Дата изменения</th>
+                        <th>Действия</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    {% for balloon in balloon_list %}
+                    <tr>
+                        <td>
+                            <a href="{{ balloon.get_absolute_url }}" class="custom-link fw-bold">
+                                {{ balloon.nfc_tag|default:"-" }}
+                            </a>
+                        </td>
+                        <td>{{ balloon.serial_number|default:"-" }}</td>
+                        <td>{{ balloon.size|default:"-" }} л</td>
+                        <td>{{ balloon.netto|float_format|default:"-" }} кг</td>
+                        <td>{{ balloon.brutto|float_format|default:"-" }} кг</td>
+                        <td>{{ balloon.status }}</td>
+                        <td>
+                            <div>{{ balloon.change_date|date:"d.m.Y"|default:"-" }}</div>
+                            <small class="text-muted">{{ balloon.change_time|time:"H:i"|default:"" }}</small>
+                        </td>
+                        <td>
+                            <div class="action-buttons">
+                                <a href="{{ balloon.get_update_url }}" class="btn-icon btn-edit" title="Редактировать">
+                                    <i class="bi bi-pencil"></i>
+                                </a>
+                                <a href="{{ balloon.get_delete_url }}" class="btn-icon btn-delete" title="Удалить">
+                                    <i class="bi bi-trash"></i>
+                                </a>
+                            </div>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="9" class="text-center py-4 text-muted">Нет данных о баллонах</td>
+                    </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            {% include 'filling_station/_paginator.html' %}
+        </div>
+    </div>
 </div>
 
-<table class="table table-striped table-hover vertical-align: middle" style="border-radius: 5px; overflow: hidden;">
-    <tr class="table-dark" align="center" style="background-color: #051831 !important; color: white !important;">
-        <th>RFID метка</th>
-        <th>Серийный номер</th>
-        <th>Объём</th>
-        <th>Вес нетто</th>
-        <th>Вес брутто</th>
-        <th>Статус</th>
-        <th>Дата изменения</th>
-        <th>Время изменения</th>
-    </tr>
-    {% for balloon in balloon_list %}
-    <tr align="center">
-        <td><a href="{{ balloon.get_absolute_url }}" style="color: #051831;">{{ balloon.nfc_tag }}</a>
-        </td>
-        <td>{{ balloon.serial_number|default_if_none:"-" }}</td>
-        <td>{{ balloon.size|default_if_none:"-" }}</td>
-        <td>{{ balloon.netto|default_if_none:"-" }}</td>
-        <td>{{ balloon.brutto|default_if_none:"-" }}</td>
-        <td>{{ balloon.status|default_if_none:"-" }}</td>
-        <td>{{ balloon.change_date|default_if_none:"-" }}</td>
-        <td>{{ balloon.change_time|default_if_none:"-" }}</td>
-    </tr>
-    {% endfor %}
-</table>
-
-{% include 'filling_station/_paginator.html' %}
-{% endblock content %}
+{% endblock %}
