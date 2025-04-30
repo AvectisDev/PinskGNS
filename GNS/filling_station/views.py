@@ -8,7 +8,7 @@ from django.contrib import messages
 from django.shortcuts import get_object_or_404
 from django.views.decorators.http import require_POST
 from django.contrib.auth.decorators import login_required
-from .models import (Balloon, Truck, Trailer, RailwayTank, TTN, BalloonsLoadingBatch, BalloonsUnloadingBatch, NewTTN,
+from .models import (Balloon, Truck, Trailer, RailwayTank, BalloonsLoadingBatch, BalloonsUnloadingBatch, TTN,
                      RailwayBatch, BalloonAmount, AutoGasBatch, Reader, RailwayTtn, AutoTtn,
                      AutoGasBatchSettings)
 from .admin import BalloonResources
@@ -322,16 +322,16 @@ class RailwayTankDeleteView(generic.DeleteView):
 
 # ТТН для баллонов
 class TTNView(generic.ListView):
-    model = NewTTN
+    model = TTN
     paginate_by = 10
 
 
 class TTNDetailView(generic.DetailView):
-    model = NewTTN
+    model = TTN
 
 
 class TTNCreateView(generic.CreateView):
-    model = NewTTN
+    model = TTN
     form_class = TTNForm
     template_name = 'filling_station/_equipment_form.html'
 
@@ -345,7 +345,7 @@ class TTNCreateView(generic.CreateView):
 
 
 class TTNUpdateView(generic.UpdateView):
-    model = NewTTN
+    model = TTN
     form_class = TTNForm
     template_name = 'filling_station/_equipment_form.html'
 
@@ -359,7 +359,7 @@ class TTNUpdateView(generic.UpdateView):
 
 
 class TTNDeleteView(generic.DeleteView):
-    model = NewTTN
+    model = TTN
     success_url = reverse_lazy("filling_station:ttn_list")
     template_name = 'filling_station/newttn_confirm_delete.html'
 

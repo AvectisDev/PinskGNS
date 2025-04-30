@@ -13,11 +13,16 @@ from rest_framework.response import Response
 from rest_framework.decorators import api_view, action
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from datetime import datetime, date
-from .serializers import (BalloonSerializer, BalloonAmountSerializer,
-                          BalloonsLoadingBatchSerializer, BalloonsUnloadingBatchSerializer,
-                          BalloonAmountLoadingSerializer, BalloonAmountUnloadingSerializer)
-
-# from .serializers import ActiveLoadingBatchSerializer, ActiveUnloadingBatchSerializer
+from .serializers import (
+    BalloonSerializer,
+    BalloonAmountSerializer,
+    BalloonsLoadingBatchSerializer,
+    BalloonsUnloadingBatchSerializer,
+    ActiveLoadingBatchSerializer,
+    ActiveUnloadingBatchSerializer,
+    BalloonAmountLoadingSerializer,
+    BalloonAmountUnloadingSerializer
+)
 
 logger = logging.getLogger('filling_station')
 
@@ -141,12 +146,12 @@ class BalloonViewSet(viewsets.ViewSet):
             )
             prepared = session.prepare_request(req)
 
-            self.logger.debug(
-                f"Подготовленный запрос:\n"
-                f"URL: {prepared.url}\n"
-                f"Headers: {prepared.headers}\n"
-                f"Body: {prepared.body}"
-            )
+            # self.logger.debug(
+            #     f"Подготовленный запрос:\n"
+            #     f"URL: {prepared.url}\n"
+            #     f"Headers: {prepared.headers}\n"
+            #     f"Body: {prepared.body}"
+            # )
 
             response = session.send(prepared, timeout=2)
             response.raise_for_status()
@@ -421,8 +426,7 @@ class BalloonsLoadingBatchViewSet(viewsets.ViewSet):
     @action(detail=False, methods=['get'], url_path='active')
     def is_active(self, request):
         batches = BalloonsLoadingBatch.objects.filter(is_active=True)
-        # serializer = ActiveLoadingBatchSerializer(batches, many=True)
-        serializer = BalloonsLoadingBatchSerializer(batches, many=True)
+        serializer = ActiveLoadingBatchSerializer(batches, many=True)
         return Response(serializer.data)
 
     @action(detail=False, methods=['get'], url_path='last-active')
@@ -504,8 +508,7 @@ class BalloonsUnloadingBatchViewSet(viewsets.ViewSet):
     @action(detail=False, methods=['get'], url_path='active')
     def is_active(self, request):
         batches = BalloonsUnloadingBatch.objects.filter(is_active=True)
-        # serializer = ActiveUnloadingBatchSerializer(batches, many=True)
-        serializer = BalloonsUnloadingBatchSerializer(batches, many=True)
+        serializer = ActiveUnloadingBatchSerializer(batches, many=True)
         return Response(serializer.data)
 
     @action(detail=False, methods=['get'], url_path='last-active')

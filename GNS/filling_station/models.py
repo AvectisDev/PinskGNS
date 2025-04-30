@@ -366,35 +366,6 @@ class BalloonsUnloadingBatch(models.Model):
 
 
 class TTN(models.Model):
-    number = models.CharField(blank=False, max_length=100, verbose_name="Номер ТТН")
-    contract = models.CharField(blank=True, max_length=100, verbose_name="Номер договора")
-    shipper = models.CharField(blank=False, max_length=100, verbose_name="Грузоотправитель")
-    carrier = models.CharField(blank=False, max_length=100, verbose_name="Перевозчик")
-    consignee = models.CharField(blank=False, max_length=100, verbose_name="Грузополучатель")
-    gas_amount = models.FloatField(null=True, blank=True, verbose_name="Количество газа")
-    gas_type = models.CharField(max_length=10, choices=GAS_TYPE_CHOICES, default='Не выбран', verbose_name="Тип газа")
-    balloons_amount = models.IntegerField(null=True, blank=True, verbose_name="Количество баллонов")
-    date = models.DateField(null=True, blank=True, verbose_name="Дата формирования накладной")
-
-    def __str__(self):
-        return self.number
-
-    class Meta:
-        verbose_name = "ТТН"
-        verbose_name_plural = "ТТН"
-        ordering = ['-date']
-
-    def get_absolute_url(self):
-        return reverse('filling_station:ttn_detail', args=[self.pk])
-
-    def get_update_url(self):
-        return reverse('filling_station:ttn_update', args=[self.pk])
-
-    def get_delete_url(self):
-        return reverse('filling_station:ttn_delete', args=[self.pk])
-
-
-class NewTTN(models.Model):
     number = models.CharField(blank=True, max_length=100, verbose_name="Номер ТТН")
     contract = models.CharField(blank=True, max_length=100, verbose_name="Номер договора")
     shipper = models.ForeignKey(
@@ -629,12 +600,6 @@ class AutoGasBatch(models.Model):
     scale_full_weight = models.FloatField(null=True, blank=True, verbose_name="Вес полного т/с (весы)")
     weight_gas_amount = models.FloatField(null=True, blank=True, verbose_name="Количество газа (весы)")
     is_active = models.BooleanField(null=True, blank=True, verbose_name="В работе")
-    ttn = models.ForeignKey(
-        TTN,
-        on_delete=models.DO_NOTHING,
-        default=0,
-        verbose_name="ТТН"
-    )
     user = models.ForeignKey(
         User,
         on_delete=models.DO_NOTHING,

@@ -198,7 +198,7 @@ class TTNForm(forms.ModelForm):
         )
 
     class Meta:
-        model = models.NewTTN
+        model = models.TTN
         fields = [
             'number',
             'contract',

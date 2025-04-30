@@ -1,5 +1,7 @@
 import os
 import asyncpg
+import psycopg2
+from psycopg2.extras import RealDictCursor
 from datetime import datetime
 from dotenv import load_dotenv
 from typing import Optional
@@ -61,29 +63,36 @@ async def write_balloons_amount(reader: dict, from_who: str):
         await conn.close()
 
 
-async def fetch_carousel_settings() -> Optional[dict]:
-    """
-    Асинхронная функция получает все данные из таблицы CarouselSettings и возвращает их в виде словаря
-    """
+def fetch_carousel_settings() -> Optional[dict]:
+    """Функция получает все данные из таблицы CarouselSettings и возвращает их в виде словаря"""
     conn = None
     try:
         # Подключение к базе данных
-        conn = await asyncpg.connect(
-            database=os.environ.get('DB_NAME'),
+        conn = psycopg2.connect(
+            dbname=os.environ.get('DB_NAME'),
             host=os.environ.get('DB_HOST'),
             user=os.environ.get('DB_USER'),
             password=os.environ.get('DB_PASSWORD'),
             port=os.environ.get('DB_PORT')
         )
 
-        # Выполняем запрос для получения всех данных из таблицы CarouselSettings
-        query = "SELECT * FROM public.filling_station_carouselsettings"
-        records = await conn.fetch(query)
+        # Создаем курсор для работы с базой данных
+        with conn.cursor(cursor_factory=RealDictCursor) as cursor:
+            # Выполняем запрос для получения всех данных из таблицы CarouselSettings
+            query = "SELECT * FROM public.filling_station_carouselsettings"
+            cursor.execute(query)
 
-        if records:
-            # Преобразуем первую запись в словарь
-            return dict(records[0])
-        return None
+            # Получаем все записи
+            records = cursor.fetchall()
+
+            # Преобразуем записи в список словарей
+            carousel_settings = []
+            for record in records:
+                carousel_settings.append(dict(record))
+
+            if carousel_settings:
+                return carousel_settings[0]  # Возвращаем первую запись
+            return None
 
     except Exception as error:
         print('Can`t establish connection to database:', error)
@@ -91,4 +100,4 @@ async def fetch_carousel_settings() -> Optional[dict]:
 
     finally:
         if conn:
-            await conn.close()
+            conn.close()

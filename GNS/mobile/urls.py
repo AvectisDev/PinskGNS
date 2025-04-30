@@ -5,6 +5,6 @@ from .api import views
 app_name = 'mobile'
 
 urlpatterns = [
-    path('app/version/', views.get_app_version),
-    path('app/apk/', views.get_app_apk)
+    path('version/', views.get_app_version),
+    path('apk/', views.get_app_apk)
 ]
