@@ -68,47 +68,6 @@ urlpatterns = [
          name="auto_gas_batch_update"),
     path('batch/auto-gas/<pk>/delete/', views.AutoGasBatchDeleteView.as_view(), name="auto_gas_batch_delete"),
 
-    # ТТН для баллонов
-    path('ttn', views.TTNView.as_view(), name="ttn_list"),
-    path('ttn/create', views.TTNCreateView.as_view(extra_context={
-        "title": "Создание ТТН на приёмку/отгрузку баллонов"
-    }),
-         name="ttn_create"),
-    path('ttn/<pk>', views.TTNDetailView.as_view(), name="ttn_detail"),
-    path('ttn/<pk>/update/', views.TTNUpdateView.as_view(extra_context={
-        "title": "Редактирование ТТН на приёмку/отгрузку баллонов"
-    }),
-         name="ttn_update"),
-    path('ttn/<pk>/delete/', views.TTNDeleteView.as_view(), name="ttn_delete"),
-
-    # ТТН для ж/д цистерн
-    path('railway-ttn', views.RailwayTtnView.as_view(), name="railway_ttn_list"),
-    path('railway-ttn/create', views.RailwayTtnCreateView.as_view(extra_context={
-        "title": "Создание ж/д ТТН"
-    }),
-         name="railway_ttn_create"),
-    path('railway-ttn/<pk>', views.RailwayTtnDetailView.as_view(), name="railway_ttn_detail"),
-    path('railway-ttn/<pk>/update/', views.RailwayTtnUpdateView.as_view(extra_context={
-        "title": "Редактирование ж/д ТТН"
-    }),
-         name="railway_ttn_update"),
-    path('railway-ttn/<pk>/delete/', views.RailwayTtnDeleteView.as_view(), name="railway_ttn_delete"),
-
-    # ТТН для авто цистерн
-    path('auto-ttn', views.AutoTtnView.as_view(), name="auto_ttn_list"),
-    path('auto-ttn/create', views.AutoTtnCreateView.as_view(extra_context={
-        "title": "Создание ТТН на приёмку/отгрузку автоцистерн"
-    }),
-         name="auto_ttn_create"),
-    path('auto-ttn/<pk>', views.AutoTtnDetailView.as_view(), name="auto_ttn_detail"),
-    path('auto-ttn/<pk>/update/', views.AutoTtnUpdateView.as_view(extra_context={
-        "title": "Редактирование ТТН на приёмку/отгрузку автоцистерн"
-    }),
-         name="auto_ttn_update"),
-    path('auto-ttn/<pk>/delete/', views.AutoTtnDeleteView.as_view(), name="auto_ttn_delete"),
-    # Установка параметра источника веса для ТТН
-    path('auto-ttn/update-weight-source/', views.update_weight_source, name="update_weight_source"),
-
     # Грузовики
     path('transport/trucks', views.TruckView.as_view(), name="truck_list"),
     path('transport/trucks/create', views.TruckCreateView.as_view(extra_context={
