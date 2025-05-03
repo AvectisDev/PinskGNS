@@ -29,6 +29,7 @@ INSTALLED_APPS = [
     'filling_station.apps.FillingStationConfig',
     'mobile.apps.MobileConfig',
     'carousel.apps.CarouselConfig',
+    'ttn.apps.TtnConfig',
     'import_export',
     'rest_framework',
     'rest_framework_simplejwt',

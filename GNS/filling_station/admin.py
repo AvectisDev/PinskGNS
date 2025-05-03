@@ -44,13 +44,6 @@ class TrailerTypeAdmin(admin.ModelAdmin):
     list_display = ['id', 'type']
 
 
-@admin.register(models.TTN)
-class TTNAdmin(admin.ModelAdmin):
-    list_display = ['id', 'number', 'contract', 'shipper', 'consignee', 'date']
-    search_fields = ['number', 'contract', 'consignee']
-    list_filter = ['date']
-
-
 @admin.register(models.BalloonsLoadingBatch)
 class BalloonsLoadingBatchAdmin(admin.ModelAdmin):
     list_display = ['id', 'begin_date', 'begin_time', 'end_date', 'end_time', 'truck', 'trailer', 'reader_number',
@@ -80,13 +73,6 @@ class AutoGasBatchAdmin(admin.ModelAdmin):
 @admin.register(models.AutoGasBatchSettings)
 class AutoGasBatchSettingsAdmin(admin.ModelAdmin):
     list_display = ['id', 'weight_source']
-
-
-@admin.register(models.AutoTtn)
-class AutoTtnAdmin(admin.ModelAdmin):
-    list_display = ['id', 'number', 'contract', 'shipper', 'consignee', 'total_gas_amount', 'gas_type', 'date']
-    search_fields = ['number', 'contract', 'shipper', 'consignee']
-    list_filter = ['date']
 
 
 @admin.register(models.FilePath)
@@ -127,28 +113,3 @@ class RailwayBatchAdmin(admin.ModelAdmin):
         'is_active'
     ]
     list_filter = ['begin_date', 'end_date', 'is_active']
-
-
-@admin.register(models.RailwayTtn)
-class RailwayTtnAdmin(admin.ModelAdmin):
-    list_display = [
-        'id',
-        'number',
-        'railway_ttn',
-        'contract',
-        'shipper',
-        'carrier',
-        'consignee',
-        'total_gas_amount_by_scales',
-        'total_gas_amount_by_ttn',
-        'gas_type',
-        'date'
-    ]
-    search_fields = ['number', 'railway_ttn', 'contract', 'shipper__name', 'consignee__name']
-    list_filter = ['date', 'gas_type']
-
-
-@admin.register(models.Contractor)
-class ContractorAdmin(admin.ModelAdmin):
-    list_display = ['id', 'name', 'code']
-    search_fields = ['name', 'code']
