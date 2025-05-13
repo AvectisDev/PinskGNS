@@ -81,8 +81,6 @@ def fetch_carousel_settings() -> Optional[dict]:
             # Выполняем запрос для получения всех данных из таблицы CarouselSettings
             query = "SELECT * FROM public.filling_station_carouselsettings"
             cursor.execute(query)
-
-            # Получаем все записи
             records = cursor.fetchall()
 
             # Преобразуем записи в список словарей
@@ -91,7 +89,7 @@ def fetch_carousel_settings() -> Optional[dict]:
                 carousel_settings.append(dict(record))
 
             if carousel_settings:
-                return carousel_settings[0]  # Возвращаем первую запись
+                return carousel_settings[0]
             return None
 
     except Exception as error:

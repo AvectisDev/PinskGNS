@@ -1,9 +1,6 @@
-from crispy_forms.bootstrap import StrictButton
 from django import forms
 from django.utils import timezone
-from django.utils.html import format_html
-from filling_station import models
-from .models import GAS_TYPE_CHOICES, BATCH_TYPE_CHOICES, BALLOON_SIZE_CHOICES
+from .models import Balloon, Truck, Trailer, AutoGasBatch, BalloonsLoadingBatch, BalloonsUnloadingBatch, BALLOON_SIZE_CHOICES
 from crispy_forms.helper import FormHelper
 from crispy_forms.layout import Submit
 
@@ -56,7 +53,7 @@ class BalloonForm(forms.ModelForm):
         self.helper.form_method = 'POST'
 
     class Meta:
-        model = models.Balloon
+        model = Balloon
         fields = ['nfc_tag', 'serial_number', 'creation_date', 'size', 'netto', 'brutto', 'current_examination_date',
                   'next_examination_date', 'diagnostic_date', 'working_pressure', 'status', 'manufacturer',
                   'wall_thickness', 'filling_status', 'update_passport_required']
@@ -90,11 +87,23 @@ class TruckForm(forms.ModelForm):
         self.helper.form_method = 'POST'
 
     class Meta:
-        model = models.Truck
-        fields = ['car_brand', 'registration_number', 'type', 'capacity_cylinders',
-                  'max_weight_of_transported_cylinders', 'max_mass_of_transported_gas', 'max_gas_volume',
-                  'empty_weight',
-                  'full_weight', 'is_on_station', 'entry_date', 'entry_time', 'departure_date', 'departure_time']
+        model = Truck
+        fields = [
+            'car_brand',
+            'registration_number',
+            'type',
+            'capacity_cylinders',
+            'max_weight_of_transported_cylinders',
+            'max_mass_of_transported_gas',
+            'max_gas_volume',
+            'empty_weight',
+            'full_weight',
+            'is_on_station',
+            'entry_date',
+            'entry_time',
+            'departure_date',
+            'departure_time'
+        ]
         widgets = {
             'car_brand': forms.TextInput(attrs={'class': 'form-control'}),
             'registration_number': forms.TextInput(attrs={'class': 'form-control'}),
@@ -124,11 +133,24 @@ class TrailerForm(forms.ModelForm):
         self.helper.form_method = 'POST'
 
     class Meta:
-        model = models.Trailer
-        fields = ['truck', 'trailer_brand', 'registration_number', 'type', 'capacity_cylinders',
-                  'max_weight_of_transported_cylinders', 'max_mass_of_transported_gas', 'max_gas_volume',
-                  'empty_weight',
-                  'full_weight', 'is_on_station', 'entry_date', 'entry_time', 'departure_date', 'departure_time']
+        model = Trailer
+        fields = [
+            'truck',
+            'trailer_brand',
+            'registration_number',
+            'type',
+            'capacity_cylinders',
+            'max_weight_of_transported_cylinders',
+            'max_mass_of_transported_gas',
+            'max_gas_volume',
+            'empty_weight',
+            'full_weight',
+            'is_on_station',
+            'entry_date',
+            'entry_time',
+            'departure_date',
+            'departure_time'
+        ]
         widgets = {
             'truck': forms.Select(attrs={'class': 'form-control'}),
             'trailer_brand': forms.TextInput(attrs={'class': 'form-control'}),
@@ -162,7 +184,7 @@ class BalloonsLoadingBatchForm(forms.ModelForm):
         self.fields['trailer'].empty_label = 'Выберите прицеп'
 
     class Meta:
-        model = models.BalloonsLoadingBatch
+        model = BalloonsLoadingBatch
         fields = [
             'end_date',
             'end_time',
@@ -255,7 +277,7 @@ class BalloonsUnloadingBatchForm(forms.ModelForm):
         self.fields['trailer'].empty_label = 'Выберите прицеп'
 
     class Meta:
-        model = models.BalloonsUnloadingBatch
+        model = BalloonsUnloadingBatch
         fields = [
             'end_date',
             'end_time',
@@ -351,7 +373,7 @@ class AutoGasBatchForm(forms.ModelForm):
         self.fields['end_time'].widget.attrs.update({'class': 'form-control'})
 
     class Meta:
-        model = models.AutoGasBatch
+        model = AutoGasBatch
         fields = [
             'batch_type',
             'end_date',
@@ -443,54 +465,3 @@ class AutoGasBatchForm(forms.ModelForm):
                 )
 
         return cleaned_data
-
-
-class RailwayTankForm(forms.ModelForm):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.helper = FormHelper()
-        self.helper.form_class = 'form-horizontal'
-        self.helper.label_class = 'col-lg-4'
-        self.helper.field_class = 'col-lg-8'
-        self.helper.add_input(Submit('Сохранить', 'Сохранить', css_class='btn btn-success'))
-        self.helper.form_method = 'POST'
-
-    class Meta:
-        model = models.RailwayTank
-        fields = ['registration_number', 'empty_weight', 'full_weight', 'gas_weight', 'gas_type', 'is_on_station',
-                  'railway_ttn', 'netto_weight_ttn', 'entry_date', 'entry_time', 'departure_date', 'departure_time']
-        widgets = {
-            'registration_number': forms.TextInput(attrs={'class': 'form-control'}),
-            'empty_weight': forms.NumberInput(attrs={'class': 'form-control'}),
-            'full_weight': forms.NumberInput(attrs={'class': 'form-control'}),
-            'gas_weight': forms.NumberInput(attrs={'class': 'form-control'}),
-            'gas_type': forms.Select(choices=GAS_TYPE_CHOICES, attrs={'class': 'form-control'}),
-            'is_on_station': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
-            'railway_ttn': forms.TextInput(attrs={'class': 'form-control'}),
-            'netto_weight_ttn': forms.NumberInput(attrs={'class': 'form-control'}),
-            'entry_date': forms.DateInput(format='%Y-%m-%d', attrs={'type': 'date'}),
-            'entry_time': forms.TimeInput(attrs={'type': 'time'}),
-            'departure_date': forms.DateInput(format='%Y-%m-%d', attrs={'type': 'date'}),
-            'departure_time': forms.TimeInput(attrs={'type': 'time'}),
-        }
-
-
-class RailwayBatchForm(forms.ModelForm):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.helper = FormHelper()
-        self.helper.form_class = 'form-horizontal'
-        self.helper.label_class = 'col-lg-4'
-        self.helper.field_class = 'col-lg-8'
-        self.helper.add_input(Submit('Сохранить', 'Сохранить', css_class='btn btn-success'))
-        self.helper.form_method = 'POST'
-
-    class Meta:
-        model = models.RailwayBatch
-        fields = ['end_date', 'gas_amount_spbt', 'gas_amount_pba', 'is_active']
-        widgets = {
-            'end_date': forms.DateTimeInput(format='%Y-%m-%d', attrs={'type': 'date'}),
-            'gas_amount_spbt': forms.NumberInput(attrs={'class': 'form-control'}),
-            'gas_amount_pba': forms.NumberInput(attrs={'class': 'form-control'}),
-            'is_active': forms.CheckboxInput(attrs={'class': 'form-check-input'})
-        }

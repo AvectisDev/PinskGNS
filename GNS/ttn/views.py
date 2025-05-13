@@ -4,24 +4,24 @@ from django.views import generic
 from django.db.models import Q, Sum
 from django.contrib import messages
 from django.views.decorators.http import require_POST
-from .models import RailwayTank, TTN, RailwayTtn, AutoTtn
+from .models import RailwayTank, BalloonTtn, RailwayTtn, AutoTtn
 from filling_station.models import AutoGasBatchSettings
-from .forms import TTNForm, AutoTtnForm, RailwayTtnForm
+from .forms import BalloonTtnForm, AutoTtnForm, RailwayTtnForm
 
 
 # ТТН для баллонов
 class TTNView(generic.ListView):
-    model = TTN
+    model = BalloonTtn
     paginate_by = 10
 
 
 class TTNDetailView(generic.DetailView):
-    model = TTN
+    model = BalloonTtn
 
 
 class TTNCreateView(generic.CreateView):
-    model = TTN
-    form_class = TTNForm
+    model = BalloonTtn
+    form_class = BalloonTtnForm
     template_name = 'ttn/_equipment_form.html'
 
     def get_success_url(self):
@@ -34,8 +34,8 @@ class TTNCreateView(generic.CreateView):
 
 
 class TTNUpdateView(generic.UpdateView):
-    model = TTN
-    form_class = TTNForm
+    model = BalloonTtn
+    form_class = BalloonTtnForm
     template_name = 'ttn/_equipment_form.html'
 
     def get_success_url(self):
@@ -48,9 +48,9 @@ class TTNUpdateView(generic.UpdateView):
 
 
 class TTNDeleteView(generic.DeleteView):
-    model = TTN
+    model = BalloonTtn
     success_url = reverse_lazy("ttn:ttn_list")
-    template_name = 'ttn/ttn_confirm_delete.html'
+    template_name = 'ttn/balloonttn_confirm_delete.html'
 
 
 # ТТН для жд цистерн

@@ -8,11 +8,11 @@
     <div class="card shadow-sm">
         <div class="card-header card-header-custom">
             <div class="d-flex justify-content-between align-items-center">
-                <h4 class="mb-0">ТТН {{ ttn.number }}</h4>
+                <h4 class="mb-0">ТТН {{ balloonttn.number }}</h4>
                 <div>
-                    {% if ttn.batch_type == 'loading' %}
+                    {% if balloonttn.batch_type == 'loading' %}
                         <span class="badge bg-primary">Приёмка</span>
-                    {% elif ttn.batch_type == 'unloading' %}
+                    {% elif balloonttn.batch_type == 'unloading' %}
                         <span class="badge bg-warning text-dark">Отгрузка</span>
                     {% endif %}
                 </div>
@@ -24,33 +24,33 @@
                 <div class="col-md-6">
                     <dl class="row">
                         <dt class="col-sm-6">Номер договора:</dt>
-                        <dd class="col-sm-6">{{ ttn.contract|default:"-" }}</dd>
+                        <dd class="col-sm-6">{{ balloonttn.contract|default:"-" }}</dd>
 
                         <dt class="col-sm-6">Грузоотправитель:</dt>
-                        <dd class="col-sm-6">{{ ttn.shipper|default:"-" }}</dd>
+                        <dd class="col-sm-6">{{ balloonttn.shipper|default:"-" }}</dd>
 
                         <dt class="col-sm-6">Грузополучатель:</dt>
-                        <dd class="col-sm-6">{{ ttn.consignee|default:"-" }}</dd>
+                        <dd class="col-sm-6">{{ balloonttn.consignee|default:"-" }}</dd>
 
                         <dt class="col-sm-6">Перевозчик:</dt>
-                        <dd class="col-sm-6">{{ ttn.carrier|default:"-" }}</dd>
+                        <dd class="col-sm-6">{{ balloonttn.carrier|default:"-" }}</dd>
                     </dl>
                 </div>
 
                 <div class="col-md-6">
                     <dl class="row">
                         <dt class="col-sm-6">Дата формирования:</dt>
-                        <dd class="col-sm-6">{{ ttn.date|date:"d.m.Y"|default:"-" }}</dd>
+                        <dd class="col-sm-6">{{ balloonttn.date|date:"d.m.Y"|default:"-" }}</dd>
 
                         <dt class="col-sm-6">Тип партии:</dt>
                         <dd class="col-sm-6">
-                            {% if ttn.loading_batch %}
-                                <a href="{{ ttn.loading_batch.get_absolute_url }}" class="custom-link">
-                                    Приёмка #{{ ttn.loading_batch.id }}
+                            {% if balloonttn.loading_batch %}
+                                <a href="{{ balloonttn.loading_batch.get_absolute_url }}" class="custom-link">
+                                    Приёмка #{{ balloonttn.loading_batch.id }}
                                 </a>
-                            {% elif ttn.unloading_batch %}
-                                <a href="{{ ttn.unloading_batch.get_absolute_url }}" class="custom-link">
-                                    Отгрузка #{{ ttn.unloading_batch.id }}
+                            {% elif balloonttn.unloading_batch %}
+                                <a href="{{ balloonttn.unloading_batch.get_absolute_url }}" class="custom-link">
+                                    Отгрузка #{{ balloonttn.unloading_batch.id }}
                                 </a>
                             {% else %}
                                 -
@@ -67,10 +67,10 @@
                     <i class="bi bi-arrow-left"></i> Назад
                 </a>
                 <div>
-                    <a href="{{ ttn.get_update_url }}" class="btn btn-custom me-2">
+                    <a href="{{ balloonttn.get_update_url }}" class="btn btn-custom me-2">
                         <i class="bi bi-pencil"></i> Редактировать
                     </a>
-                    <a href="{{ ttn.get_delete_url }}" class="btn btn-danger">
+                    <a href="{{ balloonttn.get_delete_url }}" class="btn btn-danger">
                         <i class="bi bi-trash"></i> Удалить
                     </a>
                 </div>

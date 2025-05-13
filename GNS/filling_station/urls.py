@@ -50,15 +50,6 @@ urlpatterns = [
     path('batch/balloons-unloading/<pk>/delete/', views.BalloonUnloadingBatchDeleteView.as_view(),
          name="balloon_unloading_batch_delete"),
 
-    # Партии ж/д цистерн
-    path('batch/railway', views.RailwayBatchListView.as_view(), name="railway_batch_list"),
-    path('batch/railway/<pk>/', views.RailwayBatchDetailView.as_view(), name="railway_batch_detail"),
-    path('batch/railway/<pk>/update/', views.RailwayBatchUpdateView.as_view(extra_context={
-        "title": "Редактирование партии приёмки газа в цистернах"
-    }),
-         name="railway_batch_update"),
-    path('batch/railway/<pk>/delete/', views.RailwayBatchDeleteView.as_view(), name="railway_batch_delete"),
-
     # Партии автоцистерн
     path('batch/auto-gas', views.AutoGasBatchListView.as_view(), name="auto_gas_batch_list"),
     path('batch/auto-gas/<pk>/', views.AutoGasBatchDetailView.as_view(), name="auto_gas_batch_detail"),
@@ -95,20 +86,6 @@ urlpatterns = [
          name="trailer_update"),
     path('transport/trailers/<pk>/delete/', views.TrailerDeleteView.as_view(), name="trailer_delete"),
 
-    # Ж/д цистерны
-    path('transport/railway_tanks', views.RailwayTankView.as_view(), name="railway_tank_list"),
-    path('transport/railway_tanks/create', views.RailwayTankCreateView.as_view(extra_context={
-        "title": "Создание ж/д цистерны"
-    }),
-         name="railway_tank_create"),
-    path('transport/railway_tanks/<pk>', views.RailwayTankDetailView.as_view(), name="railway_tank_detail"),
-    path('transport/railway_tanks/<pk>/update/', views.RailwayTankUpdateView.as_view(extra_context={
-        "title": "Редактирование ж/д цистерны"
-    }),
-         name="railway_tank_update"),
-    path('transport/railway_tanks/<pk>/delete/', views.RailwayTankDeleteView.as_view(), name="railway_tank_delete"),
-
     # Статистика
     path('statistic', views.statistic, name="statistic"),
-
 ]

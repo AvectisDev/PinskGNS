@@ -1,17 +1,17 @@
 import logging
 from opcua import Client, ua
 from django.core.exceptions import ObjectDoesNotExist, MultipleObjectsReturned
+from django.conf import settings
 from django.core.management.base import BaseCommand
 from django.db.models import Q
 from datetime import datetime
-from filling_station.models import AutoGasBatch, Truck, TruckType, Trailer, TrailerType
+from filling_station.models import AutoGasBatch, Truck, Trailer, TrailerType
 from .intellect import get_registration_number_list, INTELLECT_SERVER_LIST
 
-logger = logging.getLogger('filling_station')
+logger = logging.getLogger('celery')
 
 
 class Command(BaseCommand):
-    OPC_SERVER_URL = "opc.tcp://host.docker.internal:4841"
     OPC_NODE_PATHS = {
         "batch_type": "ns=4; s=Address Space.PLC_SU2.batch.batch_type",
         "gas_type": "ns=4; s=Address Space.PLC_SU2.batch.gas_type",
@@ -37,7 +37,7 @@ class Command(BaseCommand):
 
     def __init__(self):
         super().__init__()
-        self.client = Client(self.OPC_SERVER_URL)
+        self.client = Client(settings.OPC_SERVER_URL)
         self._truck_type = None
         self._trailer_type = None
 
@@ -140,7 +140,7 @@ class Command(BaseCommand):
                 capacity_value = trailer.max_gas_volume
             else:
                 capacity_value = 0.0
-                logger.warning(f'Не удалось определить емкость для {truck.registration_number}')
+                logger.warning(f'Не удалось определить объём емкости для {truck.registration_number}')
             
             self.set_opc_value("truck_capacity", capacity_value)
             self.set_opc_value("response_batch_create", True)

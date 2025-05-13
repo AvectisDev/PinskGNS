@@ -9,27 +9,28 @@ load_dotenv()
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-# Quick-start development settings - unsuitable for production
-# See https://docs.djangoproject.com/en/5.0/howto/deployment/checklist/
-
 SECRET_KEY = os.environ.get('SECRET_KEY')
 DEBUG = os.environ.get('DEBUG')
 
 ALLOWED_HOSTS = ['localhost', '127.0.0.1', '0.0.0.0', '10.0.2.2', '10.10.12.253', 'django']
+CSRF_COOKIE_SECURE = True
+SESSION_COOKIE_SECURE = True
 
 # Application definition
-
 INSTALLED_APPS = [
+    'daphne',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'core.apps.CoreConfig',
     'filling_station.apps.FillingStationConfig',
     'mobile.apps.MobileConfig',
     'carousel.apps.CarouselConfig',
     'ttn.apps.TtnConfig',
+    'railway_service.apps.RailwayServiceConfig',
     'import_export',
     'rest_framework',
     'rest_framework_simplejwt',
@@ -115,7 +116,7 @@ DATABASES = {
 CACHES = {
     'default': {
         'BACKEND': 'django.core.cache.backends.redis.RedisCache',
-        'LOCATION': 'redis://redis:6379/1'
+        'LOCATION': 'redis://localhost:6379/1'
     }
 }
 
@@ -169,19 +170,20 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 CRISPY_ALLOWED_TEMPLATE_PACKS = "bootstrap5"
 CRISPY_TEMPLATE_PACK = "bootstrap5"
 
-CELERY_BROKER_URL = 'redis://redis:6379/0'
-CELERY_RESULT_BACKEND = 'redis://redis:6379/0'
+CELERY_BROKER_URL = 'redis://localhost:6379/0'
+CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP = True
+CELERY_RESULT_BACKEND = 'redis://localhost:6379/0'
 CELERY_BEAT_SCHEDULE = {
-    # 'generate_1C_file_every_hour': {
+    # 'generate_1c_file_every_hour': {
     #     'task': 'filling_station.tasks.generate_1c_file',
     #     'schedule': crontab(hour=1),
     # },
     'railway_tank_processing': {
-        'task': 'filling_station.tasks.railway_tank_processing',
+        'task': 'railway_service.tasks.railway_tank_processing',
         'schedule': 10.0,  # каждые 10 сек
     },
     'railway_batch_processing': {
-        'task': 'filling_station.tasks.railway_batch_processing',
+        'task': 'railway_service.tasks.railway_batch_processing',
         'schedule': crontab(minute='*/20'),  # задача выполняется каждые 20 минут, начиная с 0 минут каждого часа
     },
     'auto_gas_processing': {
@@ -199,27 +201,67 @@ LOGGING = {
     'disable_existing_loggers': False,
     'formatters': {
         'verbose': {
-            'format': '%(asctime)s - %(levelname)s - %(message)s',
+            'style': '{',
+            'format': '{asctime} - {levelname} - {module} - {message}',
             'datefmt': '%Y-%m-%d %H:%M:%S',
         },
     },
     'handlers': {
-        'file': {
+        'filling_station': {
             'level': 'DEBUG',
-            'class': 'logging.FileHandler',
-            'filename': 'django.log',
+            'class': 'logging.handlers.TimedRotatingFileHandler',
+            'filename': 'log/filling_station.log',
+            'when': 'midnight',
+            'backupCount': 30,
+            'formatter': 'verbose',
+        },
+        'carousel': {
+            'level': 'DEBUG',
+            'class': 'logging.handlers.TimedRotatingFileHandler',
+            'filename': 'log/carousel.log',
+            'when': 'midnight',
+            'backupCount': 30,
+            'formatter': 'verbose',
+        },
+        'celery': {
+            'level': 'DEBUG',
+            'class': 'logging.handlers.TimedRotatingFileHandler',
+            'filename': 'log/celery.log',
+            'when': 'midnight',
+            'backupCount': 30,
             'formatter': 'verbose',
         },
     },
     'loggers': {
         'filling_station': {
-            'handlers': ['file'],
+            'handlers': ['filling_station'],
             'level': 'DEBUG',
-            'propagate': True,
+            'propagate': False,
+        },
+        'carousel': {
+            'handlers': ['carousel'],
+            'level': 'DEBUG',
+            'propagate': False,
+        },
+        'celery': {
+            'handlers': ['celery'],
+            'level': 'DEBUG',
+            'propagate': False,
         },
     },
 }
 
+DJANGO_API_HOST = 'http://localhost:8000/api'
+# OPC_SERVER_URL = "opc.tcp://host.docker.internal:4841"
+OPC_SERVER_URL = "opc.tcp://localhost:4841"
+
+# ITGas
 MIRIADA_API_POST_URL = os.environ.get('MIRIADA_API_POST_URL')
 MIRIADA_AUTH_LOGIN = os.environ.get('MIRIADA_AUTH_LOGIN')
 MIRIADA_AUTH_PASSWORD = os.environ.get('MIRIADA_AUTH_PASSWORD')
+
+GAS_TYPE_CHOICES = [
+    ('Не выбран', 'Не выбран'),
+    ('СПБТ', 'СПБТ'),
+    ('ПБА', 'ПБА'),
+]

@@ -25,11 +25,6 @@ balloons_amount_router.register(r'balloons-amount', balloons.BalloonAmountViewSe
 auto_gas_router = DefaultRouter()
 auto_gas_router.register(r'auto-gas-batch', transport.AutoGasBatchView, basename='auto-gas-batch')
 
-railway_batch_router = DefaultRouter()
-railway_batch_router.register(r'railway-batch', transport.RailwayBatchView, basename='railway-batch')
-
-
-
 urlpatterns = [
     path('', include(balloons_router.urls)),
     path('balloon-status-options', balloons.get_balloon_status_options),
@@ -46,7 +41,6 @@ urlpatterns = [
     path('', include(balloons_amount_router.urls)),
 
     path('', include(auto_gas_router.urls)),
-    path('', include(railway_batch_router.urls)),
 
     path('token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
     path('token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),

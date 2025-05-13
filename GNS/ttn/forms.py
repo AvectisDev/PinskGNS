@@ -1,12 +1,12 @@
 from django import forms
 from django.utils.html import format_html
-from filling_station.models import BalloonsLoadingBatch, AutoGasBatchSettings
-from .models import AutoTtn, RailwayTtn, TTN, GAS_TYPE_CHOICES
+from filling_station.models import BalloonsLoadingBatch, BalloonsUnloadingBatch, AutoGasBatch, AutoGasBatchSettings
+from .models import AutoTtn, RailwayTtn, BalloonTtn, GAS_TYPE_CHOICES
 from crispy_forms.helper import FormHelper
 from crispy_forms.layout import Submit
 
 
-class TTNForm(forms.ModelForm):
+class BalloonTtnForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.helper = FormHelper()
@@ -19,6 +19,7 @@ class TTNForm(forms.ModelForm):
         self.fields['shipper'].empty_label = 'Выберите грузоотправителя'
         self.fields['carrier'].empty_label = 'Выберите перевозчика'
         self.fields['consignee'].empty_label = 'Выберите грузополучателя'
+        self.fields['city'].empty_label = 'Выберите город'
         self.fields['loading_batch'].empty_label = 'Выберите партию приёмки'
         self.fields['unloading_batch'].empty_label = 'Выберите партию отгрузки'
 
@@ -28,6 +29,10 @@ class TTNForm(forms.ModelForm):
             'class': 'form-control',
             'placeholder': 'Номер заполнится автоматически или введите вручную'
         })
+
+        # Оптимизированные запросы для партий с select_related
+        self.fields['loading_batch'].queryset = BalloonsLoadingBatch.objects.select_related('truck')
+        self.fields['unloading_batch'].queryset = BalloonsUnloadingBatch.objects.select_related('truck')
 
         self.fields['loading_batch'].label_from_instance = self.format_batch_choice
         self.fields['unloading_batch'].label_from_instance = self.format_batch_choice
@@ -56,13 +61,14 @@ class TTNForm(forms.ModelForm):
         )
 
     class Meta:
-        model = TTN
+        model = BalloonTtn
         fields = [
             'number',
             'contract',
             'shipper',
             'carrier',
             'consignee',
+            'city',
             'loading_batch',
             'unloading_batch',
             'date'
@@ -83,6 +89,9 @@ class TTNForm(forms.ModelForm):
                 'class': 'form-control',
             }),
             'consignee': forms.Select(attrs={
+                'class': 'form-control',
+            }),
+            'city': forms.Select(attrs={
                 'class': 'form-control',
             }),
             'loading_batch': forms.Select(attrs={
@@ -122,7 +131,26 @@ class AutoTtnForm(forms.ModelForm):
         self.fields['shipper'].empty_label = 'Выберите грузоотправителя'
         self.fields['carrier'].empty_label = 'Выберите перевозчика'
         self.fields['consignee'].empty_label = 'Выберите грузополучателя'
-        self.fields['batch'].empty_label = 'Выберите номер партии'
+        self.fields['city'].empty_label = 'Выберите город'
+        self.fields['batch'].empty_label = 'Выберите партию'
+
+        # Оптимизированные запросы для партии с select_related
+        self.fields['batch'].queryset = AutoGasBatch.objects.select_related('truck')
+
+        self.fields['batch'].label_from_instance = self.format_batch_choice
+
+        # Добавляем data-атрибуты для выпадающих списков
+        self.fields['batch'].widget.attrs['data-ttn-field'] = 'id_ttn_number'
+
+    def format_batch_choice(self, obj):
+        """Форматирует отображение партии в выпадающем списке"""
+
+        return format_html(
+            '<span>{} №{} | Автомобиль: {}</span>',
+            'Приёмка' if obj.batch_type == 'l' else 'Отгрузка',
+            obj.id,
+            obj.truck.registration_number if obj.truck else '---'
+        )
 
     class Meta:
         model = AutoTtn
@@ -132,9 +160,8 @@ class AutoTtnForm(forms.ModelForm):
             'shipper',
             'carrier',
             'consignee',
+            'city',
             'batch',
-            'total_gas_amount',
-            'gas_type',
             'date'
         ]
         widgets = {
@@ -155,15 +182,10 @@ class AutoTtnForm(forms.ModelForm):
             'consignee': forms.Select(attrs={
                 'class': 'form-control',
             }),
+            'city': forms.Select(attrs={
+                'class': 'form-control',
+            }),
             'batch': forms.Select(attrs={
-                'class': 'form-control',
-            }),
-            'total_gas_amount': forms.NumberInput(attrs={
-                'class': 'form-control',
-                'placeholder': 'Количество газа',
-                'step': '0.01'
-            }),
-            'gas_type': forms.Select(attrs={
                 'class': 'form-control',
             }),
             'date': forms.DateInput(attrs={

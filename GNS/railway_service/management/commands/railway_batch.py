@@ -1,9 +1,9 @@
 import logging
 from django.core.management.base import BaseCommand
 from datetime import datetime, timedelta, timezone
-from filling_station.models import RailwayBatch
+from ...models import RailwayBatch
 
-logger = logging.getLogger('filling_station')
+logger = logging.getLogger('celery')
 
 
 class Command(BaseCommand):

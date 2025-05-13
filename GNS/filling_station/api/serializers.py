@@ -5,7 +5,6 @@ from ..models import (
     Trailer,
     BalloonsLoadingBatch,
     BalloonsUnloadingBatch,
-    RailwayBatch,
     AutoGasBatch,
     BalloonAmount
 )
@@ -106,13 +105,6 @@ class BalloonAmountUnloadingSerializer(serializers.ModelSerializer):
     class Meta:
         model = BalloonsUnloadingBatch
         fields = ['id', 'amount_of_rfid']
-
-
-class RailwayBatchSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = RailwayBatch
-        fields = ['id', 'end_date', 'gas_amount_spbt', 'gas_amount_pba', 'railway_tank_list', 'is_active',
-                  'import_ttn', 'export_ttn']
 
 
 class AutoGasBatchSerializer(serializers.ModelSerializer):

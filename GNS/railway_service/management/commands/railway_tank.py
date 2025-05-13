@@ -5,16 +5,15 @@ from django.core.files.base import ContentFile
 from opcua import Client, ua
 from django.core.exceptions import MultipleObjectsReturned
 from django.core.management.base import BaseCommand
+from django.conf import settings
 from datetime import datetime
-from filling_station.models import RailwayBatch, RailwayTank
+from ...models import RailwayBatch, RailwayTank
 from .intellect import get_registration_number_list, INTELLECT_SERVER_LIST, get_plate_image
 
-logger = logging.getLogger('filling_station')
+logger = logging.getLogger('celery')
 
 
 class Command(BaseCommand):
-    OPC_SERVER_URL = "opc.tcp://host.docker.internal:4841"
-    # OPC_SERVER_URL = "opc.tcp://127.0.0.1:4841"
     OPC_NODE_PATHS = {
         "tank_weight": "ns=4; s=Address Space.PLC_SU1.tank.stable_weight",
         "camera_worked": "ns=4; s=Address Space.PLC_SU1.tank.camera_worked",
@@ -23,7 +22,7 @@ class Command(BaseCommand):
 
     def __init__(self):
         super().__init__()
-        self.client = Client(self.OPC_SERVER_URL)
+        self.client = Client(settings.OPC_SERVER_URL)
         self.last_number = cache.get('last_tank_number', '')
 
     def get_opc_value(self, node_key):

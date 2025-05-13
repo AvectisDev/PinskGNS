@@ -4,13 +4,19 @@ from django.core.paginator import Paginator
 from django.urls import reverse_lazy, reverse
 from django.views import generic
 from django.db.models import Q, Sum
-from django.contrib import messages
-from django.shortcuts import get_object_or_404
-from .models import (Balloon, Truck, Trailer, RailwayTank, BalloonsLoadingBatch, BalloonsUnloadingBatch,
-                     RailwayBatch, BalloonAmount, AutoGasBatch, Reader)
+from railway_service.models import RailwayBatch
+from .models import (Balloon, Truck, Trailer, BalloonsLoadingBatch, BalloonsUnloadingBatch,
+                     BalloonAmount, AutoGasBatch, Reader)
 from .admin import BalloonResources
-from .forms import (GetBalloonsAmount, BalloonForm, TruckForm, TrailerForm, RailwayTankForm,
-                    BalloonsLoadingBatchForm, BalloonsUnloadingBatchForm, RailwayBatchForm, AutoGasBatchForm)
+from .forms import (
+    GetBalloonsAmount,
+    BalloonForm,
+    TruckForm,
+    TrailerForm,
+    BalloonsLoadingBatchForm,
+    BalloonsUnloadingBatchForm,
+    AutoGasBatchForm
+)
 from datetime import datetime, timedelta
 
 STATUS_LIST = {
@@ -197,32 +203,6 @@ class AutoGasBatchDeleteView(generic.DeleteView):
     template_name = 'filling_station/auto_batch_confirm_delete.html'
 
 
-# Партии приёмки газа в ж/д цистернах
-class RailwayBatchListView(generic.ListView):
-    model = RailwayBatch
-    paginate_by = 10
-    template_name = 'filling_station/railway_batch_list.html'
-
-
-class RailwayBatchDetailView(generic.DetailView):
-    model = RailwayBatch
-    queryset = RailwayBatch.objects.prefetch_related('railway_tank_list')
-    context_object_name = 'batch'
-    template_name = 'filling_station/railway_batch_detail.html'
-
-
-class RailwayBatchUpdateView(generic.UpdateView):
-    model = RailwayBatch
-    form_class = RailwayBatchForm
-    template_name = 'filling_station/_equipment_form.html'
-
-
-class RailwayBatchDeleteView(generic.DeleteView):
-    model = RailwayBatch
-    success_url = reverse_lazy("filling_station:railway_batch_list")
-    template_name = 'filling_station/railway_batch_confirm_delete.html'
-
-
 # Грузовики
 class TruckView(generic.ListView):
     model = Truck
@@ -283,37 +263,6 @@ class TrailerDeleteView(generic.DeleteView):
     model = Trailer
     success_url = reverse_lazy("filling_station:trailer_list")
     template_name = 'filling_station/trailer_confirm_delete.html'
-
-
-# ж/д цистерны
-class RailwayTankView(generic.ListView):
-    model = RailwayTank
-    paginate_by = 10
-
-
-class RailwayTankDetailView(generic.DetailView):
-    model = RailwayTank
-
-
-class RailwayTankCreateView(generic.CreateView):
-    model = RailwayTank
-    form_class = RailwayTankForm
-    template_name = 'filling_station/_equipment_form.html'
-
-    def get_success_url(self):
-        return self.object.get_absolute_url()
-
-
-class RailwayTankUpdateView(generic.UpdateView):
-    model = RailwayTank
-    form_class = RailwayTankForm
-    template_name = 'filling_station/_equipment_form.html'
-
-
-class RailwayTankDeleteView(generic.DeleteView):
-    model = RailwayTank
-    success_url = reverse_lazy("filling_station:railway_tank_list")
-    template_name = 'filling_station/railway_tank_confirm_delete.html'
 
 
 # Обработка данных для вкладки "Статистика"

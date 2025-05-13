@@ -1,9 +1,9 @@
 from django.db import models
-from django.core.exceptions import ValidationError
 from django.contrib.auth.models import User
 from django.urls import reverse
 from django.db.models import Q, Sum
-from filling_station.models import BalloonsLoadingBatch, BalloonsUnloadingBatch, RailwayTank, AutoGasBatch
+from filling_station.models import BalloonsLoadingBatch, BalloonsUnloadingBatch, AutoGasBatch
+from railway_service.models import RailwayTank
 
 
 GAS_TYPE_CHOICES = [
@@ -36,7 +36,7 @@ class City(models.Model):
         verbose_name_plural = "Города"
 
 
-class TTN(models.Model):
+class BalloonTtn(models.Model):
     number = models.CharField(blank=True, max_length=100, verbose_name="Номер ТТН")
     contract = models.CharField(blank=True, max_length=100, verbose_name="Номер договора")
     shipper = models.ForeignKey(
@@ -73,7 +73,7 @@ class TTN(models.Model):
         null=True,
         blank=True,
         verbose_name="Партия приёмки",
-        related_name='ttn_loading'
+        related_name='balloons_ttn_loading'
     )
     unloading_batch = models.ForeignKey(
         BalloonsUnloadingBatch,
@@ -81,7 +81,7 @@ class TTN(models.Model):
         null=True,
         blank=True,
         verbose_name="Партия отгрузки",
-        related_name='ttn_unloading'
+        related_name='balloons_ttn_unloading'
     )
     date = models.DateField(null=True, blank=True, verbose_name="Дата формирования накладной")
 
@@ -91,7 +91,7 @@ class TTN(models.Model):
     class Meta:
         verbose_name = "Баллоны"
         verbose_name_plural = "Баллоны"
-        ordering = ['-date']
+        ordering = ['-id', '-date']
 
     def get_batch(self):
         """Возвращает связанную партию (приёмки или отгрузки)"""
@@ -157,7 +157,7 @@ class RailwayTtn(models.Model):
     class Meta:
         verbose_name = "Железнодорожная ТТН"
         verbose_name_plural = "Железнодорожные ТТН"
-        ordering = ['-date']
+        ordering = ['-id', '-date']
 
     def get_absolute_url(self):
         return reverse('ttn:railway_ttn_detail', args=[self.pk])
@@ -226,7 +226,7 @@ class AutoTtn(models.Model):
     class Meta:
         verbose_name = "Автоцистерны"
         verbose_name_plural = "Автоцистерны"
-        ordering = ['-date']
+        ordering = ['-id', '-date']
 
     def get_absolute_url(self):
         return reverse('ttn:auto_ttn_detail', args=[self.pk])
@@ -236,3 +236,14 @@ class AutoTtn(models.Model):
 
     def get_delete_url(self):
         return reverse('ttn:auto_ttn_delete', args=[self.pk])
+
+
+class FilePath(models.Model):
+    path = models.CharField(max_length=255, blank=True, null=True)
+
+    def __str__(self):
+        return self.path or "API"
+
+    class Meta:
+        verbose_name = "Путь сохранения файла"
+        verbose_name_plural = "Путь сохранения файла"
