@@ -1,7 +1,6 @@
 import asyncio
 import db
 import binascii
-from datetime import datetime
 from settings import READER_LIST, COMMANDS
 import balloon_api
 import logging
