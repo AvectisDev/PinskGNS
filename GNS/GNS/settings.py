@@ -202,51 +202,54 @@ LOGGING = {
     'formatters': {
         'verbose': {
             'style': '{',
-            'format': '{asctime} - {levelname} - {module} - {message}',
+            'format': '{asctime} - {levelname} - {module}:{lineno} - {message}',
             'datefmt': '%Y-%m-%d %H:%M:%S',
         },
     },
     'handlers': {
-        'filling_station': {
+        'filling_station_file': {
             'level': 'DEBUG',
             'class': 'logging.handlers.TimedRotatingFileHandler',
             'filename': 'log/filling_station.log',
             'when': 'midnight',
             'backupCount': 30,
             'formatter': 'verbose',
+            'encoding': 'utf-8',
         },
-        'carousel': {
+        'carousel_file': {
             'level': 'DEBUG',
             'class': 'logging.handlers.TimedRotatingFileHandler',
             'filename': 'log/carousel.log',
             'when': 'midnight',
             'backupCount': 30,
             'formatter': 'verbose',
+            'encoding': 'utf-8',
         },
-        'celery': {
+        'celery_file': {
             'level': 'DEBUG',
             'class': 'logging.handlers.TimedRotatingFileHandler',
             'filename': 'log/celery.log',
             'when': 'midnight',
             'backupCount': 30,
             'formatter': 'verbose',
+            'encoding': 'utf-8',
         },
     },
     'loggers': {
         'filling_station': {
-            'handlers': ['filling_station'],
+            'handlers': ['filling_station_file'],
             'level': 'DEBUG',
-            'propagate': False,
+            'propagate': True,
         },
         'carousel': {
-            'handlers': ['carousel'],
+            'handlers': ['carousel_file'],
             'level': 'DEBUG',
-            'propagate': False,
+            'propagate': True,
         },
         'celery': {
-            'handlers': ['celery'],
-            'level': 'DEBUG',
-            'propagate': False,
+            'handlers': ['celery_file'],
+            'level': 'INFO',
+            'propagate': True,
         },
     },
 }
