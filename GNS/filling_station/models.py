@@ -21,10 +21,10 @@ BALLOON_SIZE_CHOICES = [
 ]
 
 
-@pghistory.track(exclude=['filling_status', 'update_passport_required', 'change_date', 'change_time'])
+@pghistory.track(exclude=['filling_status', 'update_passport_required'])
 class Balloon(models.Model):
-    nfc_tag = models.CharField(null=True, blank=True, max_length=30, verbose_name="Номер метки")
-    serial_number = models.CharField(null=True, blank=True, max_length=30, verbose_name="Серийный номер")
+    nfc_tag = models.CharField(primary_key=True,max_length=30, db_index=True, verbose_name="Номер метки")
+    serial_number = models.CharField(null=True, blank=True, max_length=30, db_index=True, verbose_name="Серийный номер")
     creation_date = models.DateField(null=True, blank=True, verbose_name="Дата производства")
     size = models.IntegerField(choices=BALLOON_SIZE_CHOICES, default=50, verbose_name="Объём")
     netto = models.FloatField(null=True, blank=True, verbose_name="Вес пустого баллона")
@@ -38,8 +38,7 @@ class Balloon(models.Model):
     wall_thickness = models.FloatField(null=True, blank=True, verbose_name="Толщина стенок")
     filling_status = models.BooleanField(default=False, verbose_name="Готов к наполнению")
     update_passport_required = models.BooleanField(default=True, verbose_name="Требуется обновление паспорта")
-    change_date = models.DateField(auto_now=True, verbose_name="Дата изменений")
-    change_time = models.TimeField(auto_now=True, verbose_name="Время изменений")
+    change_date = models.DateTimeField(auto_now=True, verbose_name="Дата изменений")
     user = models.ForeignKey(
         User,
         on_delete=models.SET_NULL,
@@ -48,16 +47,13 @@ class Balloon(models.Model):
         default=1
     )
 
-    def __int__(self):
-        return f"Balloon {self.nfc_tag}"
+    def __str__(self):
+        return self.nfc_tag
 
     class Meta:
         verbose_name = "Баллон"
         verbose_name_plural = "Баллоны"
-        ordering = ['-change_date', '-change_time']
-        indexes = [
-            models.Index(fields=['-nfc_tag', '-serial_number']),
-        ]
+        ordering = ['-change_date']
 
     def get_absolute_url(self):
         return reverse('filling_station:balloon_detail', args=[self.pk])

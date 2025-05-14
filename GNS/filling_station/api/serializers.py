@@ -13,9 +13,21 @@ from ..models import (
 class BalloonSerializer(serializers.ModelSerializer):
     class Meta:
         model = Balloon
-        fields = ['id', 'nfc_tag', 'serial_number', 'creation_date', 'size', 'netto', 'brutto',
-                  'current_examination_date', 'next_examination_date', 'status', 'manufacturer', 'wall_thickness',
-                  'filling_status', 'update_passport_required']
+        fields = [
+            'nfc_tag',
+            'serial_number',
+            'creation_date',
+            'size',
+            'netto',
+            'brutto',
+            'current_examination_date',
+            'next_examination_date',
+            'status',
+            'manufacturer',
+            'wall_thickness',
+            'filling_status',
+            'update_passport_required'
+        ]
 
 
 class TruckSerializer(serializers.ModelSerializer):
@@ -55,17 +67,49 @@ class TrailerSerializer(serializers.ModelSerializer):
 class BalloonsLoadingBatchSerializer(serializers.ModelSerializer):
     class Meta:
         model = BalloonsLoadingBatch
-        fields = ['id', 'begin_date', 'begin_time', 'end_date', 'end_time', 'truck', 'trailer', 'reader_number',
-                  'amount_of_rfid', 'amount_of_5_liters', 'amount_of_12_liters', 'amount_of_27_liters',
-                  'amount_of_50_liters', 'gas_amount', 'is_active', 'ttn', 'amount_of_ttn']
+        fields = [
+            'id',
+            'begin_date',
+            'begin_time',
+            'end_date',
+            'end_time',
+            'truck',
+            'trailer',
+            'reader_number',
+            'amount_of_rfid',
+            'amount_of_5_liters',
+            'amount_of_12_liters',
+            'amount_of_27_liters',
+            'amount_of_50_liters',
+            'gas_amount',
+            'is_active',
+            'ttn',
+            'amount_of_ttn'
+        ]
 
 
 class BalloonsUnloadingBatchSerializer(serializers.ModelSerializer):
     class Meta:
         model = BalloonsUnloadingBatch
-        fields = ['id', 'begin_date', 'begin_time', 'end_date', 'end_time', 'truck', 'trailer', 'reader_number',
-                  'amount_of_rfid', 'amount_of_5_liters', 'amount_of_12_liters', 'amount_of_27_liters',
-                  'amount_of_50_liters', 'gas_amount', 'is_active', 'ttn', 'amount_of_ttn']
+        fields = [
+            'id',
+            'begin_date',
+            'begin_time',
+            'end_date',
+            'end_time',
+            'truck',
+            'trailer',
+            'reader_number',
+            'amount_of_rfid',
+            'amount_of_5_liters',
+            'amount_of_12_liters',
+            'amount_of_27_liters',
+            'amount_of_50_liters',
+            'gas_amount',
+            'is_active',
+            'ttn',
+            'amount_of_ttn'
+        ]
 
 
 # Кастомные сериализаторы для партий приёмки/отгрузки баллонов

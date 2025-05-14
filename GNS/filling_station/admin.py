@@ -14,17 +14,30 @@ class BalloonResources(resources.ModelResource):
             'netto',
             'brutto',
             'filling_status',
-            "change_date",
-            "change_time"
+            "change_date"
         ]
 
 
 @admin.register(Balloon)
 class BalloonAdmin(admin.ModelAdmin):
-    list_display = ['id', 'nfc_tag', 'serial_number', 'creation_date', 'size', 'netto', 'brutto',
-                    'current_examination_date', 'next_examination_date', 'diagnostic_date', 'working_pressure',
-                    'status', 'manufacturer', 'wall_thickness', 'filling_status', 'update_passport_required']
-    search_fields = ['nfc_tag', 'serial_number', 'creation_date', 'size', 'manufacturer']
+    list_display = [
+        'nfc_tag',
+        'serial_number',
+        'creation_date',
+        'size',
+        'netto',
+        'brutto',
+        'current_examination_date',
+        'next_examination_date',
+        'diagnostic_date',
+        'working_pressure',
+        'status',
+        'manufacturer',
+        'wall_thickness',
+        'filling_status',
+        'update_passport_required'
+    ]
+    search_fields = ['nfc_tag', 'serial_number', 'size', 'manufacturer']
 
 
 @admin.register(Truck)
@@ -56,28 +69,72 @@ class TrailerTypeAdmin(admin.ModelAdmin):
 
 @admin.register(BalloonsLoadingBatch)
 class BalloonsLoadingBatchAdmin(admin.ModelAdmin):
-    list_display = ['id', 'begin_date', 'begin_time', 'end_date', 'end_time', 'truck', 'trailer', 'reader_number',
-                    'amount_of_rfid', 'amount_of_5_liters', 'amount_of_12_liters', 'amount_of_27_liters',
-                    'amount_of_50_liters', 'gas_amount', 'is_active', 'ttn', 'amount_of_ttn']
+    list_display = [
+        'id',
+        'begin_date',
+        'begin_time',
+        'end_date',
+        'end_time',
+        'truck',
+        'trailer',
+        'reader_number',
+        'amount_of_rfid',
+        'amount_of_5_liters',
+        'amount_of_12_liters',
+        'amount_of_27_liters',
+        'amount_of_50_liters',
+        'gas_amount',
+        'is_active',
+        'ttn',
+        'amount_of_ttn'
+    ]
     list_filter = ['begin_date', 'end_date', 'is_active']
-    search_fields = ['begin_date', 'end_date', 'truck', 'is_active', 'ttn']
+    search_fields = ['truck', 'is_active', 'ttn']
 
 
 @admin.register(BalloonsUnloadingBatch)
 class BalloonsUnloadingBatchAdmin(admin.ModelAdmin):
-    list_display = ['id', 'begin_date', 'begin_time', 'end_date', 'end_time', 'truck', 'trailer', 'reader_number',
-                    'amount_of_rfid', 'amount_of_5_liters', 'amount_of_12_liters', 'amount_of_27_liters',
-                    'amount_of_50_liters', 'gas_amount', 'is_active', 'ttn', 'amount_of_ttn']
+    list_display = [
+        'id',
+        'begin_date',
+        'begin_time',
+        'end_date',
+        'end_time',
+        'truck',
+        'trailer',
+        'reader_number',
+        'amount_of_rfid',
+        'amount_of_5_liters',
+        'amount_of_12_liters',
+        'amount_of_27_liters',
+        'amount_of_50_liters',
+        'gas_amount',
+        'is_active',
+        'ttn',
+        'amount_of_ttn'
+    ]
     list_filter = ['begin_date', 'end_date', 'is_active']
-    search_fields = ['begin_date', 'end_date', 'truck', 'is_active', 'ttn']
+    search_fields = ['truck', 'ttn']
 
 
 @admin.register(AutoGasBatch)
 class AutoGasBatchAdmin(admin.ModelAdmin):
-    list_display = ['id', 'batch_type', 'end_date', 'end_time', 'truck', 'trailer', 'gas_amount', 'gas_type',
-                    'scale_empty_weight', 'scale_full_weight', 'weight_gas_amount', 'is_active']
+    list_display = [
+        'id',
+        'batch_type',
+        'end_date',
+        'end_time',
+        'truck',
+        'trailer',
+        'gas_amount',
+        'gas_type',
+        'scale_empty_weight',
+        'scale_full_weight',
+        'weight_gas_amount',
+        'is_active'
+    ]
     list_filter = ['begin_date', 'end_date', 'is_active']
-    search_fields = ['begin_date', 'end_date', 'truck', 'is_active']
+    search_fields = ['truck']
 
 
 @admin.register(AutoGasBatchSettings)
