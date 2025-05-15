@@ -18,7 +18,7 @@ if not os.path.exists(LOGS_DIR):
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s',
-    filename=os.path.join(LOGS_DIR, 'carousel.log'),
+    filename=os.path.join(LOGS_DIR, 'carousel_app.log'),
     filemode='w',
     encoding='utf-8'
 )
@@ -30,7 +30,7 @@ logger.setLevel(logging.DEBUG)
 session = requests.Session()
 
 # Подключение к Redis
-redis_client = redis.Redis(host='django', port=6379, db=1, decode_responses=False)
+redis_client = redis.Redis(host='localhost', port=6379, db=1, decode_responses=False)
 CACHE_KEY = ':1:reader_8_balloon_stack'
 POST_NUMBER_CACHE_KEY = 'previous_post_number'
 
@@ -97,7 +97,8 @@ def post_processing(post_number: int):
         process_value = int(previous_post_number) - post_number
         logger.debug(f"Значение process_value = {process_value}")
 
-        if process_value in [0, 1, -19]:  # также разрешается повторный запрос с поста - значение 0
+        # if process_value in [0, 1, -19]:  # также разрешается повторный запрос с поста - значение 0
+        if process_value:
             redis_client.set(POST_NUMBER_CACHE_KEY, post_number, ex=cache_timeout)
             logger.debug(f"Значение {post_number} сохранено в Redis по ключу {POST_NUMBER_CACHE_KEY}")
             return True
@@ -144,10 +145,10 @@ def check_balloon_size(weight: int) -> int:
     :return: int: Объём баллона
     """
     balloon_size = 50
-    if weight <= 12000:
-        balloon_size = 27
-    elif 14000 < weight < 25000:
-        balloon_size = 50
+    # if weight <= 12000:
+    #     balloon_size = 27
+    # elif 14000 < weight < 25000:
+    #     balloon_size = 50
 
     return balloon_size
 

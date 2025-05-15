@@ -279,11 +279,11 @@ class BalloonViewSet(viewsets.ViewSet):
             # Баллонов на станции
             filled_balloons_on_station = (Balloon.objects
                                           .filter(status='Регистрация полного баллона на складе')
-                                          .aggregate(total=Count('id')))
+                                          .aggregate(total=Count('nfc_tag')))
             empty_balloons_on_station = (Balloon.objects
                                          .filter(status__in=['Регистрация пустого баллона на складе (рампа)',
                                                              'Регистрация пустого баллона на складе (цех)'])
-                                         .aggregate(total=Count('id')))
+                                         .aggregate(total=Count('nfc_tag')))
 
             # Баллонов за текущий месяц
             balloons_monthly_stats = (BalloonAmount.objects
