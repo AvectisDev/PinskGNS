@@ -79,7 +79,7 @@ def fetch_carousel_settings() -> Optional[dict]:
         # Создаем курсор для работы с базой данных
         with conn.cursor(cursor_factory=RealDictCursor) as cursor:
             # Выполняем запрос для получения всех данных из таблицы CarouselSettings
-            query = "SELECT * FROM public.filling_station_carouselsettings"
+            query = "SELECT * FROM public.carousel_carouselsettings"
             cursor.execute(query)
             records = cursor.fetchall()
 
