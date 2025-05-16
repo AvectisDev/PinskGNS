@@ -466,12 +466,12 @@ class BalloonsLoadingBatchViewSet(viewsets.ViewSet):
 
     @action(detail=True, methods=['patch'], url_path='add-balloon')
     def add_balloon(self, request, pk=None):
-        balloon_id = request.data.get('balloon_id', None)
+        nfc = request.data.get('nfc', None)
         batch = get_object_or_404(BalloonsLoadingBatch, id=pk)
 
-        if balloon_id:
-            balloon = get_object_or_404(Balloon, id=balloon_id)
-            if batch.balloon_list.filter(id=balloon_id).exists():
+        if nfc:
+            balloon = get_object_or_404(Balloon, nfc_tag=nfc)
+            if batch.balloon_list.filter(nfc_tag=nfc).exists():
                 return Response(status=status.HTTP_409_CONFLICT)
             else:
                 batch.balloon_list.add(balloon)
@@ -483,12 +483,12 @@ class BalloonsLoadingBatchViewSet(viewsets.ViewSet):
 
     @action(detail=True, methods=['patch'], url_path='remove-balloon')
     def remove_balloon(self, request, pk=None):
-        balloon_id = request.data.get('balloon_id', None)
+        nfc = request.data.get('nfc', None)
         batch = get_object_or_404(BalloonsLoadingBatch, id=pk)
 
-        if balloon_id:
-            balloon = get_object_or_404(Balloon, id=balloon_id)
-            if batch.balloon_list.filter(id=balloon_id).exists():
+        if nfc:
+            balloon = get_object_or_404(Balloon, nfc_tag=nfc)
+            if batch.balloon_list.filter(nfc_tag=nfc).exists():
                 batch.balloon_list.remove(balloon)
                 if batch.amount_of_rfid:
                     batch.amount_of_rfid -= 1
@@ -548,12 +548,12 @@ class BalloonsUnloadingBatchViewSet(viewsets.ViewSet):
 
     @action(detail=True, methods=['patch'], url_path='add-balloon')
     def add_balloon(self, request, pk=None):
-        balloon_id = request.data.get('balloon_id', None)
+        nfc = request.data.get('nfc', None)
         batch = get_object_or_404(BalloonsUnloadingBatch, id=pk)
 
-        if balloon_id:
-            balloon = get_object_or_404(Balloon, id=balloon_id)
-            if batch.balloon_list.filter(id=balloon_id).exists():
+        if nfc:
+            balloon = get_object_or_404(Balloon, nfc_tag=nfc)
+            if batch.balloon_list.filter(nfc_tag=nfc).exists():
                 return Response(status=status.HTTP_409_CONFLICT)
             else:
                 batch.balloon_list.add(balloon)
@@ -565,12 +565,12 @@ class BalloonsUnloadingBatchViewSet(viewsets.ViewSet):
 
     @action(detail=True, methods=['patch'], url_path='remove-balloon')
     def remove_balloon(self, request, pk=None):
-        balloon_id = request.data.get('balloon_id', None)
+        nfc = request.data.get('nfc', None)
         batch = get_object_or_404(BalloonsUnloadingBatch, id=pk)
 
-        if balloon_id:
-            balloon = get_object_or_404(Balloon, id=balloon_id)
-            if batch.balloon_list.filter(id=balloon_id).exists():
+        if nfc:
+            balloon = get_object_or_404(Balloon, nfc_tag=nfc)
+            if batch.balloon_list.filter(nfc_tag=nfc).exists():
                 batch.balloon_list.remove(balloon)
                 if batch.amount_of_rfid:
                     batch.amount_of_rfid -= 1
