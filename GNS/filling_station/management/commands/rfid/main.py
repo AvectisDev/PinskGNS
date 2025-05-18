@@ -1,22 +1,20 @@
+import os
 import asyncio
-import db
 import binascii
-from settings import READER_LIST, COMMANDS
-import balloon_api
-import logging
+import logging.config
+import django
 from concurrent.futures import ThreadPoolExecutor
+from . import db
+from .settings import READER_LIST, COMMANDS
+from . import api
 
+# Инициализация Django
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'GNS.settings')
+django.setup()
 
-logging.basicConfig(
-    level=logging.INFO,  # Уровень логирования
-    format='%(asctime)s - %(levelname)s - %(message)s',
-    filename='rfid_app.log',
-    filemode='w',
-    encoding='utf-8'
-)
-
-logger = logging.getLogger('app_logger')
-logger.setLevel(logging.DEBUG)
+# Конфигурация логирования из настроек Django
+logging.config.dictConfig(django.conf.settings.LOGGING)
+logger = logging.getLogger('rfid')
 
 
 async def data_exchange_with_reader(controller: dict, command: str):
@@ -86,7 +84,7 @@ async def balloon_passport_processing(nfc_tag: str, reader: dict):
     }
 
     # Обновляем статус баллона в базе данных. Если паспорта нет - создаём запись
-    passport = await balloon_api.update_balloon(passport)
+    passport = await api.update_balloon(passport)
 
     return passport['filling_status']
 
@@ -202,16 +200,16 @@ async def process_reader(reader):
 async def main():
     # При запуске программы очищаем буфер считывателей
     tasks = [asyncio.create_task(data_exchange_with_reader(reader, 'clean_buffer')) for reader in READER_LIST]
-    print('Очистка буфера RFID-считывателей...')
+    logger.info('Очистка буфера RFID-считывателей...')
     await asyncio.wait(tasks)
 
     with ThreadPoolExecutor(max_workers=len(READER_LIST)) as executor:
-        print('Программа в работе')
+        logger.info('Программа в работе')
         loop = asyncio.get_running_loop()
         tasks = [loop.run_in_executor(executor, process_reader_sync, reader) for reader in READER_LIST]
         await asyncio.gather(*tasks)
 
 
 if __name__ == "__main__":
-    print('Запуск программы считывания RFID-меток...')
+    logger.info('Запуск программы считывания RFID-меток...')
     asyncio.run(main())

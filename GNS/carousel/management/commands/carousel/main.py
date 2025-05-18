@@ -2,29 +2,21 @@ import os
 import serial
 import pickle
 import struct
-import logging
-import balloon_api
+import logging.config
+import django
 import requests
 import redis
-import db
+import time
+from . import api
+from . import db
 
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-LOGS_DIR = os.path.join(BASE_DIR, 'logs')
-# Создаём папку logs, если её нет
-if not os.path.exists(LOGS_DIR):
-    os.makedirs(LOGS_DIR)
+# Инициализация Django
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'GNS.settings')
+django.setup()
 
-# Настройка логирования
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s',
-    filename=os.path.join(LOGS_DIR, 'carousel_app.log'),
-    filemode='w',
-    encoding='utf-8'
-)
-
-logger = logging.getLogger('carousel_logger')
-logger.setLevel(logging.DEBUG)
+# Конфигурация логирования из настроек Django
+logging.config.dictConfig(django.conf.settings.LOGGING)
+logger = logging.getLogger('carousel')
 
 # Создаем сессию для программы обработки постов наполнения
 session = requests.Session()
@@ -309,7 +301,7 @@ def serial_exchange():
 
                     # Отправляем данные на сервер для статистики
                     if process_data_to_server and isinstance(process_data_to_server, dict):
-                        balloon_api.put_carousel_data(process_data_to_server, session)
+                        api.put_carousel_data(process_data_to_server, session)
                         logger.debug(f"Данные отправлены на сервер")
 
     except serial.SerialException as error:
@@ -329,4 +321,5 @@ while True:
     try:
         serial_exchange()
     except Exception as e:
-        logger.error(f"Ошибка в serial_exchange: {e}. Перезапуск...")
+        logger.error(f"Ошибка в serial_exchange: {e}. Перезапуск через 5 секунд...")
+        time.sleep(5)

@@ -8,6 +8,7 @@ load_dotenv()
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
+LOGS_DIR = os.path.join(BASE_DIR, 'log')
 
 SECRET_KEY = os.environ.get('SECRET_KEY')
 DEBUG = os.environ.get('DEBUG')
@@ -173,6 +174,7 @@ CRISPY_TEMPLATE_PACK = "bootstrap5"
 CELERY_BROKER_URL = 'redis://localhost:6379/0'
 CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP = True
 CELERY_RESULT_BACKEND = 'redis://localhost:6379/0'
+CELERY_RESULT_EXPIRES = 86400  # 24 часа
 CELERY_BEAT_SCHEDULE = {
     # 'generate_1c_file_every_hour': {
     #     'task': 'filling_station.tasks.generate_1c_file',
@@ -195,6 +197,7 @@ CELERY_BEAT_SCHEDULE = {
         'schedule': 60.0,
     },
 }
+CELERY_BEAT_SCHEDULE_FILENAME = None
 
 LOGGING = {
     'version': 1,
@@ -210,29 +213,42 @@ LOGGING = {
         'filling_station_file': {
             'level': 'DEBUG',
             'class': 'logging.handlers.TimedRotatingFileHandler',
-            'filename': 'log/filling_station.log',
+            'filename': os.path.join(LOGS_DIR, 'filling_station.log'),
             'when': 'midnight',
             'backupCount': 30,
             'formatter': 'verbose',
             'encoding': 'utf-8',
+            'delay': True,
         },
         'carousel_file': {
             'level': 'DEBUG',
             'class': 'logging.handlers.TimedRotatingFileHandler',
-            'filename': 'log/carousel.log',
+            'filename': os.path.join(LOGS_DIR, 'carousel.log'),
             'when': 'midnight',
             'backupCount': 30,
             'formatter': 'verbose',
             'encoding': 'utf-8',
+            'delay': True,
+        },
+        'rfid_file': {
+            'level': 'DEBUG',
+            'class': 'logging.handlers.TimedRotatingFileHandler',
+            'filename': os.path.join(LOGS_DIR, 'rfid.log'),
+            'when': 'midnight',
+            'backupCount': 30,
+            'formatter': 'verbose',
+            'encoding': 'utf-8',
+            'delay': True,
         },
         'celery_file': {
             'level': 'DEBUG',
             'class': 'logging.handlers.TimedRotatingFileHandler',
-            'filename': 'log/celery.log',
+            'filename': os.path.join(LOGS_DIR, 'celery.log'),
             'when': 'midnight',
             'backupCount': 30,
             'formatter': 'verbose',
             'encoding': 'utf-8',
+            'delay': True,
         },
     },
     'loggers': {
@@ -243,6 +259,11 @@ LOGGING = {
         },
         'carousel': {
             'handlers': ['carousel_file'],
+            'level': 'DEBUG',
+            'propagate': True,
+        },
+        'rfid': {
+            'handlers': ['rfid_file'],
             'level': 'DEBUG',
             'propagate': True,
         },
