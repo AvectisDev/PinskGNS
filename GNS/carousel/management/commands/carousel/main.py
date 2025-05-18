@@ -321,5 +321,5 @@ while True:
     try:
         serial_exchange()
     except Exception as e:
-        logger.error(f"Ошибка в serial_exchange: {e}. Перезапуск через 5 секунд...")
-        time.sleep(5)
+        logger.error(f"Ошибка в serial_exchange: {e}. Перезапуск через 5 минут...")
+        time.sleep(300)

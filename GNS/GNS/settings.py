@@ -197,7 +197,6 @@ CELERY_BEAT_SCHEDULE = {
         'schedule': 60.0,
     },
 }
-CELERY_BEAT_SCHEDULE_FILENAME = None
 
 LOGGING = {
     'version': 1,
@@ -269,7 +268,7 @@ LOGGING = {
         },
         'celery': {
             'handlers': ['celery_file'],
-            'level': 'INFO',
+            'level': 'DEBUG',
             'propagate': True,
         },
     },
