@@ -9,26 +9,26 @@ processes = []
 def start_processes():
     """Запускаем дочерние процессы и сохраняем их объекты."""
     global processes
-    print('Запускаем процессы...')
+    print('Starting processes...')
     p1 = subprocess.Popen(['python', '-m', 'filling_station.management.commands.rfid.main'])
     p2 = subprocess.Popen(['python', '-m', 'carousel.management.commands.carousel.main'])
     processes.extend([p1, p2])
-    print(f'Процессы запущены: {processes}')
+    print(f'Processes is started: {processes}')
 
 def stop_processes():
     """Завершаем дочерние процессы."""
-    print('Остановка процессов...')
+    print('Stoping processes...')
     for p in processes:
         try:
             p.terminate()
         except Exception as e:
-            print(f'Ошибка при завершении процесса: {e}')
+            print(f'Error while stopping processes: {e}')
     # Ждем завершения или принудительно убиваем
     for p in processes:
         try:
             p.wait(timeout=10)
         except subprocess.TimeoutExpired:
-            print('Процесс не завершился за отведенное время, убиваю.')
+            print('The process did not complete within the allotted time. kill')
             p.kill()
 
 def handle_exit(signum, frame):
