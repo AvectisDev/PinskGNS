@@ -176,7 +176,7 @@ CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP = True
 CELERY_WORKER_HIJACK_ROOT_LOGGER = False
 CELERY_HIJACK_ROOT_LOGGER = False
 CELERY_RESULT_BACKEND = 'redis://localhost:6379/0'
-CELERY_RESULT_EXPIRES = 86400  # 24 часа
+CELERY_RESULT_EXPIRES = 3600  # 1 час
 CELERY_BEAT_SCHEDULE = {
     # 'generate_1c_file_every_hour': {
     #     'task': 'filling_station.tasks.generate_1c_file',
@@ -209,6 +209,10 @@ LOGGING = {
             'format': '{asctime} - {levelname} - {module}:{lineno} - {message}',
             'datefmt': '%Y-%m-%d %H:%M:%S',
         },
+        'with_msecs': {
+            'format': '%(asctime)s.%(msecs)03d - %(levelname)s - %(module)s:%(lineno)d - %(message)s',
+            'datefmt': '%Y-%m-%d %H:%M:%S',
+        },
     },
     'handlers': {
         'filling_station_file': {
@@ -227,7 +231,7 @@ LOGGING = {
             'filename': os.path.join(LOGS_DIR, 'carousel.log'),
             'when': 'midnight',
             'backupCount': 30,
-            'formatter': 'verbose',
+            'formatter': 'with_msecs',
             'encoding': 'utf-8',
             'delay': True,
         },
@@ -242,7 +246,7 @@ LOGGING = {
             'delay': True,
         },
         'celery_file': {
-            'level': 'DEBUG',
+            'level': 'INFO',
             'class': 'logging.handlers.TimedRotatingFileHandler',
             'filename': os.path.join(LOGS_DIR, 'celery.log'),
             'when': 'midnight',
@@ -270,7 +274,7 @@ LOGGING = {
         },
         'celery': {
             'handlers': ['celery_file'],
-            'level': 'DEBUG',
+            'level': 'INFO',
             'propagate': False,
         },
     },

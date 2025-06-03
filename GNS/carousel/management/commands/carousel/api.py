@@ -1,21 +1,20 @@
+import os
 import aiohttp
 import requests
+import django
 import logging
+from django.conf import settings
 
 
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s',
-    filename='balloon_api.log',
-    filemode='w',
-    encoding='utf-8'
-)
+# Инициализация Django
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'GNS.settings')
+django.setup()
 
+# Конфигурация логирования из настроек Django
+logging.config.dictConfig(settings.LOGGING)
 logger = logging.getLogger('carousel')
-logger.setLevel(logging.DEBUG)
 
 
-BASE_URL = "http://localhost:8000/api"  # server address
 USERNAME = "reader"
 PASSWORD = "rfid-device"
 
@@ -30,9 +29,9 @@ def put_carousel_data(data: dict, session: requests.Session):
     :return: возвращает словарь со статусом ответа и весом баллона
     """
     try:
-        logger.debug(f"balloon_api данные поста отправлены - {data}")
-        response = session.post(f"{BASE_URL}/carousel/balloon-update/", json=data, timeout=3)
-        logger.debug(f"balloon_api данные поста получены - {response}")
+        logger.debug(f"api - данные c поста отправлены - {data}")
+        response = session.post(f"{settings.DJANGO_API_HOST}/carousel/balloon-update/", json=data, timeout=2)
+        logger.debug(f"api - данные от сервера получены - {response}")
         response.raise_for_status()
         if response.content:
             return response.json()
@@ -40,5 +39,5 @@ def put_carousel_data(data: dict, session: requests.Session):
             return {}
 
     except requests.exceptions.RequestException as error:
-        logger.error(f"put_carousel_data function error: {error}")
+        logger.error(f"Ошибка в функции отправки данных с поста наполнения на API сервера: {error}")
         return {}

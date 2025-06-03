@@ -9,7 +9,7 @@ from ..models import Carousel, CarouselSettings
 from .serializers import CarouselSerializer, CarouselSettingsSerializer
 
 
-logger = logging.getLogger('carousel')
+logger = logging.getLogger('filling_station')
 
 
 class CarouselViewSet(viewsets.ViewSet):

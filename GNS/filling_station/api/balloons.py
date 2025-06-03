@@ -227,6 +227,9 @@ class BalloonViewSet(viewsets.ViewSet):
             )
             # Сохраняем баллон в кэш на карусели наполнения
             if reader_number == 8:
+                timeout_minutes = 10
+                timeout_seconds = timeout_minutes * 60
+
                 cache_key = f'reader_{reader_number}_balloon_stack'
                 stack = cache.get(cache_key, [])
                 # Добавляем объект в стек
@@ -242,7 +245,7 @@ class BalloonViewSet(viewsets.ViewSet):
                 logger.debug(f'Стек считывателя {reader_number} = {stack}')
 
                 # Сохраняем обновленный стек в кэш
-                cache.set(cache_key, stack, timeout=None)
+                cache.set(cache_key, stack, timeout=timeout_seconds)
 
         serializer = BalloonSerializer(balloon)
         return Response(serializer.data)
