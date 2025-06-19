@@ -146,12 +146,12 @@ class BalloonViewSet(viewsets.ViewSet):
             )
             prepared = session.prepare_request(req)
 
-            # self.logger.debug(
-            #     f"Подготовленный запрос:\n"
-            #     f"URL: {prepared.url}\n"
-            #     f"Headers: {prepared.headers}\n"
-            #     f"Body: {prepared.body}"
-            # )
+            self.logger.debug(
+                f"Подготовленный запрос:\n"
+                f"URL: {prepared.url}\n"
+                f"Headers: {prepared.headers}\n"
+                f"Body: {prepared.body}"
+            )
 
             response = session.send(prepared, timeout=2)
             response.raise_for_status()
