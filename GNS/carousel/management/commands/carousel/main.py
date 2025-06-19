@@ -242,10 +242,10 @@ def serial_exchange():
 
         while True:
             # Читаем 8 байт данных из COM-порта
-            data = ser.read(8)
+            data = ser.read(9)
             logger.info(f"Получен запрос от поста - {data}")
 
-            if len(data) == 8:
+            if len(data) >= 8:
                 # Расшифровываем каждый байт по отдельности
                 request_type = data[0]
                 post_number = data[1]
