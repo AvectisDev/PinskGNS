@@ -178,10 +178,6 @@ CELERY_HIJACK_ROOT_LOGGER = False
 CELERY_RESULT_BACKEND = 'redis://localhost:6379/0'
 CELERY_RESULT_EXPIRES = 3600  # 1 час
 CELERY_BEAT_SCHEDULE = {
-    # 'generate_1c_file_every_hour': {
-    #     'task': 'filling_station.tasks.generate_1c_file',
-    #     'schedule': crontab(hour=1),
-    # },
     'railway_tank_processing': {
         'task': 'railway_service.tasks.railway_tank_processing',
         'schedule': 10.0,  # каждые 10 сек
@@ -218,7 +214,7 @@ LOGGING = {
         'filling_station_file': {
             'level': 'DEBUG',
             'class': 'logging.handlers.TimedRotatingFileHandler',
-            'filename': os.path.join(LOGS_DIR, 'filling_station.log'),
+            'filename': os.path.join(LOGS_DIR, 'filling_station/filling_station.log'),
             'when': 'midnight',
             'backupCount': 30,
             'formatter': 'verbose',
@@ -228,7 +224,7 @@ LOGGING = {
         'carousel_file': {
             'level': 'DEBUG',
             'class': 'logging.handlers.TimedRotatingFileHandler',
-            'filename': os.path.join(LOGS_DIR, 'carousel.log'),
+            'filename': os.path.join(LOGS_DIR, 'carousel/carousel.log'),
             'when': 'midnight',
             'backupCount': 30,
             'formatter': 'with_msecs',
@@ -238,7 +234,7 @@ LOGGING = {
         'rfid_file': {
             'level': 'DEBUG',
             'class': 'logging.handlers.TimedRotatingFileHandler',
-            'filename': os.path.join(LOGS_DIR, 'rfid.log'),
+            'filename': os.path.join(LOGS_DIR, 'rfid/rfid.log'),
             'when': 'midnight',
             'backupCount': 30,
             'formatter': 'verbose',
@@ -248,7 +244,7 @@ LOGGING = {
         'celery_file': {
             'level': 'INFO',
             'class': 'logging.handlers.TimedRotatingFileHandler',
-            'filename': os.path.join(LOGS_DIR, 'celery.log'),
+            'filename': os.path.join(LOGS_DIR, 'celery/celery.log'),
             'when': 'midnight',
             'backupCount': 30,
             'formatter': 'verbose',

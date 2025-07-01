@@ -1,20 +1,17 @@
+import os
+import django
 import aiohttp
-import logging
+import logging.config
+from django.conf import settings
 
+# Инициализация Django
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'GNS.settings')
+django.setup()
 
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s',
-    filename='balloon_api.log',
-    filemode='w',
-    encoding='utf-8'
-)
+# Конфигурация логирования из настроек Django
+logging.config.dictConfig(django.conf.settings.LOGGING)
+logger = logging.getLogger('rfid')
 
-logger = logging.getLogger('carousel')
-logger.setLevel(logging.DEBUG)
-
-
-BASE_URL = "http://localhost:8000/api"  # server address
 USERNAME = "reader"
 PASSWORD = "rfid-device"
 
@@ -22,13 +19,13 @@ PASSWORD = "rfid-device"
 async def update_balloon(data):
     async with aiohttp.ClientSession() as session:
         try:
-            async with session.post(f"{BASE_URL}/balloons/update-by-reader/", json=data, timeout=3,
+            async with session.post(f"{settings.DJANGO_API_HOST}/balloons/update-by-reader/", json=data, timeout=3,
                                     auth=aiohttp.BasicAuth(USERNAME, PASSWORD)) as response:
                 response.raise_for_status()
                 return await response.json()
 
         except Exception as error:
-            print(f'update_balloon function error: {error}')
+            logger.info(f'update_balloon function error: {error}')
             return data
 
 
@@ -40,9 +37,9 @@ async def update_balloon_amount(from_who: str, data: dict):
         data (dict): словарь, содержащий значения номера считывателя и соответствующий ему статус.
     """
     if from_who == 'rfid':
-        url = f'{BASE_URL}/balloons-amount/update-amount-of-rfid/'
+        url = f'{settings.DJANGO_API_HOST}/balloons-amount/update-amount-of-rfid/'
     elif from_who == 'sensor':
-        url = f'{BASE_URL}/balloons-amount/update-amount-of-sensor/'
+        url = f'{settings.DJANGO_API_HOST}/balloons-amount/update-amount-of-sensor/'
     else:
         return None
 
@@ -53,5 +50,5 @@ async def update_balloon_amount(from_who: str, data: dict):
                 response.raise_for_status()
 
         except Exception as error:
-            print(f'update_balloon_amount function error: {error}')
+            logger.info(f'update_balloon_amount function error: {error}')
             return None

@@ -70,8 +70,7 @@ class BalloonTtnForm(forms.ModelForm):
             'consignee',
             'city',
             'loading_batch',
-            'unloading_batch',
-            'date'
+            'unloading_batch'
         ]
         widgets = {
             'number': forms.TextInput(attrs={
@@ -99,11 +98,6 @@ class BalloonTtnForm(forms.ModelForm):
             }),
             'unloading_batch': forms.Select(attrs={
                 'class': 'form-control',
-            }),
-            'date': forms.DateInput(attrs={
-                'type': 'date',
-                'class': 'form-control',
-                'placeholder': 'Дата формирования'
             }),
         }
 
@@ -161,8 +155,7 @@ class AutoTtnForm(forms.ModelForm):
             'carrier',
             'consignee',
             'city',
-            'batch',
-            'date'
+            'batch'
         ]
         widgets = {
             'number': forms.TextInput(attrs={
@@ -187,11 +180,6 @@ class AutoTtnForm(forms.ModelForm):
             }),
             'batch': forms.Select(attrs={
                 'class': 'form-control',
-            }),
-            'date': forms.DateInput(attrs={
-                'type': 'date',
-                'class': 'form-control',
-                'placeholder': 'Дата формирования накладной'
             }),
         }
         labels = {
@@ -244,8 +232,7 @@ class RailwayTtnForm(forms.ModelForm):
             'shipper',
             'carrier',
             'consignee',
-            'gas_type',
-            'date'
+            'gas_type'
         ]
         widgets = {
             'number': forms.TextInput(attrs={'class': 'form-control'}),
@@ -255,7 +242,6 @@ class RailwayTtnForm(forms.ModelForm):
             }),
             'contract': forms.TextInput(attrs={'class': 'form-control'}),
             'gas_type': forms.Select(choices=GAS_TYPE_CHOICES, attrs={'class': 'form-control'}),
-            'date': forms.DateInput(format='%Y-%m-%d', attrs={'type': 'date', 'class': 'form-control'}),
             'shipper': forms.Select(attrs={'class': 'form-control'}),
             'carrier': forms.Select(attrs={'class': 'form-control'}),
             'consignee': forms.Select(attrs={'class': 'form-control'}),

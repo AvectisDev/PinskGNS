@@ -1,26 +1,27 @@
 import os
+import logging
 from django.core.management.base import BaseCommand
 from django.utils import timezone
-from datetime import datetime
-from filling_station.models import BalloonsUnloadingBatch, BalloonsLoadingBatch, AutoGasBatch
-from railway_service.models import RailwayBatch
-from ttn.models import FilePath
+from filling_station.models import BalloonsUnloadingBatch, BalloonsLoadingBatch
+from ttn.models import FilePath, RailwayTtn, AutoTtn
+
+
+logger = logging.getLogger('celery')
 
 
 class Command(BaseCommand):
     help = 'Generate 1C file'
     today = timezone.now().strftime('%d.%m.%y')
-    # day_for_search = timezone.now()
-    day_for_search = datetime(2025, 4, 22)     # для тестирования
+    day_for_search = timezone.now()
 
-    def handle(self, *args, **kwargs):
+    def handle(self, ttn_number=None, *args, **kwargs):
         filename = f'ГНС{self.today}.txt'
         file_path = FilePath.objects.first()
         path = file_path.path if file_path and file_path.path else None
 
-        content_1 = self.generate_railway_list()
-        content_2 = self.generate_loading_auto_gas_list()
-        content_3 = self.generate_unloading_auto_gas_list()
+        content_1 = self.generate_railway_list(ttn_number=ttn_number)
+        content_2 = self.generate_loading_auto_gas_list(ttn_number=ttn_number)
+        content_3 = self.generate_unloading_auto_gas_list(ttn_number=ttn_number)
         content_4 = self.generate_balloon_loading_list()
         content_5 = self.generate_balloon_unloading_list()
 
@@ -34,100 +35,108 @@ class Command(BaseCommand):
             # Логика для обмена по API
             pass
 
-    def generate_railway_list(self):
+    def generate_railway_list(self, ttn_number):
         lines = ['ГНС-ТТН1']
+        logger.info(f'Внутри функции generate_railway_list. Номер ТТН - {ttn_number}')
 
         try:
-            batches = RailwayBatch.objects.filter(begin_date__date=self.day_for_search)
+            ttn = RailwayTtn.objects.get(number=ttn_number)
+            tanks = ttn.railway_tank_list.all()
 
-            if not batches.exists():
+            if not tanks.exists():
+                logger.error(f"Нет цистерн для ТТН {ttn_number}")
                 return '\n'.join(lines)
 
-            for batch in batches:
-                ttns = batch.railwayttn_set.all()
+            # Формируем строку с данными ТТН
+            ttn_date = ttn.date.strftime('%d.%m.%y') if ttn.date else timezone.now().strftime('%d.%m.%y')
 
-                if not ttns.exists():
-                    continue  # Пропускаем партии без TTN
+            # Находим минимальную дату подачи среди цистерн этой ТТН
+            entry_dates = [t.entry_date for t in tanks if t.entry_date]
+            first_entry_date = min(entry_dates) if entry_dates else None
+            entry_date_str = first_entry_date.strftime('%d.%m.%y') if first_entry_date else ""
 
-                for ttn in ttns:
-                    # Получаем цистерны - сначала из TTN, если нет, то из партии
-                    railway_tanks = ttn.railway_tank_list.all() or batch.railway_tank_list.all()
+            lines.append(
+                f'{ttn.number};'
+                f'{ttn_date};'
+                f'{entry_date_str};'
+                f'{ttn.shipper.name if ttn.shipper else ""};'
+            )
 
-                    if not railway_tanks.exists():
-                        continue  # Пропускаем TTN без цистерн
+            # Добавляем данные по КАЖДОЙ цистерне этой ТТН
+            for tank in tanks:
+                lines.append(
+                    f'{tank.registration_number};'
+                    f'{tank.gas_type if tank.gas_type != "Не выбран" else ttn.gas_type};'
+                    f'{tank.netto_weight_ttn or 0:.3f};'
+                    f'{tank.gas_weight or 0:.3f};'
+                    f'{tank.departure_date.strftime("%d.%m.%y") if tank.departure_date else ""};'
+                    f'{""};'  # Пустая накладная возврата
+                )
 
-                    # Добавляем строку с данными TTN
-                    lines.append(
-                        f'{ttn.number};'
-                        f'{ttn.date.strftime("%d.%m.%y") if ttn.date else ""};'
-                        f'{batch.begin_date.strftime("%d.%m.%y")};'
-                        f'{ttn.shipper.name if ttn.shipper else ""};'
-                    )
-
-                    # Добавляем строки для каждой цистерны
-                    for tank in railway_tanks:
-                        lines.append(
-                            f'{tank.registration_number};'
-                            f'{ttn.gas_type};'
-                            f'{ttn.total_gas_amount_by_ttn or 0};'
-                            f'{tank.gas_weight or 0};'
-                            f'{tank.departure_date.strftime("%d.%m.%y") if tank.departure_date else ""};'
-                            f'{ttn.railway_ttn or ""};'
-                        )
-
+        except RailwayTtn.DoesNotExist:
+            logger.error(f'ТТН {ttn_number} не найдена!')
         except Exception as e:
-            print(f"Ошибка при генерации списка жд цистерн: {str(e)}")
+            logger.error(f'Ошибка: {str(e)}')
 
         return '\n'.join(lines)
 
-    def generate_loading_auto_gas_list(self):
-        batches = AutoGasBatch.objects.filter(batch_type='l', begin_date=self.day_for_search)
-
+    def generate_loading_auto_gas_list(self, ttn_number):
+        """Генерация данных для поставки газа автоцистерной (ГНС-ТТН2) по конкретной ТТН"""
         lines = ['ГНС-ТТН2']
-        print(lines, batches)
 
-        if batches:
-            for batch in batches:
-                try:
-                    ttn = batch.auto_batch_for_ttn.first()
-                    if not ttn:
-                        continue
+        if not ttn_number:
+            return '\n'.join(lines)
 
-                    lines.append(f'{ttn.number};'
-                                 f'{ttn.date.strftime("%d.%m.%y") if ttn.date else ""};'
-                                 f'{ttn.shipper.name if ttn.shipper else ""};'
-                                 f'{batch.weight_gas_amount or 0};'
-                                 f'{batch.gas_amount or 0};'
-                                 f'{batch.truck.registration_number if batch.truck else ""};')
-                except Exception as e:
-                    print(f"Error processing batch {batch.id}: {str(e)}")
-                    continue
+        try:
+            # Получаем конкретную ТТН по номеру
+            ttn = AutoTtn.objects.select_related('shipper', 'batch__truck').get(number=ttn_number)
+
+            if not ttn.batch or ttn.batch.batch_type != 'l':
+                return '\n'.join(lines)
+
+            batch = ttn.batch
+            lines.append(
+                f'{ttn.number};'
+                f'{ttn.date.strftime("%d.%m.%y") if ttn.date else ""};'
+                f'{ttn.shipper.name if ttn.shipper else ""};'
+                f'{batch.weight_gas_amount or 0:.3f};'
+                f'{batch.gas_amount or 0:.3f};'
+                f'{batch.truck.registration_number if batch.truck else ""};'
+            )
+        except AutoTtn.DoesNotExist:
+            logger.error(f"ТТН {ttn_number} не найдена")
+        except Exception as e:
+            logger.error(f"Ошибка обработки ТТН {ttn_number}: {str(e)}")
 
         return '\n'.join(lines)
 
-    def generate_unloading_auto_gas_list(self):
-        batches = AutoGasBatch.objects.filter(batch_type='u', begin_date=self.day_for_search)
-
+    def generate_unloading_auto_gas_list(self, ttn_number):
+        """Генерация данных для отгрузки газа автоцистерной (ГНС-ТТН3) по конкретной ТТН"""
         lines = ['ГНС-ТТН3']
-        print(lines, batches)
 
-        if batches:
-            for batch in batches:
-                try:
-                    ttn = batch.auto_batch_for_ttn.first()
-                    print(lines, batches, ttn)
-                    if not ttn:
-                        continue
+        if not ttn_number:
+            return '\n'.join(lines)
 
-                    lines.append(f'{ttn.number};'
-                                 f'{ttn.date.strftime("%d.%m.%y") if ttn.date else ""};'
-                                 f'{ttn.shipper.name if ttn.shipper else ""};'
-                                 f'{batch.weight_gas_amount or 0};'
-                                 f'{batch.gas_amount or 0};'
-                                 f'{batch.truck.registration_number if batch.truck else ""};')
-                except Exception as e:
-                    print(f"Error processing batch {batch.id}: {str(e)}")
-                    continue
+        try:
+            # Получаем конкретную ТТН по номеру
+            ttn = AutoTtn.objects.select_related('consignee', 'batch__truck').get(number=ttn_number)
+
+            if not ttn.batch or ttn.batch.batch_type != 'u':
+                return '\n'.join(lines)
+
+            batch = ttn.batch
+            lines.append(
+                f'{ttn.number};'
+                f'{ttn.date.strftime("%d.%m.%y") if ttn.date else ""};'
+                f'{ttn.consignee.name if ttn.consignee else ""};'
+                f'{batch.weight_gas_amount or 0:.3f};'
+                f'{batch.gas_amount or 0:.3f};'
+                f'{batch.truck.registration_number if batch.truck else ""};'
+            )
+        except AutoTtn.DoesNotExist:
+            logger.error(f"ТТН {ttn_number} не найдена")
+        except Exception as e:
+            logger.error(f"Ошибка обработки ТТН {ttn_number}: {str(e)}")
 
         return '\n'.join(lines)
 
@@ -169,7 +178,7 @@ class Command(BaseCommand):
                                  f'0;'
                                  f'0;')
                 except Exception as e:
-                    print(f"Error processing loading batch {batch.id}: {str(e)}")
+                    logger.error(f"Error processing loading batch {batch.id}: {str(e)}")
                     continue
 
         return '\n'.join(lines)
@@ -220,7 +229,7 @@ class Command(BaseCommand):
                                  f'0;'
                                  f'0;')
                 except Exception as e:
-                    print(f"Error processing unloading batch {batch.id}: {str(e)}")
+                    logger.error(f"Error processing unloading batch {batch.id}: {str(e)}")
                     continue
 
         return '\n'.join(lines)
