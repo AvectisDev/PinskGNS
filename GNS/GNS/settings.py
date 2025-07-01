@@ -280,6 +280,14 @@ DJANGO_API_HOST = 'http://localhost:8000/api'
 # OPC_SERVER_URL = "opc.tcp://host.docker.internal:4841"
 OPC_SERVER_URL = "opc.tcp://localhost:4841"
 
+# Настройки почты
+EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+EMAIL_HOST = '10.11.7.1'
+EMAIL_PORT = 25
+EMAIL_HOST_USER = os.environ.get('GNS_EMAIL_USER')
+EMAIL_HOST_PASSWORD = os.environ.get('GNS_EMAIL_PASSWORD')
+DEFAULT_FROM_EMAIL = os.environ.get('GNS_DEFAULT_FROM_EMAIL')
+
 # ITGas
 MIRIADA_API_POST_URL = os.environ.get('MIRIADA_API_POST_URL')
 MIRIADA_AUTH_LOGIN = os.environ.get('MIRIADA_AUTH_LOGIN')

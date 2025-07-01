@@ -242,10 +242,10 @@ def serial_exchange():
 
         while True:
             # Читаем 8 байт данных из COM-порта
-            data = ser.read(9)
+            data = ser.read(8)
             logger.info(f"Получен запрос от поста - {data}")
 
-            if len(data) >= 8:
+            if len(data) == 8:
                 # Расшифровываем каждый байт по отдельности
                 request_type = data[0]
                 post_number = data[1]
@@ -266,6 +266,8 @@ def serial_exchange():
                         post_number,
                         weight_combined
                     )
+                    logger.info(f"Settings:response_required {response_required}. "
+                             f"full_weight: {full_weight}. process_data_to_server: {process_data_to_server}")
 
                     if response_required:
                         # Формируем ответ

@@ -1,7 +1,9 @@
 import os
 import logging
+from django.core.mail import EmailMessage
 from django.core.management.base import BaseCommand
 from django.utils import timezone
+from django.conf import settings
 from filling_station.models import BalloonsUnloadingBatch, BalloonsLoadingBatch
 from ttn.models import FilePath, RailwayTtn, AutoTtn
 
@@ -31,9 +33,41 @@ class Command(BaseCommand):
             full_path = os.path.join(path, filename)
             with open(full_path, 'w', encoding='windows-1251') as file:
                 file.write(content)
+            
+            # Отправка почты
+            self.send_email_with_attachment(
+                file_path=full_path,
+                ttn_number=ttn_number
+        )
         else:
             # Логика для обмена по API
             pass
+
+    def send_email_with_attachment(self, file_path, ttn_number):
+        """Отправка файла по почте"""
+        try:
+            subject = f'ТТН {ttn_number} от {timezone.now().strftime("%d.%m.%Y")}'
+            body = f'Во вложении файл по ТТН {ttn_number}'
+            to_email = 'pinsk@brest.gas.by'
+            
+            email = EmailMessage(
+                subject=subject,
+                body=body,
+                from_email=settings.DEFAULT_FROM_EMAIL,
+                to=[to_email],
+            )
+            
+            # Прикрепляем файл
+            with open(file_path, 'rb') as file:
+                email.attach(
+                    filename=os.path.basename(file_path),
+                    content=file.read(),
+                    mimetype='text/plain'
+                )
+            email.send()
+            logger.info(f"Письмо с ТТН {ttn_number} успешно отправлено")
+        except Exception as e:
+            logger.error(f"Ошибка отправки письма: {str(e)}")
 
     def generate_railway_list(self, ttn_number):
         lines = ['ГНС-ТТН1']
