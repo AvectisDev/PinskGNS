@@ -122,14 +122,13 @@ class BalloonViewSet(viewsets.ViewSet):
 
         if send_data is not None:
             fulness = send_data.get('fulness')  # 1-полный, 0 — пустой
-            if fulness:
+            if fulness is not None:  # Проверяем именно на None, а не на truthy
                 payload.update({"fulness": fulness})
 
-            number_auto = send_data.get('number_auto')  # "AM 7881-2" номер машины.(Номер должен быть добавлен в  ПК «Автопарк»
-            type_car = send_data.get('type_car')    # 0-кассета, 1 — трал
-            if number_auto and type_car:
+            number_auto = send_data.get('number_auto')  # "AM 7881-2" номер машины.(Номер должен быть в ПК «Автопарк»
+            type_car = send_data.get('type_car')  # 0-кассета, 1 — трал
+            if number_auto is not None and type_car is not None:
                 payload.update({
-                    "fulness": fulness,
                     "number_auto": number_auto,
                     "type_car": type_car
                 })
