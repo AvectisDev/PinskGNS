@@ -110,7 +110,7 @@ DATABASES = {
         'PASSWORD': os.environ.get('DB_PASSWORD'),
         'HOST': os.environ.get('DB_HOST'),
         'PORT': os.environ.get('DB_PORT'),
-        'CONN_MAX_AGE': 600,  # Соединение будет жить 10 минут
+        'CONN_MAX_AGE': 600,
     }
 }
 
@@ -288,7 +288,11 @@ EMAIL_HOST_USER = os.environ.get('GNS_EMAIL_USER')
 EMAIL_HOST_PASSWORD = os.environ.get('GNS_EMAIL_PASSWORD')
 DEFAULT_FROM_EMAIL = os.environ.get('GNS_DEFAULT_FROM_EMAIL')
 
+# Intellect
+INTELLECT_SERVER_ADDRESS = 'http://10.10.0.252:10001'
+
 # ITGas
+MIRIADA_API_URL = os.environ.get('MIRIADA_API_URL')
 MIRIADA_API_POST_URL = os.environ.get('MIRIADA_API_POST_URL')
 MIRIADA_AUTH_LOGIN = os.environ.get('MIRIADA_AUTH_LOGIN')
 MIRIADA_AUTH_PASSWORD = os.environ.get('MIRIADA_AUTH_PASSWORD')

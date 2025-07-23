@@ -2,6 +2,7 @@ from typing import Optional
 import requests
 import logging
 from datetime import datetime, timedelta
+from django.conf import settings
 
 
 logger = logging.getLogger('celery')
@@ -36,7 +37,7 @@ def get_intellect_data(data) -> list:
     return: JSON-ответ в виде списка при успешном запросе; пустой список при ошибке.
     """
     try:
-        intellect_url = "http://10.10.0.252:10001/lprserver/GetProtocolNumbers"  # intellect server address
+        intellect_url = f'{settings.INTELLECT_SERVER_ADDRESS}/lprserver/GetProtocolNumbers'
         response = requests.post(intellect_url, json=data, timeout=2)
         response.raise_for_status()
 
@@ -98,13 +99,13 @@ def get_plate_image(plate_id):
     """
     Функция для получения изображения по plate_numbers.id.
     """
-    image_url = f"http://10.10.0.252:10001/lprserver/GetImage/Plate_numbers/{plate_id}"
+    image_url = f'{settings.INTELLECT_SERVER_ADDRESS}/lprserver/GetImage/Frames/{plate_id}'
     try:
         response = requests.get(image_url, timeout=2)
         response.raise_for_status()
 
         if response.headers['Content-Type'] == 'image/jpeg':
-            return response.content  # Возвращаем бинарные данные изображения
+            return response.content
         return None
 
     except Exception as error:
@@ -116,7 +117,7 @@ def check_on_station(transport: dict) -> Optional[bool]:
     """
     Функция обрабатывает направление движения транспорта, определённое "Интеллектом", и возвращает статус
     return:
-        True - транспорт въёхал на территорию ГНС
+        True - транспорт въехал на территорию ГНС
         False - транспорт выехал с территории ГНС
     """
     camera = transport.get('camera')

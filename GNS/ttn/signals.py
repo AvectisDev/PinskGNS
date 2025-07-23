@@ -7,6 +7,7 @@ from django.db.models.signals import m2m_changed
 
 @receiver(m2m_changed, sender=RailwayTtn.railway_tank_list.through)
 def trigger_1c_file_on_tanks_added(sender, instance, action, **kwargs):
+    """Для ж/д цистерн"""
     if action == "post_add":
         generate_1c_file.delay(instance.number)
 
