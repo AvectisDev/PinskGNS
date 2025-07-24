@@ -163,12 +163,12 @@ class AutoGasBatchView(viewsets.ViewSet):
                 'gas_type': active_batch.gas_type,
                 'car_brand': active_batch.truck.car_brand,
                 'truck_number': active_batch.truck.registration_number,
-                'trailer_number': active_batch.trailer.registration_number,
+                'trailer_number': active_batch.trailer.registration_number if active_batch.trailer else None,
                 'truck_gas_capacity': active_batch.truck.max_gas_volume if active_batch.truck.max_gas_volume else 0,
                 'scale_empty_weight': active_batch.scale_empty_weight if active_batch.scale_empty_weight else 0,
                 'scale_full_weight': active_batch.scale_full_weight if active_batch.scale_full_weight else 0,
-                'ttn_number': active_batch.ttn.number,
-                'ttn_consignee': active_batch.ttn.consignee,
+                'ttn_number': active_batch.ttn.number if active_batch.ttn else None,
+                'ttn_consignee': active_batch.ttn.consignee if active_batch.ttn else None
             }
         return JsonResponse(response, safe=False)
 

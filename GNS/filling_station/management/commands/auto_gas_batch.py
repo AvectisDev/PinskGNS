@@ -69,6 +69,7 @@ class Command(BaseCommand):
     def set_opc_value(self, node_key, value):
         """Установить значение на OPC UA сервере."""
         node_path = self.OPC_NODE_PATHS.get(node_key)
+        logger.debug(f"In set_opc_value. OPC node key: {node_key}, node_path = {node_path}")
         if not node_path:
             logger.error(f"Invalid OPC node key: {node_key}")
             return False
@@ -118,8 +119,10 @@ class Command(BaseCommand):
         if not registration_numbers:
             logger.warning('Автовесовая. Список номеров отсутствует')
             return
+        logger.debug(f'Автовесовая. Список номеров: {registration_numbers}')
 
         truck, trailer = self.find_transports(registration_numbers)
+        logger.debug(f'Автовесовая. Грузовик: {truck}, Прицеп: {trailer}')
         if not truck:
             logger.error('Автовесовая. Не найден подходящий грузовик')
             return
