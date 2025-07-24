@@ -201,9 +201,8 @@ class BalloonViewSet(viewsets.ViewSet):
         reader_number = request.data.get('reader_number')
         if reader_number is None:
             self.logger.error("Номер ридера отсутствует в теле запроса")
-        else:
+        elif (2 <= reader_number <= 6) or reader_number == 8:
             self.send_status_to_miriada(reader=reader_number, nfc_tag=nfc_tag)
-
 
         # Если требуется обновление паспорта или идёт приёмка новых баллонов - выполняем запрос в Мириаду
         if balloon.update_passport_required in (True, None) or reader_number in [1, 6]:
