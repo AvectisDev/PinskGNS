@@ -132,9 +132,10 @@ class BalloonViewSet(viewsets.ViewSet):
             fullness = 1
         elif reader in [2, 3, 4]:
             send_type='loading_into_truck'
-            fullness = True
+            fullness = 1
             batch = BalloonsUnloadingBatch.objects.last()
             number_auto = batch.truck.registration_number
+            formatted_number_auto = f"{number_auto[:2]} {number_auto[2:6]}-{number_auto[6]}"
             type_car = 0 if batch.truck.type.type == 'Клетевоз' else 1
 
 
@@ -143,7 +144,7 @@ class BalloonViewSet(viewsets.ViewSet):
 
         if number_auto is not None and type_car is not None:
             payload.update({
-                "number_auto": number_auto,
+                "number_auto": formatted_number_auto,
                 "type_car": type_car
             })
 
@@ -166,14 +167,13 @@ class BalloonViewSet(viewsets.ViewSet):
             )
 
             response = session.send(prepared, timeout=2)
-            response.raise_for_status()
             if response.status_code == 200:
                 self.logger.info(f"Статус по {send_type} успешно отправлен")
             else:
-                self.logger.error(f"Ошибка по {send_type}! Код: {response.status_code}, Описание: {response.reason}")
+                self.logger.error(f"Ошибка по {send_type}! Status: {response.status_code} {response.reason}, Ответ: {response.json()}")
 
         except Exception as error:
-            self.logger.error(f'Ошибка в методе отправки статуса баллона в Мириаду: {error}')
+            self.logger.error(f'Ошибка по {send_type} в методе отправки статуса баллона в Мириаду: ошибка: {error}, URL: {prepared.url}')
 
     @action(detail=False, methods=['post'], url_path='update-by-reader')
     def update_by_reader(self, request):
