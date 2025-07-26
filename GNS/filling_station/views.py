@@ -77,7 +77,6 @@ def reader_info(request, reader=1):
         action = request.POST.get('action')
 
         if action == 'export':
-            # Экспортируем данные в Excel
             dataset = BalloonResources().export(
                 Reader.objects.filter(
                     number=reader,
@@ -108,8 +107,28 @@ def reader_info(request, reader=1):
 
     balloons_list = Reader.objects.order_by('-change_date', '-change_time').filter(number=reader)
 
-    current_quantity_rfid = current_quantity['total_rfid'] or 0
-    current_quantity_balloons = current_quantity['total_balloons'] or 0
+    # Вычисляем количество баллонов в партиях по ТТН
+    # Приёмка
+    if reader == 6:
+        loading_ttn_quantity = BalloonsLoadingBatch.objects.filter(
+            reader_number=reader,
+            begin_date__range=(start_date, end_date)
+        ).aggregate(
+            total_ttn=Sum('amount_of_ttn')
+        )['total_ttn'] or 0
+    else:
+        loading_ttn_quantity = 0
+
+    # Отгрузка
+    if reader in [3,4]:
+        unloading_ttn_quantity = BalloonsUnloadingBatch.objects.filter(
+            reader_number=reader,
+            begin_date__range=(start_date, end_date)
+        ).aggregate(
+            total_ttn=Sum('amount_of_ttn')
+        )['total_ttn'] or 0
+    else:
+        unloading_ttn_quantity = 0
 
     paginator = Paginator(balloons_list, 10)
     page_num = request.GET.get('page', 1)
@@ -117,8 +136,10 @@ def reader_info(request, reader=1):
 
     context = {
         "page_obj": page_obj,
-        'current_quantity_by_reader': current_quantity_rfid,
-        'current_quantity_by_sensor': current_quantity_balloons,
+        'current_quantity_by_reader': current_quantity['total_rfid'] or 0,
+        'current_quantity_by_sensor': current_quantity['total_balloons'] or 0,
+        'loading_ttn_quantity': loading_ttn_quantity,
+        'unloading_ttn_quantity': unloading_ttn_quantity,
         'form': form,
         'reader': reader,
         'start_date': start_date,
@@ -291,31 +312,18 @@ def statistic(request):
         for i in range(1, 9)
     }
 
-    # Получаем количество партий для каждой модели за период
-    batches_data = {
-        'balloons_loading_batches': BalloonsLoadingBatch.objects.filter(
-            begin_date__range=[start_date, end_date]
-        ).count(),
-        'balloons_unloading_batches': BalloonsUnloadingBatch.objects.filter(
-            begin_date__range=[start_date, end_date]
-        ).count(),
-        'auto_gas_loading_batches': AutoGasBatch.objects.filter(
-            batch_type='l',
-            begin_date__range=[start_date, end_date]
-        ).count(),
-        'auto_gas_unloading_batches': AutoGasBatch.objects.filter(
-            batch_type='u',
-            begin_date__range=[start_date, end_date]
-        ).count(),
-        'railway_batches': RailwayBatch.objects.filter(
-            begin_date__range=[start_date, end_date]
-        ).count(),
-    }
+    # Получаем статистику по партиям за период
+    balloon_loading_stats = BalloonsLoadingBatch.get_period_stats(start_date, end_date)
+    balloon_unloading_stats = BalloonsUnloadingBatch.get_period_stats(start_date, end_date)
+    auto_gas_stats = AutoGasBatch.get_period_stats(start_date, end_date)
+    railway_stats = RailwayBatch.get_period_stats(start_date, end_date)
 
-    # Объединяем данные в контекст
     context = {
         **readers_data,
-        **batches_data,
+        'balloon_loading_stats': balloon_loading_stats,
+        'balloon_unloading_stats': balloon_unloading_stats,
+        'auto_gas_stats': auto_gas_stats,
+        'railway_stats': railway_stats,
         'form': form,
         'start_date': start_date,
         'end_date': end_date,

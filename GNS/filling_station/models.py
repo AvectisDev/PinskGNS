@@ -2,7 +2,7 @@ from django.db import models
 from django.core.exceptions import ValidationError
 from django.contrib.auth.models import User
 from django.urls import reverse
-from django.db.models import Q, Sum
+from django.db.models import Q, Sum, Count
 from django.conf import settings
 import pghistory
 
@@ -280,6 +280,18 @@ class BalloonsLoadingBatch(models.Model):
         total_amount = sum(amounts)
         return total_amount
 
+    @classmethod
+    def get_period_stats(cls, start_date=None, end_date=None):
+        queryset = cls.objects.filter(begin_date__range=[start_date, end_date])
+
+        return queryset.annotate(
+            batch_balloon_count=Count('balloon_list'),
+        ).aggregate(
+            total_batches=Count('id'),
+            total_balloon_count_by_rfid=Sum('batch_balloon_count'),
+            total_balloon_count_by_ttn=Sum('amount_of_ttn'),
+        )
+
 
 class BalloonsUnloadingBatch(models.Model):
     begin_date = models.DateField(null=True, blank=True, auto_now_add=True, verbose_name="Дата начала отгрузки")
@@ -344,6 +356,18 @@ class BalloonsUnloadingBatch(models.Model):
         total_amount = sum(amounts)
         return total_amount
 
+    @classmethod
+    def get_period_stats(cls, start_date=None, end_date=None):
+        queryset = cls.objects.filter(begin_date__range=[start_date, end_date])
+
+        return queryset.annotate(
+            batch_balloon_count=Count('balloon_list'),
+        ).aggregate(
+            total_batches=Count('id'),
+            total_balloon_count_by_rfid=Sum('batch_balloon_count'),
+            total_balloon_count_by_ttn=Sum('amount_of_ttn'),
+        )
+
 
 class AutoGasBatch(models.Model):
     batch_type = models.CharField(max_length=10, choices=BATCH_TYPE_CHOICES, default='u', verbose_name="Тип партии")
@@ -393,6 +417,19 @@ class AutoGasBatch(models.Model):
 
     def get_delete_url(self):
         return reverse('filling_station:auto_gas_batch_delete', args=[self.pk])
+
+    @classmethod
+    def get_period_stats(cls, start_date=None, end_date=None):
+        queryset = cls.objects.filter(begin_date__range=[start_date, end_date])
+
+        return queryset.aggregate(
+            loading_batches=Count('id', filter=Q(batch_type='l')),
+            unloading_batches=Count('id', filter=Q(batch_type='u')),
+            total_gas_loading_by_weight=Sum('weight_gas_amount', filter=Q(batch_type='l')),
+            total_gas_loading_by_flowmeter=Sum('gas_amount', filter=Q(batch_type='l')),
+            total_gas_unloading_by_weight=Sum('weight_gas_amount', filter=Q(batch_type='u')),
+            total_gas_unloading_by_flowmeter = Sum('gas_amount', filter=Q(batch_type='u')),
+        )
 
 
 WEIGHT_SOURCE_CHOICES = [

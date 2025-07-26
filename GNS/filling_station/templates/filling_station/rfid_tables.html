@@ -73,8 +73,17 @@
         <div class="card-body">
             <div class="row">
                 <div class="col-md-5">
-                    <p>Статистика за период: <strong>{{ start_date|date:"j E Y" }}</strong> - <strong>{{ end_date|date:"j E Y" }}</strong></p>
+                    <p>Статистика за период: <strong>{{ start_date|date:"j E Y" }}</strong> - <strong>{{end_date|date:"j E Y" }}</strong></p>
                     <p>RFID-считыватель: <strong>{{ current_quantity_by_reader }}</strong></p>
+                    {% if reader >= 3 and reader <= 6 %}
+                    <p>Оптический датчик: <strong>{{ current_quantity_by_sensor }}</strong></p>
+                    {% endif %}
+                    {% if reader == 6 %}
+                    <p>ТТН: <strong>{{ loading_ttn_quantity }}</strong></p>
+                    {% endif %}
+                    {% if reader == 3 or reader == 4 %}
+                    <p>ТТН: <strong>{{ unloading_ttn_quantity }}</strong></p>
+                    {% endif %}
                 </div>
                 <div class="col-md-7">
                     <form method="post" enctype="multipart/form-data" class="row g-3 ">

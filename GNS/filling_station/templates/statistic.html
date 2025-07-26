@@ -1,101 +1,230 @@
 {% extends 'base.html' %}
-{% block title %} Статистика по ГНС {% endblock %}
+{% load custom_filters %}
+
+{% block title %}Статистика по ГНС{% endblock %}
 
 {% block content %}
-<div>
-    <div class="container-fluid">
-        <header class="d-flex flex-wrap align-items-center justify-content-center justify-content-md-between py-3 mb-4 border-bottom">
-            <div class="col-md-3 mb-2 mb-md-0">
-                <h5 style="white-space: nowrap;">
-                    Статистика по ГНС за период с <strong>{{ start_date|date:"j E Y" }}</strong> по <strong>{{ end_date|date:"j E Y" }}</strong>
-                </h5>
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h4 class="mb-0">Статистика по ГНС</h4>
+        <form method="post" class="d-flex align-items-center">
+            {% csrf_token %}
+            <div class="me-2">
+                {{ form.start_date }}
             </div>
-
-            <div class="col-md-3 mb-2 mb-md-0">
-                <form method="post" enctype="multipart/form-data" class="d-flex align-items-center">
-                    {% csrf_token %}
-                    <div class="me-2">
-                        {{ form.start_date }}
-                    </div>
-                    <div class="me-2">
-                        {{ form.end_date }}
-                    </div>
-                    <button class="btn" style="background-color: #3CBBD9; color: white;" type="submit">
-                        Показать
-                    </button>
-                </form>
+            <div class="me-2">
+                {{ form.end_date }}
             </div>
-        </header>
+            <button class="btn btn-custom" type="submit">
+                <i class="bi bi-calendar-range"></i> Показать
+            </button>
+        </form>
     </div>
 
-    <div class="container">
-        <div class="row justify-content-center">
-            <div class="col-md-8">
-                <div class="d-flex flex-column">
-                    <div class="d-flex justify-content-between align-items-center mb-2">
-                        <p class="text-end" style="flex: 0 0 100px;">{{ balloons_quantity_by_reader_1 }}</p>
-                        <p class="text-start ms-3" style="flex: 1;">Количество баллонов RFID-считыватель №1 (Регистрация
-                            пустого баллона на складе (из кассеты))</p>
+    <div class="alert alert-info mb-4">
+        <i class="bi bi-info-circle"></i>
+        Период: <strong>{{ start_date|date:"d.m.Y" }}</strong> - <strong>{{ end_date|date:"d.m.Y" }}</strong>
+    </div>
+
+    <div class="row">
+        <!-- Статистика RFID -->
+        <div class="col-lg-6 mb-4">
+            <div class="card shadow-sm h-100">
+                <div class="card-header card-header-custom">
+                    <h5 class="mb-0"><i class="bi bi-rss"></i> RFID-считыватели</h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Считыватель</th>
+                                    <th>Описание</th>
+                                    <th class="text-center">Количество</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td class="fw-bold">№1</td>
+                                    <td>Регистрация пустого баллона на складе (из кассеты)</td>
+                                    <td class="text-center">{{ balloons_quantity_by_reader_1 }}</td>
+                                </tr>
+                                <tr>
+                                    <td class="fw-bold">№2</td>
+                                    <td>Погрузка полного баллона в кассету</td>
+                                    <td class="text-center">{{ balloons_quantity_by_reader_2 }}</td>
+                                </tr>
+                                <tr>
+                                    <td class="fw-bold">№3</td>
+                                    <td>Погрузка полного баллона на трал 1</td>
+                                    <td class="text-center">{{ balloons_quantity_by_reader_3 }}</td>
+                                </tr>
+                                <tr>
+                                    <td class="fw-bold">№4</td>
+                                    <td>Погрузка полного баллона на трал 2</td>
+                                    <td class="text-center">{{ balloons_quantity_by_reader_4 }}</td>
+                                </tr>
+                                <tr>
+                                    <td class="fw-bold">№5</td>
+                                    <td>Регистрация полного баллона на складе</td>
+                                    <td class="text-center">{{ balloons_quantity_by_reader_5 }}</td>
+                                </tr>
+                                <tr>
+                                    <td class="fw-bold">№6</td>
+                                    <td>Регистрация пустого баллона на складе (рампа)</td>
+                                    <td class="text-center">{{ balloons_quantity_by_reader_6 }}</td>
+                                </tr>
+                                <tr>
+                                    <td class="fw-bold">№7</td>
+                                    <td>Регистрация пустого баллона на складе (цех)</td>
+                                    <td class="text-center">{{ balloons_quantity_by_reader_7 }}</td>
+                                </tr>
+                                <tr>
+                                    <td class="fw-bold">№8</td>
+                                    <td>Наполнение баллона сжиженным газом</td>
+                                    <td class="text-center">{{ balloons_quantity_by_reader_8 }}</td>
+                                </tr>
+                            </tbody>
+                        </table>
                     </div>
-                    <div class="d-flex justify-content-between align-items-center mb-2">
-                        <p class="text-end" style="flex: 0 0 100px;">{{ balloons_quantity_by_reader_2 }}</p>
-                        <p class="text-start ms-3" style="flex: 1;">Количество баллонов RFID-считыватель №2 (Погрузка
-                            полного баллона в кассету)</p>
-                    </div>
-                    <div class="d-flex justify-content-between align-items-center mb-2">
-                        <p class="text-end" style="flex: 0 0 100px;">{{ balloons_quantity_by_reader_3 }}</p>
-                        <p class="text-start ms-3" style="flex: 1;">Количество баллонов RFID-считыватель №3 (Погрузка
-                            полного баллона на трал 1)</p>
-                    </div>
-                    <div class="d-flex justify-content-between align-items-center mb-2">
-                        <p class="text-end" style="flex: 0 0 100px;">{{ balloons_quantity_by_reader_4 }}</p>
-                        <p class="text-start ms-3" style="flex: 1;">Количество баллонов RFID-считыватель №4 (Погрузка
-                            полного баллона на трал 2)</p>
-                    </div>
-                    <div class="d-flex justify-content-between align-items-center mb-2">
-                        <p class="text-end" style="flex: 0 0 100px;">{{ balloons_quantity_by_reader_5 }}</p>
-                        <p class="text-start ms-3" style="flex: 1;">Количество баллонов RFID-считыватель №5 (Регистрация
-                            полного баллона на складе)</p>
-                    </div>
-                    <div class="d-flex justify-content-between align-items-center mb-2">
-                        <p class="text-end" style="flex: 0 0 100px;">{{ balloons_quantity_by_reader_6 }}</p>
-                        <p class="text-start ms-3" style="flex: 1;">Количество баллонов RFID-считыватель №6 (Регистрация
-                            пустого баллона на складе (рампа))</p>
-                    </div>
-                    <div class="d-flex justify-content-between align-items-center mb-2">
-                        <p class="text-end" style="flex: 0 0 100px;">{{ balloons_quantity_by_reader_7 }}</p>
-                        <p class="text-start ms-3" style="flex: 1;">Количество баллонов RFID-считыватель №7 (Регистрация
-                            пустого баллона на складе (цех))</p>
-                    </div>
-                    <div class="d-flex justify-content-between align-items-center mb-2">
-                        <p class="text-end" style="flex: 0 0 100px;">{{ balloons_quantity_by_reader_8 }}</p>
-                        <p class="text-start ms-3" style="flex: 1;">Количество баллонов RFID-считыватель №8 (Наполнение
-                            баллона сжиженным газом)</p>
-                    </div>
-                    <div class="d-flex justify-content-between align-items-center mb-2">
-                        <p class="text-end" style="flex: 0 0 100px;">{{ balloons_loading_batches }}</p>
-                        <p class="text-start ms-3" style="flex: 1;">Количество принятых партий баллонов</p>
-                    </div>
-                    <div class="d-flex justify-content-between align-items-center mb-2">
-                        <p class="text-end" style="flex: 0 0 100px;">{{ balloons_unloading_batches }}</p>
-                        <p class="text-start ms-3" style="flex: 1;">Количество отгруженных партий баллонов</p>
-                    </div>
-                    <div class="d-flex justify-content-between align-items-center mb-2">
-                        <p class="text-end" style="flex: 0 0 100px;">{{ auto_gas_loading_batches }}</p>
-                        <p class="text-start ms-3" style="flex: 1;">Количество принятых партий газа в автоцистернах</p>
-                    </div>
-                    <div class="d-flex justify-content-between align-items-center mb-2">
-                        <p class="text-end" style="flex: 0 0 100px;">{{ auto_gas_unloading_batches }}</p>
-                        <p class="text-start ms-3" style="flex: 1;">Количество отгруженных партий газа в
-                            автоцистернах</p>
-                    </div>
-                    <div class="d-flex justify-content-between align-items-center mb-2">
-                        <p class="text-end" style="flex: 0 0 100px;">{{ railway_batches }}</p>
-                        <p class="text-start ms-3" style="flex: 1;">Количество принятых партий газа в ж/д цистернах</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Статистика партий -->
+        <div class="col-lg-6 mb-4">
+            <div class="card shadow-sm h-100">
+                <div class="card-header card-header-custom">
+                    <h5 class="mb-0"><i class="bi bi-clipboard-data"></i> Статистика партий</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row g-3">
+                        <!-- Баллоны -->
+                        <div class="col-md-6">
+                            <div class="card border-primary h-100">
+                                <div class="card-body">
+                                    <h5 class="card-title text-primary">
+                                        <i class="bi bi-cylinder"></i> Баллоны
+                                    </h5>
+                                    <div class="mb-3">
+                                        <h6 class="text-center">Приемка</h6>
+                                        <div class="d-flex justify-content-between">
+                                            <span>Партии:</span>
+                                            <strong>{{ balloon_loading_stats.total_batches }}</strong>
+                                        </div>
+                                        <div class="d-flex justify-content-between">
+                                            <span>Баллонов с RFID:</span>
+                                            <strong>{{ balloon_loading_stats.total_balloon_count_by_rfid|default:"-" }}</strong>
+                                        </div>
+                                        <div class="d-flex justify-content-between">
+                                            <span>Баллонов по ТТН:</span>
+                                            <strong>{{ balloon_loading_stats.total_balloon_count_by_ttn|default:"-" }}</strong>
+                                        </div>
+                                    </div>
+                                    <hr>
+                                    <div>
+                                        <h6 class="text-center">Отгрузка</h6>
+                                        <div class="d-flex justify-content-between">
+                                            <span>Партии:</span>
+                                            <strong>{{ balloon_unloading_stats.total_batches }}</strong>
+                                        </div>
+                                        <div class="d-flex justify-content-between">
+                                            <span>Баллонов с RFID:</span>
+                                            <strong>{{ balloon_unloading_stats.total_balloon_count_by_rfid|default:"-" }}</strong>
+                                        </div>
+                                        <div class="d-flex justify-content-between">
+                                            <span>Баллонов по ТТН:</span>
+                                            <strong>{{ balloon_unloading_stats.total_balloon_count_by_ttn|default:"-" }}</strong>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Автоцистерны -->
+                        <div class="col-md-6">
+                            <div class="card border-warning h-100">
+                                <div class="card-body">
+                                    <h5 class="card-title text-warning">
+                                        <i class="bi bi-truck"></i> Автоцистерны
+                                    </h5>
+                                    <div class="mb-3">
+                                        <h6 class="text-center">Приемка</h6>
+                                        <div class="d-flex justify-content-between">
+                                            <span>Партии:</span>
+                                            <strong>{{ auto_gas_stats.loading_batches }}</strong>
+                                        </div>
+                                        <div class="d-flex justify-content-between">
+                                            <span>По весам:</span>
+                                            <strong>{{ auto_gas_stats.total_gas_loading_by_weight|default:"-"|floatformat:2 }} кг</strong>
+                                        </div>
+                                        <div class="d-flex justify-content-between">
+                                            <span>По расходомеру:</span>
+                                            <strong>{{ auto_gas_stats.total_gas_loading_by_flowmeter|default:"-"|floatformat:2 }} кг</strong>
+                                        </div>
+                                    </div>
+                                    <hr>
+                                    <div>
+                                        <h6 class="text-center">Отгрузка</h6>
+                                        <div class="d-flex justify-content-between">
+                                            <span>Партии:</span>
+                                            <strong>{{ auto_gas_stats.unloading_batches }}</strong>
+                                        </div>
+                                        <div class="d-flex justify-content-between">
+                                            <span>По весам:</span>
+                                            <strong>{{ auto_gas_stats.total_gas_unloading_by_weight|default:"-"|floatformat:2 }} кг</strong>
+                                        </div>
+                                        <div class="d-flex justify-content-between">
+                                            <span>По расходомеру:</span>
+                                            <strong>{{ auto_gas_stats.total_gas_unloading_by_flowmeter|default:"-"|floatformat:2 }} кг</strong>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Ж/Д цистерны -->
+                        <div class="col-12">
+                            <div class="card border-secondary h-100">
+                                <div class="card-body">
+                                    <h5 class="card-title text-secondary">
+                                        <i class="bi bi-train-freight-front"></i> Железнодорожные цистерны
+                                    </h5>
+                                    <div class="row">
+                                        <div class="col-md-4">
+                                            <div class="d-flex justify-content-between">
+                                                <span>Партии:</span>
+                                                <strong>{{ railway_stats.total_batches }}</strong>
+                                            </div>
+                                            <div class="d-flex justify-content-between">
+                                                <span>Цистерны:</span>
+                                                <strong>{{ railway_stats.total_tanks|default:"-" }}</strong>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <div class="d-flex justify-content-between">
+                                                <span>Газ СПБТ:</span>
+                                                <strong>{{ railway_stats.total_gas_spbt|default:"-"|floatformat:2 }} т</strong>
+                                            </div>
+                                            <div class="d-flex justify-content-between">
+                                                <span>Газ ПБА:</span>
+                                                <strong>{{ railway_stats.total_gas_pba|default:"-"|floatformat:2 }} т</strong>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <div class="d-flex justify-content-between">
+                                                <span>Всего газа:</span>
+                                                <strong>{{ railway_stats.total_gas_in_all_tanks|default:"-"|floatformat:2 }} т</strong>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
         </div>
     </div>
 </div>
-{% endblock content %}
+{% endblock %}

@@ -2,6 +2,7 @@ from django.db import models
 from django.contrib.auth.models import User
 from django.urls import reverse
 from django.conf import settings
+from django.db.models import Count, Sum
 
 
 class RailwayTank(models.Model):
@@ -79,3 +80,18 @@ class RailwayBatch(models.Model):
 
     def get_delete_url(self):
         return reverse('railway_service:railway_batch_delete', args=[self.pk])
+
+    @classmethod
+    def get_period_stats(cls, start_date, end_date):
+        return cls.objects.filter(
+            begin_date__range=[start_date, end_date]
+        ).annotate(
+            tanks_count=Count('railway_tank_list'),
+            total_gas_in_tanks=Sum('railway_tank_list__gas_weight')
+        ).aggregate(
+            total_batches=Count('id'),
+            total_tanks=Sum('tanks_count'),
+            total_gas_spbt=Sum('gas_amount_spbt'),
+            total_gas_pba=Sum('gas_amount_pba'),
+            total_gas_in_all_tanks=Sum('total_gas_in_tanks')
+        )
