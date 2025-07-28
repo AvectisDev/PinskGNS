@@ -56,7 +56,7 @@ class Command(BaseCommand):
         Функция отправляет запрос в Интеллект. В ответ приходит JSON ответ со списком словарей. Каждый словарь - это
         описание одной записи (цистерны)
         """
-        logger.debug(f'Выполняется запрос к Интеллекту...')
+        logger.info(f'Выполняется запрос к Интеллекту...')
         railway_tank_list = get_registration_number_list(INTELLECT_SERVER_LIST[0])
 
         if not railway_tank_list:
@@ -94,12 +94,12 @@ class Command(BaseCommand):
             camera_worked = self.get_opc_value("camera_worked")
             is_on_station = self.get_opc_value("is_on_station")
 
-            logger.debug(f'tank_weight={tank_weight}, camera_worked={camera_worked}, is_on_station={is_on_station}')
+            logger.info(f'tank_weight={tank_weight}, camera_worked={camera_worked}, is_on_station={is_on_station}')
 
             if not camera_worked:
                 return
 
-            logger.debug(f'Камера сработала. Вес жд цистерны {tank_weight}')
+            logger.info(f'Камера сработала. Вес жд цистерны {tank_weight}')
             self.set_opc_value("camera_worked", False)
 
             # Приостанавливаем выполнение на 2 секунды, чтобы в интеллекте появилась запись с номером цистерны
@@ -132,7 +132,7 @@ class Command(BaseCommand):
                         ContentFile(image_data),
                         save=True
                     )
-                    logger.debug(f'Изображение для цистерны {registration_number} успешно сохранено.')
+                    logger.info(f'Изображение для цистерны {registration_number} успешно сохранено.')
                 else:
                     logger.error(f'Не удалось получить изображение для цистерны {registration_number}.')
 
