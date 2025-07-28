@@ -296,12 +296,12 @@ LOGGING = {
         'railway': {
             'handlers': ['railway_file'],
             'level': 'DEBUG',
-            'propagate': True,
+            'propagate': False,
         },
         'autogas': {
             'handlers': ['autogas_file'],
             'level': 'DEBUG',
-            'propagate': True,
+            'propagate': False,
         },
     },
 }

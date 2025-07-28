@@ -3,7 +3,7 @@ from celery import shared_task
 from railway_service.management.commands.railway_tank import Command as RailwayTankHandleCommand
 from railway_service.management.commands.railway_batch import Command as RailwayBatchHandleCommand
 
-logger = logging.getLogger('celery')
+logger = logging.getLogger('railway')
 
 @shared_task
 def railway_tank_processing():
