@@ -173,7 +173,7 @@ class Command(BaseCommand):
             # Получаем все значения OPC
             opc_values = {key: self.get_opc_value(key) for key in self.OPC_NODE_PATHS.keys()}
 
-            logger.info(
+            logger.debug(
                 f'Тип партии={opc_values["batch_type"]}, '
                 f'Тип газа={opc_values["gas_type"]},'
                 f'Запрос создания={opc_values["request_batch_create"]}, '

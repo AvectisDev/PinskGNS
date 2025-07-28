@@ -242,7 +242,7 @@ LOGGING = {
             'delay': True,
         },
         'celery_file': {
-            'level': 'INFO',
+            'level': 'DEBUG',
             'class': 'logging.handlers.TimedRotatingFileHandler',
             'filename': os.path.join(LOGS_DIR, 'celery/celery.log'),
             'when': 'midnight',
@@ -252,7 +252,7 @@ LOGGING = {
             'delay': True,
         },
         'railway_file': {
-            'level': 'INFO',
+            'level': 'DEBUG',
             'class': 'logging.handlers.TimedRotatingFileHandler',
             'filename': os.path.join(LOGS_DIR, 'railway/railway.log'),
             'when': 'midnight',
@@ -262,7 +262,7 @@ LOGGING = {
             'delay': True,
         },
         'autogas_file': {
-            'level': 'INFO',
+            'level': 'DEBUG',
             'class': 'logging.handlers.TimedRotatingFileHandler',
             'filename': os.path.join(LOGS_DIR, 'autogas/autogas.log'),
             'when': 'midnight',
