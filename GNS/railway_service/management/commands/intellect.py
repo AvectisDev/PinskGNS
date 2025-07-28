@@ -5,7 +5,7 @@ from datetime import datetime, timedelta
 from django.conf import settings
 
 
-logger = logging.getLogger('celery')
+logger = logging.getLogger('railway')
 
 """
 Номера серверов "Интеллект":

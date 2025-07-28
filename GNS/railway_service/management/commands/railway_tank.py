@@ -10,7 +10,7 @@ from datetime import datetime
 from ...models import RailwayBatch, RailwayTank
 from .intellect import get_registration_number_list, INTELLECT_SERVER_LIST, get_plate_image
 
-logger = logging.getLogger('celery')
+logger = logging.getLogger('railway')
 
 
 class Command(BaseCommand):
@@ -60,7 +60,7 @@ class Command(BaseCommand):
         railway_tank_list = get_registration_number_list(INTELLECT_SERVER_LIST[0])
 
         if not railway_tank_list:
-            logger.info('ЖД цистерна не определена')
+            logger.error('ЖД цистерна не определена')
             return 'Не определён', None
 
         last_tank = railway_tank_list[-1]

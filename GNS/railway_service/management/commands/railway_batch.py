@@ -3,7 +3,7 @@ from django.core.management.base import BaseCommand
 from datetime import datetime, timedelta, timezone
 from ...models import RailwayBatch
 
-logger = logging.getLogger('celery')
+logger = logging.getLogger('railway')
 
 
 class Command(BaseCommand):

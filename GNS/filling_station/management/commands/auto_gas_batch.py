@@ -1,6 +1,5 @@
 import logging
 from opcua import Client, ua
-from django.core.exceptions import ObjectDoesNotExist, MultipleObjectsReturned
 from django.conf import settings
 from django.core.management.base import BaseCommand
 from django.db.models import Q
@@ -8,7 +7,7 @@ from datetime import datetime
 from filling_station.models import AutoGasBatch, Truck, Trailer, TrailerType
 from .intellect import get_registration_number_list, INTELLECT_SERVER_LIST
 
-logger = logging.getLogger('celery')
+logger = logging.getLogger('autogas')
 
 
 class Command(BaseCommand):

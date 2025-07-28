@@ -251,6 +251,26 @@ LOGGING = {
             'encoding': 'utf-8',
             'delay': True,
         },
+        'railway_file': {
+            'level': 'INFO',
+            'class': 'logging.handlers.TimedRotatingFileHandler',
+            'filename': os.path.join(LOGS_DIR, 'railway/railway.log'),
+            'when': 'midnight',
+            'backupCount': 30,
+            'formatter': 'verbose',
+            'encoding': 'utf-8',
+            'delay': True,
+        },
+        'autogas_file': {
+            'level': 'INFO',
+            'class': 'logging.handlers.TimedRotatingFileHandler',
+            'filename': os.path.join(LOGS_DIR, 'autogas/autogas.log'),
+            'when': 'midnight',
+            'backupCount': 30,
+            'formatter': 'verbose',
+            'encoding': 'utf-8',
+            'delay': True,
+        },
     },
     'loggers': {
         'filling_station': {
@@ -272,6 +292,16 @@ LOGGING = {
             'handlers': ['celery_file'],
             'level': 'DEBUG',
             'propagate': False,
+        },
+        'railway': {
+            'handlers': ['railway_file'],
+            'level': 'DEBUG',
+            'propagate': True,
+        },
+        'autogas': {
+            'handlers': ['autogas_file'],
+            'level': 'DEBUG',
+            'propagate': True,
         },
     },
 }
