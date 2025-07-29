@@ -6,7 +6,7 @@ from datetime import datetime
 from filling_station.models import Truck, Trailer
 from .intellect import get_registration_number_list, INTELLECT_SERVER_LIST, get_transport_type, check_on_station
 
-logger = logging.getLogger('filling_station')
+logger = logging.getLogger('celery')
 
 
 class Command(BaseCommand):

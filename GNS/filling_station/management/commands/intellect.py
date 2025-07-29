@@ -2,9 +2,10 @@ from typing import Optional
 import requests
 import logging
 from datetime import datetime, timedelta
+from django.conf import settings
 
 
-logger = logging.getLogger('filling_station')
+logger = logging.getLogger('celery')
 
 """
 Номера серверов "Интеллект":
@@ -36,7 +37,7 @@ def get_intellect_data(data) -> list:
     return: JSON-ответ в виде списка при успешном запросе; пустой список при ошибке.
     """
     try:
-        intellect_url = "http://10.10.0.252:10001/lprserver/GetProtocolNumbers"  # intellect server address
+        intellect_url = f'{settings.INTELLECT_SERVER_ADDRESS}/lprserver/GetProtocolNumbers'
         response = requests.post(intellect_url, json=data, timeout=2)
         response.raise_for_status()
 
@@ -92,24 +93,6 @@ def get_registration_number_list(server: dict) -> list:
         "validaty_from": "" if server.get('id') == '1' else "85"
     }
     return get_intellect_data(data_for_request)
-
-
-def get_plate_image(plate_id):
-    """
-    Функция для получения изображения по plate_numbers.id.
-    """
-    image_url = f"http://10.10.0.252:10001/lprserver/GetImage/Plate_numbers/{plate_id}"
-    try:
-        response = requests.get(image_url, timeout=2)
-        response.raise_for_status()
-
-        if response.headers['Content-Type'] == 'image/jpeg':
-            return response.content  # Возвращаем бинарные данные изображения
-        return None
-
-    except Exception as error:
-        logger.error(f'Ошибка при получении изображения - {error}')
-        return None
 
 
 def check_on_station(transport: dict) -> Optional[bool]:

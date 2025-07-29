@@ -8,27 +8,30 @@ load_dotenv()
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
-
-# Quick-start development settings - unsuitable for production
-# See https://docs.djangoproject.com/en/5.0/howto/deployment/checklist/
+LOGS_DIR = os.path.join(BASE_DIR, 'log')
 
 SECRET_KEY = os.environ.get('SECRET_KEY')
 DEBUG = os.environ.get('DEBUG')
 
-ALLOWED_HOSTS = ['localhost', '127.0.0.1', '0.0.0.0', '10.10.12.253', 'django']
+ALLOWED_HOSTS = ['localhost', '127.0.0.1', '0.0.0.0', '10.0.2.2', '10.10.12.253', 'django']
+CSRF_COOKIE_SECURE = True
+SESSION_COOKIE_SECURE = True
 
 # Application definition
-
 INSTALLED_APPS = [
+    'daphne',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'core.apps.CoreConfig',
     'filling_station.apps.FillingStationConfig',
     'mobile.apps.MobileConfig',
     'carousel.apps.CarouselConfig',
+    'ttn.apps.TtnConfig',
+    'railway_service.apps.RailwayServiceConfig',
     'import_export',
     'rest_framework',
     'rest_framework_simplejwt',
@@ -107,14 +110,14 @@ DATABASES = {
         'PASSWORD': os.environ.get('DB_PASSWORD'),
         'HOST': os.environ.get('DB_HOST'),
         'PORT': os.environ.get('DB_PORT'),
-        'CONN_MAX_AGE': 600,  # Соединение будет жить 10 минут
+        'CONN_MAX_AGE': 600,
     }
 }
 
 CACHES = {
     'default': {
         'BACKEND': 'django.core.cache.backends.redis.RedisCache',
-        'LOCATION': 'redis://redis:6379/1'
+        'LOCATION': 'redis://localhost:6379/1'
     }
 }
 
@@ -168,19 +171,19 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 CRISPY_ALLOWED_TEMPLATE_PACKS = "bootstrap5"
 CRISPY_TEMPLATE_PACK = "bootstrap5"
 
-CELERY_BROKER_URL = 'redis://redis:6379/0'
-CELERY_RESULT_BACKEND = 'redis://redis:6379/0'
+CELERY_BROKER_URL = 'redis://localhost:6379/0'
+CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP = True
+CELERY_WORKER_HIJACK_ROOT_LOGGER = False
+CELERY_HIJACK_ROOT_LOGGER = False
+CELERY_RESULT_BACKEND = 'redis://localhost:6379/0'
+CELERY_RESULT_EXPIRES = 3600  # 1 час
 CELERY_BEAT_SCHEDULE = {
-    # 'generate_1C_file_every_hour': {
-    #     'task': 'filling_station.tasks.generate_1c_file',
-    #     'schedule': crontab(hour=1),
-    # },
     'railway_tank_processing': {
-        'task': 'filling_station.tasks.railway_tank_processing',
+        'task': 'railway_service.tasks.railway_tank_processing',
         'schedule': 10.0,  # каждые 10 сек
     },
     'railway_batch_processing': {
-        'task': 'filling_station.tasks.railway_batch_processing',
+        'task': 'railway_service.tasks.railway_batch_processing',
         'schedule': crontab(minute='*/20'),  # задача выполняется каждые 20 минут, начиная с 0 минут каждого часа
     },
     'auto_gas_processing': {
@@ -198,27 +201,134 @@ LOGGING = {
     'disable_existing_loggers': False,
     'formatters': {
         'verbose': {
-            'format': '%(asctime)s - %(levelname)s - %(message)s',
+            'style': '{',
+            'format': '{asctime} - {levelname} - {module}:{lineno} - {message}',
+            'datefmt': '%Y-%m-%d %H:%M:%S',
+        },
+        'with_msecs': {
+            'format': '%(asctime)s.%(msecs)03d - %(levelname)s - %(module)s:%(lineno)d - %(message)s',
             'datefmt': '%Y-%m-%d %H:%M:%S',
         },
     },
     'handlers': {
-        'file': {
+        'filling_station_file': {
             'level': 'DEBUG',
-            'class': 'logging.FileHandler',
-            'filename': 'django.log',
+            'class': 'logging.handlers.TimedRotatingFileHandler',
+            'filename': os.path.join(LOGS_DIR, 'filling_station/filling_station.log'),
+            'when': 'midnight',
+            'backupCount': 30,
             'formatter': 'verbose',
+            'encoding': 'utf-8',
+            'delay': True,
+        },
+        'carousel_file': {
+            'level': 'DEBUG',
+            'class': 'logging.handlers.TimedRotatingFileHandler',
+            'filename': os.path.join(LOGS_DIR, 'carousel/carousel.log'),
+            'when': 'midnight',
+            'backupCount': 30,
+            'formatter': 'with_msecs',
+            'encoding': 'utf-8',
+            'delay': True,
+        },
+        'rfid_file': {
+            'level': 'DEBUG',
+            'class': 'logging.handlers.TimedRotatingFileHandler',
+            'filename': os.path.join(LOGS_DIR, 'rfid/rfid.log'),
+            'when': 'midnight',
+            'backupCount': 30,
+            'formatter': 'verbose',
+            'encoding': 'utf-8',
+            'delay': True,
+        },
+        'celery_file': {
+            'level': 'DEBUG',
+            'class': 'logging.handlers.TimedRotatingFileHandler',
+            'filename': os.path.join(LOGS_DIR, 'celery/celery.log'),
+            'when': 'midnight',
+            'backupCount': 30,
+            'formatter': 'verbose',
+            'encoding': 'utf-8',
+            'delay': True,
+        },
+        'railway_file': {
+            'level': 'DEBUG',
+            'class': 'logging.handlers.TimedRotatingFileHandler',
+            'filename': os.path.join(LOGS_DIR, 'railway/railway.log'),
+            'when': 'midnight',
+            'backupCount': 30,
+            'formatter': 'verbose',
+            'encoding': 'utf-8',
+            'delay': True,
+        },
+        'autogas_file': {
+            'level': 'DEBUG',
+            'class': 'logging.handlers.TimedRotatingFileHandler',
+            'filename': os.path.join(LOGS_DIR, 'autogas/autogas.log'),
+            'when': 'midnight',
+            'backupCount': 30,
+            'formatter': 'verbose',
+            'encoding': 'utf-8',
+            'delay': True,
         },
     },
     'loggers': {
         'filling_station': {
-            'handlers': ['file'],
+            'handlers': ['filling_station_file'],
             'level': 'DEBUG',
             'propagate': True,
+        },
+        'carousel': {
+            'handlers': ['carousel_file'],
+            'level': 'DEBUG',
+            'propagate': True,
+        },
+        'rfid': {
+            'handlers': ['rfid_file'],
+            'level': 'DEBUG',
+            'propagate': True,
+        },
+        'celery': {
+            'handlers': ['celery_file'],
+            'level': 'DEBUG',
+            'propagate': False,
+        },
+        'railway': {
+            'handlers': ['railway_file'],
+            'level': 'DEBUG',
+            'propagate': False,
+        },
+        'autogas': {
+            'handlers': ['autogas_file'],
+            'level': 'DEBUG',
+            'propagate': False,
         },
     },
 }
 
+DJANGO_API_HOST = 'http://localhost:8000/api'
+# OPC_SERVER_URL = "opc.tcp://host.docker.internal:4841"
+OPC_SERVER_URL = "opc.tcp://localhost:4841"
+
+# Настройки почты
+EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+EMAIL_HOST = '10.11.7.1'
+EMAIL_PORT = 25
+EMAIL_HOST_USER = os.environ.get('GNS_EMAIL_USER')
+EMAIL_HOST_PASSWORD = os.environ.get('GNS_EMAIL_PASSWORD')
+DEFAULT_FROM_EMAIL = os.environ.get('GNS_DEFAULT_FROM_EMAIL')
+
+# Intellect
+INTELLECT_SERVER_ADDRESS = 'http://10.10.0.252:10001'
+
+# ITGas
+MIRIADA_API_URL = os.environ.get('MIRIADA_API_URL')
 MIRIADA_API_POST_URL = os.environ.get('MIRIADA_API_POST_URL')
 MIRIADA_AUTH_LOGIN = os.environ.get('MIRIADA_AUTH_LOGIN')
 MIRIADA_AUTH_PASSWORD = os.environ.get('MIRIADA_AUTH_PASSWORD')
+
+GAS_TYPE_CHOICES = [
+    ('Не выбран', 'Не выбран'),
+    ('СПБТ', 'СПБТ'),
+    ('ПБА', 'ПБА'),
+]

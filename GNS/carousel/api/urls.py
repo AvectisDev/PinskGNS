@@ -5,7 +5,7 @@ from . import views
 app_name = 'carousel'
 
 carousel_router = DefaultRouter()
-carousel_router.register(r'carousel', views.CarouselViewSet, basename='carousel')
+carousel_router.register(r'', views.CarouselViewSet, basename='carousel')
 
 urlpatterns = [
     path('', include(carousel_router.urls)),

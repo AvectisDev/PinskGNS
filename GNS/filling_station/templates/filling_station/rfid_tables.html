@@ -1,0 +1,111 @@
+{% extends 'base.html' %}
+{% load crispy_forms_tags %}
+{% load custom_filters %}
+
+{% block title %}RFID №{{ reader }} - {{ reader_status }}{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h5 class="mb-0">Считыватель №{{ reader }} - {{ reader_status }}</h5>
+
+        <div class="col-md-6">
+            <form method="get" action="{% url 'filling_station:balloon_list' %}" class="row g-2 align-items-center">
+                <div class="col-md-8">
+                    <input type="text" name="query" class="form-control"
+                           placeholder="Номер метки или серийный номер" value="{{ request.GET.query }}">
+                </div>
+                <div class="col-md-4">
+                    <button type="submit" class="btn btn-custom w-100">
+                        <i class="bi bi-funnel"></i> Фильтровать
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="card shadow-sm mb-4">
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-hover align-middle">
+                    <thead class="table-light">
+                    <tr>
+                        <th>RFID метка</th>
+                        <th>Серийный номер</th>
+                        <th>Объём</th>
+                        <th>Вес нетто</th>
+                        <th>Вес брутто</th>
+                        <th>Готов к наполнению</th>
+                        <th>Дата изменения</th>
+                        <th>Время изменения</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    {% for balloon in page_obj.object_list %}
+                    <tr>
+                        <td>{{ balloon.nfc_tag|default:"-" }}</td>
+                        <td>{{ balloon.serial_number|default:"-" }}</td>
+                        <td>{{ balloon.size|default:"-" }} л</td>
+                        <td>{{ balloon.netto|float_format|default:"-" }} кг</td>
+                        <td>{{ balloon.brutto|float_format|default:"-" }} кг</td>
+                        <td>
+                            {% if balloon.filling_status %}
+                            <span class="badge bg-success">Да</span>
+                            {% else %}
+                            <span class="badge bg-secondary">Нет</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ balloon.change_date|date:"d.m.Y"|default:"-" }}</td>
+                        <td>{{ balloon.change_time|time:"H:i"|default:"" }}</td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="8" class="text-center py-4 text-muted">Нет данных о баллонах</td>
+                    </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div class="card shadow-sm mb-4">
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-5">
+                    <p>Статистика за период: <strong>{{ start_date|date:"j E Y" }}</strong> - <strong>{{end_date|date:"j E Y" }}</strong></p>
+                    <p>RFID-считыватель: <strong>{{ current_quantity_by_reader }}</strong></p>
+                    {% if reader >= 3 and reader <= 6 %}
+                    <p>Оптический датчик: <strong>{{ current_quantity_by_sensor }}</strong></p>
+                    {% endif %}
+                    {% if reader == 6 %}
+                    <p>ТТН: <strong>{{ loading_ttn_quantity }}</strong></p>
+                    {% endif %}
+                    {% if reader == 3 or reader == 4 %}
+                    <p>ТТН: <strong>{{ unloading_ttn_quantity }}</strong></p>
+                    {% endif %}
+                </div>
+                <div class="col-md-7">
+                    <form method="post" enctype="multipart/form-data" class="row g-3 ">
+                        {% csrf_token %}
+                        <div class="col-md-8">
+                            {{ form.start_date|as_crispy_field }}
+                            {{ form.end_date|as_crispy_field }}
+                        </div>
+                        <div class="col-md-4">
+                            <button type="submit" name="action" value="show" class="btn btn-custom w-100">
+                                <i class="bi bi-eye"></i> Показать
+                            </button>
+                            <button type="submit" name="action" value="export" class="btn btn-custom w-100 mt-3">
+                                <i class="bi bi-download"></i> Выгрузить
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {% include 'filling_station/_paginator.html' %}
+</div>
+{% endblock content %}

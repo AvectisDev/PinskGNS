@@ -1,0 +1,17 @@
+{% extends 'base.html' %}
+
+{% block title %} Удаление ТТН {% endblock %}
+
+{% block content %}
+<div class="container text-center">
+    <h6>Вы уверены, что хотите удалить ТТН?</h6>
+
+    <form method="post">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-danger">Удалить</button>
+        <button type="button" class="btn" style="background-color: #3CBBD9; color: white;"
+                onclick="location.href='{% url 'ttn:auto_ttn_list' %}'">Отмена
+        </button>
+    </form>
+</div>
+{% endblock content %}

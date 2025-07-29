@@ -4,17 +4,19 @@ from django.core.paginator import Paginator
 from django.urls import reverse_lazy, reverse
 from django.views import generic
 from django.db.models import Q, Sum
-from django.contrib import messages
-from django.shortcuts import get_object_or_404
-from django.views.decorators.http import require_POST
-from django.contrib.auth.decorators import login_required
-from .models import (Balloon, Truck, Trailer, RailwayTank, TTN, BalloonsLoadingBatch, BalloonsUnloadingBatch, NewTTN,
-                     RailwayBatch, BalloonAmount, AutoGasBatch, Reader, RailwayTtn, AutoTtn,
-                     AutoGasBatchSettings)
+from railway_service.models import RailwayBatch
+from .models import (Balloon, Truck, Trailer, BalloonsLoadingBatch, BalloonsUnloadingBatch,
+                     BalloonAmount, AutoGasBatch, Reader)
 from .admin import BalloonResources
-from .forms import (GetBalloonsAmount, BalloonForm, TruckForm, TrailerForm, RailwayTankForm, TTNForm, AutoTtnForm,
-                    BalloonsLoadingBatchForm, BalloonsUnloadingBatchForm, RailwayBatchForm, AutoGasBatchForm,
-                    RailwayTtnForm)
+from .forms import (
+    GetBalloonsAmount,
+    BalloonForm,
+    TruckForm,
+    TrailerForm,
+    BalloonsLoadingBatchForm,
+    BalloonsUnloadingBatchForm,
+    AutoGasBatchForm
+)
 from datetime import datetime, timedelta
 
 STATUS_LIST = {
@@ -75,7 +77,6 @@ def reader_info(request, reader=1):
         action = request.POST.get('action')
 
         if action == 'export':
-            # Экспортируем данные в Excel
             dataset = BalloonResources().export(
                 Reader.objects.filter(
                     number=reader,
@@ -106,8 +107,28 @@ def reader_info(request, reader=1):
 
     balloons_list = Reader.objects.order_by('-change_date', '-change_time').filter(number=reader)
 
-    current_quantity_rfid = current_quantity['total_rfid'] or 0
-    current_quantity_balloons = current_quantity['total_balloons'] or 0
+    # Вычисляем количество баллонов в партиях по ТТН
+    # Приёмка
+    if reader == 6:
+        loading_ttn_quantity = BalloonsLoadingBatch.objects.filter(
+            reader_number=reader,
+            begin_date__range=(start_date, end_date)
+        ).aggregate(
+            total_ttn=Sum('amount_of_ttn')
+        )['total_ttn'] or 0
+    else:
+        loading_ttn_quantity = 0
+
+    # Отгрузка
+    if reader in [3,4]:
+        unloading_ttn_quantity = BalloonsUnloadingBatch.objects.filter(
+            reader_number=reader,
+            begin_date__range=(start_date, end_date)
+        ).aggregate(
+            total_ttn=Sum('amount_of_ttn')
+        )['total_ttn'] or 0
+    else:
+        unloading_ttn_quantity = 0
 
     paginator = Paginator(balloons_list, 10)
     page_num = request.GET.get('page', 1)
@@ -115,15 +136,17 @@ def reader_info(request, reader=1):
 
     context = {
         "page_obj": page_obj,
-        'current_quantity_by_reader': current_quantity_rfid,
-        'current_quantity_by_sensor': current_quantity_balloons,
+        'current_quantity_by_reader': current_quantity['total_rfid'] or 0,
+        'current_quantity_by_sensor': current_quantity['total_balloons'] or 0,
+        'loading_ttn_quantity': loading_ttn_quantity,
+        'unloading_ttn_quantity': unloading_ttn_quantity,
         'form': form,
         'reader': reader,
         'start_date': start_date,
         'end_date': end_date,
         'reader_status': STATUS_LIST[reader]
     }
-    return render(request, "rfid_tables.html", context)
+    return render(request, 'filling_station/rfid_tables.html', context)
 
 
 # Партии приёмки баллонов
@@ -201,32 +224,6 @@ class AutoGasBatchDeleteView(generic.DeleteView):
     template_name = 'filling_station/auto_batch_confirm_delete.html'
 
 
-# Партии приёмки газа в ж/д цистернах
-class RailwayBatchListView(generic.ListView):
-    model = RailwayBatch
-    paginate_by = 10
-    template_name = 'filling_station/railway_batch_list.html'
-
-
-class RailwayBatchDetailView(generic.DetailView):
-    model = RailwayBatch
-    queryset = RailwayBatch.objects.prefetch_related('railway_tank_list')
-    context_object_name = 'batch'
-    template_name = 'filling_station/railway_batch_detail.html'
-
-
-class RailwayBatchUpdateView(generic.UpdateView):
-    model = RailwayBatch
-    form_class = RailwayBatchForm
-    template_name = 'filling_station/_equipment_form.html'
-
-
-class RailwayBatchDeleteView(generic.DeleteView):
-    model = RailwayBatch
-    success_url = reverse_lazy("filling_station:railway_batch_list")
-    template_name = 'filling_station/railway_batch_confirm_delete.html'
-
-
 # Грузовики
 class TruckView(generic.ListView):
     model = Truck
@@ -289,236 +286,6 @@ class TrailerDeleteView(generic.DeleteView):
     template_name = 'filling_station/trailer_confirm_delete.html'
 
 
-# ж/д цистерны
-class RailwayTankView(generic.ListView):
-    model = RailwayTank
-    paginate_by = 10
-
-
-class RailwayTankDetailView(generic.DetailView):
-    model = RailwayTank
-
-
-class RailwayTankCreateView(generic.CreateView):
-    model = RailwayTank
-    form_class = RailwayTankForm
-    template_name = 'filling_station/_equipment_form.html'
-
-    def get_success_url(self):
-        return self.object.get_absolute_url()
-
-
-class RailwayTankUpdateView(generic.UpdateView):
-    model = RailwayTank
-    form_class = RailwayTankForm
-    template_name = 'filling_station/_equipment_form.html'
-
-
-class RailwayTankDeleteView(generic.DeleteView):
-    model = RailwayTank
-    success_url = reverse_lazy("filling_station:railway_tank_list")
-    template_name = 'filling_station/railway_tank_confirm_delete.html'
-
-
-# ТТН для баллонов
-class TTNView(generic.ListView):
-    model = NewTTN
-    paginate_by = 10
-
-
-class TTNDetailView(generic.DetailView):
-    model = NewTTN
-
-
-class TTNCreateView(generic.CreateView):
-    model = NewTTN
-    form_class = TTNForm
-    template_name = 'filling_station/_equipment_form.html'
-
-    def get_success_url(self):
-        return self.object.get_absolute_url()
-
-    def form_valid(self, form):
-        response = super().form_valid(form)
-        messages.success(self.request, f'ТТН {self.object.number} успешно создана')
-        return response
-
-
-class TTNUpdateView(generic.UpdateView):
-    model = NewTTN
-    form_class = TTNForm
-    template_name = 'filling_station/_equipment_form.html'
-
-    def get_success_url(self):
-        return self.object.get_absolute_url()
-
-    def form_valid(self, form):
-        response = super().form_valid(form)
-        messages.success(self.request, f'ТТН {self.object.number} успешно обновлена')
-        return response
-
-
-class TTNDeleteView(generic.DeleteView):
-    model = NewTTN
-    success_url = reverse_lazy("filling_station:ttn_list")
-    template_name = 'filling_station/newttn_confirm_delete.html'
-
-
-# ТТН для жд цистерн
-class RailwayTtnView(generic.ListView):
-    model = RailwayTtn
-    paginate_by = 10
-
-
-class RailwayTtnDetailView(generic.DetailView):
-    model = RailwayTtn
-
-
-class RailwayTtnCreateView(generic.CreateView):
-    model = RailwayTtn
-    form_class = RailwayTtnForm
-    template_name = 'filling_station/_equipment_form.html'
-
-    def get_success_url(self):
-        return self.object.get_absolute_url()
-
-    def form_valid(self, form):
-        self.object = form.save(commit=False)
-        railway_ttn_number = form.cleaned_data['railway_ttn']
-
-        # Находим все цистерны с этим номером накладной и суммируем значения
-        tanks = RailwayTank.objects.filter(railway_ttn=railway_ttn_number)
-        self.object.total_gas_amount_by_scales = tanks.aggregate(total=Sum('gas_weight'))['total'] or 0
-        self.object.total_gas_amount_by_ttn = tanks.aggregate(total=Sum('netto_weight_ttn'))['total'] or 0
-        self.object.save()
-
-        # Добавляем цистерны в ManyToMany связь
-        self.object.railway_tank_list.set(tanks)
-
-        messages.success(self.request, f'ТТН {self.object.number} успешно создана')
-        return super().form_valid(form)
-
-
-class RailwayTtnUpdateView(generic.UpdateView):
-    model = RailwayTtn
-    form_class = RailwayTtnForm
-    template_name = 'filling_station/_equipment_form.html'
-
-    def form_valid(self, form):
-        new_railway_ttn = form.cleaned_data['railway_ttn']
-
-        self.object = form.save(commit=False)
-
-        # Обновляем суммы
-        tanks = RailwayTank.objects.filter(railway_ttn=new_railway_ttn)
-        self.object.total_gas_amount_by_scales = tanks.aggregate(total=Sum('gas_weight'))['total'] or 0
-        self.object.total_gas_amount_by_ttn = tanks.aggregate(total=Sum('netto_weight_ttn'))['total'] or 0
-
-        # Обновляем ManyToMany связь
-        self.object.railway_tank_list.set(tanks)
-
-        self.object.save()
-        return super().form_valid(form)
-
-
-class RailwayTtnDeleteView(generic.DeleteView):
-    model = RailwayTtn
-    success_url = reverse_lazy("filling_station:railway_ttn_list")
-    template_name = 'filling_station/railwayttn_confirm_delete.html'
-
-
-# ТТН для автоцистерн
-@require_POST
-# @login_required
-def update_weight_source(request):
-    weight_source = request.POST.get('weight_source', 's')  # 'f' если чекбокс отмечен, иначе 's'
-    settings, _ = AutoGasBatchSettings.objects.get_or_create()
-    settings.weight_source = weight_source
-    settings.save()
-    return redirect('filling_station:auto_ttn_list')
-
-
-class AutoTtnView(generic.ListView):
-    model = AutoTtn
-    paginate_by = 10
-
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        settings = AutoGasBatchSettings.objects.first()
-        context['weight_source'] = settings.weight_source if settings else 'f'
-        return context
-
-
-class AutoTtnDetailView(generic.DetailView):
-    model = AutoTtn
-
-
-class AutoTtnCreateView(generic.CreateView):
-    model = AutoTtn
-    form_class = AutoTtnForm
-    template_name = 'filling_station/_equipment_form.html'
-
-    def form_valid(self, form):
-        response = super().form_valid(form)
-
-        self.update_ttn_values()
-
-        return response
-
-    def get_success_url(self):
-        return self.object.get_absolute_url()
-
-    def update_ttn_values(self):
-        batch = self.object.batch
-        if batch:
-            settings = AutoGasBatchSettings.objects.first()
-
-            # Определяем источник данных и значение количества газа
-            if settings and settings.weight_source == 'f':
-                gas_amount = batch.gas_amount
-                source = 'Расходомер'
-            else:
-                gas_amount = batch.weight_gas_amount
-                source = 'Весы'
-
-            self.object.total_gas_amount = gas_amount
-            self.object.source_gas_amount = source
-            self.object.gas_type = batch.gas_type
-            self.object.save()
-
-
-class AutoTtnUpdateView(generic.UpdateView):
-    model = AutoTtn
-    form_class = AutoTtnForm
-    template_name = 'filling_station/_equipment_form.html'
-
-    def form_valid(self, form):
-        response = super().form_valid(form)
-        self.update_ttn_values()
-        return response
-
-    def update_ttn_values(self):
-        batch = self.object.batch
-        if batch:
-            settings = AutoGasBatchSettings.objects.first()
-
-            if settings and settings.weight_source == 'f':
-                self.object.total_gas_amount = batch.gas_amount
-                self.object.source_gas_amount = 'Расходомер'
-            else:
-                self.object.total_gas_amount = batch.weight_gas_amount
-                self.object.source_gas_amount = 'Весы'
-
-            self.object.gas_type = batch.gas_type
-            self.object.save()
-
-
-class AutoTtnDeleteView(generic.DeleteView):
-    model = AutoTtn
-    success_url = reverse_lazy("filling_station:auto_ttn_list")
-    template_name = 'filling_station/autottn_confirm_delete.html'
-
-
 # Обработка данных для вкладки "Статистика"
 def statistic(request):
     current_date = datetime.now().date()
@@ -545,31 +312,18 @@ def statistic(request):
         for i in range(1, 9)
     }
 
-    # Получаем количество партий для каждой модели за период
-    batches_data = {
-        'balloons_loading_batches': BalloonsLoadingBatch.objects.filter(
-            begin_date__range=[start_date, end_date]
-        ).count(),
-        'balloons_unloading_batches': BalloonsUnloadingBatch.objects.filter(
-            begin_date__range=[start_date, end_date]
-        ).count(),
-        'auto_gas_loading_batches': AutoGasBatch.objects.filter(
-            batch_type='l',
-            begin_date__range=[start_date, end_date]
-        ).count(),
-        'auto_gas_unloading_batches': AutoGasBatch.objects.filter(
-            batch_type='u',
-            begin_date__range=[start_date, end_date]
-        ).count(),
-        'railway_batches': RailwayBatch.objects.filter(
-            begin_date__range=[start_date, end_date]
-        ).count(),
-    }
+    # Получаем статистику по партиям за период
+    balloon_loading_stats = BalloonsLoadingBatch.get_period_stats(start_date, end_date)
+    balloon_unloading_stats = BalloonsUnloadingBatch.get_period_stats(start_date, end_date)
+    auto_gas_stats = AutoGasBatch.get_period_stats(start_date, end_date)
+    railway_stats = RailwayBatch.get_period_stats(start_date, end_date)
 
-    # Объединяем данные в контекст
     context = {
         **readers_data,
-        **batches_data,
+        'balloon_loading_stats': balloon_loading_stats,
+        'balloon_unloading_stats': balloon_unloading_stats,
+        'auto_gas_stats': auto_gas_stats,
+        'railway_stats': railway_stats,
         'form': form,
         'start_date': start_date,
         'end_date': end_date,

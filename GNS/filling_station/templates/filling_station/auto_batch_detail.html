@@ -60,11 +60,11 @@
 
                 <div class="col-md-6">
                     <dl class="row">
-                        <dt class="col-sm-6">Вес пустого ТС (весы):</dt>
-                        <dd class="col-sm-6">{{ batch.scale_empty_weight|float_format|default:"-" }} кг</dd>
-
                         <dt class="col-sm-6">Вес полного ТС (весы):</dt>
                         <dd class="col-sm-6">{{ batch.scale_full_weight|float_format|default:"-" }} кг</dd>
+
+                        <dt class="col-sm-6">Вес пустого ТС (весы):</dt>
+                        <dd class="col-sm-6">{{ batch.scale_empty_weight|float_format|default:"-" }} кг</dd>
 
                         <dt class="col-sm-6">Количество газа (весы):</dt>
                         <dd class="col-sm-6">{{ batch.weight_gas_amount|float_format|default:"-" }} кг</dd>
@@ -74,9 +74,6 @@
 
                         <dt class="col-sm-6">Тип газа:</dt>
                         <dd class="col-sm-6">{{ batch.get_gas_type_display|default:"-" }}</dd>
-
-                        <dt class="col-sm-6">ТТН:</dt>
-                        <dd class="col-sm-6">{{ batch.ttn|default:"Не указана" }}</dd>
                     </dl>
                 </div>
             </div>

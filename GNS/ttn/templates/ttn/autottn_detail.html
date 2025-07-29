@@ -1,0 +1,85 @@
+{% extends 'base.html' %}
+{% load custom_filters %}
+
+{% block title %}ТТН {{ autottn.number }}{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="card shadow-sm">
+        <div class="card-header card-header-custom">
+            <div class="d-flex justify-content-between align-items-center">
+                <h4 class="mb-0">ТТН {{ autottn.number }}</h4>
+                <div>
+                    <span class="badge bg-info text-dark">{{ autottn.get_gas_type_display }}</span>
+                    {% if autottn.source_gas_amount == 'Расходомер' %}
+                        <span class="badge bg-success ms-2">Расходомер</span>
+                    {% else %}
+                        <span class="badge bg-primary ms-2">Весы</span>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-6">
+                    <dl class="row">
+                        <dt class="col-sm-6">Номер договора:</dt>
+                        <dd class="col-sm-6">{{ autottn.contract|default:"-" }}</dd>
+
+                        <dt class="col-sm-6">Грузоотправитель:</dt>
+                        <dd class="col-sm-6">{{ autottn.shipper|default:"-" }}</dd>
+
+                        <dt class="col-sm-6">Грузополучатель:</dt>
+                        <dd class="col-sm-6">{{ autottn.consignee|default:"-" }}</dd>
+
+                        <dt class="col-sm-6">Тип газа:</dt>
+                        <dd class="col-sm-6">{{ autottn.get_gas_type_display|default:"-" }}</dd>
+                    </dl>
+                </div>
+
+                <div class="col-md-6">
+                    <dl class="row">
+                        <dt class="col-sm-6">Перевозчик:</dt>
+                        <dd class="col-sm-6">{{ autottn.carrier|default:"-" }}</dd>
+
+                        <dt class="col-sm-6">Дата формирования:</dt>
+                        <dd class="col-sm-6">{{ autottn.date|date:"d.m.Y"|default:"-" }}</dd>
+
+                        <dt class="col-sm-6">Количество газа:</dt>
+                        <dd class="col-sm-6">
+                            {{ autottn.total_gas_amount|float_format|default:"-" }}
+                            <small class="text-muted">({{ autottn.source_gas_amount|default:"источник не указан" }})</small>
+                        </dd>
+
+                        {% if autottn.batch %}
+                        <dt class="col-sm-6">Связанная партия:</dt>
+                        <dd class="col-sm-6">
+                            <a href="{{ autottn.batch.get_absolute_url }}" class="custom-link">
+                                Партия #{{ autottn.batch.id }}
+                            </a>
+                        </dd>
+                        {% endif %}
+                    </dl>
+                </div>
+            </div>
+        </div>
+
+        <div class="card-footer bg-light">
+            <div class="d-flex justify-content-between">
+                <a href="{% url 'ttn:auto_ttn_list' %}" class="btn btn-custom">
+                    <i class="bi bi-arrow-left"></i> Назад
+                </a>
+                <div>
+                    <a href="{{ autottn.get_update_url }}" class="btn btn-custom me-2">
+                        <i class="bi bi-pencil"></i> Редактировать
+                    </a>
+                    <a href="{{ autottn.get_delete_url }}" class="btn btn-danger">
+                        <i class="bi bi-trash"></i> Удалить
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

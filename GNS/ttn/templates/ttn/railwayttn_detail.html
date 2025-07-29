@@ -1,0 +1,117 @@
+{% extends 'base.html' %}
+{% load custom_filters %}
+
+{% block title %} ТТН № {{ railwayttn.number }}{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="card shadow-sm">
+        <div class="card-header card-header-custom">
+            <div class="d-flex justify-content-between align-items-center">
+                <h4 class="mb-0">ТТН № {{ railwayttn.number }}</h4>
+                <div>
+                    <span class="badge bg-primary">
+                        {{ railwayttn.get_gas_type_display|default:"Тип не указан" }}
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-6">
+                    <dl class="row">
+                        <dt class="col-sm-6">Номер ж/д накладной:</dt>
+                        <dd class="col-sm-6">{{ railwayttn.railway_ttn|default:"-" }}</dd>
+
+                        <dt class="col-sm-6">Номер договора:</dt>
+                        <dd class="col-sm-6">{{ railwayttn.contract|default:"-" }}</dd>
+
+                        <dt class="col-sm-6">Грузоотправитель:</dt>
+                        <dd class="col-sm-6">{{ railwayttn.shipper|default:"-" }}</dd>
+
+                        <dt class="col-sm-6">Грузополучатель:</dt>
+                        <dd class="col-sm-6">{{ railwayttn.consignee|default:"-" }}</dd>
+
+                        <dt class="col-sm-6">Перевозчик:</dt>
+                        <dd class="col-sm-6">{{ railwayttn.carrier|default:"-" }}</dd>
+                    </dl>
+                </div>
+
+                <div class="col-md-6">
+                    <dl class="row">
+                        <dt class="col-sm-6">Количество газа (ТТН):</dt>
+                        <dd class="col-sm-6">{{ railwayttn.total_gas_amount_by_ttn|float_format }} т</dd>
+
+                        <dt class="col-sm-6">Количество газа (весы):</dt>
+                        <dd class="col-sm-6">{{ railwayttn.total_gas_amount_by_scales|float_format }} т</dd>
+
+                        <dt class="col-sm-6">Тип газа:</dt>
+                        <dd class="col-sm-6">{{ railwayttn.get_gas_type_display|default:"-" }}</dd>
+
+                        <dt class="col-sm-6">Дата формирования:</dt>
+                        <dd class="col-sm-6">{{ railwayttn.date|date:"d.m.Y"|default:"-" }}</dd>
+                    </dl>
+                </div>
+            </div>
+
+            <div class="mt-4">
+                <h5 class="mb-3">Список цистерн</h5>
+                {% if railwayttn.railway_tank_list.all %}
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead class="table-light">
+                        <tr>
+                            <th>Номер цистерны</th>
+                            <th>Тип газа</th>
+                            <th>Вес полной</th>
+                            <th>Вес пустой</th>
+                            <th>Вес газа</th>
+                            <th>Статус</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        {% for tank in railwayttn.railway_tank_list.all %}
+                        <tr onclick="window.location='{{ tank.get_absolute_url }}'"
+                            style="cursor: pointer;">
+                            <td>{{ tank.registration_number }}</td>
+                            <td>{{ tank.get_gas_type_display }}</td>
+                            <td>{{ tank.full_weight|float_format }} т</td>
+                            <td>{{ tank.empty_weight|float_format }} т</td>
+                            <td>{{ tank.gas_weight|float_format }} т</td>
+                            <td>
+                                {% if tank.is_on_station %}
+                                <span class="badge bg-success">На станции</span>
+                                {% else %}
+                                <span class="badge bg-warning text-dark">Отгружена</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="alert alert-info">В этой ТТН нет цистерн</div>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="card-footer bg-light">
+            <div class="d-flex justify-content-between">
+                <a href="{% url 'ttn:railway_ttn_list' %}" class="btn btn-custom">
+                    <i class="bi bi-arrow-left"></i> Назад
+                </a>
+                <div>
+                    <a href="{{ railwayttn.get_update_url }}" class="btn btn-custom me-2">
+                        <i class="bi bi-pencil"></i> Редактировать
+                    </a>
+                    <a href="{{ railwayttn.get_delete_url }}" class="btn btn-danger">
+                        <i class="bi bi-trash"></i> Удалить
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

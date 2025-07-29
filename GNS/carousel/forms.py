@@ -1,8 +1,6 @@
-from crispy_forms.bootstrap import StrictButton
 from django import forms
 from django.utils import timezone
-from .models import CarouselSettings
-from .models import BALLOON_SIZE_CHOICES
+from .models import CarouselSettings, BALLOON_SIZE_CHOICES
 from crispy_forms.helper import FormHelper
 from crispy_forms.layout import Submit
 

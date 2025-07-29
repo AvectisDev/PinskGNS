@@ -8,6 +8,12 @@ GNS/filling_station/__pycache__/
 GNS/GNS/__pycache__/
 GNS/filling_station/migrations/__pycache__/
 
+# media/static files
+GNS/media/
+GNS/static/
+
+log/
+
 # C extensions
 *.so
 
@@ -118,9 +124,6 @@ ipython_config.py
 
 # PEP 582; used by e.g. github.com/David-OConnor/pyflow and github.com/pdm-project/pdm
 __pypackages__/
-
-# media files
-GNS/media/
 
 # Celery stuff
 celerybeat-schedule

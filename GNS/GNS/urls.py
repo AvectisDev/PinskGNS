@@ -23,10 +23,14 @@ from django.conf.urls.static import static
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('', include("filling_station.urls", namespace='filling_station')),
-    path('', include("carousel.urls", namespace='carousel')),
-    path('api/', include("filling_station.api.urls", namespace='api')),
-    path('api/', include("mobile.urls", namespace='api')),
-    path('api/', include("carousel.api.urls", namespace='api')),
+    path('carousel/', include("carousel.urls", namespace='carousel')),
+    path('ttn/', include("ttn.urls", namespace='ttn')),
+    path('railway/', include("railway_service.urls", namespace='railway_service')),
+
+    path('api/', include("filling_station.api.urls", namespace='filling_station_api')),
+    path('api/app/', include("mobile.urls", namespace='mobile_api')),
+    path('api/carousel/', include("carousel.api.urls", namespace='carousel_api')),
+    path('api/railway-batch/', include("railway_service.api.urls", namespace='railway_api')),
 ] + debug_toolbar_urls()
 
 urlpatterns += [

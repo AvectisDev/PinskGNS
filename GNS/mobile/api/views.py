@@ -9,7 +9,7 @@ from django.http import FileResponse
 
 
 @api_view(['GET'])
-@permission_classes([IsAuthenticated])
+@permission_classes([AllowAny])
 def get_app_version(request):
     latest_app = MobileApp.objects.order_by('-update_date').first()
     if not latest_app:
@@ -20,7 +20,7 @@ def get_app_version(request):
 
 
 @api_view(['GET'])
-@permission_classes([IsAuthenticated])
+@permission_classes([AllowAny])
 def get_app_apk(request):
     latest_app = MobileApp.objects.order_by('-update_date').first()
     if not latest_app:

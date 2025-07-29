@@ -1,17 +1,16 @@
 import logging
 from opcua import Client, ua
-from django.core.exceptions import ObjectDoesNotExist, MultipleObjectsReturned
+from django.conf import settings
 from django.core.management.base import BaseCommand
 from django.db.models import Q
 from datetime import datetime
-from filling_station.models import AutoGasBatch, Truck, TruckType, Trailer, TrailerType
+from filling_station.models import AutoGasBatch, Truck, Trailer, TrailerType
 from .intellect import get_registration_number_list, INTELLECT_SERVER_LIST
 
-logger = logging.getLogger('filling_station')
+logger = logging.getLogger('autogas')
 
 
 class Command(BaseCommand):
-    OPC_SERVER_URL = "opc.tcp://host.docker.internal:4841"
     OPC_NODE_PATHS = {
         "batch_type": "ns=4; s=Address Space.PLC_SU2.batch.batch_type",
         "gas_type": "ns=4; s=Address Space.PLC_SU2.batch.gas_type",
@@ -37,7 +36,7 @@ class Command(BaseCommand):
 
     def __init__(self):
         super().__init__()
-        self.client = Client(self.OPC_SERVER_URL)
+        self.client = Client(settings.OPC_SERVER_URL)
         self._truck_type = None
         self._trailer_type = None
 
@@ -69,6 +68,7 @@ class Command(BaseCommand):
     def set_opc_value(self, node_key, value):
         """Установить значение на OPC UA сервере."""
         node_path = self.OPC_NODE_PATHS.get(node_key)
+        logger.debug(f"In set_opc_value. OPC node key: {node_key}, node_path = {node_path}")
         if not node_path:
             logger.error(f"Invalid OPC node key: {node_key}")
             return False
@@ -118,8 +118,10 @@ class Command(BaseCommand):
         if not registration_numbers:
             logger.warning('Автовесовая. Список номеров отсутствует')
             return
+        logger.debug(f'Автовесовая. Список номеров: {registration_numbers}')
 
         truck, trailer = self.find_transports(registration_numbers)
+        logger.debug(f'Автовесовая. Грузовик: {truck}, Прицеп: {trailer}')
         if not truck:
             logger.error('Автовесовая. Не найден подходящий грузовик')
             return
@@ -140,7 +142,7 @@ class Command(BaseCommand):
                 capacity_value = trailer.max_gas_volume
             else:
                 capacity_value = 0.0
-                logger.warning(f'Не удалось определить емкость для {truck.registration_number}')
+                logger.warning(f'Не удалось определить объём емкости для {truck.registration_number}')
             
             self.set_opc_value("truck_capacity", capacity_value)
             self.set_opc_value("response_batch_create", True)
@@ -171,7 +173,7 @@ class Command(BaseCommand):
             # Получаем все значения OPC
             opc_values = {key: self.get_opc_value(key) for key in self.OPC_NODE_PATHS.keys()}
 
-            logger.info(
+            logger.debug(
                 f'Тип партии={opc_values["batch_type"]}, '
                 f'Тип газа={opc_values["gas_type"]},'
                 f'Запрос создания={opc_values["request_batch_create"]}, '

@@ -54,7 +54,7 @@
                         <td>{{ balloon.status }}</td>
                         <td>
                             <div>{{ balloon.change_date|date:"d.m.Y"|default:"-" }}</div>
-                            <small class="text-muted">{{ balloon.change_time|time:"H:i"|default:"" }}</small>
+                            <small class="text-muted">{{ balloon.change_date|time:"H:i"|default:"" }}</small>
                         </td>
                         <td>
                             <div class="action-buttons">

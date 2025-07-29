@@ -1,0 +1,62 @@
+{% extends 'base.html' %}
+{% load crispy_forms_tags %}
+{% block title %} {{ title }} {% endblock %}
+
+{% block content %}
+
+<div class="row" style="padding: 20px;">
+    <h5>{{ title }}</h5>
+    <div class="w-50 mx-auto">
+        {% crispy form %}
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const loadingBatchSelect = document.getElementById('id_loading_batch');
+    const unloadingBatchSelect = document.getElementById('id_unloading_batch');
+    const ttnField = document.getElementById('id_ttn_number');
+
+    // Функция для обновления номера ТТН
+    function updateTTNNumber(selectElement) {
+        if (!selectElement || !selectElement.value || !ttnField) return;
+
+        const selectedOption = selectElement.options[selectElement.selectedIndex];
+        if (selectedOption) {
+            const span = selectedOption.querySelector('span');
+            if (span && span.dataset.ttn) {
+                // Всегда обновляем значение, если нашли номер ТТН в data-атрибуте
+                ttnField.value = span.dataset.ttn;
+            }
+        }
+    }
+
+    // Обработчики изменений для обоих select'ов
+    if (loadingBatchSelect) {
+        loadingBatchSelect.addEventListener('change', function() {
+            updateTTNNumber(this);
+            if (this.value && unloadingBatchSelect) {
+                unloadingBatchSelect.value = '';
+            }
+        });
+    }
+
+    if (unloadingBatchSelect) {
+        unloadingBatchSelect.addEventListener('change', function() {
+            updateTTNNumber(this);
+            if (this.value && loadingBatchSelect) {
+                loadingBatchSelect.value = '';
+            }
+        });
+    }
+
+    // Инициализация при загрузке страницы
+    if (loadingBatchSelect && loadingBatchSelect.value) {
+        updateTTNNumber(loadingBatchSelect);
+    } else if (unloadingBatchSelect && unloadingBatchSelect.value) {
+        updateTTNNumber(unloadingBatchSelect);
+    }
+});
+</script>
+
+{% endblock content %}
