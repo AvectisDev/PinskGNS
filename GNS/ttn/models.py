@@ -209,7 +209,7 @@ class AutoTtn(models.Model):
         related_name='auto_tank_city'
     )
     batch = models.ForeignKey(
-        'autogas.AutoGasBatch',  # Изменено с filling_station.AutoGasBatch
+        AutoGasBatch,
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
@@ -219,7 +219,7 @@ class AutoTtn(models.Model):
     total_gas_amount = models.FloatField(null=True, blank=True, verbose_name="Количество газа")
     source_gas_amount = models.CharField(max_length=20, null=True, blank=True, verbose_name="Источник веса для ТТН")
     gas_type = models.CharField(max_length=10, choices=GAS_TYPE_CHOICES, default='Не выбран', verbose_name="Тип газа")
-    date = models.DateField(auto_now=True, verbose_name="Дата формирования накладной")
+    date = models.DateTimeField(auto_now=True, verbose_name="Дата формирования накладной")
 
     def __str__(self):
         return self.number

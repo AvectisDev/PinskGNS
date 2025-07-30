@@ -5,8 +5,7 @@ from django.urls import reverse_lazy, reverse
 from django.views import generic
 from django.db.models import Q, Sum
 from railway_service.models import RailwayBatch
-from .models import (Balloon, Truck, Trailer, BalloonsLoadingBatch, BalloonsUnloadingBatch,
-                     BalloonAmount, AutoGasBatch, Reader)
+from .models import Balloon, Truck, Trailer, BalloonsLoadingBatch, BalloonsUnloadingBatch, BalloonAmount, Reader
 from .admin import BalloonResources
 from .forms import (
     GetBalloonsAmount,
