@@ -32,7 +32,7 @@ urlpatterns = [
     path('api/app/', include("mobile.urls", namespace='mobile_api')),
     path('api/carousel/', include("carousel.api.urls", namespace='carousel_api')),
     path('api/railway-batch/', include("railway_service.api.urls", namespace='railway_api')),
-    path('api/autogas/', include("autogas.api.urls", namespace='autogas_api')),
+    path('api/auto-gas-batch/', include("autogas.api.urls", namespace='autogas_api')),
 ] + debug_toolbar_urls()
 
 urlpatterns += [

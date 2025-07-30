@@ -4,14 +4,14 @@ from django.db.models import Sum, Count
 from rest_framework import generics, status, viewsets
 from rest_framework.response import Response
 from rest_framework.decorators import action
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated, AllowAny
 from datetime import datetime, date
 from ..models import AutoGasBatch
 from .serializers import AutoGasBatchSerializer
 
 
 class AutoGasBatchView(viewsets.ViewSet):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [AllowAny]
 
     @action(detail=False, methods=['get'], url_path='statistic')
     def auto_batch_statistic(self, request):
