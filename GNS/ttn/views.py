@@ -5,7 +5,7 @@ from django.db.models import Q, Sum
 from django.contrib import messages
 from django.views.decorators.http import require_POST
 from .models import RailwayTank, BalloonTtn, RailwayTtn, AutoTtn
-from filling_station.models import AutoGasBatchSettings
+from autogas.models import AutoGasBatchSettings
 from .forms import BalloonTtnForm, AutoTtnForm, RailwayTtnForm
 
 

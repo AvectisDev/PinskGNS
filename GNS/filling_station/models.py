@@ -370,15 +370,16 @@ class BalloonsUnloadingBatch(models.Model):
 
 
 class AutoGasBatch(models.Model):
-    batch_type = models.CharField(max_length=10, choices=BATCH_TYPE_CHOICES, default='u', verbose_name="Тип партии")
-    begin_date = models.DateField(null=True, blank=True, auto_now_add=True, verbose_name="Дата начала приёмки")
-    begin_time = models.TimeField(null=True, blank=True, auto_now_add=True, verbose_name="Время начала приёмки")
-    end_date = models.DateField(null=True, blank=True, verbose_name="Дата окончания приёмки")
-    end_time = models.TimeField(null=True, blank=True, verbose_name="Время окончания приёмки")
+    batch_type = models.CharField(max_length=10, choices=BATCH_TYPE_CHOICES, default='u', verbose_name="_Тип партии")
+    begin_date = models.DateField(null=True, blank=True, auto_now_add=True, verbose_name="_Дата начала приёмки")
+    begin_time = models.TimeField(null=True, blank=True, auto_now_add=True, verbose_name="_Время начала приёмки")
+    end_date = models.DateField(null=True, blank=True, verbose_name="_Дата окончания приёмки")
+    end_time = models.TimeField(null=True, blank=True, verbose_name="_Время окончания приёмки")
     truck = models.ForeignKey(
         Truck,
         on_delete=models.DO_NOTHING,
-        verbose_name="Автомобиль"
+        verbose_name="_Автомобиль",
+        related_name = 'filling_set_Truck'
     )
     trailer = models.ForeignKey(
         Trailer,
@@ -386,27 +387,29 @@ class AutoGasBatch(models.Model):
         null=True,
         blank=True,
         default=0,
-        verbose_name="Прицеп"
+        verbose_name="_Прицеп",
+        related_name='filling_set_trailer'
     )
-    gas_amount = models.FloatField(null=True, blank=True, verbose_name="Количество газа (массомер)")
-    gas_type = models.CharField(max_length=10, choices=settings.GAS_TYPE_CHOICES, default='Не выбран', verbose_name="Тип газа")
-    scale_empty_weight = models.FloatField(null=True, blank=True, verbose_name="Вес пустого т/с (весы)")
-    scale_full_weight = models.FloatField(null=True, blank=True, verbose_name="Вес полного т/с (весы)")
-    weight_gas_amount = models.FloatField(null=True, blank=True, verbose_name="Количество газа (весы)")
-    is_active = models.BooleanField(null=True, blank=True, verbose_name="В работе")
+    gas_amount = models.FloatField(null=True, blank=True, verbose_name="__Количество газа (массомер)")
+    gas_type = models.CharField(max_length=10, choices=settings.GAS_TYPE_CHOICES, default='Не выбран', verbose_name="_Тип газа")
+    scale_empty_weight = models.FloatField(null=True, blank=True, verbose_name="_Вес пустого т/с (весы)")
+    scale_full_weight = models.FloatField(null=True, blank=True, verbose_name="_Вес полного т/с (весы)")
+    weight_gas_amount = models.FloatField(null=True, blank=True, verbose_name="_Количество газа (весы)")
+    is_active = models.BooleanField(null=True, blank=True, verbose_name="_В работе")
     user = models.ForeignKey(
         User,
         on_delete=models.DO_NOTHING,
         default=1,
-        verbose_name="Пользователь"
+        verbose_name="_Пользователь",
+        related_name='filling_set_User'
     )
 
     def __str__(self):
         return str(self.id)
 
     class Meta:
-        verbose_name = "Автоколонка"
-        verbose_name_plural = "Автоколонка"
+        verbose_name = "_Автоколонка"
+        verbose_name_plural = "А_втоколонка"
         ordering = ['-begin_date', '-begin_time']
 
     def get_absolute_url(self):
@@ -439,11 +442,11 @@ WEIGHT_SOURCE_CHOICES = [
 
 
 class AutoGasBatchSettings(models.Model):
-    weight_source = models.CharField(choices=WEIGHT_SOURCE_CHOICES, default='f', verbose_name="Источник веса для ТТН")
+    weight_source = models.CharField(choices=WEIGHT_SOURCE_CHOICES, default='f', verbose_name="_Источник веса для ТТН")
 
     def __str__(self):
         return 'Настройки автоколонки'
 
     class Meta:
-        verbose_name = "Настройки автоколонки"
-        verbose_name_plural = "Настройки автоколонки"
+        verbose_name = "_Настройки автоколонки"
+        verbose_name_plural = "_Настройки автоколонки"

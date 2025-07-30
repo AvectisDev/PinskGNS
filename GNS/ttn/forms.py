@@ -1,6 +1,7 @@
 from django import forms
 from django.utils.html import format_html
-from filling_station.models import BalloonsLoadingBatch, BalloonsUnloadingBatch, AutoGasBatch, AutoGasBatchSettings
+from filling_station.models import BalloonsLoadingBatch, BalloonsUnloadingBatch
+from autogas.models import AutoGasBatch, AutoGasBatchSettings
 from .models import AutoTtn, RailwayTtn, BalloonTtn, GAS_TYPE_CHOICES
 from crispy_forms.helper import FormHelper
 from crispy_forms.layout import Submit

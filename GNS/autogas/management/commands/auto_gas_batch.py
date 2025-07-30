@@ -4,7 +4,8 @@ from django.conf import settings
 from django.core.management.base import BaseCommand
 from django.db.models import Q
 from datetime import datetime
-from filling_station.models import AutoGasBatch, Truck, Trailer, TrailerType
+from filling_station.models import Truck, Trailer, TrailerType
+from ...models import AutoGasBatch
 from .intellect import get_registration_number_list, INTELLECT_SERVER_LIST
 
 logger = logging.getLogger('autogas')

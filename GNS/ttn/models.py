@@ -2,7 +2,8 @@ from django.db import models
 from django.contrib.auth.models import User
 from django.urls import reverse
 from django.db.models import Q, Sum
-from filling_station.models import BalloonsLoadingBatch, BalloonsUnloadingBatch, AutoGasBatch
+from filling_station.models import BalloonsLoadingBatch, BalloonsUnloadingBatch
+from autogas.models import AutoGasBatch
 from railway_service.models import RailwayTank
 
 
@@ -208,7 +209,7 @@ class AutoTtn(models.Model):
         related_name='auto_tank_city'
     )
     batch = models.ForeignKey(
-        AutoGasBatch,
+        'autogas.AutoGasBatch',  # Изменено с filling_station.AutoGasBatch
         on_delete=models.SET_NULL,
         null=True,
         blank=True,

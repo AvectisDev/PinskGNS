@@ -32,6 +32,7 @@ INSTALLED_APPS = [
     'carousel.apps.CarouselConfig',
     'ttn.apps.TtnConfig',
     'railway_service.apps.RailwayServiceConfig',
+    'autogas.apps.AutogasConfig',
     'import_export',
     'rest_framework',
     'rest_framework_simplejwt',

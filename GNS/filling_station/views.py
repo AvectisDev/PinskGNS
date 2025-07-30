@@ -14,8 +14,7 @@ from .forms import (
     TruckForm,
     TrailerForm,
     BalloonsLoadingBatchForm,
-    BalloonsUnloadingBatchForm,
-    AutoGasBatchForm
+    BalloonsUnloadingBatchForm
 )
 from datetime import datetime, timedelta
 
@@ -197,31 +196,6 @@ class BalloonUnloadingBatchDeleteView(generic.DeleteView):
     model = BalloonsUnloadingBatch
     success_url = reverse_lazy("filling_station:balloon_unloading_batch_list")
     template_name = 'filling_station/balloons_unloading_batch_confirm_delete.html'
-
-
-# Партии автоцистерн
-class AutoGasBatchListView(generic.ListView):
-    model = AutoGasBatch
-    paginate_by = 10
-    template_name = 'filling_station/auto_batch_list.html'
-
-
-class AutoGasBatchDetailView(generic.DetailView):
-    model = AutoGasBatch
-    context_object_name = 'batch'
-    template_name = 'filling_station/auto_batch_detail.html'
-
-
-class AutoGasBatchUpdateView(generic.UpdateView):
-    model = AutoGasBatch
-    form_class = AutoGasBatchForm
-    template_name = 'filling_station/_equipment_form.html'
-
-
-class AutoGasBatchDeleteView(generic.DeleteView):
-    model = AutoGasBatch
-    success_url = reverse_lazy("filling_station:auto_gas_batch_list")
-    template_name = 'filling_station/auto_batch_confirm_delete.html'
 
 
 # Грузовики

@@ -26,11 +26,13 @@ urlpatterns = [
     path('carousel/', include("carousel.urls", namespace='carousel')),
     path('ttn/', include("ttn.urls", namespace='ttn')),
     path('railway/', include("railway_service.urls", namespace='railway_service')),
+    path('autogas/', include("autogas.urls", namespace='autogas')),
 
     path('api/', include("filling_station.api.urls", namespace='filling_station_api')),
     path('api/app/', include("mobile.urls", namespace='mobile_api')),
     path('api/carousel/', include("carousel.api.urls", namespace='carousel_api')),
     path('api/railway-batch/', include("railway_service.api.urls", namespace='railway_api')),
+    path('api/autogas/', include("autogas.api.urls", namespace='autogas_api')),
 ] + debug_toolbar_urls()
 
 urlpatterns += [
