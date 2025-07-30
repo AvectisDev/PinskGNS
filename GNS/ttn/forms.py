@@ -1,8 +1,9 @@
 from django import forms
 from django.utils.html import format_html
+from django.conf import settings
 from filling_station.models import BalloonsLoadingBatch, BalloonsUnloadingBatch
 from autogas.models import AutoGasBatch, AutoGasBatchSettings
-from .models import AutoTtn, RailwayTtn, BalloonTtn, GAS_TYPE_CHOICES
+from .models import AutoTtn, RailwayTtn, BalloonTtn
 from crispy_forms.helper import FormHelper
 from crispy_forms.layout import Submit
 
@@ -242,7 +243,7 @@ class RailwayTtnForm(forms.ModelForm):
                 'onchange': 'this.form.submit()'  # Авто сохранение при изменении
             }),
             'contract': forms.TextInput(attrs={'class': 'form-control'}),
-            'gas_type': forms.Select(choices=GAS_TYPE_CHOICES, attrs={'class': 'form-control'}),
+            'gas_type': forms.Select(choices=settings.GAS_TYPE_CHOICES, attrs={'class': 'form-control'}),
             'shipper': forms.Select(attrs={'class': 'form-control'}),
             'carrier': forms.Select(attrs={'class': 'form-control'}),
             'consignee': forms.Select(attrs={'class': 'form-control'}),

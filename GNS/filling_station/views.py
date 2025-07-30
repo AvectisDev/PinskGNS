@@ -4,6 +4,7 @@ from django.core.paginator import Paginator
 from django.urls import reverse_lazy, reverse
 from django.views import generic
 from django.db.models import Q, Sum
+from autogas.models import AutoGasBatch
 from railway_service.models import RailwayBatch
 from .models import Balloon, Truck, Trailer, BalloonsLoadingBatch, BalloonsUnloadingBatch, BalloonAmount, Reader
 from .admin import BalloonResources

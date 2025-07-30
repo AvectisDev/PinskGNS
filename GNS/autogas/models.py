@@ -6,16 +6,10 @@ from django.conf import settings
 from filling_station.models import Truck, Trailer
 
 
-BATCH_TYPE_CHOICES = [
-    ('l', 'Приёмка'),
-    ('u', 'Отгрузка'),
-]
-
-
 class AutoGasBatch(models.Model):
-    batch_type = models.CharField(max_length=10, choices=BATCH_TYPE_CHOICES, default='u', verbose_name="Тип партии")
-    begin_date = models.DateField(null=True, blank=True, verbose_name="Дата начала приёмки")
-    begin_time = models.TimeField(null=True, blank=True, verbose_name="Время начала приёмки")
+    batch_type = models.CharField(max_length=10, choices=settings.BATCH_TYPE_CHOICES, default='u', verbose_name="Тип партии")
+    begin_date = models.DateField(auto_now_add=True, verbose_name="Дата начала приёмки")
+    begin_time = models.TimeField(auto_now_add=True, verbose_name="Время начала приёмки")
     end_date = models.DateField(null=True, blank=True, verbose_name="Дата окончания приёмки")
     end_time = models.TimeField(null=True, blank=True, verbose_name="Время окончания приёмки")
     truck = models.ForeignKey(
@@ -36,7 +30,7 @@ class AutoGasBatch(models.Model):
     scale_empty_weight = models.FloatField(null=True, blank=True, verbose_name="Вес пустого т/с (весы)")
     scale_full_weight = models.FloatField(null=True, blank=True, verbose_name="Вес полного т/с (весы)")
     weight_gas_amount = models.FloatField(null=True, blank=True, verbose_name="Количество газа (весы)")
-    is_active = models.BooleanField(null=True, blank=True, verbose_name="В работе")
+    is_active = models.BooleanField(default=False, verbose_name="В работе")
     user = models.ForeignKey(
         User,
         on_delete=models.DO_NOTHING,
@@ -51,7 +45,6 @@ class AutoGasBatch(models.Model):
         verbose_name = "Автоколонка"
         verbose_name_plural = "Автоколонка"
         ordering = ['-begin_date', '-begin_time']
-        app_label = 'autogas'
 
     def get_absolute_url(self):
         return reverse('autogas:auto_gas_batch_detail', args=[self.pk])

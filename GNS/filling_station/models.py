@@ -7,12 +7,6 @@ from django.conf import settings
 import pghistory
 
 
-BATCH_TYPE_CHOICES = [
-    ('l', 'Приёмка'),
-    ('u', 'Отгрузка'),
-]
-
-
 BALLOON_SIZE_CHOICES = [
     (5, 5),
     (12, 12),
@@ -214,8 +208,8 @@ class BalloonAmount(models.Model):
 
 
 class BalloonsLoadingBatch(models.Model):
-    begin_date = models.DateField(null=True, blank=True, auto_now_add=True, verbose_name="Дата начала приёмки")
-    begin_time = models.TimeField(null=True, blank=True, auto_now_add=True, verbose_name="Время начала приёмки")
+    begin_date = models.DateField(auto_now_add=True, verbose_name="Дата начала приёмки")
+    begin_time = models.TimeField(auto_now_add=True, verbose_name="Время начала приёмки")
     end_date = models.DateField(null=True, blank=True, verbose_name="Дата окончания приёмки")
     end_time = models.TimeField(null=True, blank=True, verbose_name="Время окончания приёмки")
     truck = models.ForeignKey(
@@ -232,18 +226,18 @@ class BalloonsLoadingBatch(models.Model):
         verbose_name="Прицеп"
     )
     reader_number = models.IntegerField(null=True, blank=True, verbose_name="Номер считывателя")
-    amount_of_rfid = models.IntegerField(null=True, blank=True, verbose_name="Количество баллонов по rfid")
-    amount_of_5_liters = models.IntegerField(null=True, blank=True, default=0, verbose_name="Количество 5л баллонов")
-    amount_of_12_liters = models.IntegerField(null=True, blank=True, default=0, verbose_name="Количество 12л баллонов")
-    amount_of_27_liters = models.IntegerField(null=True, blank=True, default=0, verbose_name="Количество 27л баллонов")
-    amount_of_50_liters = models.IntegerField(null=True, blank=True, default=0, verbose_name="Количество 50л баллонов")
+    amount_of_rfid = models.IntegerField(default=0, verbose_name="Количество баллонов по rfid")
+    amount_of_5_liters = models.IntegerField(default=0, verbose_name="Количество 5л баллонов")
+    amount_of_12_liters = models.IntegerField(default=0, verbose_name="Количество 12л баллонов")
+    amount_of_27_liters = models.IntegerField(default=0, verbose_name="Количество 27л баллонов")
+    amount_of_50_liters = models.IntegerField(default=0, verbose_name="Количество 50л баллонов")
     gas_amount = models.FloatField(null=True, blank=True, verbose_name="Количество принятого газа")
     balloon_list = models.ManyToManyField(
         Balloon,
         blank=True,
         verbose_name="Список баллонов"
     )
-    is_active = models.BooleanField(null=True, blank=True, verbose_name="В работе")
+    is_active = models.BooleanField(default=False, verbose_name="В работе")
     ttn = models.CharField(max_length=20, default='', verbose_name="Номер ТТН")
     amount_of_ttn = models.IntegerField(null=True, blank=True, verbose_name="Количество баллонов по ТТН")
     user = models.ForeignKey(
@@ -294,8 +288,8 @@ class BalloonsLoadingBatch(models.Model):
 
 
 class BalloonsUnloadingBatch(models.Model):
-    begin_date = models.DateField(null=True, blank=True, auto_now_add=True, verbose_name="Дата начала отгрузки")
-    begin_time = models.TimeField(null=True, blank=True, auto_now_add=True, verbose_name="Время начала отгрузки")
+    begin_date = models.DateField(auto_now_add=True, verbose_name="Дата начала отгрузки")
+    begin_time = models.TimeField(auto_now_add=True, verbose_name="Время начала отгрузки")
     end_date = models.DateField(null=True, blank=True, verbose_name="Дата окончания отгрузки")
     end_time = models.TimeField(null=True, blank=True, verbose_name="Время окончания отгрузки")
     truck = models.ForeignKey(
@@ -312,14 +306,14 @@ class BalloonsUnloadingBatch(models.Model):
         verbose_name="Прицеп"
     )
     reader_number = models.IntegerField(null=True, blank=True, verbose_name="Номер считывателя")
-    amount_of_rfid = models.IntegerField(null=True, blank=True, verbose_name="Количество баллонов по rfid")
-    amount_of_5_liters = models.IntegerField(null=True, blank=True, default=0, verbose_name="Количество 5л баллонов")
-    amount_of_12_liters = models.IntegerField(null=True, blank=True, default=0, verbose_name="Количество 12л баллонов")
-    amount_of_27_liters = models.IntegerField(null=True, blank=True, default=0, verbose_name="Количество 27л баллонов")
-    amount_of_50_liters = models.IntegerField(null=True, blank=True, default=0, verbose_name="Количество 50л баллонов")
+    amount_of_rfid = models.IntegerField(default=0, verbose_name="Количество баллонов по rfid")
+    amount_of_5_liters = models.IntegerField(default=0, verbose_name="Количество 5л баллонов")
+    amount_of_12_liters = models.IntegerField(default=0, verbose_name="Количество 12л баллонов")
+    amount_of_27_liters = models.IntegerField(default=0, verbose_name="Количество 27л баллонов")
+    amount_of_50_liters = models.IntegerField(default=0, verbose_name="Количество 50л баллонов")
     gas_amount = models.FloatField(null=True, blank=True, verbose_name="Количество отгруженного газа")
     balloon_list = models.ManyToManyField(Balloon, blank=True, verbose_name="Список баллонов")
-    is_active = models.BooleanField(null=True, blank=True, verbose_name="В работе")
+    is_active = models.BooleanField(default=False, verbose_name="В работе")
     ttn = models.CharField(max_length=20, default='', verbose_name="Номер ТТН")
     amount_of_ttn = models.IntegerField(null=True, blank=True, verbose_name="Количество баллонов по ТТН")
     user = models.ForeignKey(
