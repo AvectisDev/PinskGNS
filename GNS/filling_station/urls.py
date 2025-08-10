@@ -14,10 +14,10 @@ urlpatterns = [
     path("balloon/<pk>/delete/", views.BalloonDeleteView.as_view(), name="balloon_delete"),
 
     # Таблицы считывателей
-    path('reader/<int:reader>', views.reader_info, name="reader"),
+    path('reader/<int:reader>/', views.reader_info, name="reader"),
 
     # Партии приёмки баллонов
-    path('batch/balloons-loading', views.BalloonLoadingBatchListView.as_view(extra_context={
+    path('batch/balloons-loading/', views.BalloonLoadingBatchListView.as_view(extra_context={
         "title": "Партии приёмки баллонов"
     }),
          name="balloon_loading_batch_list"),
@@ -34,7 +34,7 @@ urlpatterns = [
          name="balloon_loading_batch_delete"),
 
     # Партии отгрузки баллонов
-    path('batch/balloons-unloading', views.BalloonUnloadingBatchListView.as_view(extra_context={
+    path('batch/balloons-unloading/', views.BalloonUnloadingBatchListView.as_view(extra_context={
         "title": "Партии отгрузки баллонов"
     }),
          name="balloon_unloading_batch_list"),
@@ -51,12 +51,12 @@ urlpatterns = [
          name="balloon_unloading_batch_delete"),
 
     # Грузовики
-    path('transport/trucks', views.TruckView.as_view(), name="truck_list"),
-    path('transport/trucks/create', views.TruckCreateView.as_view(extra_context={
+    path('transport/trucks/', views.TruckView.as_view(), name="truck_list"),
+    path('transport/trucks/create/', views.TruckCreateView.as_view(extra_context={
         "title": "Создание грузовика"
     }),
          name="truck_create"),
-    path('transport/trucks/<pk>', views.TruckDetailView.as_view(), name="truck_detail"),
+    path('transport/trucks/<pk>/', views.TruckDetailView.as_view(), name="truck_detail"),
     path('transport/trucks/<pk>/update/',
          views.TruckUpdateView.as_view(extra_context={
              "title": "Редактирование грузовика"
@@ -65,12 +65,12 @@ urlpatterns = [
     path('transport/trucks/<pk>/delete/', views.TruckDeleteView.as_view(), name="truck_delete"),
 
     # Прицепы
-    path('transport/trailers', views.TrailerView.as_view(), name="trailer_list"),
-    path('transport/trailers/create', views.TrailerCreateView.as_view(extra_context={
+    path('transport/trailers/', views.TrailerView.as_view(), name="trailer_list"),
+    path('transport/trailers/create/', views.TrailerCreateView.as_view(extra_context={
         "title": "Создание прицепа"
     }),
          name="trailer_create"),
-    path('transport/trailers/<pk>', views.TrailerDetailView.as_view(), name="trailer_detail"),
+    path('transport/trailers/<pk>/', views.TrailerDetailView.as_view(), name="trailer_detail"),
     path('transport/trailers/<pk>/update/', views.TrailerUpdateView.as_view(extra_context={
         "title": "Редактирование прицепа"
     }),

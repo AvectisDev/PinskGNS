@@ -1,6 +1,9 @@
 from django.shortcuts import get_object_or_404
 from django.http import JsonResponse
 from django.db.models import Sum, Count
+from django.core.cache import cache
+from django.db.models.signals import post_save, post_delete
+from django.dispatch import receiver
 from rest_framework import generics, status, viewsets
 from rest_framework.response import Response
 from rest_framework.decorators import action
@@ -11,10 +14,16 @@ from .serializers import AutoGasBatchSerializer
 
 
 class AutoGasBatchView(viewsets.ViewSet):
-    permission_classes = [AllowAny]
+    permission_classes = [IsAuthenticated]
 
     @action(detail=False, methods=['get'], url_path='statistic')
     def auto_batch_statistic(self, request):
+        cache_key = 'auto_gas_batch_statistic'
+        cached_data = cache.get(cache_key)
+
+        if cached_data is not None:
+            return JsonResponse(cached_data, safe=False)
+
         today = date.today()
         first_day_of_month = today.replace(day=1)
 
@@ -93,6 +102,8 @@ class AutoGasBatchView(viewsets.ViewSet):
                 'ttn_number': active_batch.ttn.number if active_batch.ttn else None,
                 'ttn_consignee': active_batch.ttn.consignee if active_batch.ttn else None
             }
+
+        cache.set(cache_key, response)
         return JsonResponse(response, safe=False)
 
     def list(self, request):
@@ -121,3 +132,9 @@ class AutoGasBatchView(viewsets.ViewSet):
             serializer.save()
             return Response(serializer.data)
         return Response(serializer.errors)
+
+# Сигналы для сброса кеша при изменении данных
+@receiver(post_save, sender=AutoGasBatch)
+@receiver(post_delete, sender=AutoGasBatch)
+def clear_auto_gas_cache(sender, **kwargs):
+    cache.delete('auto_gas_batch_statistic')

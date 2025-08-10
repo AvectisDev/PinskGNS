@@ -56,7 +56,7 @@
                             {% endif %}
                         </td>
                         <td>{{ balloon.change_date|date:"d.m.Y"|default:"-" }}</td>
-                        <td>{{ balloon.change_time|time:"H:i"|default:"" }}</td>
+                        <td>{{ balloon.change_date|time:"H:i:s"|default:"" }}</td>
                     </tr>
                     {% empty %}
                     <tr>

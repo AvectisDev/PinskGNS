@@ -1,12 +1,12 @@
 import os
 import asyncio
+import aiohttp
 import binascii
 import logging.config
 import django
+from django.conf import settings
 from concurrent.futures import ThreadPoolExecutor
-from . import db
 from .settings import READER_LIST, COMMANDS
-from . import api
 
 # Инициализация Django
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'GNS.settings')
@@ -15,6 +15,24 @@ django.setup()
 # Конфигурация логирования из настроек Django
 logging.config.dictConfig(django.conf.settings.LOGGING)
 logger = logging.getLogger('rfid')
+
+USERNAME = "reader"
+PASSWORD = "rfid-device"
+
+
+async def update_balloon(data: dict):
+
+    async with aiohttp.ClientSession() as session:
+        try:
+            async with session.post(f'{settings.DJANGO_API_HOST}/balloons/update-by-reader/', json=data, timeout=2,
+                                    auth=aiohttp.BasicAuth(USERNAME, PASSWORD)) as response:
+                response.raise_for_status()
+                return await response.json()
+
+        except Exception as error:
+            logger.error(f'Ошибка в функции отправки данных баллона с ридера: {error},'
+                         f'send_data: {data}, Ответ: {response}')
+            return {'error': str(error), 'response': response.json()}
 
 
 async def data_exchange_with_reader(controller: dict, command: str):
@@ -34,7 +52,7 @@ async def data_exchange_with_reader(controller: dict, command: str):
         logger.error(f'Таймаут при ожидании ответа от контроллера {controller["ip"]}:{controller["port"]}')
         return []
     except Exception as error:
-        logger.debug(f'Нет связи с контроллером {controller["ip"]}:{controller["port"]}: {error}')
+        logger.error(f'Нет связи с контроллером {controller["ip"]}:{controller["port"]}: {error}')
         return []
     finally:
         writer.close()
@@ -70,25 +88,6 @@ def work_with_nfc_tag_list(nfc_tag: str, nfc_tag_list: list):
             nfc_tag_list.append(nfc_tag)
 
 
-async def balloon_passport_processing(nfc_tag: str, reader: dict):
-    """
-    Функция проверяет наличие и заполненность паспорта в базе данных. Перезаписывает статус баллона в зависимости от
-    того, через какой считыватель сейчас прошёл баллон.
-    """
-
-    passport = {
-        'nfc_tag': nfc_tag,
-        'status': reader['status'],
-        'reader_number': reader['number'],
-        'reader_function': reader['function']
-    }
-
-    # Обновляем статус баллона в базе данных. Если паспорта нет - создаём запись
-    passport = await api.update_balloon(passport)
-
-    return passport['filling_status']
-
-
 async def read_nfc_tag(reader: dict):
     """
     Асинхронная функция отправляет запрос на считыватель FEIG и получает в ответ дату, время и номер RFID метки.
@@ -114,20 +113,11 @@ async def read_nfc_tag(reader: dict):
             work_with_nfc_tag_list(nfc_tag, reader['previous_nfc_tags'])
 
             try:
-                balloon_passport_status = await balloon_passport_processing(nfc_tag, reader)
-                
-                # if reader["ip"] == '10.10.2.23':
-                #     logger.debug(f'{reader["ip"]} rfid 3.записываем в бд новое количество rfid баллонов')
-
-                # data_for_amount = {
-                #     'reader_id': reader['number'],
-                #     'reader_status': reader['status']
-                # }
-                # await balloon_api.update_balloon_amount('rfid', data_for_amount)
-                await db.write_balloons_amount(reader, 'rfid')  # сохраняем значение в бд
-
-                # if reader["ip"] == '10.10.2.23':
-                #     logger.debug(f'{reader["ip"]} rfid 4.запись завершена')
+                post_data = {
+                    'nfc_tag': nfc_tag,
+                    'reader_number': reader['number']
+                }
+                balloon_passport_status = await update_balloon(post_data)
 
                 if balloon_passport_status:  # если паспорт заполнен
                     # зажигаем зелёную лампу на считывателе
@@ -137,7 +127,7 @@ async def read_nfc_tag(reader: dict):
                     await data_exchange_with_reader(reader, 'read_complete_with_error')
 
             except Exception as error:
-                print('Ошибка в функции read_nfc_tag', error)
+                logger.error('Ошибка в функции read_nfc_tag', error)
 
     else:
         await asyncio.sleep(0.3)
@@ -163,18 +153,12 @@ async def read_input_status(reader: dict):
         #     logger.debug(f'{reader["ip"]} 2.состояние 1-го входа = {input_state}, предыдущее = {previous_input_state}')
 
         if input_state == 1 and previous_input_state == 0:
-            # if reader["ip"] == '10.10.2.23':
-            #     logger.debug(f'{reader["ip"]} 3.записываем в бд новое количество определённых баллонов')
 
-            # data_for_amount = {
-            #     'reader_id': reader['number'],
-            #     'reader_status': reader['status']
-            # }
-            # await balloon_api.update_balloon_amount('sensor', data_for_amount)
-            await db.write_balloons_amount(reader, 'sensor')
-
-            # if reader["ip"] == '10.10.2.23':
-            #     logger.debug(f'{reader["ip"]} 4.запись завершена')
+            post_data = {
+                'nfc_tag': None,
+                'reader_number': reader['number']
+            }
+            balloon_passport_status = await update_balloon(post_data)
 
             return 1  # возвращаем состояние входа "активен"
         elif input_state == 0 and previous_input_state == 1:

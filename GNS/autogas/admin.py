@@ -18,10 +18,17 @@ class AutoGasBatchAdmin(admin.ModelAdmin):
         'weight_gas_amount',
         'is_active'
     ]
-    list_filter = ['begin_date', 'end_date', 'is_active']
+    list_filter = [
+        'begin_date',
+        'end_date',
+        'is_active'
+    ]
     search_fields = ['truck']
 
 
 @admin.register(AutoGasBatchSettings)
 class AutoGasBatchSettingsAdmin(admin.ModelAdmin):
-    list_display = ['id', 'weight_source']
+    list_display = [
+        'id',
+        'weight_source'
+    ]

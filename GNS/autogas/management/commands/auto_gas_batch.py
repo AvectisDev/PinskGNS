@@ -8,6 +8,7 @@ from filling_station.models import Truck, Trailer, TrailerType
 from ...models import AutoGasBatch
 from .intellect import get_registration_number_list, INTELLECT_SERVER_LIST
 
+
 logger = logging.getLogger('autogas')
 
 

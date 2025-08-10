@@ -1,6 +1,7 @@
 from django import forms
 from django.utils import timezone
-from .models import Balloon, Truck, Trailer, BalloonsLoadingBatch, BalloonsUnloadingBatch, BALLOON_SIZE_CHOICES
+from django.conf import settings
+from .models import Balloon, Truck, Trailer, BalloonsLoadingBatch, BalloonsUnloadingBatch
 from crispy_forms.helper import FormHelper
 from crispy_forms.layout import Submit
 
@@ -61,7 +62,7 @@ class BalloonForm(forms.ModelForm):
             'nfc_tag': forms.TextInput(attrs={'class': 'form-control'}),
             'serial_number': forms.TextInput(attrs={'class': 'form-control'}),
             'creation_date': forms.DateInput(attrs={'type': 'date'}),
-            'size': forms.Select(choices=BALLOON_SIZE_CHOICES, attrs={'class': 'form-control'}),
+            'size': forms.Select(choices=settings.BALLOON_SIZE_CHOICES, attrs={'class': 'form-control'}),
             'netto': forms.NumberInput(attrs={'class': 'form-control'}),
             'brutto': forms.NumberInput(attrs={'class': 'form-control'}),
             'current_examination_date': forms.DateInput(format='%Y-%m-%d', attrs={'type': 'date'}),
