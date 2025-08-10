@@ -131,7 +131,7 @@ class BalloonViewSet(viewsets.ViewSet):
                 Reader.objects
                 .filter(change_date__gte=first_day_of_month)
                 .order_by('number')
-                .values('reader_id')
+                .values('number')
                 .annotate(
                     balloons_month=Count('pk'),
                     rfid_month=Count('pk', filter=Q(nfc_tag__isnull=False))
@@ -142,7 +142,7 @@ class BalloonViewSet(viewsets.ViewSet):
             balloons_today_stats = (
                 Reader.objects
                 .filter(change_date=today)
-                .values('reader_id')
+                .values('number')
                 .annotate(
                     balloons_month=Count('pk'),
                     rfid_month=Count('pk', filter=Q(nfc_tag__isnull=False))
