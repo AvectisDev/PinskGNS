@@ -14,7 +14,7 @@ urlpatterns = [
     path("balloon/<pk>/delete/", views.BalloonDeleteView.as_view(), name="balloon_delete"),
 
     # Таблицы считывателей
-    path('reader/<int:reader>/', views.reader_info, name="reader"),
+    path('reader/<int:reader_number>/', views.reader_info, name="reader"),
 
     # Партии приёмки баллонов
     path('batch/balloons-loading/', views.BalloonLoadingBatchListView.as_view(extra_context={

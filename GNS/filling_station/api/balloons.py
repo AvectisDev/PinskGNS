@@ -115,7 +115,7 @@ class BalloonViewSet(viewsets.ViewSet):
 
         if not data:
             today = date.today()
-            first_day_of_month = today.replace(day=1, hour=0)
+            first_day_of_month = today.replace(day=1)
 
             # Баллонов на станции
             filled_balloons_on_station = (Balloon.objects

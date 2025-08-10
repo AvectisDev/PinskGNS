@@ -6,7 +6,7 @@ from django.views import generic
 from django.db.models import Q, Sum, Count
 from autogas.models import AutoGasBatch
 from railway_service.models import RailwayBatch
-from .models import Balloon, Truck, Trailer, BalloonsLoadingBatch, BalloonsUnloadingBatch, Reader
+from .models import Balloon, Truck, Trailer, BalloonsLoadingBatch, BalloonsUnloadingBatch, Reader, ReaderSettings
 from .admin import BalloonResources
 from .forms import (
     GetBalloonsAmount,
@@ -61,7 +61,7 @@ class BalloonDeleteView(generic.DeleteView):
     template_name = 'filling_station/balloon_confirm_delete.html'
 
 
-def reader_info(request, reader=1):
+def reader_info(request, reader_number=1):
     current_date = datetime.now().date()
     form = GetBalloonsAmount(request.POST or None)
 
@@ -73,18 +73,19 @@ def reader_info(request, reader=1):
         if action == 'export':
             dataset = BalloonResources().export(
                 Reader.objects.filter(
-                    number=reader,
+                    number=reader_number,
                     change_date__range=(start_date, end_date)
                 )
             )
             response = HttpResponse(dataset.xlsx, content_type='xlsx')
-            response['Content-Disposition'] = f'attachment; filename="RFID_{reader}_{start_date}-{end_date}.xlsx"'
+            response['Content-Disposition'] = f'attachment; filename="RFID_{reader_number}_{start_date}-{end_date}.xlsx"'
             return response
     else:
         start_date = end_date = current_date
 
     # Получаем все данные через метод модели
-    stats = Reader.get_reader_stats(reader, start_date, end_date)
+    stats = Reader.get_reader_stats(reader_number, start_date, end_date)
+    reader = ReaderSettings.objects.get(number=reader_number)
 
     paginator = Paginator(stats['balloons_list'], 10)
     page_num = request.GET.get('page', 1)
@@ -99,8 +100,7 @@ def reader_info(request, reader=1):
         'form': form,
         'reader': reader,
         'start_date': start_date,
-        'end_date': end_date,
-        'reader_status': STATUS_LIST[reader]
+        'end_date': end_date
     }
     return render(request, 'filling_station/rfid_tables.html', context)
 

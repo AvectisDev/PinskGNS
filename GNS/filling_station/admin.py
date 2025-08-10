@@ -60,7 +60,8 @@ class ReaderSettingsAdmin(admin.ModelAdmin):
         'status',
         'ip',
         'port',
-        'function'
+        'function',
+        'need_cache'
     ]
     search_fields = [
         'number',
