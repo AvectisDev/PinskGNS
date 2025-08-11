@@ -94,7 +94,7 @@ class BalloonViewSet(viewsets.ViewSet):
         # Ситуация, когда нет метки
         if nfc_tag is None:
             services.processing_request_without_nfc(reader_number)
-            return Response(status=200)
+            return Response({"status": "Добавлен баллон без NFC"}, status=200)
 
         # Ситуация, когда есть метка
         balloon, reader = services.processing_request_with_nfc(nfc_tag=nfc_tag, reader_number=reader_number)
@@ -197,7 +197,7 @@ class BalloonViewSet(viewsets.ViewSet):
             # Объединяем данные
             response = []
             for stat in balloons_monthly_stats:
-                reader_id = stat['reader_id']
+                reader_id = stat['number']
                 balloons_today = today_dict.get(reader_id, {}).get('balloons_today', 0)
                 rfid_today = today_dict.get(reader_id, {}).get('rfid_today', 0)
                 truck_month = batches_last_month.get(reader_id, 0)
