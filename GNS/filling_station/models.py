@@ -5,7 +5,7 @@ from django.urls import reverse
 from django.db.models import Q, Sum, Count
 from django.conf import settings
 from typing import Dict, Any, Optional
-from datetime import datetime, date
+from datetime import datetime, date, time
 import pghistory
 
 
@@ -110,7 +110,7 @@ class Reader(models.Model):
         return self.pk
 
     def __str__(self):
-        return self.number
+        return str(self.number)
 
     class Meta:
         verbose_name = "Считыватель"
@@ -143,9 +143,12 @@ class Reader(models.Model):
                 'unloading_ttn_quantity': Optional[int]  # Только для reader_number=3,4
             }
         """
+        start_datetime = datetime.combine(start_date, time.min)
+        end_datetime = datetime.combine(end_date, time.max)
+
         queryset = cls.objects.filter(
             number=reader_number,
-            change_date__range=(start_date, end_date)
+            change_date__range=(start_datetime, end_datetime)
         )
 
         stats = queryset.aggregate(
@@ -153,7 +156,7 @@ class Reader(models.Model):
             total_balloons=Count('pk')
         )
 
-        stats['balloons_list'] = queryset.order_by('-change_date')
+        stats['balloons_list'] = queryset.filter(nfc_tag__isnull=False)
 
         # Статистика по ТТН
         if reader_number == 6:
