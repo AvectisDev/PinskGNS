@@ -242,3 +242,16 @@ class FilePath(models.Model):
     class Meta:
         verbose_name = "Путь сохранения файла"
         verbose_name_plural = "Путь сохранения файла"
+
+
+class EmailRecipient(models.Model):
+    email = models.EmailField(verbose_name="Email адрес")
+    active = models.BooleanField(default=True, verbose_name="Включен в рассылку")
+    description = models.CharField(max_length=255, blank=True, verbose_name="Описание")
+
+    class Meta:
+        verbose_name = "Получатель почты"
+        verbose_name_plural = "Получатели почты"
+
+    def __str__(self):
+        return f"{self.email} ({'активен' if self.active else 'неактивен'})"

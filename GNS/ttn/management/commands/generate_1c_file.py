@@ -5,7 +5,7 @@ from django.core.management.base import BaseCommand
 from django.utils import timezone
 from django.conf import settings
 from filling_station.models import BalloonsUnloadingBatch, BalloonsLoadingBatch
-from ttn.models import FilePath, RailwayTtn, AutoTtn
+from ttn.models import FilePath, RailwayTtn, AutoTtn, EmailRecipient
 
 
 logger = logging.getLogger('celery')
@@ -43,21 +43,24 @@ class Command(BaseCommand):
             # Логика для обмена по API
             pass
 
+    def get_recipient_list(self):
+        """Получаем список активных email-адресов"""
+        return list(EmailRecipient.objects.filter(active=True).values_list('email', flat=True))
+
     def send_email_with_attachment(self, file_path, ttn_number):
         """Отправка файла по почте"""
         try:
             subject = f'ТТН {ttn_number} от {timezone.now().strftime("%d.%m.%Y")}'
             body = f'Во вложении файл по ТТН {ttn_number}'
-            to_email = 'pinsk@brest.gas.by'
-            
+            recipient_list = self.get_recipient_list()
+
             email = EmailMessage(
                 subject=subject,
                 body=body,
                 from_email=settings.DEFAULT_FROM_EMAIL,
-                to=[to_email],
+                to=recipient_list,
             )
-            
-            # Прикрепляем файл
+
             with open(file_path, 'rb') as file:
                 email.attach(
                     filename=os.path.basename(file_path),
@@ -65,7 +68,7 @@ class Command(BaseCommand):
                     mimetype='text/plain'
                 )
             email.send()
-            logger.info(f"Письмо с ТТН {ttn_number} успешно отправлено")
+            logger.info(f"Письмо с ТТН {ttn_number} успешно отправлено на {len(recipient_list)} адресов")
         except Exception as e:
             logger.error(f"Ошибка отправки письма: {str(e)}")
 

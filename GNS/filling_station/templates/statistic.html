@@ -44,46 +44,13 @@
                                 </tr>
                             </thead>
                             <tbody>
+                                {% for stat in readers_stats.values %}
                                 <tr>
-                                    <td class="fw-bold">№1</td>
-                                    <td>Регистрация пустого баллона на складе (из кассеты)</td>
-                                    <td class="text-center">{{ balloons_quantity_by_reader_1 }}</td>
+                                    <td>{{ stat.number }}</td>
+                                    <td>{{ stat.status }}</td>
+                                    <td class="text-center">{{ stat.total_rfid }}</td>
                                 </tr>
-                                <tr>
-                                    <td class="fw-bold">№2</td>
-                                    <td>Погрузка полного баллона в кассету</td>
-                                    <td class="text-center">{{ balloons_quantity_by_reader_2 }}</td>
-                                </tr>
-                                <tr>
-                                    <td class="fw-bold">№3</td>
-                                    <td>Погрузка полного баллона на трал 1</td>
-                                    <td class="text-center">{{ balloons_quantity_by_reader_3 }}</td>
-                                </tr>
-                                <tr>
-                                    <td class="fw-bold">№4</td>
-                                    <td>Погрузка полного баллона на трал 2</td>
-                                    <td class="text-center">{{ balloons_quantity_by_reader_4 }}</td>
-                                </tr>
-                                <tr>
-                                    <td class="fw-bold">№5</td>
-                                    <td>Регистрация полного баллона на складе</td>
-                                    <td class="text-center">{{ balloons_quantity_by_reader_5 }}</td>
-                                </tr>
-                                <tr>
-                                    <td class="fw-bold">№6</td>
-                                    <td>Регистрация пустого баллона на складе (рампа)</td>
-                                    <td class="text-center">{{ balloons_quantity_by_reader_6 }}</td>
-                                </tr>
-                                <tr>
-                                    <td class="fw-bold">№7</td>
-                                    <td>Регистрация пустого баллона на складе (цех)</td>
-                                    <td class="text-center">{{ balloons_quantity_by_reader_7 }}</td>
-                                </tr>
-                                <tr>
-                                    <td class="fw-bold">№8</td>
-                                    <td>Наполнение баллона сжиженным газом</td>
-                                    <td class="text-center">{{ balloons_quantity_by_reader_8 }}</td>
-                                </tr>
+                                {% endfor %}
                             </tbody>
                         </table>
                     </div>

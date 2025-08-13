@@ -380,6 +380,35 @@ class BalloonViewSet(viewsets.ViewSet):
 
     @action(detail=False, methods=['get'], url_path='statistic')
     def get_statistic(self, request):
+        """
+        Получение сводной статистики по баллонам и операциям на ГНС.
+        Возвращает кэшированные (на 10 минут) данные в формате:
+        [
+            {
+                "reader_id": int, # Номер считывателя (1-8)
+                "balloons_month": int, # Всего баллонов за месяц
+                "rfid_month": int, # Баллонов с RFID за месяц
+                "balloons_today": int, # Всего баллонов за сегодня
+                "rfid_today": int, # Баллонов с RFID за сегодня
+                "truck_month": int, # Партий (грузовиков) за месяц
+                "truck_today": int # Партий (грузовиков) за сегодня},
+            ...,
+            {"filled_balloons_on_station": int, # Заполненных баллонов на станции
+                "empty_balloons_on_station": int # Пустых баллонов на станции}
+        ]
+        Логика работы:
+        1. Проверяет наличие данных в кэше
+        2. Если данных нет в кэше:
+           - Получает базовую статистику по считывателям
+           - Получает статистику по партиям погрузки/выгрузки
+           - Получает данные о баллонах на станции
+           - Объединяет все данные в единую структуру
+        3. Сохраняет результат в кэш на 10 минут
+
+        Returns:
+            JsonResponse:
+                - 200 OK с данными статистики
+        """
         cache_key = 'get_balloon_statistic'
         cache_time = 600  # 10 минут
         data = cache.get(cache_key)
