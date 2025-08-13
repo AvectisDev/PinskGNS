@@ -16,7 +16,7 @@ from .forms import (
     BalloonsLoadingBatchForm,
     BalloonsUnloadingBatchForm
 )
-from datetime import datetime, timedelta
+from datetime import datetime, time, timedelta
 
 STATUS_LIST = {
     1: 'Регистрация пустого баллона на складе (из кассеты)',
@@ -234,25 +234,28 @@ def statistic(request):
         start_date = current_date
         end_date = current_date
 
+    start_datetime = datetime.combine(start_date, time.min)
+    end_datetime = datetime.combine(end_date, time.max)
+
     # Получаем общее количество баллонов для каждого ридера за период
     readers_data = {
         f'balloons_quantity_by_reader_{i}': Reader.objects.filter(
             number=i,
             nfc_tag__isnull=False,
-            change_date__range=[start_date, end_date]
+            change_date__range=[start_datetime, end_datetime]
             ).count()
         for i in range(1, 9)
     }
 
     context = {
         **readers_data,
-        'balloon_loading_stats': BalloonsLoadingBatch.get_period_stats(start_date, end_date),
-        'balloon_unloading_stats': BalloonsUnloadingBatch.get_period_stats(start_date, end_date),
-        'auto_gas_stats': AutoGasBatch.get_period_stats(start_date, end_date),
-        'railway_stats': RailwayBatch.get_period_stats(start_date, end_date),
+        'balloon_loading_stats': BalloonsLoadingBatch.get_period_stats(start_datetime, end_datetime),
+        'balloon_unloading_stats': BalloonsUnloadingBatch.get_period_stats(start_datetime, end_datetime),
+        'auto_gas_stats': AutoGasBatch.get_period_stats(start_datetime, end_datetime),
+        'railway_stats': RailwayBatch.get_period_stats(start_datetime, end_datetime),
         'form': form,
-        'start_date': start_date,
-        'end_date': end_date,
+        'start_date': start_datetime,
+        'end_date': end_datetime,
     }
 
     return render(request, "statistic.html", context)

@@ -151,7 +151,7 @@ async def read_input_status(reader: dict):
 
     if len(data) == 18:
         input_state = int(data[13])  # определяем состояние 1-го входа (13 индекс в ответе)
-        logger.debug(f'{reader["ip"]} 2.состояние 1-го входа = {input_state}, предыдущее = {previous_input_state}')
+        # logger.debug(f'{reader["ip"]} 2.состояние 1-го входа = {input_state}, предыдущее = {previous_input_state}')
 
         if input_state == 1 and previous_input_state == 0:
 
