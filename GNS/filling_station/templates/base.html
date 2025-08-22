@@ -13,125 +13,148 @@
 </head>
 
 <body>
-    <div class="sidebar d-flex flex-column flex-shrink-0 p-0">
-        <div class="logo-container">
-            <a href="/" class="d-flex align-items-center mb-3 mb-md-0 me-md-auto text-decoration-none">
-                <img src="{% static 'filling_station/media/logo_white.svg' %}" width="80%" alt="Логотип">
-            </a>
-        </div>
+<div class="sidebar d-flex flex-column flex-shrink-0 p-0">
+    <div class="logo-container">
+        <a href="{% url 'filling_station:balloon_list' %}"
+           class="d-flex align-items-center mb-3 mb-md-0 me-md-auto text-decoration-none">
+            <img src="{% static 'filling_station/media/logo_white.svg' %}" width="80%" alt="Логотип">
+        </a>
+    </div>
 
-        <div class="sidebar-menu-container">
-            <ul class="nav nav-pills flex-column mb-auto px-2">
-                <li class="nav-item">
-                    <a href="/" class="nav-link" aria-current="page">
-                        <i class="bi bi-archive me-2"></i>
-                        Архив баллонов
-                    </a>
-                </li>
+    <div class="sidebar-menu-container">
+        <ul class="nav nav-pills flex-column mb-auto px-2">
+            <li class="nav-item">
+                <a href="/" class="nav-link" aria-current="page">
+                    <i class="bi bi-archive me-2"></i>
+                    Архив баллонов
+                </a>
+            </li>
 
-                <li>
-                    <a class="nav-link collapsed" data-bs-toggle="collapse" href="#readers-collapse">
-                        <i class="bi bi-cpu me-2"></i>
-                        Считыватели
-                        <i class="bi bi-chevron-down ms-auto"></i>
-                    </a>
-                    <div class="collapse" id="readers-collapse">
+            <li>
+                <a class="nav-link collapsed" data-bs-toggle="collapse" href="#readers-collapse"
+                   id="readers-menu-link"
+                   data-auto-expand="{% if '/reader/' in request.path %}true{% else %}false{% endif %}">
+                    <i class="bi bi-cpu me-2"></i>
+                    Считыватели
+                    <i class="bi bi-chevron-down ms-auto"></i>
+                </a>
+                <div class="collapse" id="readers-collapse">
                         <ul class="nav flex-column ps-3">
-                            <li><a href="/reader/1" class="nav-link">1 - Регистрация пустого баллона на складе (из кассеты)</a></li>
-                            <li><a href="/reader/2" class="nav-link">2 - Погрузка полного баллона в кассету</a></li>
-                            <li><a href="/reader/3" class="nav-link">3 - Погрузка полного баллона на трал 1</a></li>
-                            <li><a href="/reader/4" class="nav-link">4 - Погрузка полного баллона на трал 2</a></li>
-                            <li><a href="/reader/5" class="nav-link">5 - Регистрация полного баллона на складе</a></li>
-                            <li><a href="/reader/6" class="nav-link">6 - Регистрация пустого баллона на складе (рампа)</a></li>
-                            <li><a href="/reader/7" class="nav-link">7 - Регистрация пустого баллона на складе (цех)</a></li>
-                            <li><a href="/reader/8" class="nav-link">8 - Наполнение баллона сжиженным газом</a></li>
-                        </ul>
-                    </div>
-                </li>
-
-                <li>
-                    <a class="nav-link collapsed" data-bs-toggle="collapse" href="#batches-collapse">
-                        <i class="bi bi-journal-text me-2"></i>
-                        Партии
-                        <i class="bi bi-chevron-down ms-auto"></i>
-                    </a>
-                    <div class="collapse" id="batches-collapse">
-                        <ul class="nav flex-column ps-3">
-                            <li><a href="{% url 'railway_service:railway_batch_list' %}" class="nav-link">Журнал ж/д цистерн</a></li>
-                            <li><a href="{% url 'filling_station:balloon_loading_batch_list' %}" class="nav-link">Приёмка баллонов</a></li>
-                            <li><a href="{% url 'filling_station:balloon_unloading_batch_list' %}" class="nav-link">Отгрузка баллонов</a></li>
-                            <li><a href="{% url 'filling_station:auto_gas_batch_list' %}" class="nav-link">Автоколонка</a></li>
-                        </ul>
-                    </div>
-                </li>
-
-                <li>
-                    <a class="nav-link collapsed" data-bs-toggle="collapse" href="#transport-collapse">
-                        <i class="bi bi-truck me-2"></i>
-                        Транспорт
-                        <i class="bi bi-chevron-down ms-auto"></i>
-                    </a>
-                    <div class="collapse" id="transport-collapse">
-                        <ul class="nav flex-column ps-3">
-                            <li><a href="{% url 'filling_station:truck_list' %}" class="nav-link">Грузовики</a></li>
-                            <li><a href="{% url 'filling_station:trailer_list' %}" class="nav-link">Прицепы</a></li>
-                            <li><a href="{% url 'railway_service:railway_tank_list' %}" class="nav-link">Ж/д цистерны</a></li>
-                        </ul>
-                    </div>
-                </li>
-
-                <li>
-                    <a class="nav-link collapsed" data-bs-toggle="collapse" href="#ttn-collapse">
-                        <i class="bi bi-file-earmark-text me-2"></i>
-                        ТТН
-                        <i class="bi bi-chevron-down ms-auto"></i>
-                    </a>
-                    <div class="collapse" id="ttn-collapse">
-                        <ul class="nav flex-column ps-3">
-                            <li><a href="{% url 'ttn:ttn_list' %}" class="nav-link">Баллоны</a></li>
-                            <li><a href="{% url 'ttn:auto_ttn_list' %}" class="nav-link">Автоцистерны</a></li>
-                            <li><a href="{% url 'ttn:railway_ttn_list' %}" class="nav-link">Ж/д цистерны</a></li>
-                        </ul>
-                    </div>
-                </li>
-               <li class="nav-item">
-                    <a href="/carousel/1" class="nav-link">
-                        <i class="bi bi-gear me-2"></i>
-                        УНБ
-                    </a>
-                </li>
-                <li class="nav-item">
-                    <a href="{% url 'carousel:carousel_settings_detail' %}" class="nav-link">
-                        <i class="bi bi-sliders me-2"></i>
-                        Настройки карусели
-                    </a>
-                </li>
-                <li class="nav-item">
-                    <a href="{% url 'filling_station:statistic' %}" class="nav-link">
-                        <i class="bi bi-graph-up me-2"></i>
-                        Статистика
-                    </a>
-                </li>
-            </ul>
-        </div>
-
-        <div class="user-info">
-            {% if user.is_authenticated %}
-                <div>
-                    <i class="bi bi-person-circle me-2"></i>
-                    {{ user.get_username }}
+                        <li><a href="{% url 'filling_station:reader' reader_number=1 %}" class="nav-link">
+                            1 - Регистрация пустого баллона на складе (из кассеты)
+                        </a></li>
+                        <li><a href="{% url 'filling_station:reader' reader_number=2 %}" class="nav-link">
+                            2 - Погрузка полного баллона в кассету
+                        </a></li>
+                        <li><a href="{% url 'filling_station:reader' reader_number=3 %}" class="nav-link">
+                            3 - Погрузка полного баллона на трал 1
+                        </a></li>
+                        <li><a href="{% url 'filling_station:reader' reader_number=4 %}" class="nav-link">
+                            4 - Погрузка полного баллона на трал 2
+                        </a></li>
+                        <li><a href="{% url 'filling_station:reader' reader_number=5 %}" class="nav-link">
+                            5 - Регистрация полного баллона на складе
+                        </a></li>
+                        <li><a href="{% url 'filling_station:reader' reader_number=6 %}" class="nav-link">
+                            6 - Регистрация пустого баллона на складе (рампа)
+                        </a></li>
+                        <li><a href="{% url 'filling_station:reader' reader_number=7 %}" class="nav-link">
+                            7 - Регистрация пустого баллона на складе (цех)
+                        </a></li>
+                        <li><a href="{% url 'filling_station:reader' reader_number=8 %}" class="nav-link">
+                            8 - Наполнение баллона сжиженным газом
+                        </a></li>
+                    </ul>
                 </div>
-            {% endif %}
+            </li>
+
+            <li>
+                <a class="nav-link collapsed" data-bs-toggle="collapse" href="#batches-collapse">
+                    <i class="bi bi-journal-text me-2"></i>
+                    Партии
+                    <i class="bi bi-chevron-down ms-auto"></i>
+                </a>
+                <div class="collapse" id="batches-collapse">
+                    <ul class="nav flex-column ps-3">
+                        <li><a href="{% url 'railway_service:railway_batch_list' %}" class="nav-link">Журнал ж/д
+                            цистерн</a></li>
+                        <li><a href="{% url 'filling_station:balloon_loading_batch_list' %}" class="nav-link">Приёмка
+                            баллонов</a></li>
+                        <li><a href="{% url 'filling_station:balloon_unloading_batch_list' %}" class="nav-link">Отгрузка
+                            баллонов</a></li>
+                        <li><a href="{% url 'autogas:auto_gas_batch_list' %}" class="nav-link">Автоколонка</a></li>
+                    </ul>
+                </div>
+            </li>
+
+            <li>
+                <a class="nav-link collapsed" data-bs-toggle="collapse" href="#transport-collapse">
+                    <i class="bi bi-truck me-2"></i>
+                    Транспорт
+                    <i class="bi bi-chevron-down ms-auto"></i>
+                </a>
+                <div class="collapse" id="transport-collapse">
+                    <ul class="nav flex-column ps-3">
+                        <li><a href="{% url 'filling_station:truck_list' %}" class="nav-link">Грузовики</a></li>
+                        <li><a href="{% url 'filling_station:trailer_list' %}" class="nav-link">Прицепы</a></li>
+                        <li><a href="{% url 'railway_service:railway_tank_list' %}" class="nav-link">Ж/д цистерны</a>
+                        </li>
+                    </ul>
+                </div>
+            </li>
+
+            <li>
+                <a class="nav-link collapsed" data-bs-toggle="collapse" href="#ttn-collapse">
+                    <i class="bi bi-file-earmark-text me-2"></i>
+                    ТТН
+                    <i class="bi bi-chevron-down ms-auto"></i>
+                </a>
+                <div class="collapse" id="ttn-collapse">
+                    <ul class="nav flex-column ps-3">
+                        <li><a href="{% url 'ttn:ttn_list' %}" class="nav-link">Баллоны</a></li>
+                        <li><a href="{% url 'ttn:auto_ttn_list' %}" class="nav-link">Автоцистерны</a></li>
+                        <li><a href="{% url 'ttn:railway_ttn_list' %}" class="nav-link">Ж/д цистерны</a></li>
+                    </ul>
+                </div>
+            </li>
+            <li class="nav-item">
+                <a href="/carousel/1" class="nav-link">
+                    <i class="bi bi-gear me-2"></i>
+                    УНБ
+                </a>
+            </li>
+            <li class="nav-item">
+                <a href="{% url 'carousel:carousel_settings_detail' %}" class="nav-link">
+                    <i class="bi bi-sliders me-2"></i>
+                    Настройки карусели
+                </a>
+            </li>
+            <li class="nav-item">
+                <a href="{% url 'filling_station:statistic' %}" class="nav-link">
+                    <i class="bi bi-graph-up me-2"></i>
+                    Статистика
+                </a>
+            </li>
+        </ul>
+    </div>
+
+    <div class="user-info">
+        {% if user.is_authenticated %}
+        <div>
+            <i class="bi bi-person-circle me-2"></i>
+            {{ user.get_username }}
         </div>
+        {% endif %}
     </div>
+</div>
 
-    <div class="main-content">
-        {% block content %}
-        {% endblock content %}
-    </div>
+<div class="main-content">
+    {% block content %}
+    {% endblock content %}
+</div>
 
-    <script src="/static/filling_station/bootstrap/jquery-3.5.1.slim.min.js"></script>
-    <script type="text/javascript" src="/static/filling_station/bootstrap/js/bootstrap.bundle.min.js"></script>
+<script src="/static/filling_station/bootstrap/jquery-3.5.1.slim.min.js"></script>
+<script type="text/javascript" src="/static/filling_station/bootstrap/js/bootstrap.bundle.min.js"></script>
     <script>
         // Активация текущего пункта меню
         document.querySelectorAll('.nav-link').forEach(link => {

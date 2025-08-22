@@ -2,12 +2,12 @@
 {% load crispy_forms_tags %}
 {% load custom_filters %}
 
-{% block title %}RFID №{{ reader }} - {{ reader_status }}{% endblock %}
+{% block title %}RFID №{{ reader.number }} - {{ reader.status }}{% endblock %}
 
 {% block content %}
 <div class="container mt-4">
     <div class="d-flex justify-content-between align-items-center mb-4">
-        <h5 class="mb-0">Считыватель №{{ reader }} - {{ reader_status }}</h5>
+        <h5 class="mb-0">Считыватель №{{ reader.number }} - {{ reader.status }}</h5>
 
         <div class="col-md-6">
             <form method="get" action="{% url 'filling_station:balloon_list' %}" class="row g-2 align-items-center">
@@ -56,7 +56,7 @@
                             {% endif %}
                         </td>
                         <td>{{ balloon.change_date|date:"d.m.Y"|default:"-" }}</td>
-                        <td>{{ balloon.change_time|time:"H:i"|default:"" }}</td>
+                        <td>{{ balloon.change_date|time:"H:i:s"|default:"" }}</td>
                     </tr>
                     {% empty %}
                     <tr>
@@ -75,13 +75,13 @@
                 <div class="col-md-5">
                     <p>Статистика за период: <strong>{{ start_date|date:"j E Y" }}</strong> - <strong>{{end_date|date:"j E Y" }}</strong></p>
                     <p>RFID-считыватель: <strong>{{ current_quantity_by_reader }}</strong></p>
-                    {% if reader >= 3 and reader <= 6 %}
+                    {% if reader.number >= 3 and reader.number <= 6 %}
                     <p>Оптический датчик: <strong>{{ current_quantity_by_sensor }}</strong></p>
                     {% endif %}
-                    {% if reader == 6 %}
+                    {% if reader.number == 6 %}
                     <p>ТТН: <strong>{{ loading_ttn_quantity }}</strong></p>
                     {% endif %}
-                    {% if reader == 3 or reader == 4 %}
+                    {% if reader.number == 3 or reader.number == 4 %}
                     <p>ТТН: <strong>{{ unloading_ttn_quantity }}</strong></p>
                     {% endif %}
                 </div>
@@ -106,6 +106,8 @@
         </div>
     </div>
 
-    {% include 'filling_station/_paginator.html' %}
+    <div class="mt-4">
+        {% include 'core/_paginator.html' %}
+    </div>
 </div>
 {% endblock content %}

@@ -18,12 +18,6 @@ balloons_unloading_router.register(r'balloons-unloading',
 balloons_router = DefaultRouter()
 balloons_router.register(r'balloons', balloons.BalloonViewSet, basename='balloons')
 
-balloons_amount_router = DefaultRouter()
-balloons_amount_router.register(r'balloons-amount', balloons.BalloonAmountViewSet, basename='balloonamount')
-
-# statistic
-auto_gas_router = DefaultRouter()
-auto_gas_router.register(r'auto-gas-batch', transport.AutoGasBatchView, basename='auto-gas-batch')
 
 urlpatterns = [
     path('', include(balloons_router.urls)),
@@ -37,10 +31,6 @@ urlpatterns = [
 
     path('', include(balloons_loading_router.urls)),
     path('', include(balloons_unloading_router.urls)),
-
-    path('', include(balloons_amount_router.urls)),
-
-    path('', include(auto_gas_router.urls)),
 
     path('token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
     path('token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),

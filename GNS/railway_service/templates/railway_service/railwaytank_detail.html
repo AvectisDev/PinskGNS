@@ -47,7 +47,8 @@
                         <dt class="col-sm-4">Дата въезда:</dt>
                         <dd class="col-sm-8">
                             {% if object.entry_date %}
-                            {{ object.entry_date|date:"d.m.Y" }} {{ object.entry_time|time:"H:i" }}
+                            <div>{{ object.entry_date|date:"d.m.Y" }}</div>
+                            <small class="text-muted">{{ object.entry_date|time:"H:i" }}</small>
                             {% else %}
                             -
                             {% endif %}
@@ -56,7 +57,8 @@
                         <dt class="col-sm-4">Дата выезда:</dt>
                         <dd class="col-sm-8">
                             {% if object.departure_date %}
-                            {{ object.departure_date|date:"d.m.Y" }} {{ object.departure_time|time:"H:i" }}
+                            <div>{{ object.departure_date|date:"d.m.Y" }}</div>
+                            <small class="text-muted">{{ object.departure_date|time:"H:i" }}</small>
                             {% else %}
                             -
                             {% endif %}

@@ -4,9 +4,7 @@ from ..models import (
     Truck,
     Trailer,
     BalloonsLoadingBatch,
-    BalloonsUnloadingBatch,
-    AutoGasBatch,
-    BalloonAmount
+    BalloonsUnloadingBatch
 )
 
 
@@ -210,29 +208,3 @@ class BalloonAmountUnloadingSerializer(serializers.ModelSerializer):
     class Meta:
         model = BalloonsUnloadingBatch
         fields = ['id', 'amount_of_rfid']
-
-
-class AutoGasBatchSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = AutoGasBatch
-        fields = [
-            'id',
-            'batch_type',
-            'end_date',
-            'end_time',
-            'truck',
-            'trailer',
-            'gas_amount',
-            'gas_type',
-            'scale_empty_weight',
-            'scale_full_weight',
-            'weight_gas_amount',
-            'is_active',
-            'ttn'
-        ]
-
-
-class BalloonAmountSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = BalloonAmount
-        fields = '__all__'

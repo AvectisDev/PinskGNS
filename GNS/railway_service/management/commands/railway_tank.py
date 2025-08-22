@@ -117,10 +117,8 @@ class Command(BaseCommand):
                     defaults={
                         'registration_number': registration_number,
                         'is_on_station': is_on_station,
-                        'entry_date': current_date if is_on_station else None,
-                        'entry_time': current_time if is_on_station else None,
-                        'departure_date': current_date if not is_on_station else None,
-                        'departure_time': current_time if not is_on_station else None,
+                        'entry_date': datetime.now() if is_on_station else None,
+                        'departure_date': datetime.now() if not is_on_station else None,
                         'full_weight': tank_weight if is_on_station else None,
                         'empty_weight': tank_weight if not is_on_station else None,
                     }
@@ -139,14 +137,11 @@ class Command(BaseCommand):
                 if not tank_created:
                     railway_tank.is_on_station = is_on_station
                     if is_on_station:
-                        railway_tank.entry_date = current_date
-                        railway_tank.entry_time = current_time
+                        railway_tank.entry_date = datetime.now()
                         railway_tank.departure_date = None
-                        railway_tank.departure_time = None
                         railway_tank.full_weight = tank_weight
                     else:
-                        railway_tank.departure_date = current_date
-                        railway_tank.departure_time = current_time
+                        railway_tank.departure_date = datetime.now()
                         railway_tank.empty_weight = tank_weight
                         if railway_tank.full_weight is not None:
                             railway_tank.gas_weight = railway_tank.full_weight - tank_weight

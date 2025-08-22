@@ -185,3 +185,16 @@ a.custom-link:hover {
     background-color: #6c757d !important;
     color: white !important;
 }
+
+/* Стили для пагинатора */
+.pagination .page-link {
+    background-color: #3CBBD9 !important;
+    color: white !important;
+    border-color: #3CBBD9 !important;
+}
+
+.pagination .page-item.active .page-link {
+    background-color: #2AA2C0;
+    border-color: #2AA2C0;
+    color: white;
+}

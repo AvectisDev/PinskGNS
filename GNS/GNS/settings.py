@@ -32,6 +32,8 @@ INSTALLED_APPS = [
     'carousel.apps.CarouselConfig',
     'ttn.apps.TtnConfig',
     'railway_service.apps.RailwayServiceConfig',
+    'autogas.apps.AutogasConfig',
+    'drf_spectacular',
     'import_export',
     'rest_framework',
     'rest_framework_simplejwt',
@@ -48,6 +50,32 @@ INTERNAL_IPS = [
     '[::1]',
 ]
 
+# Настройки drf-spectacular
+SPECTACULAR_SETTINGS = {
+    'TITLE': 'Balloon Management API',
+    'DESCRIPTION': 'API for managing gas balloons, loading/unloading batches and integration with Miriada system',
+    'VERSION': '1.0.0',
+    'SERVE_INCLUDE_SCHEMA': False,
+    'SCHEMA_PATH_PREFIX': r'/api/v[0-9]',
+    'COMPONENT_SPLIT_REQUEST': True,
+    'AUTHENTICATION_WHITELIST': [
+        'rest_framework.authentication.SessionAuthentication',
+        'rest_framework.authentication.BasicAuthentication',
+    ],
+    'SWAGGER_UI_SETTINGS': {
+        'deepLinking': True,
+        'persistAuthorization': True,
+        'displayOperationId': True,
+    },
+    'PREPROCESSING_HOOKS': [
+        'drf_spectacular.hooks.preprocess_exclude_path_format',
+    ],
+    'SCHEMA_COERCE_PATH_PK_SUFFIX': True,
+    'TAGS_SORTER': 'alpha',
+    'OPERATIONS_SORTER': 'alpha',
+    'DEFAULT_TAG': 'Другое',
+}
+
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
         'rest_framework_simplejwt.authentication.JWTAuthentication',
@@ -58,6 +86,7 @@ REST_FRAMEWORK = {
     'DEFAULT_PERMISSION_CLASSES': [
         'rest_framework.permissions.IsAuthenticated',
     ],
+    'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
 }
 
 SIMPLE_JWT = {
@@ -187,7 +216,7 @@ CELERY_BEAT_SCHEDULE = {
         'schedule': crontab(minute='*/20'),  # задача выполняется каждые 20 минут, начиная с 0 минут каждого часа
     },
     'auto_gas_processing': {
-        'task': 'filling_station.tasks.auto_gas_processing',
+        'task': 'autogas.tasks.auto_gas_processing',
         'schedule': 10.0,
     },
     'kpp_processing': {
@@ -331,4 +360,16 @@ GAS_TYPE_CHOICES = [
     ('Не выбран', 'Не выбран'),
     ('СПБТ', 'СПБТ'),
     ('ПБА', 'ПБА'),
+]
+
+BATCH_TYPE_CHOICES = [
+    ('l', 'Приёмка'),
+    ('u', 'Отгрузка'),
+]
+
+BALLOON_SIZE_CHOICES = [
+    (5, 5),
+    (12, 12),
+    (27, 27),
+    (50, 50),
 ]

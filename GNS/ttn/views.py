@@ -5,7 +5,7 @@ from django.db.models import Q, Sum
 from django.contrib import messages
 from django.views.decorators.http import require_POST
 from .models import RailwayTank, BalloonTtn, RailwayTtn, AutoTtn
-from filling_station.models import AutoGasBatchSettings
+from autogas.models import AutoGasBatchSettings
 from .forms import BalloonTtnForm, AutoTtnForm, RailwayTtnForm
 
 
@@ -40,6 +40,11 @@ class TTNUpdateView(generic.UpdateView):
 
     def get_success_url(self):
         return self.object.get_absolute_url()
+
+    def post(self, request, *args, **kwargs):
+        if 'cancel' in request.POST:
+            return redirect('ttn:ttn_detail', pk=self.get_object().pk)
+        return super().post(request, *args, **kwargs)
 
     def form_valid(self, form):
         response = super().form_valid(form)
@@ -92,6 +97,14 @@ class RailwayTtnUpdateView(generic.UpdateView):
     model = RailwayTtn
     form_class = RailwayTtnForm
     template_name = 'ttn/_equipment_form.html'
+
+    def get_success_url(self):
+        return self.object.get_absolute_url()
+
+    def post(self, request, *args, **kwargs):
+        if 'cancel' in request.POST:
+            return redirect('ttn:railway_ttn_detail', pk=self.get_object().pk)
+        return super().post(request, *args, **kwargs)
 
     def form_valid(self, form):
         new_railway_ttn = form.cleaned_data['railway_ttn']
@@ -180,6 +193,14 @@ class AutoTtnUpdateView(generic.UpdateView):
     model = AutoTtn
     form_class = AutoTtnForm
     template_name = 'ttn/_equipment_form.html'
+
+    def get_success_url(self):
+        return self.object.get_absolute_url()
+
+    def post(self, request, *args, **kwargs):
+        if 'cancel' in request.POST:
+            return redirect('ttn:auto_ttn_detail', pk=self.get_object().pk)
+        return super().post(request, *args, **kwargs)
 
     def form_valid(self, form):
         response = super().form_valid(form)

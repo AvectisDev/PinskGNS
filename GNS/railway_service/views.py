@@ -1,5 +1,6 @@
 from django.urls import reverse_lazy, reverse
 from django.views import generic
+from django.shortcuts import redirect
 from .models import RailwayTank, RailwayBatch
 from .forms import RailwayTankForm, RailwayBatchForm
 
@@ -22,11 +23,24 @@ class RailwayTankCreateView(generic.CreateView):
     def get_success_url(self):
         return self.object.get_absolute_url()
 
+    def post(self, request, *args, **kwargs):
+        if 'cancel' in request.POST:
+            return redirect('railway_service:railway_tank_list')
+        return super().post(request, *args, **kwargs)
+
 
 class RailwayTankUpdateView(generic.UpdateView):
     model = RailwayTank
     form_class = RailwayTankForm
     template_name = 'railway_service/_equipment_form.html'
+
+    def get_success_url(self):
+        return self.object.get_absolute_url()
+
+    def post(self, request, *args, **kwargs):
+        if 'cancel' in request.POST:
+            return redirect('railway_service:railway_tank_detail', pk=self.get_object().pk)
+        return super().post(request, *args, **kwargs)
 
 
 class RailwayTankDeleteView(generic.DeleteView):
@@ -53,6 +67,14 @@ class RailwayBatchUpdateView(generic.UpdateView):
     model = RailwayBatch
     form_class = RailwayBatchForm
     template_name = 'railway_service/_equipment_form.html'
+
+    def get_success_url(self):
+        return self.object.get_absolute_url()
+
+    def post(self, request, *args, **kwargs):
+        if 'cancel' in request.POST:
+            return redirect('railway_service:railway_batch_detail', pk=self.get_object().pk)
+        return super().post(request, *args, **kwargs)
 
 
 class RailwayBatchDeleteView(generic.DeleteView):

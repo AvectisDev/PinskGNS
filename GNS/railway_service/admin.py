@@ -15,12 +15,10 @@ class RailwayTankAdmin(admin.ModelAdmin):
         'railway_ttn',
         'netto_weight_ttn',
         'entry_date',
-        'entry_time',
         'departure_date',
-        'departure_time',
         'registration_number_img'
     ]
-    search_fields = ['registration_number', 'is_on_station', 'entry_date', 'departure_date']
+    search_fields = ['registration_number']
     list_filter = ['entry_date', 'departure_date', 'is_on_station']
 
 

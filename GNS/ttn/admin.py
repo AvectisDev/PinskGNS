@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import BalloonTtn, AutoTtn, RailwayTtn, Contractor, City, FilePath
+from .models import BalloonTtn, AutoTtn, RailwayTtn, Contractor, City, FilePath, EmailRecipient
 
 @admin.register(BalloonTtn)
 class TTNAdmin(admin.ModelAdmin):
@@ -82,3 +82,18 @@ class CityAdmin(admin.ModelAdmin):
 @admin.register(FilePath)
 class FilePathAdmin(admin.ModelAdmin):
     list_display = ['path']
+
+
+@admin.register(EmailRecipient)
+class EmailRecipientAdmin(admin.ModelAdmin):
+    list_display = [
+        'id',
+        'email',
+        'active',
+        'description'
+    ]
+    search_fields = [
+        'email',
+        'description'
+    ]
+    list_filter = ['active']
