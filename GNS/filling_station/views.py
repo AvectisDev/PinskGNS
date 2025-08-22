@@ -54,6 +54,14 @@ class BalloonUpdateView(generic.UpdateView):
     form_class = BalloonForm
     template_name = 'filling_station/_equipment_form.html'
 
+    def get_success_url(self):
+        return self.object.get_absolute_url()
+
+    def post(self, request, *args, **kwargs):
+        if 'cancel' in request.POST:
+            return redirect('filling_station:balloon_detail', pk=self.get_object().pk)
+        return super().post(request, *args, **kwargs)
+
 
 class BalloonDeleteView(generic.DeleteView):
     model = Balloon
@@ -123,6 +131,14 @@ class BalloonLoadingBatchUpdateView(generic.UpdateView):
     form_class = BalloonsLoadingBatchForm
     template_name = 'filling_station/_equipment_form.html'
 
+    def get_success_url(self):
+        return self.object.get_absolute_url()
+
+    def post(self, request, *args, **kwargs):
+        if 'cancel' in request.POST:
+            return redirect('filling_station:balloon_loading_batch_detail', pk=self.get_object().pk)
+        return super().post(request, *args, **kwargs)
+
 
 class BalloonLoadingBatchDeleteView(generic.DeleteView):
     model = BalloonsLoadingBatch
@@ -147,6 +163,14 @@ class BalloonUnloadingBatchUpdateView(generic.UpdateView):
     model = BalloonsUnloadingBatch
     form_class = BalloonsUnloadingBatchForm
     template_name = 'filling_station/_equipment_form.html'
+
+    def get_success_url(self):
+        return self.object.get_absolute_url()
+
+    def post(self, request, *args, **kwargs):
+        if 'cancel' in request.POST:
+            return redirect('filling_station:balloon_unloading_batch_detail', pk=self.get_object().pk)
+        return super().post(request, *args, **kwargs)
 
 
 class BalloonUnloadingBatchDeleteView(generic.DeleteView):
@@ -179,6 +203,14 @@ class TruckUpdateView(generic.UpdateView):
     form_class = TruckForm
     template_name = 'filling_station/_equipment_form.html'
 
+    def get_success_url(self):
+        return self.object.get_absolute_url()
+
+    def post(self, request, *args, **kwargs):
+        if 'cancel' in request.POST:
+            return redirect('filling_station:truck_detail', pk=self.get_object().pk)
+        return super().post(request, *args, **kwargs)
+
 
 class TruckDeleteView(generic.DeleteView):
     model = Truck
@@ -209,6 +241,14 @@ class TrailerUpdateView(generic.UpdateView):
     model = Trailer
     form_class = TrailerForm
     template_name = 'filling_station/_equipment_form.html'
+
+    def get_success_url(self):
+        return self.object.get_absolute_url()
+
+    def post(self, request, *args, **kwargs):
+        if 'cancel' in request.POST:
+            return redirect('filling_station:trailer_detail', pk=self.get_object().pk)
+        return super().post(request, *args, **kwargs)
 
 
 class TrailerDeleteView(generic.DeleteView):

@@ -3,6 +3,7 @@ from django.contrib.auth.models import User
 from django.urls import reverse
 from django.conf import settings
 from django.db.models import Count, Sum
+from datetime import datetime, time
 
 
 class RailwayTank(models.Model):
@@ -14,10 +15,8 @@ class RailwayTank(models.Model):
     is_on_station = models.BooleanField(null=True, blank=True, verbose_name="Находится на станции")
     railway_ttn = models.CharField(null=True, blank=True, max_length=50, verbose_name="Номер ж/д накладной")
     netto_weight_ttn = models.FloatField(null=True, blank=True, verbose_name="Вес НЕТТО ж/д цистерны по накладной")
-    entry_date = models.DateField(null=True, blank=True, verbose_name="Дата въезда")
-    entry_time = models.TimeField(null=True, blank=True, verbose_name="Время въезда")
-    departure_date = models.DateField(null=True, blank=True, verbose_name="Дата выезда")
-    departure_time = models.TimeField(null=True, blank=True, verbose_name="Время выезда")
+    entry_date = models.DateTimeField(null=True, blank=True, verbose_name="Дата въезда")
+    departure_date = models.DateTimeField(null=True, blank=True, verbose_name="Дата выезда")
     registration_number_img = models.ImageField(null=True, blank=True, upload_to='railway_tanks/', verbose_name="Фото номера")
     user = models.ForeignKey(
         User,
@@ -32,7 +31,7 @@ class RailwayTank(models.Model):
     class Meta:
         verbose_name = "Ж/д цистерна"
         verbose_name_plural = "Ж/д цистерны"
-        ordering = ['-is_on_station', '-entry_date', '-entry_time', '-departure_date', '-departure_time']
+        ordering = ['-is_on_station', '-entry_date', '-departure_date']
 
     def get_absolute_url(self):
         return reverse('railway_service:railway_tank_detail', args=[self.pk])
@@ -83,8 +82,10 @@ class RailwayBatch(models.Model):
 
     @classmethod
     def get_period_stats(cls, start_date, end_date):
+        start_datetime = datetime.combine(start_date, time.min)
+        end_datetime = datetime.combine(end_date, time.max)
         return cls.objects.filter(
-            begin_date__range=[start_date, end_date]
+            begin_date__range=[start_datetime, end_datetime]
         ).annotate(
             tanks_count=Count('railway_tank_list'),
             total_gas_in_tanks=Sum('railway_tank_list__gas_weight')

@@ -41,6 +41,11 @@ class TTNUpdateView(generic.UpdateView):
     def get_success_url(self):
         return self.object.get_absolute_url()
 
+    def post(self, request, *args, **kwargs):
+        if 'cancel' in request.POST:
+            return redirect('ttn:ttn_detail', pk=self.get_object().pk)
+        return super().post(request, *args, **kwargs)
+
     def form_valid(self, form):
         response = super().form_valid(form)
         messages.success(self.request, f'ТТН {self.object.number} успешно обновлена')
@@ -92,6 +97,14 @@ class RailwayTtnUpdateView(generic.UpdateView):
     model = RailwayTtn
     form_class = RailwayTtnForm
     template_name = 'ttn/_equipment_form.html'
+
+    def get_success_url(self):
+        return self.object.get_absolute_url()
+
+    def post(self, request, *args, **kwargs):
+        if 'cancel' in request.POST:
+            return redirect('ttn:railway_ttn_detail', pk=self.get_object().pk)
+        return super().post(request, *args, **kwargs)
 
     def form_valid(self, form):
         new_railway_ttn = form.cleaned_data['railway_ttn']
@@ -180,6 +193,14 @@ class AutoTtnUpdateView(generic.UpdateView):
     model = AutoTtn
     form_class = AutoTtnForm
     template_name = 'ttn/_equipment_form.html'
+
+    def get_success_url(self):
+        return self.object.get_absolute_url()
+
+    def post(self, request, *args, **kwargs):
+        if 'cancel' in request.POST:
+            return redirect('ttn:auto_ttn_detail', pk=self.get_object().pk)
+        return super().post(request, *args, **kwargs)
 
     def form_valid(self, form):
         response = super().form_valid(form)

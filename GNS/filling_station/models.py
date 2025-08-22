@@ -82,9 +82,9 @@ class Balloon(models.Model):
 
 
 READER_FUNCTION_CHOICES = [
-    ('l', 'loading'),
-    ('u', 'unloading'),
-    ('p', None)
+    ('l', 'Приёмка'),
+    ('u', 'Отгрузка'),
+    ('p', 'Нет')
 ]
 
 class ReaderSettings(models.Model):

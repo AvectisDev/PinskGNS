@@ -50,7 +50,8 @@ class BalloonForm(forms.ModelForm):
         self.helper.form_class = 'form-horizontal'
         self.helper.label_class = 'col-lg-4'
         self.helper.field_class = 'col-lg-8'
-        self.helper.add_input(Submit('Сохранить', 'Сохранить', css_class='btn btn-success'))
+        self.helper.add_input(Submit('save', 'Сохранить', css_class='btn btn-success'))
+        self.helper.add_input(Submit('cancel', 'Отмена', css_class='btn btn-secondary'))
         self.helper.form_method = 'POST'
 
     class Meta:
@@ -84,7 +85,8 @@ class TruckForm(forms.ModelForm):
         self.helper.form_class = 'form-horizontal'
         self.helper.label_class = 'col-lg-4'
         self.helper.field_class = 'col-lg-8'
-        self.helper.add_input(Submit('Сохранить', 'Сохранить', css_class='btn btn-success'))
+        self.helper.add_input(Submit('save', 'Сохранить', css_class='btn btn-success'))
+        self.helper.add_input(Submit('cancel', 'Отмена', css_class='btn btn-secondary'))
         self.helper.form_method = 'POST'
 
     class Meta:
@@ -130,7 +132,8 @@ class TrailerForm(forms.ModelForm):
         self.helper.form_class = 'form-horizontal'
         self.helper.label_class = 'col-lg-4'
         self.helper.field_class = 'col-lg-8'
-        self.helper.add_input(Submit('Сохранить', 'Сохранить', css_class='btn btn-success'))
+        self.helper.add_input(Submit('save', 'Сохранить', css_class='btn btn-success'))
+        self.helper.add_input(Submit('cancel', 'Отмена', css_class='btn btn-secondary'))
         self.helper.form_method = 'POST'
 
     class Meta:
@@ -178,7 +181,8 @@ class BalloonsLoadingBatchForm(forms.ModelForm):
         self.helper.form_class = 'form-horizontal'
         self.helper.label_class = 'col-lg-4'
         self.helper.field_class = 'col-lg-8'
-        self.helper.add_input(Submit('Сохранить', 'Сохранить', css_class='btn btn-success'))
+        self.helper.add_input(Submit('save', 'Сохранить', css_class='btn btn-success'))
+        self.helper.add_input(Submit('cancel', 'Отмена', css_class='btn btn-secondary'))
         self.helper.form_method = 'POST'
 
         self.fields['truck'].empty_label = 'Выберите автомобиль'
@@ -271,7 +275,8 @@ class BalloonsUnloadingBatchForm(forms.ModelForm):
         self.helper.form_class = 'form-horizontal'
         self.helper.label_class = 'col-lg-4'
         self.helper.field_class = 'col-lg-8'
-        self.helper.add_input(Submit('Сохранить', 'Сохранить', css_class='btn btn-success'))
+        self.helper.add_input(Submit('save', 'Сохранить', css_class='btn btn-success'))
+        self.helper.add_input(Submit('cancel', 'Отмена', css_class='btn btn-secondary'))
         self.helper.form_method = 'POST'
 
         self.fields['truck'].empty_label = 'Выберите автомобиль'

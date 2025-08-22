@@ -12,7 +12,8 @@ class RailwayTankForm(forms.ModelForm):
         self.helper.form_class = 'form-horizontal'
         self.helper.label_class = 'col-lg-4'
         self.helper.field_class = 'col-lg-8'
-        self.helper.add_input(Submit('Сохранить', 'Сохранить', css_class='btn btn-success'))
+        self.helper.add_input(Submit('save', 'Сохранить', css_class='btn btn-success'))
+        self.helper.add_input(Submit('cancel', 'Отмена', css_class='btn btn-secondary'))
         self.helper.form_method = 'POST'
 
     class Meta:
@@ -27,9 +28,8 @@ class RailwayTankForm(forms.ModelForm):
             'railway_ttn',
             'netto_weight_ttn',
             'entry_date',
-            'entry_time',
             'departure_date',
-            'departure_time'
+            'registration_number_img',
         ]
         widgets = {
             'registration_number': forms.TextInput(attrs={'class': 'form-control'}),
@@ -40,10 +40,9 @@ class RailwayTankForm(forms.ModelForm):
             'is_on_station': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
             'railway_ttn': forms.TextInput(attrs={'class': 'form-control'}),
             'netto_weight_ttn': forms.NumberInput(attrs={'class': 'form-control'}),
-            'entry_date': forms.DateInput(format='%Y-%m-%d', attrs={'type': 'date'}),
-            'entry_time': forms.TimeInput(attrs={'type': 'time'}),
-            'departure_date': forms.DateInput(format='%Y-%m-%d', attrs={'type': 'date'}),
-            'departure_time': forms.TimeInput(attrs={'type': 'time'}),
+            'entry_date': forms.DateTimeInput(attrs={'type': 'datetime-local', 'class': 'form-control'}),
+            'departure_date': forms.DateTimeInput(attrs={'type': 'datetime-local', 'class': 'form-control'}),
+            'registration_number_img': forms.ClearableFileInput(attrs={'class': 'form-control'}),
         }
 
 
@@ -54,7 +53,8 @@ class RailwayBatchForm(forms.ModelForm):
         self.helper.form_class = 'form-horizontal'
         self.helper.label_class = 'col-lg-4'
         self.helper.field_class = 'col-lg-8'
-        self.helper.add_input(Submit('Сохранить', 'Сохранить', css_class='btn btn-success'))
+        self.helper.add_input(Submit('save', 'Сохранить', css_class='btn btn-success'))
+        self.helper.add_input(Submit('cancel', 'Отмена', css_class='btn btn-secondary'))
         self.helper.form_method = 'POST'
 
     class Meta:
