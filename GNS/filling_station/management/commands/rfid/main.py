@@ -36,7 +36,6 @@ async def update_balloon(data: dict):
             return {'error': str(error), 'response': response_json}
 
 
-
 async def data_exchange_with_reader(controller: dict, command: str):
     """
     Асинхронная функция выполняет обмен данными со считывателем FEIG.

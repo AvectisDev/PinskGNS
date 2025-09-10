@@ -16,9 +16,13 @@ def processing_request_without_nfc(reader_number: int) -> Optional[Reader]:
     Возвращает созданный объект Reader или None в случае ошибки.
     """
     try:
-        reader = Reader.objects.create(number=reader_number)
+        reader_settings = ReaderSettings.objects.get(number=reader_number)
+        reader = Reader.objects.create(number=reader_settings)
         logger.info(f"Создана запись баллона без NFC. Ридер {reader_number}")
         return reader
+    except ReaderSettings.DoesNotExist:
+        logger.error(f"Ридер с номером {reader_number} не найден в настройках")
+        return None
     except Exception as error:
         logger.error(f"Ошибка обработки сигнала от оптического датчика: {error}")
         return None
@@ -114,7 +118,7 @@ def add_balloon_to_reader_table(balloon: Balloon, reader: ReaderSettings):
     """
     try:
         Reader.objects.create(
-            number=reader.number,
+            number=reader,
             nfc_tag=balloon.nfc_tag,
             serial_number=balloon.serial_number,
             size=balloon.size,
