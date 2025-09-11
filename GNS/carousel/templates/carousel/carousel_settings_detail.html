@@ -35,8 +35,17 @@
                             </span>
                         </dd>
 
-                        <dt class="col-sm-8">Значение корректировки веса:</dt>
-                        <dd class="col-sm-4">{{ carousel_settings.weight_correction_value|floatformat:2 }}</dd>
+                        <dt class="col-sm-8">Общее значение коррекции:</dt>
+                        <dd class="col-sm-4">{{ carousel_settings.weight_correction_value|floatformat:2 }} кг</dd>
+                    </dl>
+                </div>
+                <div class="col-md-6">
+                    <dl class="row">
+                        <dt class="col-sm-8">Минимальный вес баллона:</dt>
+                        <dd class="col-sm-4">{{ carousel_settings.min_balloon_weight|floatformat:2 }} кг</dd>
+
+                        <dt class="col-sm-8">Максимальный вес баллона:</dt>
+                        <dd class="col-sm-4">{{ carousel_settings.max_balloon_weight|floatformat:2 }} кг</dd>
                     </dl>
                 </div>
             </div>

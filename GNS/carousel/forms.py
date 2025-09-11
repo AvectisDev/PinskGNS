@@ -45,12 +45,14 @@ class CarouselSettingsForm(forms.ModelForm):
 
     class Meta:
         model = CarouselSettings
-        fields = '__all__'
+        exclude = ['user']
         widgets = {
             'read_only': forms.CheckboxInput(attrs={'class': 'form-control'}),
             'use_weight_management': forms.CheckboxInput(attrs={'class': 'form-control'}),
             'weight_correction_value': forms.NumberInput(attrs={'class': 'form-control'}),
             'use_common_correction': forms.CheckboxInput(attrs={'class': 'form-control'}),
+            'min_balloon_weight': forms.NumberInput(attrs={'class': 'form-control'}),
+            'max_balloon_weight': forms.NumberInput(attrs={'class': 'form-control'}),
             'post_1_correction': forms.NumberInput(attrs={'class': 'form-control'}),
             'post_2_correction': forms.NumberInput(attrs={'class': 'form-control'}),
             'post_3_correction': forms.NumberInput(attrs={'class': 'form-control'}),
