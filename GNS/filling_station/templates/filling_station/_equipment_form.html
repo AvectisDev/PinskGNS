@@ -7,6 +7,7 @@
 <div class="row" style="padding: 20px;">
     <h5>{{ title }}</h5>
     <div class="w-50 mx-auto">
+        {% csrf_token %}
         {% crispy form %}
     </div>
 </div>
