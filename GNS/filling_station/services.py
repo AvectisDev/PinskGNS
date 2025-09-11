@@ -90,13 +90,13 @@ def add_balloon_to_batch(balloon: Balloon, reader: ReaderSettings):
     today = date.today()
 
     try:
-        function_type = reader.get_function_display()
+        function_type = reader.function
 
-        if function_type == 'loading':
+        if function_type == 'l':
             batch = BalloonsLoadingBatch.objects.filter(begin_date=today,
                                                         reader_number=reader.number,
                                                         is_active=True).first()
-        elif function_type == 'unloading':
+        elif function_type == 'u':
             batch = BalloonsUnloadingBatch.objects.filter(begin_date=today,
                                                           reader_number=reader.number,
                                                           is_active=True).first()
