@@ -40,9 +40,10 @@
                             </a>
                         </td>
                         <td>{{ tank.get_gas_type_display|default:"-" }}</td>
-                        <td>{{ tank.full_weight|float_format|default:"-" }} т</td>
-                        <td>{{ tank.empty_weight|float_format|default:"-" }} т</td>
-                        <td>{{ tank.gas_weight|float_format|default:"-" }} т</td>
+                        {% with last=tank.tank_history.all.0 %}
+                        <td>{{ last.full_weight|float_format|default:"-" }} т</td>
+                        <td>{{ last.empty_weight|float_format|default:"-" }} т</td>
+                        <td>{{ last.gas_weight|float_format|default:"-" }} т</td>
                         <td>
                             {% if tank.is_on_station %}
                             <span class="badge bg-success">На станции</span>
@@ -51,29 +52,30 @@
                             {% endif %}
                         </td>
                         <td>
-                            {% if tank.entry_date %}
-                            <div>{{ tank.entry_date|date:"d.m.Y" }}</div>
-                            <small class="text-muted">{{ tank.entry_date|time:"H:i" }}</small>
+                            {% if last and last.arrival_at %}
+                            <div>{{ last.arrival_at|date:"d.m.Y" }}</div>
+                            <small class="text-muted">{{ last.arrival_at|time:"H:i" }}</small>
                             {% else %}
                             -
                             {% endif %}
                         </td>
                         <td>
-                            {% if tank.departure_date %}
-                            <div>{{ tank.departure_date|date:"d.m.Y" }}</div>
-                            <small class="text-muted">{{ tank.departure_date|time:"H:i" }}</small>
+                            {% if last and last.departure_at %}
+                            <div>{{ last.departure_at|date:"d.m.Y" }}</div>
+                            <small class="text-muted">{{ last.departure_at|time:"H:i" }}</small>
                             {% else %}
                             -
                             {% endif %}
                         </td>
                         <td>
-                            {% if tank.railway_ttn %}
+                            {% if last and last.railway_ttn %}
                             <div><span class="badge bg-success">Введена</span></div>
-                            <small class="text-muted">№ {{ tank.railway_ttn }}</small>
+                            <small class="text-muted">№ {{ last.railway_ttn }}</small>
                             {% else %}
                             <span class="badge bg-secondary">Отсутствует</span>
                             {% endif %}
                         </td>
+                        {% endwith %}
                         <td>
                             <div class="action-buttons">
                                 <a href="{{ tank.get_update_url }}" class="btn-icon btn-edit" title="Редактировать">

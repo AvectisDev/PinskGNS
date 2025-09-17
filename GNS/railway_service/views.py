@@ -1,7 +1,7 @@
 from django.urls import reverse_lazy, reverse
 from django.views import generic
 from django.shortcuts import redirect
-from .models import RailwayTank, RailwayBatch
+from .models import RailwayTank, RailwayBatch, RailwayTankHistory
 from .forms import RailwayTankForm, RailwayBatchForm
 
 
@@ -10,9 +10,23 @@ class RailwayTankView(generic.ListView):
     model = RailwayTank
     paginate_by = 10
 
+    def get_queryset(self):
+        return (
+            super()
+            .get_queryset()
+            .prefetch_related('tank_history')
+        )
+
 
 class RailwayTankDetailView(generic.DetailView):
     model = RailwayTank
+
+    def get_queryset(self):
+        return (
+            super()
+            .get_queryset()
+            .prefetch_related('tank_history')
+        )
 
 
 class RailwayTankCreateView(generic.CreateView):

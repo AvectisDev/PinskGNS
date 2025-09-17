@@ -20,28 +20,14 @@ class RailwayTankForm(forms.ModelForm):
         model = RailwayTank
         fields = [
             'registration_number',
-            'empty_weight',
-            'full_weight',
-            'gas_weight',
             'gas_type',
             'is_on_station',
-            'railway_ttn',
-            'netto_weight_ttn',
-            'entry_date',
-            'departure_date',
             'registration_number_img',
         ]
         widgets = {
-            'registration_number': forms.TextInput(attrs={'class': 'form-control'}),
-            'empty_weight': forms.NumberInput(attrs={'class': 'form-control'}),
-            'full_weight': forms.NumberInput(attrs={'class': 'form-control'}),
-            'gas_weight': forms.NumberInput(attrs={'class': 'form-control'}),
+            'registration_number': forms.NumberInput(attrs={'class': 'form-control'}),
             'gas_type': forms.Select(choices=settings.GAS_TYPE_CHOICES, attrs={'class': 'form-control'}),
             'is_on_station': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
-            'railway_ttn': forms.TextInput(attrs={'class': 'form-control'}),
-            'netto_weight_ttn': forms.NumberInput(attrs={'class': 'form-control'}),
-            'entry_date': forms.DateTimeInput(attrs={'type': 'datetime-local', 'class': 'form-control'}),
-            'departure_date': forms.DateTimeInput(attrs={'type': 'datetime-local', 'class': 'form-control'}),
             'registration_number_img': forms.ClearableFileInput(attrs={'class': 'form-control'}),
         }
 
