@@ -8,10 +8,16 @@
     <div class="row justify-content-center">
         <div class="col-12 col-md-8 col-lg-6">
             <h5 class="mb-3">{{ title }}</h5>
-            {% crispy form %}
+            <form method="post" enctype="multipart/form-data">
+                {% csrf_token %}
+                {% crispy form %}
+            </form>
         </div>
     </div>
-    
 </div>
 
 {% endblock content %}
+
+{% block extra_scripts %}{% endblock %}
+
+

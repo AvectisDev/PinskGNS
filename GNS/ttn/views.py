@@ -80,10 +80,10 @@ class RailwayTtnCreateView(generic.CreateView):
         self.object = form.save(commit=False)
         railway_ttn_number = form.cleaned_data['railway_ttn']
 
-        # Находим все цистерны с этим номером накладной и суммируем значения
-        tanks = RailwayTank.objects.filter(railway_ttn=railway_ttn_number)
-        self.object.total_gas_amount_by_scales = tanks.aggregate(total=Sum('gas_weight'))['total'] or 0
-        self.object.total_gas_amount_by_ttn = tanks.aggregate(total=Sum('netto_weight_ttn'))['total'] or 0
+        # Находим все цистерны с этим номером ж/д накладной по истории и суммируем значения
+        tanks = RailwayTank.objects.filter(tank_history__railway_ttn=railway_ttn_number).distinct()
+        self.object.total_gas_amount_by_scales = tanks.aggregate(total=Sum('tank_history__gas_weight'))['total'] or 0
+        self.object.total_gas_amount_by_ttn = tanks.aggregate(total=Sum('tank_history__netto_weight_ttn'))['total'] or 0
         self.object.save()
 
         # Добавляем цистерны в ManyToMany связь
@@ -111,10 +111,10 @@ class RailwayTtnUpdateView(generic.UpdateView):
 
         self.object = form.save(commit=False)
 
-        # Обновляем суммы
-        tanks = RailwayTank.objects.filter(railway_ttn=new_railway_ttn)
-        self.object.total_gas_amount_by_scales = tanks.aggregate(total=Sum('gas_weight'))['total'] or 0
-        self.object.total_gas_amount_by_ttn = tanks.aggregate(total=Sum('netto_weight_ttn'))['total'] or 0
+        # Обновляем суммы по истории
+        tanks = RailwayTank.objects.filter(tank_history__railway_ttn=new_railway_ttn).distinct()
+        self.object.total_gas_amount_by_scales = tanks.aggregate(total=Sum('tank_history__gas_weight'))['total'] or 0
+        self.object.total_gas_amount_by_ttn = tanks.aggregate(total=Sum('tank_history__netto_weight_ttn'))['total'] or 0
 
         # Обновляем ManyToMany связь
         self.object.railway_tank_list.set(tanks)

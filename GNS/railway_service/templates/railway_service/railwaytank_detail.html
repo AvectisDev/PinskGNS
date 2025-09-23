@@ -35,6 +35,8 @@
                         <dt class="col-sm-5">Масса газа:</dt>
                         <dd class="col-sm-7">{{ last.gas_weight|float_format|default:"-" }} т</dd>
 
+                        <hr>
+
                         <dt class="col-sm-5">Номер ж/д накладной:</dt>
                         <dd class="col-sm-7">{{ last.railway_ttn|default:"-" }}</dd>
 
@@ -102,6 +104,27 @@
                         <i class="bi bi-trash"></i> Удалить
                     </a>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card shadow-sm mt-4">
+        <div class="card-header card-header-custom">
+            <h5 class="mb-0">История цистерны</h5>
+        </div>
+        <div class="card-body p-0">
+            <div class="list-group list-group-flush">
+                {% for h in object.tank_history.all %}
+                <div class="list-group-item">
+                    <div class="d-flex w-100 justify-content-between">
+                        <h6 class="mb-1">{{ h.arrival_at|date:'d.m.Y H:i'|default:'-' }} → {{ h.departure_at|date:'d.m.Y H:i'|default:'-' }}</h6>
+                        <small>Количество газа: {{ h.gas_weight|default:'-' }} т</small>
+                    </div>
+                    <div class="small text-muted">Вес полной: {{ h.full_weight|default:'-' }} т, Вес пустой: {{ h.empty_weight|default:'-' }} т, Номер ж/д накладной: {{ h.railway_ttn|default:'-' }}, Вес по накладной: {{ h.netto_weight_ttn|default:'-' }}</div>
+                </div>
+                {% empty %}
+                <div class="p-3 text-muted">Исторические записи отсутствуют</div>
+                {% endfor %}
             </div>
         </div>
     </div>

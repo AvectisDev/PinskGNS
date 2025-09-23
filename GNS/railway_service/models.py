@@ -109,7 +109,7 @@ class RailwayBatch(models.Model):
             begin_date__range=[start_datetime, end_datetime]
         ).annotate(
             tanks_count=Count('railway_tank_list'),
-            total_gas_in_tanks=Sum('railway_tank_list__gas_weight')
+            total_gas_in_tanks=Sum('railway_tank_list__tank_history__gas_weight')
         ).aggregate(
             total_batches=Count('id'),
             total_tanks=Sum('tanks_count'),

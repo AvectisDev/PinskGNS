@@ -1,16 +1,8 @@
-{% extends 'base.html' %}
+{% extends 'core/_equipment_form.html' %}
 {% load crispy_forms_tags %}
 {% block title %} {{ title }} {% endblock %}
 
-{% block content %}
-
-<div class="row" style="padding: 20px;">
-    <h5>{{ title }}</h5>
-    <div class="w-50 mx-auto">
-        {% crispy form %}
-    </div>
-</div>
-
+{% block extra_scripts %}
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     const loadingBatchSelect = document.getElementById('id_loading_batch');
@@ -58,5 +50,4 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 });
 </script>
-
-{% endblock content %}
+{% endblock %}
