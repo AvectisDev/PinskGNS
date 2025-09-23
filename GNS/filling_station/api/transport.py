@@ -147,7 +147,7 @@ class TruckView(APIView):
         queryset = Truck.objects.all()
 
         if on_station is not None:
-            queryset = queryset.filter(is_on_station=on_station.lower() == 'true')
+            # queryset = queryset.filter(is_on_station=on_station.lower() == 'true')
             if not queryset.exists():
                 return Response(
                     {"detail": "Грузовики с указанным фильтром не найдены"},
