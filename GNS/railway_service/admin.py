@@ -5,7 +5,15 @@ from .models import RailwayTank, RailwayBatch, RailwayTankHistory
 class RailwayTankHistoryInline(admin.TabularInline):
     model = RailwayTankHistory
     extra = 0
-    fields = ('arrival_at', 'departure_at', 'full_weight', 'empty_weight', 'gas_weight', 'railway_ttn', 'netto_weight_ttn')
+    fields = (
+        'arrival_at',
+        'departure_at',
+        'full_weight',
+        'empty_weight',
+        'gas_weight',
+        'railway_ttn',
+        'netto_weight_ttn',
+    )
     readonly_fields = ()
 
 
@@ -15,7 +23,6 @@ class RailwayTankAdmin(admin.ModelAdmin):
         'registration_number',
         'gas_type',
         'is_on_station',
-        'registration_number_img'
         ]
     search_fields = ['registration_number']
     list_filter = ['is_on_station']

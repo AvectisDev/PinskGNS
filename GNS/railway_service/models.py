@@ -10,7 +10,6 @@ class RailwayTank(models.Model):
     registration_number = models.IntegerField(unique=True, blank=False, verbose_name="Номер ж/д цистерны")
     gas_type = models.CharField(max_length=10, choices=settings.GAS_TYPE_CHOICES, default='Не выбран', verbose_name="Тип газа")
     is_on_station = models.BooleanField(default=False, verbose_name="Находится на станции")
-    registration_number_img = models.ImageField(null=True, blank=True, upload_to='railway_tanks/', verbose_name="Фото номера")
     user = models.ForeignKey(
         User,
         on_delete=models.SET_NULL,
@@ -57,6 +56,8 @@ class RailwayTankHistory(models.Model):
     gas_weight = models.FloatField(null=True, blank=True, verbose_name="Поставлено газа")
     railway_ttn = models.CharField(null=True, blank=True, max_length=50, verbose_name="Номер ж/д накладной")
     netto_weight_ttn = models.FloatField(null=True, blank=True, verbose_name="Вес НЕТТО ж/д цистерны по накладной")
+    arrival_img = models.ImageField(null=True, blank=True, upload_to='railway_tanks/', verbose_name="Фото номера при въезде")
+    departure_img = models.ImageField(null=True, blank=True, upload_to='railway_tanks/', verbose_name="Фото номера при выезде")
     
 
     class Meta:

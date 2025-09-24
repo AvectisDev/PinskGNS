@@ -63,11 +63,11 @@ class RailwayTankHistoryForm(forms.ModelForm):
         widgets = {
             'arrival_at': forms.DateTimeInput(format='%Y-%m-%dT%H:%M', attrs={'type': 'datetime-local', 'class': 'form-control'}),
             'departure_at': forms.DateTimeInput(format='%Y-%m-%dT%H:%M', attrs={'type': 'datetime-local', 'class': 'form-control'}),
-            'full_weight': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.001'}),
-            'empty_weight': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.001'}),
-            'gas_weight': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.001'}),
+            'full_weight': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
+            'empty_weight': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
+            'gas_weight': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
             'railway_ttn': forms.TextInput(attrs={'class': 'form-control'}),
-            'netto_weight_ttn': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.001'}),
+            'netto_weight_ttn': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
         }
 
 class RailwayBatchForm(forms.ModelForm):

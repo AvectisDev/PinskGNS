@@ -52,9 +52,7 @@ class RailwayTankCreateView(generic.CreateView):
         history_form = RailwayTankHistoryForm(request.POST)
         # Проверка на дубликат номера
         reg_num = request.POST.get('registration_number')
-        # if reg_num and RailwayTank.objects.filter(registration_number=reg_num).exists():
-        #     # tank_form.add_error('registration_number', 'Цистерна с таким номером уже существует')
-        #     messages.error(request, 'Цистерна с таким номером уже существует')
+        
         if tank_form.is_valid() and history_form.is_valid():
             with transaction.atomic():
                 self.object = tank_form.save()

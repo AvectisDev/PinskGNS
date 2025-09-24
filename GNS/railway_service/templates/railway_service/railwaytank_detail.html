@@ -72,18 +72,20 @@
 
                         <dt class="col-sm-4">Фото номера:</dt>
                         <dd class="col-sm-8">
-                            {% if object.registration_number_img %}
-                            <div class="text-center">
-                                <a href="{{ object.registration_number_img.url }}" target="_blank" class="custom-link">
-                                    <img src="{{ object.registration_number_img.url }}"
-                                         alt="Фото номера цистерны"
-                                         class="img-fluid rounded border"
-                                         style="max-width: 100%; height: auto; max-height: 400px;">
-                                </a>
-                            </div>
-                            {% else %}
-                            <span class="text-muted">Отсутствует</span>
-                            {% endif %}
+                            {% with last=object.tank_history.all.0 %}
+                                {% if last and last.arrival_img %}
+                                <div class="text-center">
+                                    <a href="{{ last.arrival_img.url }}" target="_blank" class="custom-link">
+                                        <img src="{{ last.arrival_img.url }}"
+                                             alt="Фото номера при въезде"
+                                             class="img-fluid rounded border"
+                                             style="max-width: 100%; height: auto; max-height: 400px;">
+                                    </a>
+                                </div>
+                                {% else %}
+                                <span class="text-muted">Отсутствует</span>
+                                {% endif %}
+                            {% endwith %}
                         </dd>
 
                     </dl>
@@ -121,6 +123,18 @@
                         <small>Количество газа: {{ h.gas_weight|default:'-' }} т</small>
                     </div>
                     <div class="small text-muted">Вес полной: {{ h.full_weight|default:'-' }} т, Вес пустой: {{ h.empty_weight|default:'-' }} т, Номер ж/д накладной: {{ h.railway_ttn|default:'-' }}, Вес по накладной: {{ h.netto_weight_ttn|default:'-' }}</div>
+                    <div class="mt-2 d-flex gap-3 flex-wrap">
+                        {% if h.arrival_img %}
+                        <a href="{{ h.arrival_img.url }}" target="_blank">
+                            <img src="{{ h.arrival_img.url }}" alt="Въезд" style="max-height: 120px;" class="img-thumbnail">
+                        </a>
+                        {% endif %}
+                        {% if h.departure_img %}
+                        <a href="{{ h.departure_img.url }}" target="_blank">
+                            <img src="{{ h.departure_img.url }}" alt="Выезд" style="max-height: 120px;" class="img-thumbnail">
+                        </a>
+                        {% endif %}
+                    </div>
                 </div>
                 {% empty %}
                 <div class="p-3 text-muted">Исторические записи отсутствуют</div>
