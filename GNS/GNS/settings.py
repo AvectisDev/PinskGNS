@@ -146,7 +146,14 @@ DATABASES = {
 CACHES = {
     'default': {
         'BACKEND': 'django.core.cache.backends.redis.RedisCache',
-        'LOCATION': 'redis://localhost:6379/1'
+        'LOCATION': 'redis://localhost:6379/1',
+        'OPTIONS': {
+            'socket_connect_timeout': 5,
+            'socket_keepalive': True,
+            'retry_on_timeout': True,
+            'max_connections': 10,
+            'connection_pool_class': 'redis.BlockingConnectionPool',
+        }
     }
 }
 
@@ -202,7 +209,17 @@ CRISPY_TEMPLATE_PACK = "bootstrap5"
 
 CELERY_BROKER_URL = 'redis://localhost:6379/0'
 CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP = True
+CELERY_BROKER_POOL_LIMIT = 15
+CELERY_BROKER_CONNECTION_TIMEOUT = 30
+CELERY_BROKER_CONNECTION_RETRY = True
+CELERY_BROKER_CONNECTION_MAX_RETRIES = 10
+CELERY_REDIS_MAX_CONNECTIONS = 20
+
 CELERY_WORKER_HIJACK_ROOT_LOGGER = False
+CELERY_WORKER_MAX_TASKS_PER_CHILD = 100
+CELERY_WORKER_MAX_MEMORY_PER_CHILD = 200000  # 200MB в KiB
+CELERY_TASK_TIME_LIMIT = 300  # 5 минут
+CELERY_TASK_SOFT_TIME_LIMIT = 240  # 4 минуты
 CELERY_HIJACK_ROOT_LOGGER = False
 CELERY_RESULT_BACKEND = 'redis://localhost:6379/0'
 CELERY_RESULT_EXPIRES = 3600  # 1 час
