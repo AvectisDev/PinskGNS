@@ -152,7 +152,6 @@ CACHES = {
             'socket_keepalive': True,
             'retry_on_timeout': True,
             'max_connections': 10,
-            'connection_pool_class': 'redis.BlockingConnectionPool',
         }
     }
 }
