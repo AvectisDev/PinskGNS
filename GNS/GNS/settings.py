@@ -147,13 +147,6 @@ CACHES = {
     'default': {
         'BACKEND': 'django.core.cache.backends.redis.RedisCache',
         'LOCATION': 'redis://localhost:6379/1',
-        'OPTIONS': {
-            'socket_connect_timeout': 5,
-            'socket_keepalive': True,
-            'retry_on_timeout': True,
-            'max_connections': 10,
-            'connection_pool_class': 'redis.BlockingConnectionPool',
-        }
     }
 }
 
