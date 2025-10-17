@@ -84,6 +84,7 @@ class Command(BaseCommand):
                 }
             )
             railway_batch.railway_tank_list.add(railway_tank)
+            logger.info(f'Цистерна {railway_tank.registration_number} добавлена в партию {railway_batch.id}')
         except MultipleObjectsReturned:
             logger.error(f"Найдено более одной активной партии")
         except Exception as error:

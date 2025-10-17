@@ -15,7 +15,8 @@ class Command(BaseCommand):
 
             for batch in railway_batch:
                 logger.debug(f'Есть активная партия: {batch}')
-                if batch.begin_date < current_datetime - timedelta(minutes=30):
+                if batch.begin_date < current_datetime - timedelta(minutes=10):
                     batch.is_active = False
                     batch.end_date = current_datetime
                     batch.save()
+                    logger.info(f'Партия закрыта по истечению времени {batch.id}')
