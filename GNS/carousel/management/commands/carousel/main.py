@@ -339,6 +339,8 @@ def serial_exchange():
             # Закрываем соединение только если оно было открыто
             ser.close()
             logger.debug("Соединение закрыто")
+        if redis_client:
+            redis_client.close()
 
 
 while True:
