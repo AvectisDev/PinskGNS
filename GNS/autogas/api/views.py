@@ -9,7 +9,7 @@ from rest_framework.response import Response
 from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from datetime import datetime, date
-from ..models import AutoGasBatch
+from autogas.models import AutoGasBatch
 from .serializers import AutoGasBatchSerializer
 
 
@@ -30,22 +30,22 @@ class AutoGasBatchView(viewsets.ViewSet):
         result = []
         # Партии за последний месяц
         result.append(AutoGasBatch.objects
-                      .filter(begin_date__gte=first_day_of_month, batch_type='l', gas_type='ПБА')
+                      .filter(begin_at__date__gte=first_day_of_month, batch_type='l', gas_type='ПБА')
                       .values('gas_type', 'batch_type')
                       .annotate(last_month_loading_batches=Count('id'),
                                 last_month_loading_weight=Sum('weight_gas_amount')))
         result.append(AutoGasBatch.objects
-                      .filter(begin_date__gte=first_day_of_month, batch_type='l', gas_type='СПБТ')
+                      .filter(begin_at__date__gte=first_day_of_month, batch_type='l', gas_type='СПБТ')
                       .values('gas_type', 'batch_type')
                       .annotate(last_month_loading_batches=Count('id'),
                                 last_month_loading_weight=Sum('weight_gas_amount')))
         result.append(AutoGasBatch.objects
-                      .filter(begin_date__gte=first_day_of_month, batch_type='u', gas_type='ПБА')
+                      .filter(begin_at__date__gte=first_day_of_month, batch_type='u', gas_type='ПБА')
                       .values('gas_type', 'batch_type')
                       .annotate(last_month_unloading_batches=Count('id'),
                                 last_month_unloading_weight=Sum('weight_gas_amount')))
         result.append(AutoGasBatch.objects
-                      .filter(begin_date__gte=first_day_of_month, batch_type='u',
+                      .filter(begin_at__date__gte=first_day_of_month, batch_type='u',
                               gas_type='СПБТ')
                       .values('gas_type', 'batch_type')
                       .annotate(last_month_unloading_batches=Count('id'),
@@ -53,22 +53,22 @@ class AutoGasBatchView(viewsets.ViewSet):
 
         # Партии за последний день
         result.append(AutoGasBatch.objects
-                      .filter(begin_date=today, batch_type='l', gas_type='ПБА')
+                      .filter(begin_at__date=today, batch_type='l', gas_type='ПБА')
                       .values('gas_type', 'batch_type')
                       .annotate(today_loading_batches=Count('id'),
                                 today_loading_weight=Sum('weight_gas_amount')))
         result.append(AutoGasBatch.objects
-                      .filter(begin_date=today, batch_type='l', gas_type='СПБТ')
+                      .filter(begin_at__date=today, batch_type='l', gas_type='СПБТ')
                       .values('gas_type', 'batch_type')
                       .annotate(today_loading_batches=Count('id'),
                                 today_loading_weight=Sum('weight_gas_amount')))
         result.append(AutoGasBatch.objects
-                      .filter(begin_date=today, batch_type='u', gas_type='ПБА')
+                      .filter(begin_at__date=today, batch_type='u', gas_type='ПБА')
                       .values('gas_type', 'batch_type')
                       .annotate(today_unloading_batches=Count('id'),
                                 today_unloading_weight=Sum('weight_gas_amount')))
         result.append(AutoGasBatch.objects
-                      .filter(begin_date=today, batch_type='u', gas_type='СПБТ')
+                      .filter(begin_at__date=today, batch_type='u', gas_type='СПБТ')
                       .values('gas_type', 'batch_type')
                       .annotate(today_unloading_batches=Count('id'),
                                 today_unloading_weight=Sum('weight_gas_amount')))
@@ -99,8 +99,7 @@ class AutoGasBatchView(viewsets.ViewSet):
                 'truck_gas_capacity': active_batch.truck.max_gas_volume if active_batch.truck.max_gas_volume else 0,
                 'scale_empty_weight': active_batch.scale_empty_weight if active_batch.scale_empty_weight else 0,
                 'scale_full_weight': active_batch.scale_full_weight if active_batch.scale_full_weight else 0,
-                'ttn_number': active_batch.ttn.number if active_batch.ttn else None,
-                'ttn_consignee': active_batch.ttn.consignee if active_batch.ttn else None
+                # ttn данные исключены, так как нет связанного поля
             }
 
         cache.set(cache_key, response)
@@ -108,8 +107,8 @@ class AutoGasBatchView(viewsets.ViewSet):
 
     def list(self, request):
         today = date.today()
-        batch = AutoGasBatch.objects.filter(is_active=True, begin_date=today)
-        serializer = AutoGasBatchSerializer(batch)
+        batch = AutoGasBatch.objects.filter(is_active=True, begin_at__date=today)
+        serializer = AutoGasBatchSerializer(batch, many=True)
         return Response(serializer.data)
 
     def create(self, request):
@@ -121,12 +120,8 @@ class AutoGasBatchView(viewsets.ViewSet):
 
     def partial_update(self, request, pk=None):
         batch = get_object_or_404(AutoGasBatch, id=pk)
-
         if not request.data.get('is_active', True):
-            current_date = datetime.now()
-            request.data['end_date'] = current_date.date()
-            request.data['end_time'] = current_date.time()
-
+            request.data['completed_at'] = datetime.now()
         serializer = AutoGasBatchSerializer(batch, data=request.data, partial=True)
         if serializer.is_valid():
             serializer.save()

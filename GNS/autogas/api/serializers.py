@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from ..models import AutoGasBatch
+from autogas.models import AutoGasBatch
 
 
 class AutoGasBatchSerializer(serializers.ModelSerializer):
@@ -8,8 +8,8 @@ class AutoGasBatchSerializer(serializers.ModelSerializer):
         fields = [
             'id',
             'batch_type',
-            'end_date',
-            'end_time',
+            'begin_at',
+            'completed_at',
             'truck',
             'trailer',
             'gas_amount',
@@ -18,5 +18,4 @@ class AutoGasBatchSerializer(serializers.ModelSerializer):
             'scale_full_weight',
             'weight_gas_amount',
             'is_active',
-            'ttn'
         ]
