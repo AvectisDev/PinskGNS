@@ -1,25 +1,32 @@
 from django.contrib import admin
-from .models import RailwayTank, RailwayBatch
+from .models import RailwayTank, RailwayBatch, RailwayTankHistory
+
+
+class RailwayTankHistoryInline(admin.TabularInline):
+    model = RailwayTankHistory
+    extra = 0
+    fields = (
+        'arrival_at',
+        'departure_at',
+        'full_weight',
+        'empty_weight',
+        'gas_weight',
+        'railway_ttn',
+        'netto_weight_ttn',
+    )
+    readonly_fields = ()
 
 
 @admin.register(RailwayTank)
 class RailwayTankAdmin(admin.ModelAdmin):
     list_display = [
-        'id',
         'registration_number',
-        'empty_weight',
-        'full_weight',
-        'gas_weight',
         'gas_type',
         'is_on_station',
-        'railway_ttn',
-        'netto_weight_ttn',
-        'entry_date',
-        'departure_date',
-        'registration_number_img'
-    ]
+        ]
     search_fields = ['registration_number']
-    list_filter = ['entry_date', 'departure_date', 'is_on_station']
+    list_filter = ['is_on_station']
+    inlines = [RailwayTankHistoryInline]
 
 
 @admin.register(RailwayBatch)

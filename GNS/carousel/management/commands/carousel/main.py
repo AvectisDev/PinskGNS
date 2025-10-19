@@ -7,8 +7,9 @@ import django
 import requests
 import redis
 import time
-from . import api
 from . import db
+from django.conf import settings
+
 
 # Инициализация Django
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'GNS.settings')
@@ -52,6 +53,30 @@ def get_and_remove_last_balloon():
             logger.error(f"Кэш. Ошибка при десериализации данных: {error}")
             return None
     return None
+
+
+def put_carousel_data(data: dict, session: requests.Session):
+    """
+    Функция работает как шлюз между сервером и постом наполнения, т.к. пост может слать запрос только через COM-порт в
+    виде набора байт по проприетарному протоколу. Функция отправляет POST-запрос с текущими показаниями поста карусели
+    на сервер. В ответ сервер должен прислать требуемый вес газа, которым нужно заправить баллон.
+    :param data: Содержит словарь с ключами 'request_type'-тип запроса с поста наполнения, 'post_number' -
+    номер поста наполнения, 'weight_combined'- текущий вес баллона, который находится на посту наполнения
+    :return: возвращает словарь со статусом ответа и весом баллона
+    """
+    try:
+        logger.info(f"api - данные c поста отправлены - {data}")
+        response = session.post(f"{settings.DJANGO_API_HOST}/carousel/balloon-update/", json=data, timeout=2)
+        logger.info(f"api - данные от сервера получены - {response}")
+        response.raise_for_status()
+        if response.content:
+            return response.json()
+        else:
+            return {}
+
+    except requests.exceptions.RequestException as error:
+        logger.error(f"Ошибка в функции отправки данных с поста наполнения на API сервера: {error}")
+        return {}
 
 
 def calc_crc(message):
@@ -120,10 +145,10 @@ def check_settings(post_number: int):
     if post_settings:
         logger.debug(f'Настройки поста наполнения {post_settings}')
         if post_settings.get('read_only'):
-            return transmit_command, weight_correction_value
+            return transmit_command, weight_correction_value, post_settings.get('min_balloon_weight'), post_settings.get('max_balloon_weight')
 
         transmit_command = True
-        logger.debug(f'Требуется отправка веса на пост {post_settings}')
+        logger.debug(f'Требуется отправка веса на пост {post_number}')
         if post_settings.get('use_weight_management'):
             if post_settings.get('use_common_correction'):
                 weight_correction_value = post_settings.get('weight_correction_value')
@@ -131,7 +156,7 @@ def check_settings(post_number: int):
                 weight_correction_value = post_settings.get(f'post_{post_number}_correction')
         logger.debug(f'Требуется отправка веса на пост. weight_correction_value = {post_settings}')
 
-    return transmit_command, weight_correction_value
+    return transmit_command, weight_correction_value, post_settings.get('min_balloon_weight'), post_settings.get('max_balloon_weight')
 
 
 def check_balloon_size(weight: int) -> int:
@@ -162,7 +187,7 @@ def request_caching(request_type: str, post_number: int, weight: int) -> bool:
     cached_value = redis_client.get(cache_key)
     if cached_value is not None:
         request_processing_required = False
-        logger.debug(f"Запрос уже обрабатывается: {request_type} {post_number} {weight}")
+        logger.debug(f"Запрос с ключём {cache_key} уже обрабатывается")
         return request_processing_required
 
     redis_client.set(cache_key, "1", cache_time)
@@ -206,7 +231,12 @@ def request_processing(request_type: str, post_number: int, weight: int) -> tupl
 
         # Обработка данных баллона
         if balloon_from_cache.get('filling_status') and (brutto := balloon_from_cache.get('brutto')):
-            response_required, weight_correction = check_settings(post_number)
+            response_required, weight_correction, min_balloon_weight, max_balloon_weight = check_settings(post_number)
+            
+            if balloon_from_cache.get('netto') < min_balloon_weight or brutto > max_balloon_weight:
+                response_required = False
+                logger.debug(f"Вес баллона не входит в допустимый диапазон")
+
             if response_required:
                 full_weight = int((brutto + weight_correction) * 1000)
                 logger.debug(f"Требуется отправка веса на пост. Полный вес баллона по паспорту: {brutto} кг. "
@@ -241,12 +271,10 @@ def serial_exchange():
         logger.info(f"Соединение установлено на порту {PORT}.")
 
         while True:
-            # Читаем 8 байт данных из COM-порта
             data = ser.read(8)
-            logger.info(f"Получен запрос от поста - {data}")
 
             if len(data) == 8:
-                # Расшифровываем каждый байт по отдельности
+                logger.info(f"Получен запрос от поста - {data}")
                 request_type = data[0]
                 post_number = data[1]
                 measurement_number = data[2]
@@ -256,7 +284,7 @@ def serial_exchange():
                 crc = int.from_bytes(data[6:8], byteorder='little')
 
                 request_type_in_str = str(hex(request_type))
-                logger.info(f"Получен запрос от поста. Тип запроса: {request_type_in_str}. "
+                logger.info(f"Парсинг: Тип запроса: {request_type_in_str}. "
                              f"Номер поста: {post_number}. Масса баллона: {weight_combined}")
 
                 # Обработка запроса с поста
@@ -266,8 +294,6 @@ def serial_exchange():
                         post_number,
                         weight_combined
                     )
-                    logger.info(f"Settings:response_required {response_required}. "
-                             f"full_weight: {full_weight}. process_data_to_server: {process_data_to_server}")
 
                     if response_required:
                         # Формируем ответ
@@ -293,7 +319,6 @@ def serial_exchange():
                         crc_t = calc_crc(response_data[:-2])
                         crc = ((crc_t & 0xFF) << 8) | ((crc_t >> 8) & 0xFF)
 
-                        # Добавляем CRC к ответу
                         response_with_crc = response_data[:-2] + struct.pack('<H', crc)
 
                         ser.write(response_with_crc)
@@ -301,8 +326,7 @@ def serial_exchange():
 
                     # Отправляем данные на сервер для статистики
                     if process_data_to_server and isinstance(process_data_to_server, dict):
-                        api.put_carousel_data(process_data_to_server, session)
-                        logger.info(f"Данные отправлены на сервер")
+                        put_carousel_data(process_data_to_server, session)
 
     except serial.SerialException as error:
         logger.error(f"Ошибка: {error}. Проверьте правильность указанного порта.")
@@ -315,6 +339,8 @@ def serial_exchange():
             # Закрываем соединение только если оно было открыто
             ser.close()
             logger.debug("Соединение закрыто")
+        if redis_client:
+            redis_client.close()
 
 
 while True:

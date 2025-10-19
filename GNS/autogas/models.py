@@ -7,11 +7,9 @@ from filling_station.models import Truck, Trailer
 
 
 class AutoGasBatch(models.Model):
-    batch_type = models.CharField(max_length=10, choices=settings.BATCH_TYPE_CHOICES, default='u', verbose_name="Тип партии")
-    begin_date = models.DateField(auto_now_add=True, verbose_name="Дата начала приёмки")
-    begin_time = models.TimeField(auto_now_add=True, verbose_name="Время начала приёмки")
-    end_date = models.DateField(null=True, blank=True, verbose_name="Дата окончания приёмки")
-    end_time = models.TimeField(null=True, blank=True, verbose_name="Время окончания приёмки")
+    batch_type = models.CharField(choices=settings.BATCH_TYPE_CHOICES, default='u', verbose_name="Тип партии")
+    begin_at = models.DateTimeField(auto_now_add=True, verbose_name="Дата и время начала")
+    completed_at = models.DateTimeField(null=True, blank=True, verbose_name="Дата и время окончания")
     truck = models.ForeignKey(
         Truck,
         on_delete=models.DO_NOTHING,
@@ -22,11 +20,10 @@ class AutoGasBatch(models.Model):
         on_delete=models.DO_NOTHING,
         null=True,
         blank=True,
-        default=0,
         verbose_name="Прицеп"
     )
     gas_amount = models.FloatField(null=True, blank=True, verbose_name="Количество газа (массомер)")
-    gas_type = models.CharField(max_length=10, choices=settings.GAS_TYPE_CHOICES, default='Не выбран', verbose_name="Тип газа")
+    gas_type = models.CharField(choices=settings.GAS_TYPE_CHOICES, default='Не выбран', verbose_name="Тип газа")
     scale_empty_weight = models.FloatField(null=True, blank=True, verbose_name="Вес пустого т/с (весы)")
     scale_full_weight = models.FloatField(null=True, blank=True, verbose_name="Вес полного т/с (весы)")
     weight_gas_amount = models.FloatField(null=True, blank=True, verbose_name="Количество газа (весы)")
@@ -44,7 +41,7 @@ class AutoGasBatch(models.Model):
     class Meta:
         verbose_name = "Автоколонка"
         verbose_name_plural = "Автоколонка"
-        ordering = ['-begin_date', '-begin_time']
+        ordering = ['-begin_at']
 
     def get_absolute_url(self):
         return reverse('autogas:auto_gas_batch_detail', args=[self.pk])

@@ -7,8 +7,7 @@ class AutoGasBatchAdmin(admin.ModelAdmin):
     list_display = [
         'id',
         'batch_type',
-        'end_date',
-        'end_time',
+        'completed_at',
         'truck',
         'trailer',
         'gas_amount',
@@ -16,15 +15,14 @@ class AutoGasBatchAdmin(admin.ModelAdmin):
         'scale_empty_weight',
         'scale_full_weight',
         'weight_gas_amount',
-        'is_active'
+        'is_active',
     ]
     list_filter = [
-        'begin_date',
-        'end_date',
-        'is_active'
+        'begin_at',
+        'completed_at',
+        'is_active',
     ]
-    search_fields = ['truck']
-
+    search_fields = ['truck', 'trailer']
 
 @admin.register(AutoGasBatchSettings)
 class AutoGasBatchSettingsAdmin(admin.ModelAdmin):

@@ -19,14 +19,12 @@ class AutoGasBatchForm(forms.ModelForm):
         self.fields['trailer'].empty_label = 'Выберите прицеп'
 
         self.fields['end_date'].widget.attrs.update({'class': 'form-control'})
-        self.fields['end_time'].widget.attrs.update({'class': 'form-control'})
 
     class Meta:
         model = AutoGasBatch
         fields = [
             'batch_type',
-            'end_date',
-            'end_time',
+            'completed_at',
             'truck',
             'trailer',
             'gas_amount',
@@ -34,18 +32,14 @@ class AutoGasBatchForm(forms.ModelForm):
             'scale_empty_weight',
             'scale_full_weight',
             'weight_gas_amount',
-            'is_active'
+            'is_active',
         ]
         widgets = {
             'batch_type': forms.Select(attrs={
                 'class': 'form-control',
             }),
-            'end_date': forms.DateInput(attrs={
-                'type': 'date',
-                'class': 'form-control'
-            }),
-            'end_time': forms.TimeInput(attrs={
-                'type': 'time',
+            'completed_at': forms.DateTimeInput(attrs={
+                'type': 'datetime-local',
                 'class': 'form-control'
             }),
             'truck': forms.Select(attrs={

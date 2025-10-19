@@ -7,31 +7,25 @@ from datetime import datetime, time
 
 
 class RailwayTank(models.Model):
-    registration_number = models.CharField(blank=False, max_length=20, verbose_name="Номер ж/д цистерны")
-    empty_weight = models.FloatField(null=True, blank=True, verbose_name="Вес пустой цистерны")
-    full_weight = models.FloatField(null=True, blank=True, verbose_name="Вес полной цистерны")
-    gas_weight = models.FloatField(null=True, blank=True, verbose_name="Масса перевозимого газа")
+    registration_number = models.IntegerField(unique=True, blank=False, verbose_name="Номер ж/д цистерны")
     gas_type = models.CharField(max_length=10, choices=settings.GAS_TYPE_CHOICES, default='Не выбран', verbose_name="Тип газа")
-    is_on_station = models.BooleanField(null=True, blank=True, verbose_name="Находится на станции")
-    railway_ttn = models.CharField(null=True, blank=True, max_length=50, verbose_name="Номер ж/д накладной")
-    netto_weight_ttn = models.FloatField(null=True, blank=True, verbose_name="Вес НЕТТО ж/д цистерны по накладной")
-    entry_date = models.DateTimeField(null=True, blank=True, verbose_name="Дата въезда")
-    departure_date = models.DateTimeField(null=True, blank=True, verbose_name="Дата выезда")
-    registration_number_img = models.ImageField(null=True, blank=True, upload_to='railway_tanks/', verbose_name="Фото номера")
+    is_on_station = models.BooleanField(default=False, verbose_name="Находится на станции")
     user = models.ForeignKey(
         User,
-        on_delete=models.DO_NOTHING,
+        on_delete=models.SET_NULL,
+        null=True,
         default=1,
         verbose_name="Пользователь"
     )
 
     def __str__(self):
-        return self.registration_number
+        return str(self.registration_number)
+
 
     class Meta:
         verbose_name = "Ж/д цистерна"
         verbose_name_plural = "Ж/д цистерны"
-        ordering = ['-is_on_station', '-entry_date', '-departure_date']
+        ordering = ['-is_on_station']
 
     def get_absolute_url(self):
         return reverse('railway_service:railway_tank_detail', args=[self.pk])
@@ -47,6 +41,34 @@ class RailwayTank(models.Model):
         return f"{self.registration_number}.jpg"
 
 
+class RailwayTankHistory(models.Model):
+    """История нахождения цистерны на объекте и поставок газа"""
+    tank = models.ForeignKey(
+        RailwayTank,
+        on_delete=models.CASCADE,
+        related_name='tank_history',
+        verbose_name="Цистерна",
+    )
+    arrival_at = models.DateTimeField(null=True, blank=True, verbose_name="Дата въезда")
+    departure_at = models.DateTimeField(null=True, blank=True, verbose_name="Дата выезда")
+    full_weight = models.FloatField(null=True, blank=True, verbose_name="Вес полной цистерны")
+    empty_weight = models.FloatField(null=True, blank=True, verbose_name="Вес пустой цистерны")
+    gas_weight = models.FloatField(null=True, blank=True, verbose_name="Поставлено газа")
+    railway_ttn = models.CharField(null=True, blank=True, max_length=50, verbose_name="Номер ж/д накладной")
+    netto_weight_ttn = models.FloatField(null=True, blank=True, verbose_name="Вес НЕТТО ж/д цистерны по накладной")
+    arrival_img = models.ImageField(null=True, blank=True, upload_to='railway_tanks/', verbose_name="Фото номера при въезде")
+    departure_img = models.ImageField(null=True, blank=True, upload_to='railway_tanks/', verbose_name="Фото номера при выезде")
+    
+
+    class Meta:
+        verbose_name = "История цистерны"
+        verbose_name_plural = "Истории цистерн"
+        ordering = ['-arrival_at', '-departure_at']
+
+    def __str__(self):
+        return f"{self.tank.registration_number}: {self.arrival_at} → {self.departure_at}"
+
+
 class RailwayBatch(models.Model):
     begin_date = models.DateTimeField(auto_now_add=True, verbose_name="Дата начала приёмки")
     end_date = models.DateTimeField(null=True, blank=True, verbose_name="Дата окончания приёмки")
@@ -57,7 +79,7 @@ class RailwayBatch(models.Model):
         blank=True,
         verbose_name="Список жд цистерн"
     )
-    is_active = models.BooleanField(null=True, blank=True, verbose_name="В работе")
+    is_active = models.BooleanField(default=False, verbose_name="В работе")
     user = models.ForeignKey(
         User,
         on_delete=models.SET_NULL,
@@ -88,7 +110,7 @@ class RailwayBatch(models.Model):
             begin_date__range=[start_datetime, end_datetime]
         ).annotate(
             tanks_count=Count('railway_tank_list'),
-            total_gas_in_tanks=Sum('railway_tank_list__gas_weight')
+            total_gas_in_tanks=Sum('railway_tank_list__tank_history__gas_weight')
         ).aggregate(
             total_batches=Count('id'),
             total_tanks=Sum('tanks_count'),

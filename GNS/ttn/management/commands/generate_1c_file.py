@@ -87,8 +87,12 @@ class Command(BaseCommand):
             # Формируем строку с данными ТТН
             ttn_date = ttn.date.strftime('%d.%m.%y') if ttn.date else timezone.now().strftime('%d.%m.%y')
 
-            # Находим минимальную дату подачи среди цистерн этой ТТН
-            entry_dates = [t.entry_date for t in tanks if t.entry_date]
+            # Находим минимальную дату подачи (arrival_at) из истории по этой ж/д накладной
+            entry_dates = []
+            for t in tanks:
+                hist = t.tank_history.filter(railway_ttn=ttn.railway_ttn).order_by('arrival_at').first()
+                if hist and hist.arrival_at:
+                    entry_dates.append(hist.arrival_at)
             first_entry_date = min(entry_dates) if entry_dates else None
             entry_date_str = first_entry_date.strftime('%d.%m.%y') if first_entry_date else ""
 
@@ -99,14 +103,18 @@ class Command(BaseCommand):
                 f'{ttn.shipper.name if ttn.shipper else ""};'
             )
 
-            # Добавляем данные по КАЖДОЙ цистерне этой ТТН
+            # Добавляем данные по КАЖДОЙ цистерне этой ТТН (берём историю, связанную с номером ж/д накладной)
             for tank in tanks:
+                hist = tank.tank_history.filter(railway_ttn=ttn.railway_ttn).order_by('-arrival_at', '-departure_at').first()
+                netto_weight_ttn = hist.netto_weight_ttn if hist and hist.netto_weight_ttn is not None else 0
+                gas_weight = hist.gas_weight if hist and hist.gas_weight is not None else 0
+                departure_date = hist.departure_at if hist else None
                 lines.append(
                     f'{tank.registration_number};'
                     f'{tank.gas_type if tank.gas_type != "Не выбран" else ttn.gas_type};'
-                    f'{tank.netto_weight_ttn or 0:.3f};'
-                    f'{tank.gas_weight or 0:.3f};'
-                    f'{tank.departure_date.strftime("%d.%m.%y") if tank.departure_date else ""};'
+                    f'{netto_weight_ttn:.3f};'
+                    f'{gas_weight:.3f};'
+                    f'{departure_date.strftime("%d.%m.%y") if departure_date else ""};'
                     f'{""};'  # Пустая накладная возврата
                 )
 

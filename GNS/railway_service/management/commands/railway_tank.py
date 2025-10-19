@@ -7,7 +7,7 @@ from django.core.exceptions import MultipleObjectsReturned
 from django.core.management.base import BaseCommand
 from django.conf import settings
 from datetime import datetime
-from ...models import RailwayBatch, RailwayTank
+from ...models import RailwayBatch, RailwayTank, RailwayTankHistory
 from .intellect import get_registration_number_list, INTELLECT_SERVER_LIST, get_plate_image
 
 logger = logging.getLogger('railway')
@@ -20,10 +20,11 @@ class Command(BaseCommand):
         "is_on_station": "ns=4; s=Address Space.PLC_SU1.tank.on_station",
     }
 
+
     def __init__(self):
         super().__init__()
         self.client = Client(settings.OPC_SERVER_URL)
-        self.last_number = cache.get('last_tank_number', '')
+
 
     def get_opc_value(self, node_key):
         """Получить значение с OPC UA сервера по ключу."""
@@ -36,6 +37,7 @@ class Command(BaseCommand):
         except Exception as error:
             logger.error(f"Error getting OPC value for {node_key}: {error}")
             return None
+
 
     def set_opc_value(self, node_key, value):
         """Установить значение на OPC UA сервере."""
@@ -51,9 +53,10 @@ class Command(BaseCommand):
             logger.error(f"Error setting OPC value for {node_key}: {error}")
             return False
 
+
     def fetch_railway_tank_data(self):
         """
-        Функция отправляет запрос в Интеллект. В ответ приходит JSON ответ со списком словарей. Каждый словарь - это
+        Отправляет запрос в Интеллект. В ответ приходит JSON со списком словарей. Каждый словарь - это
         описание одной записи (цистерны)
         """
         logger.debug(f'Выполняется запрос к Интеллекту...')
@@ -61,18 +64,18 @@ class Command(BaseCommand):
 
         if not railway_tank_list:
             logger.error('ЖД цистерна не определена')
-            return 'Не определён', None
+            return None, None
 
         last_tank = railway_tank_list[-1]
         plate_image = last_tank.get('plate_numbers.id')
         photo_of_number = get_plate_image(plate_image) if plate_image else None
-        return last_tank['number'], photo_of_number
+        return int(last_tank['number']), photo_of_number
+
 
     def batch_process(self, railway_tank):
         """
-        Функция создаёт партию приёмки жд цистерн (если ещё не создана) и добавляет в неё цистерны.
+        Создаёт партию приёмки жд цистерн (если ещё не создана) и добавляет в неё цистерны.
         """
-        # Проверяем активные партии. Если партии нет - создаём её
         try:
             railway_batch, batch_created = RailwayBatch.objects.get_or_create(
                 is_active=True,
@@ -81,10 +84,103 @@ class Command(BaseCommand):
                 }
             )
             railway_batch.railway_tank_list.add(railway_tank)
+            logger.info(f'Цистерна {railway_tank.registration_number} добавлена в партию {railway_batch.id}')
         except MultipleObjectsReturned:
             logger.error(f"Найдено более одной активной партии")
         except Exception as error:
             logger.error(f"Ошибка при обработке партии: {error}", exc_info=True)
+
+
+    def tank_process(self, registration_number, image_data, is_on_station, tank_weight):
+        """
+        Управляет созданием/обновлением данных цистерн
+        """
+        try:
+            # Проверяем наличие цистерны в базе
+            railway_tank, tank_created = RailwayTank.objects.get_or_create(
+                registration_number=registration_number,
+                defaults={
+                        'registration_number': registration_number,
+                        'is_on_station': is_on_station,
+                    }
+                )
+            # Для новой цистерны всегда создаём новую историческую запись
+            if tank_created:
+                if is_on_station:
+                    RailwayTankHistory.objects.create(
+                        tank=railway_tank,
+                        arrival_at=datetime.now(),
+                        full_weight=tank_weight,
+                        arrival_img=ContentFile(image_data, name=f"{registration_number}_arrival.jpg") if image_data else None,
+                    )
+                else:
+                    RailwayTankHistory.objects.create(
+                        tank=railway_tank,
+                        departure_at=datetime.now(),
+                        empty_weight=tank_weight,
+                        departure_img=ContentFile(image_data, name=f"{registration_number}_departure.jpg") if image_data else None,
+                    )
+                logger.info(f"Создана новая цистерна {registration_number} с исторической записью")
+                return railway_tank
+
+            # Для существующей цистерны создаём новую историческую запись при въезде
+            if is_on_station:
+                RailwayTankHistory.objects.create(
+                    tank=railway_tank,
+                    arrival_at=datetime.now(),
+                    full_weight=tank_weight,
+                    arrival_img=ContentFile(image_data, name=f"{registration_number}_arrival.jpg") if image_data else None,
+                )
+                logger.info(f"Создана историческая запись для цистерны {registration_number} при въезде")
+                return railway_tank
+
+            # Если существующая цистерна выезжает, проверям последнюю историческую запись
+            open_hist = railway_tank.tank_history.order_by('-id').first()
+            
+            if not open_hist:
+                # Если истории нет, создаем новую запись на выезд
+                RailwayTankHistory.objects.create(
+                    tank=railway_tank,
+                    departure_at=datetime.now(),
+                    empty_weight=tank_weight,
+                    departure_img=ContentFile(image_data, name=f"{registration_number}_departure.jpg") if image_data else None,
+                )
+                logger.warning(f"Создана историческая запись для цистерны {registration_number} при выезде (не было истории)")
+                return railway_tank
+
+            # Если последнияя историческая запись закрыта по временным меткам
+            if open_hist.arrival_at and open_hist.departure_at:
+                # Создаём новую запись на выезд
+                RailwayTankHistory.objects.create(
+                    tank=railway_tank,
+                    departure_at=datetime.now(),
+                    empty_weight=tank_weight,
+                    departure_img=ContentFile(image_data, name=f"{registration_number}_departure.jpg") if image_data else None,
+                )
+                logger.warning(f"Создана не полная историческая запись для цистерны {registration_number} при выезде")
+                return railway_tank
+
+            # Если запись открыта, то работаем с последней исторической записью
+            open_hist.departure_at = datetime.now()
+            open_hist.empty_weight = tank_weight
+            open_hist.gas_weight = open_hist.full_weight - tank_weight if open_hist.full_weight else None
+
+            # Обрабатываем изображение
+            if image_data:
+                open_hist.departure_img.save(
+                    f"{registration_number}_departure.jpg",
+                    ContentFile(image_data),
+                    save=False
+                )
+
+            open_hist.save()
+            logger.info(f"Обновлена историческая запись для цистерны {registration_number} при выезде")
+            return railway_tank
+
+        except Exception as error:
+            logger.error(f"ЖД. Ошибка при создании/обновлении данных цистерны: {error}", exc_info=True)
+            return None
+
 
     def handle(self, *args, **kwargs):
         try:
@@ -94,67 +190,37 @@ class Command(BaseCommand):
             camera_worked = self.get_opc_value("camera_worked")
             is_on_station = self.get_opc_value("is_on_station")
 
-            logger.debug(f'tank_weight={tank_weight}, camera_worked={camera_worked}, is_on_station={is_on_station}')
+            logger.info(f'tank_weight={tank_weight}, camera_worked={camera_worked}, is_on_station={is_on_station}')
 
             if not camera_worked:
                 return
 
-            logger.debug(f'Камера сработала. Вес жд цистерны {tank_weight}')
+            logger.info(f'Камера сработала. Вес жд цистерны {tank_weight}')
             self.set_opc_value("camera_worked", False)
 
             # Приостанавливаем выполнение на 2 секунды, чтобы в интеллекте появилась запись с номером цистерны
             time.sleep(2)
 
             registration_number, image_data = self.fetch_railway_tank_data()
-            current_date, current_time = datetime.now().date(), datetime.now().time()
 
-            if registration_number != self.last_number:
-                cache.set('last_tank_number', self.last_number)
+            # Пропускаем, если номер не определён
+            if not registration_number:
+                logger.error('ЖД цистерна не определена — пропуск обработки')
+                return
 
-            try:
-                railway_tank, tank_created = RailwayTank.objects.get_or_create(
-                    registration_number=registration_number if registration_number != 'Не определён' else ' ',
-                    defaults={
-                        'registration_number': registration_number,
-                        'is_on_station': is_on_station,
-                        'entry_date': datetime.now() if is_on_station else None,
-                        'departure_date': datetime.now() if not is_on_station else None,
-                        'full_weight': tank_weight if is_on_station else None,
-                        'empty_weight': tank_weight if not is_on_station else None,
-                    }
-                )
-                if image_data:
-                    image_name = f"{registration_number}.jpg"
-                    railway_tank.registration_number_img.save(
-                        image_name,
-                        ContentFile(image_data),
-                        save=True
-                    )
-                    logger.debug(f'Изображение для цистерны {registration_number} успешно сохранено.')
-                else:
-                    logger.error(f'Не удалось получить изображение для цистерны {registration_number}.')
+            if registration_number == cache.get('last_tank_number', None):
+                logger.warning(f'ЖД цистерна с номером {registration_number} уже обрабатывалась — пропуск обработки')
+                return
 
-                if not tank_created:
-                    railway_tank.is_on_station = is_on_station
-                    if is_on_station:
-                        railway_tank.entry_date = datetime.now()
-                        railway_tank.departure_date = None
-                        railway_tank.full_weight = tank_weight
-                    else:
-                        railway_tank.departure_date = datetime.now()
-                        railway_tank.empty_weight = tank_weight
-                        if railway_tank.full_weight is not None:
-                            railway_tank.gas_weight = railway_tank.full_weight - tank_weight
-                    railway_tank.save()
+            cache.set('last_tank_number', registration_number)
 
-                # Добавляем цистерну в партию
+            # Вызываем метод обработки цистерн
+            railway_tank = self.tank_process(registration_number, image_data, is_on_station, tank_weight)
+
+            # Добавляем цистерну в активную партию
+            if railway_tank:
                 self.batch_process(railway_tank)
-                logger.debug(f'ЖД весовая. Обработка завершена. Цистерна № {registration_number}')
-
-            except MultipleObjectsReturned:
-                logger.error(f"Найдено более одного объекта с номером {registration_number}")
-            except Exception as error:
-                logger.error(f"ЖД. Ошибка в основном цикле: {error}", exc_info=True)
+                logger.info(f'ЖД весовая. Обработка цистерны № {registration_number} успешно завершена')
 
         except Exception as error:
             logger.error(f'No connection to OPC server: {error}')
