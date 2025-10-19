@@ -104,6 +104,9 @@ class Command(BaseCommand):
                         'is_on_station': is_on_station,
                     }
                 )
+            # Указываем состояние цистерны
+            railway_tank.is_on_station = is_on_station
+
             # Для новой цистерны всегда создаём новую историческую запись
             if tank_created:
                 if is_on_station:

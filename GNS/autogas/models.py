@@ -22,11 +22,11 @@ class AutoGasBatch(models.Model):
         blank=True,
         verbose_name="Прицеп"
     )
-    gas_amount = models.FloatField(null=True, blank=True, verbose_name="Количество газа (массомер)")
+    gas_amount = models.DecimalField(max_digits=12, decimal_places=3, null=True, blank=True, verbose_name="Количество газа (массомер)")
     gas_type = models.CharField(choices=settings.GAS_TYPE_CHOICES, default='Не выбран', verbose_name="Тип газа")
-    scale_empty_weight = models.FloatField(null=True, blank=True, verbose_name="Вес пустого т/с (весы)")
-    scale_full_weight = models.FloatField(null=True, blank=True, verbose_name="Вес полного т/с (весы)")
-    weight_gas_amount = models.FloatField(null=True, blank=True, verbose_name="Количество газа (весы)")
+    scale_empty_weight = models.DecimalField(max_digits=12, decimal_places=3, null=True, blank=True, verbose_name="Вес пустого т/с (весы)")
+    scale_full_weight = models.DecimalField(max_digits=12, decimal_places=3, null=True, blank=True, verbose_name="Вес полного т/с (весы)")
+    weight_gas_amount = models.DecimalField(max_digits=12, decimal_places=3, null=True, blank=True, verbose_name="Количество газа (весы)")
     is_active = models.BooleanField(default=False, verbose_name="В работе")
     user = models.ForeignKey(
         User,
