@@ -19,7 +19,7 @@ from drf_spectacular.utils import (
     inline_serializer
 )
 from datetime import datetime, date
-from ..models import Balloon, Reader, BalloonsLoadingBatch, BalloonsUnloadingBatch, ReaderSettings
+from filling_station.models import Balloon, Reader, BalloonsLoadingBatch, BalloonsUnloadingBatch, ReaderSettings
 from .serializers import (
     BalloonSerializer,
     BalloonsLoadingBatchSerializer,
