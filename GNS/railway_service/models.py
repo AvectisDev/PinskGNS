@@ -51,11 +51,11 @@ class RailwayTankHistory(models.Model):
     )
     arrival_at = models.DateTimeField(null=True, blank=True, verbose_name="Дата въезда")
     departure_at = models.DateTimeField(null=True, blank=True, verbose_name="Дата выезда")
-    full_weight = models.DecimalField(max_digits=12, decimal_places=3, null=True, blank=True, verbose_name="Вес полной цистерны")
-    empty_weight = models.DecimalField(max_digits=12, decimal_places=3, null=True, blank=True, verbose_name="Вес пустой цистерны")
-    gas_weight = models.DecimalField(max_digits=12, decimal_places=3, null=True, blank=True, verbose_name="Поставлено газа")
+    full_weight = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True, verbose_name="Вес полной цистерны")
+    empty_weight = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True, verbose_name="Вес пустой цистерны")
+    gas_weight = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True, verbose_name="Поставлено газа")
     railway_ttn = models.CharField(null=True, blank=True, max_length=50, verbose_name="Номер ж/д накладной")
-    netto_weight_ttn = models.DecimalField(max_digits=12, decimal_places=3, null=True, blank=True, verbose_name="Вес НЕТТО ж/д цистерны по накладной")
+    netto_weight_ttn = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True, verbose_name="Вес НЕТТО ж/д цистерны по накладной")
     arrival_img = models.ImageField(null=True, blank=True, upload_to='railway_tanks/', verbose_name="Фото номера при въезде")
     departure_img = models.ImageField(null=True, blank=True, upload_to='railway_tanks/', verbose_name="Фото номера при выезде")
     
@@ -63,7 +63,7 @@ class RailwayTankHistory(models.Model):
     class Meta:
         verbose_name = "История цистерны"
         verbose_name_plural = "Истории цистерн"
-        ordering = ['-arrival_at', '-departure_at']
+        ordering = ['-arrival_at']
 
     def __str__(self):
         return f"{self.tank.registration_number}: {self.arrival_at} → {self.departure_at}"

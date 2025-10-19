@@ -120,7 +120,7 @@
                 <div class="list-group-item">
                     <div class="d-flex w-100 justify-content-between">
                         <h6 class="mb-1">{{ h.arrival_at|date:'d.m.Y H:i'|default:'-' }} → {{ h.departure_at|date:'d.m.Y H:i'|default:'-' }}</h6>
-                        <small>Количество газа: {{ h.gas_weight|default:'-' }} т</small>
+                        <h6>Количество газа: {{ h.gas_weight|default:'-' }} т</h6>
                     </div>
                     <div class="small text-muted">Вес полной: {{ h.full_weight|default:'-' }} т, Вес пустой: {{ h.empty_weight|default:'-' }} т, Номер ж/д накладной: {{ h.railway_ttn|default:'-' }}, Вес по накладной: {{ h.netto_weight_ttn|default:'-' }}</div>
                     <div class="mt-2 d-flex gap-3 flex-wrap">
