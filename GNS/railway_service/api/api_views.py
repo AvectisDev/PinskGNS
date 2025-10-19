@@ -85,9 +85,7 @@ class RailwayBatchView(viewsets.ViewSet):
         batch = get_object_or_404(RailwayBatch, id=pk)
 
         if not request.data.get('is_active', True):
-            current_date = datetime.now()
-            request.data['end_date'] = current_date.date()
-            request.data['end_time'] = current_date.time()
+            request.data['end_date'] = datetime.now()
 
         serializer = RailwayBatchSerializer(batch, data=request.data, partial=True)
         if serializer.is_valid():

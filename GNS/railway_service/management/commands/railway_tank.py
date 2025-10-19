@@ -104,8 +104,6 @@ class Command(BaseCommand):
                         'is_on_station': is_on_station,
                     }
                 )
-            # Указываем состояние цистерны
-            railway_tank.is_on_station = is_on_station
 
             # Для новой цистерны всегда создаём новую историческую запись
             if tank_created:
@@ -125,6 +123,10 @@ class Command(BaseCommand):
                     )
                 logger.info(f"Создана новая цистерна {registration_number} с исторической записью")
                 return railway_tank
+
+            # Указываем состояние цистерны
+            railway_tank.is_on_station = is_on_station
+            railway_tank.save()
 
             # Для существующей цистерны создаём новую историческую запись при въезде
             if is_on_station:
