@@ -1,13 +1,13 @@
 from django.shortcuts import get_object_or_404
 from django.http import JsonResponse
-from django.db.models import Sum, Count, Value, Case, When, IntegerField
+from django.db.models import Sum, Count, Value, Case, When, IntegerField, DecimalField
 from django.db.models.functions import Coalesce
 from rest_framework import generics, status, viewsets
 from rest_framework.response import Response
 from rest_framework.decorators import api_view, action
 from rest_framework.permissions import IsAuthenticated
 from datetime import datetime, date
-from ..models import RailwayTank, RailwayBatch
+from railway_service.models import RailwayTank, RailwayBatch
 from .serializers import RailwayBatchSerializer
 
 
@@ -32,8 +32,16 @@ class RailwayBatchView(viewsets.ViewSet):
                 When(railway_tank_list__gas_type='ПБА', then=1),
                 output_field=IntegerField()
             )),
-            last_month_gas_amount_spbt=Coalesce(Sum('gas_amount_spbt'), Value(0.0)),
-            last_month_gas_amount_pba=Coalesce(Sum('gas_amount_pba'), Value(0.0)))
+            last_month_gas_amount_spbt=Coalesce(
+                Sum('gas_amount_spbt', output_field=DecimalField(max_digits=12, decimal_places=2)),
+                Value(0.0),
+                output_field=DecimalField(max_digits=12, decimal_places=2)
+            ),
+            last_month_gas_amount_pba=Coalesce(
+                Sum('gas_amount_pba', output_field=DecimalField(max_digits=12, decimal_places=2)),
+                Value(0.0),
+                output_field=DecimalField(max_digits=12, decimal_places=2)
+            ))
         )
 
         # Партии за последний день
@@ -47,8 +55,16 @@ class RailwayBatchView(viewsets.ViewSet):
                 When(railway_tank_list__gas_type='ПБА', then=1),
                 output_field=IntegerField()
             )),
-            last_day_gas_amount_spbt=Coalesce(Sum('gas_amount_spbt'), Value(0.0)),
-            last_day_gas_amount_pba=Coalesce(Sum('gas_amount_pba'), Value(0.0)))
+            last_day_gas_amount_spbt=Coalesce(
+                Sum('gas_amount_spbt', output_field=DecimalField(max_digits=12, decimal_places=2)),
+                Value(0.0),
+                output_field=DecimalField(max_digits=12, decimal_places=2)
+            ),
+            last_day_gas_amount_pba=Coalesce(
+                Sum('gas_amount_pba', output_field=DecimalField(max_digits=12, decimal_places=2)),
+                Value(0.0),
+                output_field=DecimalField(max_digits=12, decimal_places=2)
+            ))
         )
 
         response = {}
