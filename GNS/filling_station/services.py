@@ -4,7 +4,7 @@ from datetime import datetime, date
 from typing import Optional, Dict, Any, Union, Tuple
 from django.conf import settings
 from django.core.cache import cache
-from .models import Balloon, Reader, BalloonsLoadingBatch, BalloonsUnloadingBatch, ReaderSettings
+from .models import Balloon, Reader, BalloonsBatch, ReaderSettings
 
 
 logger = logging.getLogger('filling_station')
@@ -92,14 +92,11 @@ def add_balloon_to_batch(balloon: Balloon, reader: ReaderSettings):
     try:
         function_type = reader.function
 
-        if function_type == 'l':
-            batch = BalloonsLoadingBatch.objects.filter(begin_date=today,
-                                                        reader_number=reader.number,
-                                                        is_active=True).first()
-        elif function_type == 'u':
-            batch = BalloonsUnloadingBatch.objects.filter(begin_date=today,
-                                                          reader_number=reader.number,
-                                                          is_active=True).first()
+        if function_type in ['l', 'u']:
+            batch = BalloonsBatch.objects.filter(batch_type=function_type,
+                                                started_at__date=today,
+                                                reader_number=reader.number,
+                                                is_active=True).first()
         else:
             batch = None
 
@@ -241,7 +238,7 @@ def send_status_to_miriada(reader: int, nfc_tag: str):
     elif reader in [2, 3, 4]:
         send_type = 'loading_into_truck'
         fullness = 1
-        batch = BalloonsUnloadingBatch.objects.last()
+        batch = BalloonsBatch.objects.filter(batch_type='u').last()
         number_auto = batch.truck.registration_number
         formatted_number_auto = f"{number_auto[:2]} {number_auto[2:6]}-{number_auto[6]}"
         type_car = 0 if batch.truck.type.type == 'Клетевоз' else 1

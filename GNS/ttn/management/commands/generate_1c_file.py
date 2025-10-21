@@ -4,7 +4,7 @@ from django.core.mail import EmailMessage
 from django.core.management.base import BaseCommand
 from django.utils import timezone
 from django.conf import settings
-from filling_station.models import BalloonsUnloadingBatch, BalloonsLoadingBatch
+from filling_station.models import BalloonsBatch
 from ttn.models import FilePath, RailwayTtn, AutoTtn, EmailRecipient
 
 
@@ -186,7 +186,7 @@ class Command(BaseCommand):
         return '\n'.join(lines)
 
     def generate_balloon_loading_list(self):
-        batches = BalloonsLoadingBatch.objects.filter(begin_date=self.day_for_search)
+        batches = BalloonsBatch.objects.filter(batch_type='l', started_at__date=self.day_for_search.date())
 
         lines = ['ГНС-ТТН4']
 
@@ -229,7 +229,7 @@ class Command(BaseCommand):
         return '\n'.join(lines)
 
     def generate_balloon_unloading_list(self):
-        batches = BalloonsUnloadingBatch.objects.filter(begin_date=self.day_for_search)
+        batches = BalloonsBatch.objects.filter(batch_type='u', started_at__date=self.day_for_search.date())
 
         lines = ['ГНС-ТТН5']
 

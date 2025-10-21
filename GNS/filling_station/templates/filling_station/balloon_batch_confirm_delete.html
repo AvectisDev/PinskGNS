@@ -10,7 +10,7 @@
         {% csrf_token %}
         <button type="submit" class="btn btn-danger">Удалить</button>
         <button type="button" class="btn" style="background-color: #3CBBD9; color: white;"
-                onclick="location.href='{{ balloonsunloadingbatch.get_absolute_url }}'">Отмена
+                onclick="location.href='{{ object.get_absolute_url }}'">Отмена
         </button>
     </form>
 </div>
