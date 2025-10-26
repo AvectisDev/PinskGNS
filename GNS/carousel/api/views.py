@@ -5,7 +5,7 @@ from rest_framework.response import Response
 from rest_framework.decorators import api_view, action
 from rest_framework.permissions import IsAuthenticated, AllowAny
 import logging
-from ..models import Carousel, CarouselSettings
+from carousel.models import Carousel, CarouselSettings
 from .serializers import CarouselSerializer, CarouselSettingsSerializer
 
 

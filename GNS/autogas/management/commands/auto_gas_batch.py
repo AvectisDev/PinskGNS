@@ -124,6 +124,7 @@ class Command(BaseCommand):
 
         if not registration_numbers:
             logger.warning('Список номеров пуст')
+            self.set_opc_value("response_batch_create", True)
             return
         logger.debug(f'Список номеров: {registration_numbers}')
 
@@ -132,6 +133,7 @@ class Command(BaseCommand):
 
         if not truck:
             logger.error('Не найден подходящий грузовик')
+            self.set_opc_value("response_batch_create", True)
             return
 
         try:

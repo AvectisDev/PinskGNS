@@ -1,8 +1,9 @@
 from django import forms
 from django.utils import timezone
-from .models import CarouselSettings, BALLOON_SIZE_CHOICES
+from .models import CarouselSettings
 from crispy_forms.helper import FormHelper
 from crispy_forms.layout import Submit
+from django.conf import settings
 
 
 class GetCarouselBalloonsAmount(forms.Form):
@@ -18,7 +19,7 @@ class GetCarouselBalloonsAmount(forms.Form):
     )
     size = forms.ChoiceField(
         label="Объем баллона",
-        choices=[('', 'Все объемы')] + list(BALLOON_SIZE_CHOICES),
+        choices=[('', 'Все объемы')] + list(settings.BALLOON_SIZE_CHOICES),
         required=False,
         widget=forms.Select(attrs={'class': 'form-control'})
     )

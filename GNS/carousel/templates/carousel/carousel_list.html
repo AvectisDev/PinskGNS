@@ -47,8 +47,8 @@
                             {% endif %}
                         </td>
                         <td>
-                            <div>{{ item.change_date|date:"d.m.Y"|default:"-" }}</div>
-                            <small class="text-muted">{{ item.change_time|time:"H:i"|default:"" }}</small>
+                            <div>{{ item.change_at|date:"d.m.Y"|default:"-" }}</div>
+                            <small class="text-muted">{{ item.change_at|time:"H:i"|default:"" }}</small>
                         </td>
                     </tr>
                     {% empty %}

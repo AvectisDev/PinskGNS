@@ -6,15 +6,14 @@ from django.views import generic
 from django.db.models import Q, Sum, Count
 from autogas.models import AutoGasBatch
 from railway_service.models import RailwayBatch
-from .models import Balloon, Truck, Trailer, BalloonsLoadingBatch, BalloonsUnloadingBatch, Reader, ReaderSettings
+from .models import Balloon, Truck, Trailer, BalloonsBatch, Reader, ReaderSettings
 from .admin import BalloonResources
 from .forms import (
     GetBalloonsAmount,
     BalloonForm,
     TruckForm,
     TrailerForm,
-    BalloonsLoadingBatchForm,
-    BalloonsUnloadingBatchForm
+    BalloonsBatchForm
 )
 from datetime import datetime, time, timedelta
 
@@ -113,70 +112,96 @@ def reader_info(request, reader_number=1):
     return render(request, 'filling_station/rfid_tables.html', context)
 
 
-# Партии приёмки баллонов
-class BalloonLoadingBatchListView(generic.ListView):
-    model = BalloonsLoadingBatch
+# Единые классы для работы с партиями баллонов
+class BalloonBatchListView(generic.ListView):
+    """Отображает список партий баллонов в зависимости от типа"""
+    model = BalloonsBatch
+    form_class = BalloonsBatchForm
     paginate_by = 10
     template_name = 'filling_station/balloon_batch_list.html'
+    
+    def get_batch_type(self):
+        path = self.request.path.lower()
+        if 'unloading' in path:
+            return 'u'
+        elif 'loading' in path:
+            return 'l'
+        return None
+
+    def get_queryset(self):
+        batch_type = self.get_batch_type()
+        if batch_type:
+            return BalloonsBatch.objects.filter(batch_type=batch_type)
+        return BalloonsBatch.objects.all()
 
 
-class BalloonLoadingBatchDetailView(generic.DetailView):
-    model = BalloonsLoadingBatch
+class BalloonBatchDetailView(generic.DetailView):
+    """Отображает детальное представление партии баллонов"""
+    model = BalloonsBatch
     context_object_name = 'batch'
     template_name = 'filling_station/balloon_batch_detail.html'
+    
 
-
-class BalloonLoadingBatchUpdateView(generic.UpdateView):
-    model = BalloonsLoadingBatch
-    form_class = BalloonsLoadingBatchForm
+class BalloonBatchUpdateView(generic.UpdateView):
+    """Универсальное редактирование партии баллонов"""
+    model = BalloonsBatch
+    form_class = BalloonsBatchForm
     template_name = 'filling_station/_equipment_form.html'
-
+    
     def get_success_url(self):
         return self.object.get_absolute_url()
 
     def post(self, request, *args, **kwargs):
         if 'cancel' in request.POST:
-            return redirect('filling_station:balloon_loading_batch_detail', pk=self.get_object().pk)
+            # Определяем правильный URL для редиректа
+            url_name = self.request.resolver_match.url_name
+            if 'loading' in url_name:
+                return redirect('filling_station:balloon_loading_batch_detail', pk=self.get_object().pk)
+            elif 'unloading' in url_name:
+                return redirect('filling_station:balloon_unloading_batch_detail', pk=self.get_object().pk)
         return super().post(request, *args, **kwargs)
 
 
-class BalloonLoadingBatchDeleteView(generic.DeleteView):
-    model = BalloonsLoadingBatch
-    success_url = reverse_lazy("filling_station:balloon_loading_batch_list")
-    template_name = 'filling_station/balloons_loading_batch_confirm_delete.html'
-
-
-# Партии отгрузки баллонов
-class BalloonUnloadingBatchListView(generic.ListView):
-    model = BalloonsUnloadingBatch
-    paginate_by = 10
-    template_name = 'filling_station/balloon_batch_list.html'
-
-
-class BalloonUnloadingBatchDetailView(generic.DetailView):
-    model = BalloonsUnloadingBatch
-    context_object_name = 'batch'
-    template_name = 'filling_station/balloon_batch_detail.html'
-
-
-class BalloonUnloadingBatchUpdateView(generic.UpdateView):
-    model = BalloonsUnloadingBatch
-    form_class = BalloonsUnloadingBatchForm
-    template_name = 'filling_station/_equipment_form.html'
-
+class BalloonBatchDeleteView(generic.DeleteView):
+    """Универсальное удаление партии баллонов"""
+    model = BalloonsBatch
+    template_name = 'filling_station/balloon_batch_confirm_delete.html'
+    
+    def get_batch_type(self):
+        """Определяет тип партии из URL"""
+        url_name = self.request.resolver_match.url_name
+        if 'loading' in url_name:
+            return 'l'
+        elif 'unloading' in url_name:
+            return 'u'
+        return None
+    
+    def get_queryset(self):
+        batch_type = self.get_batch_type()
+        if batch_type:
+            return BalloonsBatch.objects.filter(batch_type=batch_type)
+        return BalloonsBatch.objects.all()
+    
     def get_success_url(self):
-        return self.object.get_absolute_url()
+        """Определяет правильный URL для редиректа после удаления"""
+        url_name = self.request.resolver_match.url_name
+        if 'loading' in url_name:
+            return reverse_lazy("filling_station:balloon_loading_batch_list")
+        elif 'unloading' in url_name:
+            return reverse_lazy("filling_station:balloon_unloading_batch_list")
+        return reverse_lazy("filling_station:balloon_loading_batch_list")  # fallback
 
-    def post(self, request, *args, **kwargs):
-        if 'cancel' in request.POST:
-            return redirect('filling_station:balloon_unloading_batch_detail', pk=self.get_object().pk)
-        return super().post(request, *args, **kwargs)
 
+# Алиасы для обратной совместимости
+BalloonLoadingBatchListView = BalloonBatchListView
+BalloonLoadingBatchDetailView = BalloonBatchDetailView
+BalloonLoadingBatchUpdateView = BalloonBatchUpdateView
+BalloonLoadingBatchDeleteView = BalloonBatchDeleteView
 
-class BalloonUnloadingBatchDeleteView(generic.DeleteView):
-    model = BalloonsUnloadingBatch
-    success_url = reverse_lazy("filling_station:balloon_unloading_batch_list")
-    template_name = 'filling_station/balloons_unloading_batch_confirm_delete.html'
+BalloonUnloadingBatchListView = BalloonBatchListView
+BalloonUnloadingBatchDetailView = BalloonBatchDetailView
+BalloonUnloadingBatchUpdateView = BalloonBatchUpdateView
+BalloonUnloadingBatchDeleteView = BalloonBatchDeleteView
 
 
 # Грузовики
@@ -276,8 +301,8 @@ def statistic(request):
 
     context = {
         'readers_stats': Reader.get_all_readers_stats(start_date, end_date),
-        'balloon_loading_stats': BalloonsLoadingBatch.get_period_stats(start_date, end_date),
-        'balloon_unloading_stats': BalloonsUnloadingBatch.get_period_stats(start_date, end_date),
+        'balloon_loading_stats': BalloonsBatch.get_period_stats(start_date, end_date, batch_type='l'),
+        'balloon_unloading_stats': BalloonsBatch.get_period_stats(start_date, end_date, batch_type='u'),
         'auto_gas_stats': AutoGasBatch.get_period_stats(start_date, end_date),
         'railway_stats': RailwayBatch.get_period_stats(start_date, end_date),
         'form': form,

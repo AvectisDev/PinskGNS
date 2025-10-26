@@ -17,37 +17,37 @@ urlpatterns = [
     path('reader/<int:reader_number>/', views.reader_info, name="reader"),
 
     # Партии приёмки баллонов
-    path('batch/balloons-loading/', views.BalloonLoadingBatchListView.as_view(extra_context={
+    path('balloons/batch/loading/', views.BalloonBatchListView.as_view(extra_context={
         "title": "Партии приёмки баллонов"
     }),
          name="balloon_loading_batch_list"),
-    path('batch/balloons-loading/<pk>/', views.BalloonLoadingBatchDetailView.as_view(extra_context={
+    path('balloons/batch/loading/<pk>/', views.BalloonBatchDetailView.as_view(extra_context={
         "title": "Детали партии приёмки баллонов",
         "main_list": "loading"
     }),
          name="balloon_loading_batch_detail"),
-    path('batch/balloons-loading/<pk>/update/', views.BalloonLoadingBatchUpdateView.as_view(extra_context={
+    path('balloons/batch/loading/<pk>/update/', views.BalloonBatchUpdateView.as_view(extra_context={
         "title": "Редактирование партии приёмки баллонов"
     }),
          name="balloon_loading_batch_update"),
-    path('batch/balloons-loading/<pk>/delete/', views.BalloonLoadingBatchDeleteView.as_view(),
+    path('balloons/batch/loading/<pk>/delete/', views.BalloonBatchDeleteView.as_view(),
          name="balloon_loading_batch_delete"),
 
     # Партии отгрузки баллонов
-    path('batch/balloons-unloading/', views.BalloonUnloadingBatchListView.as_view(extra_context={
+    path('balloons/batch/unloading/', views.BalloonBatchListView.as_view(extra_context={
         "title": "Партии отгрузки баллонов"
     }),
          name="balloon_unloading_batch_list"),
-    path('batch/balloons-unloading/<pk>/', views.BalloonUnloadingBatchDetailView.as_view(extra_context={
+    path('balloons/batch/unloading/<pk>/', views.BalloonBatchDetailView.as_view(extra_context={
         "title": "Детали партии отгрузки баллонов",
         "main_list": "unloading"
     }),
          name="balloon_unloading_batch_detail"),
-    path('batch/balloons-unloading/<pk>/update/', views.BalloonUnloadingBatchUpdateView.as_view(extra_context={
+    path('balloons/batch/unloading/<pk>/update/', views.BalloonBatchUpdateView.as_view(extra_context={
         "title": "Редактирование партии отгрузки баллонов"
     }),
          name="balloon_unloading_batch_update"),
-    path('batch/balloons-unloading/<pk>/delete/', views.BalloonUnloadingBatchDeleteView.as_view(),
+    path('balloons/batch/unloading/<pk>/delete/', views.BalloonBatchDeleteView.as_view(),
          name="balloon_unloading_batch_delete"),
 
     # Грузовики

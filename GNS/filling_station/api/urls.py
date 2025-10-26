@@ -5,18 +5,10 @@ from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 
 app_name = 'filling_station'
 
-balloons_loading_router = DefaultRouter()
-balloons_loading_router.register(r'balloons-loading',
-                                 balloons.BalloonsLoadingBatchViewSet,
-                                 basename='balloons-loading')
-
-balloons_unloading_router = DefaultRouter()
-balloons_unloading_router.register(r'balloons-unloading',
-                                   balloons.BalloonsUnloadingBatchViewSet,
-                                   basename='balloons-unloading')
-
 balloons_router = DefaultRouter()
 balloons_router.register(r'balloons', balloons.BalloonViewSet, basename='balloons')
+balloons_router.register(r'balloons-loading', balloons.BalloonsBatchViewSet, basename='balloons-loading')
+balloons_router.register(r'balloons-unloading', balloons.BalloonsBatchViewSet, basename='balloons-unloading')
 
 
 urlpatterns = [
@@ -28,9 +20,6 @@ urlpatterns = [
 
     path('trucks', transport.TruckView.as_view()),
     path('trailers', transport.TrailerView.as_view()),
-
-    path('', include(balloons_loading_router.urls)),
-    path('', include(balloons_unloading_router.urls)),
 
     path('token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
     path('token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),

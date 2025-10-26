@@ -1,13 +1,7 @@
 from django.db import models
 from django.contrib.auth.models import User
+from django.conf import settings
 
-
-BALLOON_SIZE_CHOICES = [
-    (5, 5),
-    (12, 12),
-    (27, 27),
-    (50, 50),
-]
 
 class Carousel(models.Model):
     carousel_number = models.IntegerField(default=1, verbose_name="Номер карусели наполнения")
@@ -17,12 +11,11 @@ class Carousel(models.Model):
     full_weight = models.FloatField(null=True, blank=True, verbose_name="Вес полного баллона на посту")
     nfc_tag = models.CharField(null=True, blank=True, max_length=30, verbose_name="Номер метки")
     serial_number = models.CharField(null=True, blank=True, max_length=30, verbose_name="Серийный номер")
-    size = models.IntegerField(choices=BALLOON_SIZE_CHOICES, default=50, verbose_name="Объём")
+    size = models.IntegerField(choices=settings.BALLOON_SIZE_CHOICES, default=50, verbose_name="Объём")
     netto = models.FloatField(null=True, blank=True, verbose_name="Вес пустого баллона")
     brutto = models.FloatField(null=True, blank=True, verbose_name="Вес наполненного баллона")
     filling_status = models.BooleanField(default=False, verbose_name="Готов к наполнению")
-    change_date = models.DateField(auto_now=True, verbose_name="Дата изменений")
-    change_time = models.TimeField(auto_now=True, verbose_name="Время изменений")
+    change_at = models.DateTimeField(auto_now=True, verbose_name="Дата и время изменений")
 
     def __int__(self):
         return self.pk
@@ -33,7 +26,7 @@ class Carousel(models.Model):
     class Meta:
         verbose_name = "Карусель"
         verbose_name_plural = "Карусель"
-        ordering = ['-change_date', '-change_time']
+        ordering = ['-change_at']
 
 
 class CarouselSettings(models.Model):

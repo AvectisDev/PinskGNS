@@ -18,8 +18,6 @@ class AutoGasBatchForm(forms.ModelForm):
         self.fields['truck'].empty_label = 'Выберите автомобиль'
         self.fields['trailer'].empty_label = 'Выберите прицеп'
 
-        self.fields['end_date'].widget.attrs.update({'class': 'form-control'})
-
     class Meta:
         model = AutoGasBatch
         fields = [
@@ -38,7 +36,7 @@ class AutoGasBatchForm(forms.ModelForm):
             'batch_type': forms.Select(attrs={
                 'class': 'form-control',
             }),
-            'completed_at': forms.DateTimeInput(attrs={
+            'completed_at': forms.DateTimeInput(format='%Y-%m-%dT%H:%M', attrs={
                 'type': 'datetime-local',
                 'class': 'form-control'
             }),

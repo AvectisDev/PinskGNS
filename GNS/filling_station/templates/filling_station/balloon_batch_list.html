@@ -34,17 +34,17 @@
                                 </a>
                             </td>
                             <td>
-                                {% if batch.begin_date %}
-                                <div>{{ batch.begin_date|date:"d.m.Y" }}</div>
-                                <small class="text-muted">{{ batch.begin_time|time:"H:i" }}</small>
+                                {% if batch.started_at %}
+                                <div>{{ batch.started_at|date:"d.m.Y" }}</div>
+                                <small class="text-muted">{{ batch.started_at|time:"H:i" }}</small>
                                 {% else %}
                                 -
                                 {% endif %}
                             </td>
                             <td>
-                                {% if batch.end_date %}
-                                <div>{{ batch.end_date|date:"d.m.Y" }}</div>
-                                <small class="text-muted">{{ batch.end_time|time:"H:i" }}</small>
+                                {% if batch.completed_at %}
+                                <div>{{ batch.completed_at|date:"d.m.Y" }}</div>
+                                <small class="text-muted">{{ batch.completed_at|time:"H:i" }}</small>
                                 {% else %}
                                 <span class="text-muted">-</span>
                                 {% endif %}

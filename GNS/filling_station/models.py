@@ -186,14 +186,16 @@ class Reader(models.Model):
 
         # Статистика по ТТН
         if reader_number == 6:
-            stats['loading_ttn_quantity'] = BalloonsLoadingBatch.objects.filter(
+            stats['loading_ttn_quantity'] = BalloonsBatch.objects.filter(
+                batch_type='l',
                 reader_number=reader_number,
-                begin_date__range=(start_date, end_date)
+                started_at__range=(start_datetime, end_datetime)
             ).aggregate(total_ttn=Sum('amount_of_ttn'))['total_ttn'] or 0
         elif reader_number in [3, 4]:
-            stats['unloading_ttn_quantity'] = BalloonsUnloadingBatch.objects.filter(
+            stats['unloading_ttn_quantity'] = BalloonsBatch.objects.filter(
+                batch_type='u',
                 reader_number=reader_number,
-                begin_date__range=(start_date, end_date)
+                started_at__range=(start_datetime, end_datetime)
             ).aggregate(total_ttn=Sum('amount_of_ttn'))['total_ttn'] or 0
 
         return stats
@@ -302,7 +304,7 @@ class Truck(models.Model):
     - Временные метки въезда/выезда
     """
     car_brand = models.CharField(null=True, blank=True, max_length=20, verbose_name="Марка авто")
-    registration_number = models.CharField(max_length=10, verbose_name="Регистрационный знак")
+    registration_number = models.CharField(unique=True, max_length=10, verbose_name="Регистрационный знак")
     type = models.ForeignKey(
         TruckType,
         on_delete=models.DO_NOTHING,
@@ -310,18 +312,44 @@ class Truck(models.Model):
         default=1
     )
     capacity_cylinders = models.IntegerField(null=True, blank=True, verbose_name="Максимальная вместимость баллонов")
-    max_weight_of_transported_cylinders = models.FloatField(null=True, blank=True,
-                                                            verbose_name="Максимальная масса перевозимых баллонов")
-    max_mass_of_transported_gas = models.FloatField(null=True, blank=True,
-                                                    verbose_name="Максимальная масса перевозимого газа")
-    max_gas_volume = models.FloatField(null=True, blank=True, verbose_name="Максимальный объём перевозимого газа")
-    empty_weight = models.FloatField(null=True, blank=True, verbose_name="Вес пустого т/с (по техпаспорту)")
-    full_weight = models.FloatField(null=True, blank=True, verbose_name="Вес полного т/с (по техпаспорту)")
+    max_weight_of_transported_cylinders = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        verbose_name="Максимальная масса перевозимых баллонов"
+        )
+    max_mass_of_transported_gas = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        verbose_name="Максимальная масса перевозимого газа"
+        )
+    max_gas_volume = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        verbose_name="Максимальный объём перевозимого газа"
+        )
+    empty_weight = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        verbose_name="Вес пустого т/с (по техпаспорту)"
+        )
+    full_weight = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        verbose_name="Вес полного т/с (по техпаспорту)"
+        )
     is_on_station = models.BooleanField(default=False, verbose_name="Находится на станции")
-    entry_date = models.DateField(null=True, blank=True, verbose_name="Дата въезда")
-    entry_time = models.TimeField(null=True, blank=True, verbose_name="Время въезда")
-    departure_date = models.DateField(null=True, blank=True, verbose_name="Дата выезда")
-    departure_time = models.TimeField(null=True, blank=True, verbose_name="Время выезда")
+    entry_at = models.DateTimeField(null=True, blank=True, verbose_name="Дата и время въезда")
+    departure_at = models.DateTimeField(null=True, blank=True, verbose_name="Дата и время выезда")
 
     def __str__(self):
         return self.registration_number
@@ -329,7 +357,7 @@ class Truck(models.Model):
     class Meta:
         verbose_name = "Грузовик"
         verbose_name_plural = "Грузовики"
-        ordering = ['-is_on_station', '-entry_date', '-entry_time', '-departure_date', '-departure_time']
+        ordering = ['-is_on_station', '-entry_at']
 
     def get_absolute_url(self):
         return reverse('filling_station:truck_detail', args=[self.pk])
@@ -370,27 +398,56 @@ class Trailer(models.Model):
         default=1
     )
     trailer_brand = models.CharField(null=True, blank=True, max_length=20, verbose_name="Марка прицепа")
-    registration_number = models.CharField(max_length=10, verbose_name="Регистрационный знак")
+    registration_number = models.CharField(unique=True, max_length=10, verbose_name="Регистрационный знак")
     type = models.ForeignKey(
         TrailerType,
         on_delete=models.DO_NOTHING,
         verbose_name="Тип",
         default=1
     )
-    capacity_cylinders = models.IntegerField(null=True, blank=True, verbose_name="Максимальная вместимость баллонов")
-    max_weight_of_transported_cylinders = models.FloatField(null=True, blank=True,
-                                                            verbose_name="Максимальная масса перевозимых баллонов")
-    max_mass_of_transported_gas = models.FloatField(null=True, blank=True,
-                                                    verbose_name="Максимальная масса перевозимого газа")
-    max_gas_volume = models.FloatField(null=True, blank=True, verbose_name="Максимальный объём перевозимого газа")
-    empty_weight = models.FloatField(null=True, blank=True, verbose_name="Вес пустого т/с (по техпаспорту)")
-    full_weight = models.FloatField(null=True, blank=True, verbose_name="Вес полного т/с (по техпаспорту)")
-
+    capacity_cylinders = models.IntegerField(
+        null=True,
+        blank=True,
+        verbose_name="Максимальная вместимость баллонов"
+        )
+    max_weight_of_transported_cylinders = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        verbose_name="Максимальная масса перевозимых баллонов"
+        )
+    max_mass_of_transported_gas = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        verbose_name="Максимальная масса перевозимого газа"
+        )
+    max_gas_volume = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        verbose_name="Максимальный объём перевозимого газа"
+        )
+    empty_weight = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        verbose_name="Вес пустого т/с (по техпаспорту)"
+        )
+    full_weight = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        verbose_name="Вес полного т/с (по техпаспорту)"
+        )
     is_on_station = models.BooleanField(default=False, verbose_name="Находится на станции")
-    entry_date = models.DateField(null=True, blank=True, verbose_name="Дата въезда")
-    entry_time = models.TimeField(null=True, blank=True, verbose_name="Время въезда")
-    departure_date = models.DateField(null=True, blank=True, verbose_name="Дата выезда")
-    departure_time = models.TimeField(null=True, blank=True, verbose_name="Время выезда")
+    entry_at = models.DateTimeField(null=True, blank=True, verbose_name="Дата и время въезда")
+    departure_at = models.DateTimeField(null=True, blank=True, verbose_name="Дата и время выезда")
 
     def __str__(self):
         return self.registration_number
@@ -398,7 +455,7 @@ class Trailer(models.Model):
     class Meta:
         verbose_name = "Прицеп"
         verbose_name_plural = "Прицепы"
-        ordering = ['-is_on_station', '-entry_date', '-entry_time', '-departure_date', '-departure_time']
+        ordering = ['-is_on_station', '-entry_at']
 
     def get_absolute_url(self):
         return reverse('filling_station:trailer_detail', args=[self.pk])
@@ -410,21 +467,19 @@ class Trailer(models.Model):
         return reverse('filling_station:trailer_delete', args=[self.pk])
 
 
-class BalloonsLoadingBatch(models.Model):
+class BalloonsBatch(models.Model):
     """
-    Партия баллонов для погрузки в транспорт.
-    Содержит:
-    - Временные метки начала/окончания погрузки
+    Партии баллонов. Содержит:
+    - Временные метки начала/окончания партии
     - Данные транспорта (грузовик и прицеп)
     - Статистику по количеству баллонов (по объёмам и RFID)
     - Список загруженных баллонов (ManyToMany)
     - Номер и количество по ТТН
     - Статус активности партии
     """
-    begin_date = models.DateField(auto_now_add=True, verbose_name="Дата начала приёмки")
-    begin_time = models.TimeField(auto_now_add=True, verbose_name="Время начала приёмки")
-    end_date = models.DateField(null=True, blank=True, verbose_name="Дата окончания приёмки")
-    end_time = models.TimeField(null=True, blank=True, verbose_name="Время окончания приёмки")
+    batch_type = models.CharField(choices=settings.BATCH_TYPE_CHOICES, default='l', verbose_name="Тип партии")
+    started_at = models.DateTimeField(auto_now_add=True, verbose_name="Дата и время начала")
+    completed_at = models.DateTimeField(null=True, blank=True, verbose_name="Дата и время окончания")
     truck = models.ForeignKey(
         Truck,
         on_delete=models.DO_NOTHING,
@@ -464,9 +519,9 @@ class BalloonsLoadingBatch(models.Model):
         return str(self.id)
 
     class Meta:
-        verbose_name = "Партия приёмки баллонов"
-        verbose_name_plural = "Партии приёмки баллонов"
-        ordering = ['-begin_date', '-begin_time']
+        verbose_name = "Партия баллонов"
+        verbose_name_plural = "Партии баллонов"
+        ordering = ['-started_at']
 
     def get_absolute_url(self):
         return reverse('filling_station:balloon_loading_batch_detail', args=[self.pk])
@@ -573,14 +628,21 @@ class BalloonsLoadingBatch(models.Model):
         return result
 
     @classmethod
-    def get_period_stats(cls, start_date: Optional[date]=None, end_date: Optional[date]=None) -> Dict[str, Optional[int]]:
+    def get_period_stats(cls, start_date: Optional[date]=None, end_date: Optional[date]=None, batch_type: Optional[str]=None) -> Dict[str, Optional[int]]:
         """
         Собирает статистику по партиям за период:
         - кол-во партий
         - кол-во баллонов с RFID
         - кол-во баллонов по ТТН
         """
-        queryset = cls.objects.filter(begin_date__range=[start_date, end_date])
+        start_dt = datetime.combine(start_date, time.min)
+        end_dt = datetime.combine(end_date, time.max)
+
+        queryset = cls.objects.all()
+        if start_dt and end_dt:
+            queryset = queryset.filter(started_at__range=[start_dt, end_dt])
+        if batch_type:
+            queryset = queryset.filter(batch_type=batch_type)
 
         return queryset.annotate(
             batch_balloon_count=Count('balloon_list'),
@@ -591,7 +653,7 @@ class BalloonsLoadingBatch(models.Model):
         )
 
     @classmethod
-    def get_common_stats_for_gns(cls) -> list:
+    def get_common_stats_for_gns(cls, batch_type: Optional[str] = None) -> list:
         """
         Собирает статистику по партиям за последние день и месяц
         """
@@ -600,7 +662,10 @@ class BalloonsLoadingBatch(models.Model):
 
         month_start = datetime.combine(first_day_of_month, time.min)
 
-        queryset = cls.objects.filter(begin_date__gte=month_start)
+        queryset = cls.objects.filter(started_at__gte=month_start)
+        
+        if batch_type:
+            queryset = queryset.filter(batch_type=batch_type)
 
         # Группируем по reader_number
         stats_by_reader = defaultdict(lambda: {"truck_month": 0, "truck_today": 0})
@@ -611,211 +676,7 @@ class BalloonsLoadingBatch(models.Model):
                 continue
 
             stats_by_reader[reader_id]["truck_month"] += 1
-            if batch.begin_date >= today:
-                stats_by_reader[reader_id]["truck_today"] += 1
-
-        stats = [
-            {"reader_id": reader_id, **data}
-            for reader_id, data in stats_by_reader.items()
-        ]
-        return stats
-
-
-class BalloonsUnloadingBatch(models.Model):
-    """
-    Партия баллонов для приёмки из транспорта.
-    Содержит:
-    - Временные метки начала/окончания погрузки
-    - Данные транспорта (грузовик и прицеп)
-    - Статистику по количеству баллонов (по объёмам и RFID)
-    - Список принятых баллонов (ManyToMany)
-    - Номер и количество по ТТН
-    - Статус активности партии
-    """
-    begin_date = models.DateField(auto_now_add=True, verbose_name="Дата начала отгрузки")
-    begin_time = models.TimeField(auto_now_add=True, verbose_name="Время начала отгрузки")
-    end_date = models.DateField(null=True, blank=True, verbose_name="Дата окончания отгрузки")
-    end_time = models.TimeField(null=True, blank=True, verbose_name="Время окончания отгрузки")
-    truck = models.ForeignKey(
-        Truck,
-        on_delete=models.DO_NOTHING,
-        verbose_name="Автомобиль"
-    )
-    trailer = models.ForeignKey(
-        Trailer,
-        on_delete=models.DO_NOTHING,
-        null=True,
-        blank=True,
-        default=0,
-        verbose_name="Прицеп"
-    )
-    reader_number = models.IntegerField(null=True, blank=True, verbose_name="Номер считывателя")
-    amount_of_rfid = models.IntegerField(default=0, verbose_name="Количество баллонов по rfid")
-    amount_of_5_liters = models.IntegerField(default=0, verbose_name="Количество 5л баллонов")
-    amount_of_12_liters = models.IntegerField(default=0, verbose_name="Количество 12л баллонов")
-    amount_of_27_liters = models.IntegerField(default=0, verbose_name="Количество 27л баллонов")
-    amount_of_50_liters = models.IntegerField(default=0, verbose_name="Количество 50л баллонов")
-    gas_amount = models.FloatField(null=True, blank=True, verbose_name="Количество отгруженного газа")
-    balloon_list = models.ManyToManyField(Balloon, blank=True, verbose_name="Список баллонов")
-    is_active = models.BooleanField(default=False, verbose_name="В работе")
-    ttn = models.CharField(max_length=20, default='', verbose_name="Номер ТТН")
-    amount_of_ttn = models.IntegerField(null=True, blank=True, verbose_name="Количество баллонов по ТТН")
-    user = models.ForeignKey(
-        User,
-        on_delete=models.DO_NOTHING,
-        default=1,
-        verbose_name="Пользователь"
-    )
-
-    def __str__(self):
-        return str(self.id)
-
-    class Meta:
-        verbose_name = "Партия отгрузки баллонов"
-        verbose_name_plural = "Партии отгрузки баллонов"
-        ordering = ['-begin_date', '-begin_time']
-
-    def get_absolute_url(self):
-        return reverse('filling_station:balloon_unloading_batch_detail', args=[self.pk])
-
-    def get_update_url(self):
-        return reverse('filling_station:balloon_unloading_batch_update', args=[self.pk])
-
-    def get_delete_url(self):
-        return reverse('filling_station:balloon_unloading_batch_delete', args=[self.pk])
-
-    def get_amount_without_rfid(self):
-        amounts = [
-            self.amount_of_5_liters or 0,
-            self.amount_of_12_liters or 0,
-            self.amount_of_27_liters or 0,
-            self.amount_of_50_liters or 0
-        ]
-        total_amount = sum(amounts)
-        return total_amount
-
-    def add_balloon(self, nfc_tag):
-        """
-        Добавляет баллон в партию по NFC-метке
-        Возвращает словарь с результатами операции:
-        {
-            'success': bool,
-            'balloon_id': int | None,
-            'new_count': int,
-            'error': str
-        }
-        """
-        result = {
-            'success': False,
-            'balloon_id': None,
-            'new_count': self.amount_of_rfid or 0,
-            'error': 'ok'
-        }
-
-        try:
-            if self.balloon_list.filter(nfc_tag=nfc_tag).exists():
-                result['error'] = 'Баллон уже в партии'
-                return result
-
-            balloon = Balloon.objects.get(nfc_tag=nfc_tag)
-            self.balloon_list.add(balloon)
-            self.amount_of_rfid = (self.amount_of_rfid or 0) + 1
-            self.save()
-
-            result.update({
-                'success': True,
-                'balloon_id': balloon.nfc_tag,
-                'new_count': self.amount_of_rfid
-            })
-
-        except Balloon.DoesNotExist:
-            result['error'] = 'Баллон не найден'
-        except Exception as e:
-            result['error'] = f'Ошибка сервера: {str(e)}'
-
-        return result
-
-    def remove_balloon(self, nfc_tag):
-        """
-        Удаляет баллон из партии по NFC-метке
-        Возвращает словарь с результатами операции:
-        {
-            'success': bool,
-            'balloon_id': int | None,
-            'new_count': int,
-            'error': str
-        }
-        """
-        result = {
-            'success': False,
-            'balloon_id': None,
-            'new_count': self.amount_of_rfid or 0,
-            'error': 'ok'
-        }
-
-        try:
-            if not self.balloon_list.filter(nfc_tag=nfc_tag).exists():
-                result['error'] = 'Баллон не найден в партии'
-                return result
-
-            balloon = Balloon.objects.get(nfc_tag=nfc_tag)
-            self.balloon_list.remove(balloon)
-            self.amount_of_rfid = max((self.amount_of_rfid or 0) - 1, 0)
-            self.save()
-
-            result.update({
-                'success': True,
-                'balloon_id': balloon.nfc_tag,
-                'new_count': self.amount_of_rfid
-            })
-
-        except Balloon.DoesNotExist:
-            result['error'] = 'Баллон не найден'
-        except Exception as e:
-            result['error'] = f'Ошибка сервера: {str(e)}'
-
-        return result
-
-    @classmethod
-    def get_period_stats(cls, start_date: Optional[date]=None, end_date: Optional[date]=None) -> Dict[str, Optional[int]]:
-        """
-        Собирает статистику по партиям за период:
-        - кол-во партий
-        - кол-во баллонов с RFID
-        - кол-во баллонов по ТТН
-        """
-        queryset = cls.objects.filter(begin_date__range=[start_date, end_date])
-
-        return queryset.annotate(
-            batch_balloon_count=Count('balloon_list'),
-        ).aggregate(
-            total_batches=Count('id'),
-            total_balloon_count_by_rfid=Sum('batch_balloon_count'),
-            total_balloon_count_by_ttn=Sum('amount_of_ttn'),
-        )
-
-    @classmethod
-    def get_common_stats_for_gns(cls) -> list:
-        """
-        Собирает статистику по партиям за последние день и месяц
-        """
-        today = date.today()
-        first_day_of_month = today.replace(day=1)
-
-        month_start = datetime.combine(first_day_of_month, time.min)
-
-        queryset = cls.objects.filter(begin_date__gte=month_start)
-
-        # Группируем по reader_number
-        stats_by_reader = defaultdict(lambda: {"truck_month": 0, "truck_today": 0})
-
-        for batch in queryset:
-            reader_id = batch.reader_number
-            if reader_id is None:
-                continue
-
-            stats_by_reader[reader_id]["truck_month"] += 1
-            if batch.begin_date >= today:
+            if batch.started_at >= today:
                 stats_by_reader[reader_id]["truck_today"] += 1
 
         stats = [

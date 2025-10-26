@@ -21,23 +21,22 @@ class Command(BaseCommand):
         logger.debug(f'КПП. Список номеров c интеллекта: {transport_list}')
         return transport_list
 
-    def transport_process(self, registration_number, is_on_station, current_date, current_time, model):
+    def transport_process(self, registration_number, is_on_station, model):
         """
         Функция обновляет данные по грузовику
         """
+        current_datetime = datetime.now()
+        
         if is_on_station:
             update_data = {
                 'is_on_station': True,
-                'entry_date': current_date,
-                'entry_time': current_time,
-                'departure_date': None,
-                'departure_time': None
+                'entry_at': current_datetime,
+                'departure_at': None
             }
         else:
             update_data = {
                 'is_on_station': False,
-                'departure_date': current_date,
-                'departure_time': current_time
+                'departure_at': current_datetime
             }
         try:
             model.objects.filter(registration_number=registration_number).update(**update_data)
@@ -48,8 +47,6 @@ class Command(BaseCommand):
 
     def handle(self, *args, **kwargs):
         try:
-            current_date, current_time = datetime.now().date(), datetime.now().time()
-
             registration_number_list = self.get_transport_data()
 
             for transport in registration_number_list:
@@ -66,9 +63,9 @@ class Command(BaseCommand):
                 transport_type = get_transport_type(registration_number)
 
                 if transport_type == 'truck':
-                    self.transport_process(registration_number, is_on_station, current_date, current_time, Truck)
+                    self.transport_process(registration_number, is_on_station, Truck)
                 elif transport_type == 'trailer':
-                    self.transport_process(registration_number, is_on_station, current_date, current_time, Trailer)
+                    self.transport_process(registration_number, is_on_station, Trailer)
 
                 logger.info(f'КПП. Обработка завершена. {transport_type} № {registration_number}')
 

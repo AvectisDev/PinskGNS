@@ -3,7 +3,7 @@ from django.contrib.auth.models import User
 from django.urls import reverse
 from django.db.models import Q, Sum
 from django.conf import settings
-from filling_station.models import BalloonsLoadingBatch, BalloonsUnloadingBatch
+from filling_station.models import BalloonsBatch
 from autogas.models import AutoGasBatch
 from railway_service.models import RailwayTank
 
@@ -63,20 +63,22 @@ class BalloonTtn(models.Model):
         related_name='balloons_city'
     )
     loading_batch = models.ForeignKey(
-        BalloonsLoadingBatch,
+        BalloonsBatch,
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
         verbose_name="Партия приёмки",
-        related_name='balloons_ttn_loading'
+        related_name='balloons_ttn_loading',
+        limit_choices_to={'batch_type': 'l'}
     )
     unloading_batch = models.ForeignKey(
-        BalloonsUnloadingBatch,
+        BalloonsBatch,
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
         verbose_name="Партия отгрузки",
-        related_name='balloons_ttn_unloading'
+        related_name='balloons_ttn_unloading',
+        limit_choices_to={'batch_type': 'u'}
     )
     date = models.DateTimeField(auto_now=True, verbose_name="Дата формирования накладной")
 

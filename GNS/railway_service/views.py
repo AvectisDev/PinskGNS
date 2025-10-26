@@ -6,6 +6,7 @@ from .forms import RailwayTankForm, RailwayBatchForm, RailwayTankHistoryForm
 from django.shortcuts import get_object_or_404
 from django.contrib import messages
 from django.db import transaction
+from django.db.models import Prefetch, Max
 
 
 # ж/д цистерны
@@ -14,21 +15,25 @@ class RailwayTankView(generic.ListView):
     paginate_by = 10
 
     def get_queryset(self):
-        return (
-            super()
-            .get_queryset()
-            .prefetch_related('tank_history')
-        )
+        return super().get_queryset().prefetch_related(
+            Prefetch(
+                'tank_history',
+                queryset=RailwayTankHistory.objects.order_by('-arrival_at')
+            )
+        ).annotate(
+            latest_arrival=Max('tank_history__arrival_at')
+        ).order_by('-is_on_station', 'latest_arrival')
 
 
 class RailwayTankDetailView(generic.DetailView):
     model = RailwayTank
 
     def get_queryset(self):
-        return (
-            super()
-            .get_queryset()
-            .prefetch_related('tank_history')
+        return super().get_queryset().prefetch_related(
+            Prefetch(
+                'tank_history',
+                queryset=RailwayTankHistory.objects.order_by('-arrival_at')
+            )
         )
 
 

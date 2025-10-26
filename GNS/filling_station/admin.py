@@ -6,8 +6,7 @@ from .models import (
     TruckType,
     Trailer,
     TrailerType,
-    BalloonsLoadingBatch,
-    BalloonsUnloadingBatch,
+    BalloonsBatch,
     ReaderSettings
 )
 
@@ -84,18 +83,14 @@ class TruckAdmin(admin.ModelAdmin):
         'empty_weight',
         'full_weight',
         'is_on_station',
-        'entry_date',
-        'entry_time',
-        'departure_date',
-        'departure_time'
+        'entry_at',
+        'departure_at'
     ]
     search_fields = [
         'car_brand',
         'registration_number',
-        'type',
-        'is_on_station',
-        'entry_date',
-        'departure_date'
+        'type__type',
+        'is_on_station'
     ]
 
 
@@ -119,15 +114,13 @@ class TrailerAdmin(admin.ModelAdmin):
         'empty_weight',
         'full_weight',
         'is_on_station',
-        'entry_date',
-        'entry_time',
-        'departure_date',
-        'departure_time'
+        'entry_at',
+        'departure_at'
     ]
     search_fields = [
         'trailer_brand',
         'registration_number',
-        'type',
+        'type__type',
         'is_on_station'
     ]
 
@@ -137,14 +130,13 @@ class TrailerTypeAdmin(admin.ModelAdmin):
     list_display = ['id', 'type']
 
 
-@admin.register(BalloonsLoadingBatch)
-class BalloonsLoadingBatchAdmin(admin.ModelAdmin):
+@admin.register(BalloonsBatch)
+class BalloonsBatchAdmin(admin.ModelAdmin):
     list_display = [
         'id',
-        'begin_date',
-        'begin_time',
-        'end_date',
-        'end_time',
+        'batch_type',
+        'started_at',
+        'completed_at',
         'truck',
         'trailer',
         'reader_number',
@@ -158,30 +150,5 @@ class BalloonsLoadingBatchAdmin(admin.ModelAdmin):
         'ttn',
         'amount_of_ttn'
     ]
-    list_filter = ['begin_date', 'end_date', 'is_active']
-    search_fields = ['truck', 'is_active', 'ttn']
-
-
-@admin.register(BalloonsUnloadingBatch)
-class BalloonsUnloadingBatchAdmin(admin.ModelAdmin):
-    list_display = [
-        'id',
-        'begin_date',
-        'begin_time',
-        'end_date',
-        'end_time',
-        'truck',
-        'trailer',
-        'reader_number',
-        'amount_of_rfid',
-        'amount_of_5_liters',
-        'amount_of_12_liters',
-        'amount_of_27_liters',
-        'amount_of_50_liters',
-        'gas_amount',
-        'is_active',
-        'ttn',
-        'amount_of_ttn'
-    ]
-    list_filter = ['begin_date', 'end_date', 'is_active']
-    search_fields = ['truck', 'ttn']
+    list_filter = ['batch_type', 'started_at', 'completed_at', 'is_active']
+    search_fields = ['truck', 'is_active', 'ttn', 'batch_type']

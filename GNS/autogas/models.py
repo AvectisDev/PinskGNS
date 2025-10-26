@@ -22,11 +22,11 @@ class AutoGasBatch(models.Model):
         blank=True,
         verbose_name="Прицеп"
     )
-    gas_amount = models.FloatField(null=True, blank=True, verbose_name="Количество газа (массомер)")
+    gas_amount = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True, verbose_name="Количество газа (массомер)")
     gas_type = models.CharField(choices=settings.GAS_TYPE_CHOICES, default='Не выбран', verbose_name="Тип газа")
-    scale_empty_weight = models.FloatField(null=True, blank=True, verbose_name="Вес пустого т/с (весы)")
-    scale_full_weight = models.FloatField(null=True, blank=True, verbose_name="Вес полного т/с (весы)")
-    weight_gas_amount = models.FloatField(null=True, blank=True, verbose_name="Количество газа (весы)")
+    scale_empty_weight = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True, verbose_name="Вес пустого т/с (весы)")
+    scale_full_weight = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True, verbose_name="Вес полного т/с (весы)")
+    weight_gas_amount = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True, verbose_name="Количество газа (весы)")
     is_active = models.BooleanField(default=False, verbose_name="В работе")
     user = models.ForeignKey(
         User,
@@ -41,7 +41,7 @@ class AutoGasBatch(models.Model):
     class Meta:
         verbose_name = "Автоколонка"
         verbose_name_plural = "Автоколонка"
-        ordering = ['-begin_at']
+        ordering = ['-is_active', '-begin_at']
 
     def get_absolute_url(self):
         return reverse('autogas:auto_gas_batch_detail', args=[self.pk])
@@ -54,7 +54,7 @@ class AutoGasBatch(models.Model):
 
     @classmethod
     def get_period_stats(cls, start_date=None, end_date=None):
-        queryset = cls.objects.filter(begin_date__range=[start_date, end_date])
+        queryset = cls.objects.filter(begin_at__range=[start_date, end_date])
 
         return queryset.aggregate(
             loading_batches=Count('id', filter=Q(batch_type='l')),
