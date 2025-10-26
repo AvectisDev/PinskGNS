@@ -18,8 +18,6 @@ class AutoGasBatchForm(forms.ModelForm):
         self.fields['truck'].empty_label = 'Выберите автомобиль'
         self.fields['trailer'].empty_label = 'Выберите прицеп'
 
-        self.fields['end_date'].widget.attrs.update({'class': 'form-control'})
-
     class Meta:
         model = AutoGasBatch
         fields = [

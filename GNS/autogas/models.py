@@ -41,7 +41,7 @@ class AutoGasBatch(models.Model):
     class Meta:
         verbose_name = "Автоколонка"
         verbose_name_plural = "Автоколонка"
-        ordering = ['-begin_at']
+        ordering = ['-is_active', '-begin_at']
 
     def get_absolute_url(self):
         return reverse('autogas:auto_gas_batch_detail', args=[self.pk])
