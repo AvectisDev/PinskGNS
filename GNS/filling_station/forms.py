@@ -56,9 +56,7 @@ class BalloonForm(forms.ModelForm):
 
     class Meta:
         model = Balloon
-        fields = ['nfc_tag', 'serial_number', 'creation_date', 'size', 'netto', 'brutto', 'current_examination_date',
-                  'next_examination_date', 'diagnostic_date', 'working_pressure', 'status', 'manufacturer',
-                  'wall_thickness', 'filling_status', 'update_passport_required']
+        exclude = ['user', 'change_date']
         widgets = {
             'nfc_tag': forms.TextInput(attrs={'class': 'form-control'}),
             'serial_number': forms.TextInput(attrs={'class': 'form-control'}),
@@ -91,22 +89,7 @@ class TruckForm(forms.ModelForm):
 
     class Meta:
         model = Truck
-        fields = [
-            'car_brand',
-            'registration_number',
-            'type',
-            'capacity_cylinders',
-            'max_weight_of_transported_cylinders',
-            'max_mass_of_transported_gas',
-            'max_gas_volume',
-            'empty_weight',
-            'full_weight',
-            'is_on_station',
-            'entry_date',
-            'entry_time',
-            'departure_date',
-            'departure_time'
-        ]
+        fields = '__all__'
         widgets = {
             'car_brand': forms.TextInput(attrs={'class': 'form-control'}),
             'registration_number': forms.TextInput(attrs={'class': 'form-control'}),
@@ -118,10 +101,14 @@ class TruckForm(forms.ModelForm):
             'empty_weight': forms.NumberInput(attrs={'class': 'form-control'}),
             'full_weight': forms.NumberInput(attrs={'class': 'form-control'}),
             'is_on_station': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
-            'entry_date': forms.DateInput(format='%Y-%m-%d', attrs={'type': 'date'}),
-            'entry_time': forms.TimeInput(attrs={'type': 'time'}),
-            'departure_date': forms.DateInput(format='%Y-%m-%d', attrs={'type': 'date'}),
-            'departure_time': forms.TimeInput(attrs={'type': 'time'})
+            'entry_at': forms.DateTimeInput(format='%Y-%m-%dT%H:%M', attrs={
+                'type': 'datetime-local',
+                'class': 'form-control'
+                }),
+            'departure_at': forms.DateTimeInput(format='%Y-%m-%dT%H:%M', attrs={
+                'type': 'datetime-local',
+                'class': 'form-control'
+                })
         }
 
 
@@ -138,23 +125,7 @@ class TrailerForm(forms.ModelForm):
 
     class Meta:
         model = Trailer
-        fields = [
-            'truck',
-            'trailer_brand',
-            'registration_number',
-            'type',
-            'capacity_cylinders',
-            'max_weight_of_transported_cylinders',
-            'max_mass_of_transported_gas',
-            'max_gas_volume',
-            'empty_weight',
-            'full_weight',
-            'is_on_station',
-            'entry_date',
-            'entry_time',
-            'departure_date',
-            'departure_time'
-        ]
+        fields = '__all__'
         widgets = {
             'truck': forms.Select(attrs={'class': 'form-control'}),
             'trailer_brand': forms.TextInput(attrs={'class': 'form-control'}),
@@ -167,10 +138,14 @@ class TrailerForm(forms.ModelForm):
             'empty_weight': forms.NumberInput(attrs={'class': 'form-control'}),
             'full_weight': forms.NumberInput(attrs={'class': 'form-control'}),
             'is_on_station': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
-            'entry_date': forms.DateInput(format='%Y-%m-%d', attrs={'type': 'date'}),
-            'entry_time': forms.TimeInput(attrs={'type': 'time'}),
-            'departure_date': forms.DateInput(format='%Y-%m-%d', attrs={'type': 'date'}),
-            'departure_time': forms.TimeInput(attrs={'type': 'time'})
+            'entry_at': forms.DateTimeInput(format='%Y-%m-%dT%H:%M',attrs={
+                'type': 'datetime-local',
+                'class': 'form-control'
+                }),
+            'departure_at': forms.DateTimeInput(format='%Y-%m-%dT%H:%M', attrs={
+                'type': 'datetime-local',
+                'class': 'form-control'
+                })
         }
 
 
@@ -192,22 +167,7 @@ class BalloonsBatchForm(forms.ModelForm):
 
     class Meta:
         model = BalloonsBatch
-        fields = [
-            'batch_type',
-            'completed_at',
-            'truck',
-            'trailer',
-            'reader_number',
-            'amount_of_rfid',
-            'amount_of_5_liters',
-            'amount_of_12_liters',
-            'amount_of_27_liters',
-            'amount_of_50_liters',
-            'gas_amount',
-            'is_active',
-            'ttn',
-            'amount_of_ttn'
-        ]
+        exclude = ['user', 'balloon_list']
         widgets = {
             'batch_type': forms.HiddenInput(),
             'completed_at': forms.DateTimeInput(format='%Y-%m-%dT%H:%M', attrs={

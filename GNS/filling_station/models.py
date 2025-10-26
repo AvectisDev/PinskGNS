@@ -304,7 +304,7 @@ class Truck(models.Model):
     - Временные метки въезда/выезда
     """
     car_brand = models.CharField(null=True, blank=True, max_length=20, verbose_name="Марка авто")
-    registration_number = models.CharField(max_length=10, verbose_name="Регистрационный знак")
+    registration_number = models.CharField(unique=True, max_length=10, verbose_name="Регистрационный знак")
     type = models.ForeignKey(
         TruckType,
         on_delete=models.DO_NOTHING,
@@ -312,18 +312,44 @@ class Truck(models.Model):
         default=1
     )
     capacity_cylinders = models.IntegerField(null=True, blank=True, verbose_name="Максимальная вместимость баллонов")
-    max_weight_of_transported_cylinders = models.FloatField(null=True, blank=True,
-                                                            verbose_name="Максимальная масса перевозимых баллонов")
-    max_mass_of_transported_gas = models.FloatField(null=True, blank=True,
-                                                    verbose_name="Максимальная масса перевозимого газа")
-    max_gas_volume = models.FloatField(null=True, blank=True, verbose_name="Максимальный объём перевозимого газа")
-    empty_weight = models.FloatField(null=True, blank=True, verbose_name="Вес пустого т/с (по техпаспорту)")
-    full_weight = models.FloatField(null=True, blank=True, verbose_name="Вес полного т/с (по техпаспорту)")
+    max_weight_of_transported_cylinders = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        verbose_name="Максимальная масса перевозимых баллонов"
+        )
+    max_mass_of_transported_gas = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        verbose_name="Максимальная масса перевозимого газа"
+        )
+    max_gas_volume = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        verbose_name="Максимальный объём перевозимого газа"
+        )
+    empty_weight = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        verbose_name="Вес пустого т/с (по техпаспорту)"
+        )
+    full_weight = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        verbose_name="Вес полного т/с (по техпаспорту)"
+        )
     is_on_station = models.BooleanField(default=False, verbose_name="Находится на станции")
-    entry_date = models.DateField(null=True, blank=True, verbose_name="Дата въезда")
-    entry_time = models.TimeField(null=True, blank=True, verbose_name="Время въезда")
-    departure_date = models.DateField(null=True, blank=True, verbose_name="Дата выезда")
-    departure_time = models.TimeField(null=True, blank=True, verbose_name="Время выезда")
+    entry_at = models.DateTimeField(null=True, blank=True, verbose_name="Дата и время въезда")
+    departure_at = models.DateTimeField(null=True, blank=True, verbose_name="Дата и время выезда")
 
     def __str__(self):
         return self.registration_number
@@ -331,7 +357,7 @@ class Truck(models.Model):
     class Meta:
         verbose_name = "Грузовик"
         verbose_name_plural = "Грузовики"
-        ordering = ['-is_on_station', '-entry_date', '-entry_time', '-departure_date', '-departure_time']
+        ordering = ['-is_on_station', '-entry_at']
 
     def get_absolute_url(self):
         return reverse('filling_station:truck_detail', args=[self.pk])
@@ -372,27 +398,56 @@ class Trailer(models.Model):
         default=1
     )
     trailer_brand = models.CharField(null=True, blank=True, max_length=20, verbose_name="Марка прицепа")
-    registration_number = models.CharField(max_length=10, verbose_name="Регистрационный знак")
+    registration_number = models.CharField(unique=True, max_length=10, verbose_name="Регистрационный знак")
     type = models.ForeignKey(
         TrailerType,
         on_delete=models.DO_NOTHING,
         verbose_name="Тип",
         default=1
     )
-    capacity_cylinders = models.IntegerField(null=True, blank=True, verbose_name="Максимальная вместимость баллонов")
-    max_weight_of_transported_cylinders = models.FloatField(null=True, blank=True,
-                                                            verbose_name="Максимальная масса перевозимых баллонов")
-    max_mass_of_transported_gas = models.FloatField(null=True, blank=True,
-                                                    verbose_name="Максимальная масса перевозимого газа")
-    max_gas_volume = models.FloatField(null=True, blank=True, verbose_name="Максимальный объём перевозимого газа")
-    empty_weight = models.FloatField(null=True, blank=True, verbose_name="Вес пустого т/с (по техпаспорту)")
-    full_weight = models.FloatField(null=True, blank=True, verbose_name="Вес полного т/с (по техпаспорту)")
-
+    capacity_cylinders = models.IntegerField(
+        null=True,
+        blank=True,
+        verbose_name="Максимальная вместимость баллонов"
+        )
+    max_weight_of_transported_cylinders = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        verbose_name="Максимальная масса перевозимых баллонов"
+        )
+    max_mass_of_transported_gas = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        verbose_name="Максимальная масса перевозимого газа"
+        )
+    max_gas_volume = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        verbose_name="Максимальный объём перевозимого газа"
+        )
+    empty_weight = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        verbose_name="Вес пустого т/с (по техпаспорту)"
+        )
+    full_weight = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        verbose_name="Вес полного т/с (по техпаспорту)"
+        )
     is_on_station = models.BooleanField(default=False, verbose_name="Находится на станции")
-    entry_date = models.DateField(null=True, blank=True, verbose_name="Дата въезда")
-    entry_time = models.TimeField(null=True, blank=True, verbose_name="Время въезда")
-    departure_date = models.DateField(null=True, blank=True, verbose_name="Дата выезда")
-    departure_time = models.TimeField(null=True, blank=True, verbose_name="Время выезда")
+    entry_at = models.DateTimeField(null=True, blank=True, verbose_name="Дата и время въезда")
+    departure_at = models.DateTimeField(null=True, blank=True, verbose_name="Дата и время выезда")
 
     def __str__(self):
         return self.registration_number
@@ -400,7 +455,7 @@ class Trailer(models.Model):
     class Meta:
         verbose_name = "Прицеп"
         verbose_name_plural = "Прицепы"
-        ordering = ['-is_on_station', '-entry_date', '-entry_time', '-departure_date', '-departure_time']
+        ordering = ['-is_on_station', '-entry_at']
 
     def get_absolute_url(self):
         return reverse('filling_station:trailer_detail', args=[self.pk])

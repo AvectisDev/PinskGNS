@@ -38,7 +38,7 @@ class AutoGasBatchForm(forms.ModelForm):
             'batch_type': forms.Select(attrs={
                 'class': 'form-control',
             }),
-            'completed_at': forms.DateTimeInput(attrs={
+            'completed_at': forms.DateTimeInput(format='%Y-%m-%dT%H:%M', attrs={
                 'type': 'datetime-local',
                 'class': 'form-control'
             }),

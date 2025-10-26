@@ -61,10 +61,8 @@ from .serializers import TruckSerializer, TrailerSerializer
                     "empty_weight": 7500.0,
                     "full_weight": 20000.0,
                     "is_on_station": True,
-                    "entry_date": "2023-05-15",
-                    "entry_time": "08:30:00",
-                    "departure_date": None,
-                    "departure_time": None,
+                    "entry_at": "2023-05-15T08:30:00",
+                    "departure_at": None,
                     "trailer": {
                         "id": 1,
                         "registration_number": "A1234B7"
@@ -118,10 +116,8 @@ from .serializers import TruckSerializer, TrailerSerializer
                 value={
                     "id": 1,
                     "is_on_station": False,
-                    "entry_date": "2023-05-16",
-                    "entry_time": "10:00:00",
-                    "departure_date": "2023-05-16",
-                    "departure_time": "16:30:00"
+                    "entry_at": "2023-05-16T10:00:00",
+                    "departure_at": "2023-05-16T16:30:00"
                 },
                 request_only=True
             )
@@ -239,10 +235,8 @@ class TruckView(APIView):
                     "empty_weight": 5000.0,
                     "full_weight": 15000.0,
                     "is_on_station": True,
-                    "entry_date": "2023-05-15",
-                    "entry_time": "08:45:00",
-                    "departure_date": None,
-                    "departure_time": None
+                    "entry_at": "2023-05-15T08:45:00",
+                    "departure_at": None
                 }],
                 response_only=True
             )
@@ -293,10 +287,8 @@ class TruckView(APIView):
                 value={
                     "id": 1,
                     "is_on_station": False,
-                    "entry_date": "2023-05-16",
-                    "entry_time": "10:15:00",
-                    "departure_date": "2023-05-16",
-                    "departure_time": "17:00:00"
+                    "entry_at": "2023-05-16T10:15:00",
+                    "departure_at": "2023-05-16T17:00:00"
                 },
                 request_only=True
             )

@@ -239,9 +239,11 @@ def send_status_to_miriada(reader: int, nfc_tag: str):
         send_type = 'loading_into_truck'
         fullness = 1
         batch = BalloonsBatch.objects.filter(batch_type='u').last()
-        number_auto = batch.truck.registration_number
-        formatted_number_auto = f"{number_auto[:2]} {number_auto[2:6]}-{number_auto[6]}"
-        type_car = 0 if batch.truck.type.type == 'Клетевоз' else 1
+
+        if batch:
+            number_auto = batch.truck.registration_number
+            formatted_number_auto = f"{number_auto[:2]} {number_auto[2:6]}-{number_auto[6]}"
+            type_car = 0 if batch.truck.type.type == 'Клетевоз' else 1
 
     if fullness is not None:
         payload.update({"fulness": fullness})

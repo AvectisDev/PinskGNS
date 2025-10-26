@@ -45,17 +45,17 @@
                                 {% endif %}
                             </td>
                             <td>
-                                {% if truck.entry_date %}
-                                <div>{{ truck.entry_date|date:"d.m.Y" }}</div>
-                                <small class="text-muted">{{ truck.entry_time|time:"H:i" }}</small>
+                                {% if truck.entry_at %}
+                                <div>{{ truck.entry_at|date:"d.m.Y" }}</div>
+                                <small class="text-muted">{{ truck.entry_at|time:"H:i" }}</small>
                                 {% else %}
                                 -
                                 {% endif %}
                             </td>
                             <td>
-                                {% if truck.departure_date %}
-                                <div>{{ truck.departure_date|date:"d.m.Y" }}</div>
-                                <small class="text-muted">{{ truck.departure_time|time:"H:i" }}</small>
+                                {% if truck.departure_at %}
+                                <div>{{ truck.departure_at|date:"d.m.Y" }}</div>
+                                <small class="text-muted">{{ truck.departure_at|time:"H:i" }}</small>
                                 {% else %}
                                 -
                                 {% endif %}

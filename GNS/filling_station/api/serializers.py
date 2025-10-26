@@ -45,10 +45,8 @@ class TruckSerializer(serializers.ModelSerializer):
             'empty_weight',
             'full_weight',
             'is_on_station',
-            'entry_date',
-            'entry_time',
-            'departure_date',
-            'departure_time',
+            'entry_at',
+            'departure_at',
             'trailer'
         ]
 
@@ -80,10 +78,8 @@ class TrailerSerializer(serializers.ModelSerializer):
             'empty_weight',
             'full_weight',
             'is_on_station',
-            'entry_date',
-            'entry_time',
-            'departure_date',
-            'departure_time'
+            'entry_at',
+            'departure_at'
         ]
 
     def get_type(self, obj):

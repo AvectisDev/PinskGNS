@@ -83,18 +83,14 @@ class TruckAdmin(admin.ModelAdmin):
         'empty_weight',
         'full_weight',
         'is_on_station',
-        'entry_date',
-        'entry_time',
-        'departure_date',
-        'departure_time'
+        'entry_at',
+        'departure_at'
     ]
     search_fields = [
         'car_brand',
         'registration_number',
-        'type',
-        'is_on_station',
-        'entry_date',
-        'departure_date'
+        'type__type',
+        'is_on_station'
     ]
 
 
@@ -118,15 +114,13 @@ class TrailerAdmin(admin.ModelAdmin):
         'empty_weight',
         'full_weight',
         'is_on_station',
-        'entry_date',
-        'entry_time',
-        'departure_date',
-        'departure_time'
+        'entry_at',
+        'departure_at'
     ]
     search_fields = [
         'trailer_brand',
         'registration_number',
-        'type',
+        'type__type',
         'is_on_station'
     ]
 
