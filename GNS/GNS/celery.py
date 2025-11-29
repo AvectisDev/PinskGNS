@@ -5,7 +5,6 @@ import logging.config
 from django.conf import settings
 
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'GNS.settings')
-
 django.setup()
 
 # Применяем настройки логирования Django
