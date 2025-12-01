@@ -1,5 +1,6 @@
 import logging
 import time
+from decimal import Decimal
 from django.core.cache import cache
 from django.core.files.base import ContentFile
 from opcua import Client, ua
@@ -7,7 +8,7 @@ from django.core.exceptions import MultipleObjectsReturned
 from django.core.management.base import BaseCommand
 from django.conf import settings
 from datetime import datetime
-from ...models import RailwayBatch, RailwayTank, RailwayTankHistory
+from railway_service.models import RailwayBatch, RailwayTank, RailwayTankHistory
 from .intellect import get_registration_number_list, INTELLECT_SERVER_LIST, get_plate_image
 
 logger = logging.getLogger('railway')
@@ -168,7 +169,9 @@ class Command(BaseCommand):
             # Если запись открыта, то работаем с последней исторической записью
             open_hist.departure_at = datetime.now()
             open_hist.empty_weight = tank_weight
-            open_hist.gas_weight = open_hist.full_weight - tank_weight if open_hist.full_weight else None
+            # Приводим tank_weight к Decimal для корректного вычисления
+            tank_weight_decimal = Decimal(str(tank_weight)) if tank_weight is not None else None
+            open_hist.gas_weight = open_hist.full_weight - tank_weight_decimal if open_hist.full_weight and tank_weight_decimal is not None else None
 
             # Обрабатываем изображение
             if image_data:
@@ -195,12 +198,20 @@ class Command(BaseCommand):
             camera_worked = self.get_opc_value("camera_worked")
             is_on_station = self.get_opc_value("is_on_station")
 
-            logger.info(f'tank_weight={tank_weight}, camera_worked={camera_worked}, is_on_station={is_on_station}')
+            cache_key = 'railway_tank_processing'
+            cached_data = cache.get(cache_key)
+            
+            opc_values = f'tank_weight={tank_weight}, camera_worked={camera_worked}, is_on_station={is_on_station}'
+            if opc_values == cached_data:
+                return
+            
+            cache.set(cache_key, opc_values, timeout=3600)
+            logger.info(opc_values)
 
             if not camera_worked:
                 return
 
-            logger.info(f'Камера сработала. Вес жд цистерны {tank_weight}')
+            logger.info(f'Камера сработала. Вес жд цистерны {tank_weight}. Цистерна на станции: {is_on_station}')
             self.set_opc_value("camera_worked", False)
 
             # Приостанавливаем выполнение на 2 секунды, чтобы в интеллекте появилась запись с номером цистерны
