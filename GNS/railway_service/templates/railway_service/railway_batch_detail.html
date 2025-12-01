@@ -62,12 +62,13 @@
                             </thead>
                             <tbody>
                                 {% for tank in batch.railway_tank_list.all %}
+                                {% with last=tank.tank_history.all.0 %}
                                 <tr onclick="window.location='{{ tank.get_absolute_url }}'" style="cursor: pointer;">
                                     <td>{{ tank.registration_number }}</td>
-                                    <td>{{ tank.get_gas_type_display }}</td>
-                                    <td>{{ tank.full_weight|float_format }} т</td>
-                                    <td>{{ tank.empty_weight|float_format }} т</td>
-                                    <td>{{ tank.gas_weight|float_format }} т</td>
+                                    <td>{{ last.get_gas_type_display|default:"-" }}</td>
+                                    <td>{{ last.full_weight|float_format|default:"-" }} т</td>
+                                    <td>{{ last.empty_weight|float_format|default:"-" }} т</td>
+                                    <td>{{ last.gas_weight|float_format|default:"-" }} т</td>
                                     <td>
                                         {% if tank.is_on_station %}
                                             <span class="badge bg-success">На станции</span>
@@ -76,6 +77,7 @@
                                         {% endif %}
                                     </td>
                                 </tr>
+                                {% endwith %}
                                 {% endfor %}
                             </tbody>
                         </table>

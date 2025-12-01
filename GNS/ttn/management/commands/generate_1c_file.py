@@ -109,9 +109,10 @@ class Command(BaseCommand):
                 netto_weight_ttn = hist.netto_weight_ttn if hist and hist.netto_weight_ttn is not None else 0
                 gas_weight = hist.gas_weight if hist and hist.gas_weight is not None else 0
                 departure_date = hist.departure_at if hist else None
+                gas_type = hist.gas_type if hist and hist.gas_type and hist.gas_type != "Не выбран" else ttn.gas_type
                 lines.append(
                     f'{tank.registration_number};'
-                    f'{tank.gas_type if tank.gas_type != "Не выбран" else ttn.gas_type};'
+                    f'{gas_type};'
                     f'{netto_weight_ttn:.3f};'
                     f'{gas_weight:.3f};'
                     f'{departure_date.strftime("%d.%m.%y") if departure_date else ""};'

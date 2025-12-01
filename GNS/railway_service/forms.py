@@ -23,12 +23,10 @@ class RailwayTankForm(forms.ModelForm):
         model = RailwayTank
         fields = [
             'registration_number',
-            'gas_type',
             'is_on_station',
         ]
         widgets = {
             'registration_number': forms.NumberInput(attrs={'class': 'form-control'}),
-            'gas_type': forms.Select(choices=settings.GAS_TYPE_CHOICES, attrs={'class': 'form-control'}),
             'is_on_station': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
         }
 
@@ -57,6 +55,7 @@ class RailwayTankHistoryForm(forms.ModelForm):
             'full_weight',
             'empty_weight',
             'gas_weight',
+            'gas_type',
             'railway_ttn',
             'netto_weight_ttn',
         ]
@@ -66,6 +65,7 @@ class RailwayTankHistoryForm(forms.ModelForm):
             'full_weight': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
             'empty_weight': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
             'gas_weight': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
+            'gas_type': forms.Select(choices=settings.GAS_TYPE_CHOICES, attrs={'class': 'form-control'}),
             'railway_ttn': forms.TextInput(attrs={'class': 'form-control'}),
             'netto_weight_ttn': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
         }

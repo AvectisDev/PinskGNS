@@ -7,7 +7,7 @@ from rest_framework.response import Response
 from rest_framework.decorators import api_view, action
 from rest_framework.permissions import IsAuthenticated
 from datetime import datetime, date
-from railway_service.models import RailwayTank, RailwayBatch
+from railway_service.models import RailwayTank, RailwayBatch, RailwayTankHistory
 from .serializers import RailwayBatchSerializer
 
 
@@ -25,12 +25,14 @@ class RailwayBatchView(viewsets.ViewSet):
         .filter(begin_date__gte=first_day_of_month)
         .aggregate(
             last_month_total_tanks_spbt=Count(Case(
-                When(railway_tank_list__gas_type='СПБТ', then=1),
-                output_field=IntegerField()
+                When(railway_tank_list__tank_history__gas_type='СПБТ', then=1),
+                output_field=IntegerField(),
+                distinct=True
             )),
             last_month_total_tanks_pba=Count(Case(
-                When(railway_tank_list__gas_type='ПБА', then=1),
-                output_field=IntegerField()
+                When(railway_tank_list__tank_history__gas_type='ПБА', then=1),
+                output_field=IntegerField(),
+                distinct=True
             )),
             last_month_gas_amount_spbt=Coalesce(
                 Sum('gas_amount_spbt', output_field=DecimalField(max_digits=12, decimal_places=2)),
@@ -48,12 +50,14 @@ class RailwayBatchView(viewsets.ViewSet):
         result.append(RailwayBatch.objects
         .filter(begin_date=today)
         .aggregate(last_day_total_tanks_spbt=Count(Case(
-            When(railway_tank_list__gas_type='СПБТ', then=1),
-            output_field=IntegerField()
+            When(railway_tank_list__tank_history__gas_type='СПБТ', then=1),
+            output_field=IntegerField(),
+            distinct=True
         )),
             last_day_total_tanks_pba=Count(Case(
-                When(railway_tank_list__gas_type='ПБА', then=1),
-                output_field=IntegerField()
+                When(railway_tank_list__tank_history__gas_type='ПБА', then=1),
+                output_field=IntegerField(),
+                distinct=True
             )),
             last_day_gas_amount_spbt=Coalesce(
                 Sum('gas_amount_spbt', output_field=DecimalField(max_digits=12, decimal_places=2)),
@@ -72,12 +76,13 @@ class RailwayBatchView(viewsets.ViewSet):
             response['loading_batch'] = response.get('loading_batch', {}) | item
 
         # Активная партия
-        tanks_on_station = RailwayTank.objects.filter(is_on_station=True)
+        tanks_on_station = RailwayTank.objects.filter(is_on_station=True).prefetch_related('tank_history')
         for tank in tanks_on_station:
+            last_history = tank.tank_history.first()  # first() потому что ordering = ['-arrival_at']
             response[tank.registration_number] = {
                 'registration_number': tank.registration_number,
-                'gas_type': tank.gas_type,
-                'full_weight': tank.full_weight if tank.full_weight else 0
+                'gas_type': last_history.gas_type if last_history else 'Не выбран',
+                'full_weight': float(last_history.full_weight) if last_history and last_history.full_weight else 0
             }
         return JsonResponse(response, safe=False)
 

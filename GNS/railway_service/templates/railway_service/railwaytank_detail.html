@@ -22,10 +22,9 @@
             <div class="row">
                 <div class="col-md-6">
                     <dl class="row">
-                        <dt class="col-sm-5">Тип газа:</dt>
-                        <dd class="col-sm-7">{{ object.get_gas_type_display|default:"-" }}</dd>
-
                         {% with last=object.tank_history.all.0 %}
+                        <dt class="col-sm-5">Тип газа:</dt>
+                        <dd class="col-sm-7">{{ last.get_gas_type_display|default:"-" }}</dd>
                         <dt class="col-sm-5">Вес полной цистерны:</dt>
                         <dd class="col-sm-7">{{ last.full_weight|float_format|default:"-" }} т</dd>
 
@@ -122,7 +121,7 @@
                         <h6 class="mb-1">{{ h.arrival_at|date:'d.m.Y H:i'|default:'-' }} → {{ h.departure_at|date:'d.m.Y H:i'|default:'-' }}</h6>
                         <h6>Количество газа: {{ h.gas_weight|default:'-' }} т</h6>
                     </div>
-                    <div class="small text-muted">Вес полной: {{ h.full_weight|default:'-' }} т, Вес пустой: {{ h.empty_weight|default:'-' }} т, Номер ж/д накладной: {{ h.railway_ttn|default:'-' }}, Вес по накладной: {{ h.netto_weight_ttn|default:'-' }}</div>
+                    <div class="small text-muted">Тип газа: {{ h.get_gas_type_display|default:'-' }}, Вес полной: {{ h.full_weight|default:'-' }} т, Вес пустой: {{ h.empty_weight|default:'-' }} т, Номер ж/д накладной: {{ h.railway_ttn|default:'-' }}, Вес по накладной: {{ h.netto_weight_ttn|default:'-' }}</div>
                     <div class="mt-2 d-flex gap-3 flex-wrap">
                         {% if h.arrival_img %}
                         <a href="{{ h.arrival_img.url }}" target="_blank">
