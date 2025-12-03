@@ -21,18 +21,29 @@ PASSWORD = "rfid-device"
 
 
 async def update_balloon(data: dict):
-
     async with aiohttp.ClientSession() as session:
+        response = None
         try:
-            async with session.post(f'{settings.DJANGO_API_HOST}/balloons/update-by-reader/', json=data, timeout=2,
-                                    auth=aiohttp.BasicAuth(USERNAME, PASSWORD)) as response:
+            async with session.post(
+                f'{settings.DJANGO_API_HOST}/balloons/update-by-reader/',
+                json=data,
+                timeout=2,
+                auth=aiohttp.BasicAuth(USERNAME, PASSWORD),
+            ) as resp:
+                response = resp
                 logger.debug(f'Данные баллона с ридера отправлены: send_data: {data}')
                 response.raise_for_status()
                 return await response.json()
 
         except Exception as error:
             logger.error(f'Ошибка в функции отправки данных баллона с ридера: {error}, send_data: {data}')
-            response_json = await response.json()
+            response_json = None
+            if response is not None:
+                try:
+                    response_json = await response.json()
+                except Exception:
+                    # Если тело ответа не удалось прочитать, просто вернём ошибку без деталей ответа
+                    response_json = None
             return {'error': str(error), 'response': response_json}
 
 
