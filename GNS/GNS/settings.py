@@ -13,9 +13,32 @@ LOGS_DIR = os.path.join(BASE_DIR, 'log')
 SECRET_KEY = os.environ.get('SECRET_KEY')
 DEBUG = os.environ.get('DEBUG')
 
-ALLOWED_HOSTS = ['localhost', '127.0.0.1', '0.0.0.0', '10.0.2.2', '10.10.12.253', 'django']
-CSRF_COOKIE_SECURE = True
-SESSION_COOKIE_SECURE = True
+# CSRF и сессии
+CSRF_COOKIE_SECURE = False  # True только для HTTPS
+SESSION_COOKIE_SECURE = False  # True только для HTTPS
+CSRF_COOKIE_SAMESITE = 'Lax'
+SESSION_COOKIE_SAMESITE = 'Lax'
+CSRF_COOKIE_HTTPONLY = False
+SESSION_COOKIE_HTTPONLY = True
+
+# Разрешенные хосты
+ALLOWED_HOSTS = [
+    'localhost',
+    '127.0.0.1',
+    '0.0.0.0',
+    '10.0.2.2',
+    '10.10.12.253',
+    'django',
+    '10.10.12.253:8000',
+]
+
+# Доверенные источники для CSRF
+CSRF_TRUSTED_ORIGINS = [
+    'http://localhost:8000',
+    'http://127.0.0.1:8000',
+    'http://10.10.12.253:8000',
+    'http://0.0.0.0:8000',
+]
 
 # Application definition
 INSTALLED_APPS = [
@@ -230,8 +253,12 @@ CELERY_BEAT_SCHEDULE = {
         'schedule': 10.0,
     },
     'kpp_processing': {
-        'task': 'filling_station.tasks.kpp_processing',
+        'task': 'transport.tasks.kpp_processing',
         'schedule': 60.0,
+    },
+    'kpp_close_transport': {
+        'task': 'transport.tasks.kpp_close_transport',
+        'schedule': crontab(hour=18, minute=0),
     },
 }
 
@@ -310,6 +337,16 @@ LOGGING = {
             'encoding': 'utf-8',
             'delay': True,
         },
+        'kpp_file': {
+            'level': 'DEBUG',
+            'class': 'logging.handlers.TimedRotatingFileHandler',
+            'filename': os.path.join(LOGS_DIR, 'transport/kpp.log'),
+            'when': 'midnight',
+            'backupCount': 30,
+            'formatter': 'verbose',
+            'encoding': 'utf-8',
+            'delay': True,
+        },
     },
     'loggers': {
         'filling_station': {
@@ -339,6 +376,11 @@ LOGGING = {
         },
         'autogas': {
             'handlers': ['autogas_file'],
+            'level': 'DEBUG',
+            'propagate': False,
+        },
+        'kpp': {
+            'handlers': ['kpp_file'],
             'level': 'DEBUG',
             'propagate': False,
         },
