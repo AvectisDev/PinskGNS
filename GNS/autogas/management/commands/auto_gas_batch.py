@@ -3,6 +3,7 @@ from opcua import Client, ua
 from django.conf import settings
 from django.core.management.base import BaseCommand
 from django.db.models import Q
+from django.core.cache import cache
 from datetime import datetime
 from filling_station.models import Truck, Trailer, TrailerType
 from autogas.models import AutoGasBatch
@@ -22,7 +23,7 @@ class Command(BaseCommand):
         "truck_full_weight": "ns=4; s=Address Space.PLC_SU2.batch.truck_full_weight",
         "truck_empty_weight": "ns=4; s=Address Space.PLC_SU2.batch.truck_empty_weight",
         "weight_gas_amount": "ns=4; s=Address Space.PLC_SU2.batch.weight_gas_amount",
-        "truck_capacity ": "ns=4; s=Address Space.PLC_SU2.batch.truck_capacity",
+        "truck_capacity": "ns=4; s=Address Space.PLC_SU2.batch.truck_capacity",
         "request_batch_create": "ns=4; s=Address Space.PLC_SU2.batch.request_number_identification",
         "response_batch_create": "ns=4; s=Address Space.PLC_SU2.batch.response_number_detect",
         "request_batch_complete": "ns=4; s=Address Space.PLC_SU2.batch.request_batch_complete",
@@ -129,12 +130,20 @@ class Command(BaseCommand):
         logger.debug(f'Список номеров: {registration_numbers}')
 
         truck, trailer = self.find_transports(registration_numbers)
-        logger.debug(f'Грузовик: {truck.registration_number}-{truck.type.type}, Прицеп: {trailer.registration_number}-{trailer.type.type}')
 
         if not truck:
             logger.error('Не найден подходящий грузовик')
             self.set_opc_value("response_batch_create", True)
             return
+
+        trailer_info = (
+            f'{trailer.registration_number}-{trailer.type.type}'
+            if trailer and trailer.type else 'не найден'
+        )
+        logger.debug(
+            f'Грузовик: {truck.registration_number}-{truck.type.type if truck.type else "?"}, '
+            f'Прицеп: {trailer_info}'
+        )
 
         try:
             AutoGasBatch.objects.create(
@@ -181,6 +190,17 @@ class Command(BaseCommand):
 
             # Получаем все значения OPC
             opc_values = {key: self.get_opc_value(key) for key in self.OPC_NODE_PATHS.keys()}
+
+            # Кеширование, чтобы не обрабатывать одни и те же данные постоянно
+            cache_key = 'autogas_batch_processing'
+            cached_data = cache.get(cache_key)
+            # Преобразуем словарь в строку для стабильного сравнения
+            opc_values_str = ';'.join(f'{k}={opc_values[k]}' for k in sorted(opc_values.keys()))
+
+            if opc_values_str == cached_data:
+                return
+
+            cache.set(cache_key, opc_values_str, timeout=3600)
 
             logger.debug(
                 f'Тип партии={opc_values["batch_type_code"]}, '

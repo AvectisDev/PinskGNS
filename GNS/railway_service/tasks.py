@@ -8,7 +8,6 @@ logger = logging.getLogger('railway')
 @shared_task
 def railway_tank_processing():
     command = RailwayTankHandleCommand()
-    logger.info('Начало обработки жд цистерн...')
     command.handle()
 
 @shared_task
