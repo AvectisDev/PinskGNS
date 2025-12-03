@@ -17,6 +17,7 @@ class Command(BaseCommand):
     OPC_NODE_PATHS = {
         "batch_type_code": "ns=4; s=Address Space.PLC_SU2.batch.batch_type", # 1-приёмка, 2-отгрузка
         "gas_type": "ns=4; s=Address Space.PLC_SU2.batch.gas_type", # 1-Не выбран, 2-СПБТ, 3-ПБА
+        "stop_batch": "ns=4; s=Address Space.PLC_SU2.batch.stop_batch",
         "initial_mass_meter": "ns=4; s=Address Space.PLC_SU2.batch.initial_mass_meter",
         "final_mass_meter": "ns=4; s=Address Space.PLC_SU2.batch.final_mass_meter",
         "gas_amount": "ns=4; s=Address Space.PLC_SU2.batch.gas_amount",
@@ -133,7 +134,7 @@ class Command(BaseCommand):
 
         if not truck:
             logger.error('Не найден подходящий грузовик')
-            self.set_opc_value("response_batch_create", True)
+            self.set_opc_value("stop_batch", True)  # Останавливаем формирование партии
             return
 
         trailer_info = (
