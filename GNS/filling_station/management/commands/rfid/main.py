@@ -131,7 +131,7 @@ async def read_nfc_tag(reader: dict):
                 }
                 balloon_passport = await update_balloon(post_data)
 
-                if balloon_passport['filling_status']:  # если паспорт заполнен
+                if balloon_passport.get('filling_status') == True:  # если паспорт заполнен и баллон готов к наполнению
                     # зажигаем зелёную лампу на считывателе
                     await data_exchange_with_reader(reader, 'read_complete')
                 else:
