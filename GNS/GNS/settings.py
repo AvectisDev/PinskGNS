@@ -56,6 +56,7 @@ INSTALLED_APPS = [
     'ttn.apps.TtnConfig',
     'railway_service.apps.RailwayServiceConfig',
     'autogas.apps.AutogasConfig',
+    'transport.apps.TransportConfig',
     'drf_spectacular',
     'import_export',
     'rest_framework',
