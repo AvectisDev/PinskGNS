@@ -81,7 +81,9 @@ def reader_info(request, reader_number=1):
             dataset = BalloonResources().export(
                 Reader.objects.filter(
                     number=reader_number,
-                    change_date__range=(start_date, end_date)
+                    nfc_tag__isnull=False,
+                    change_date__date__gte=start_date,
+                    change_date__date__lte=end_date,
                 )
             )
             response = HttpResponse(dataset.xlsx, content_type='xlsx')

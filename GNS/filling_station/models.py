@@ -167,18 +167,21 @@ class Reader(models.Model):
                 'unloading_ttn_quantity': Optional[int]  # Только для reader_number=3,4
             }
         """
-        start_datetime = datetime.combine(start_date, time.min)
-        end_datetime = datetime.combine(end_date, time.max)
-
         queryset = cls.objects.filter(
             number=reader_number,
-            change_date__range=(start_datetime, end_datetime)
+            change_date__date__gte=start_date,
+            change_date__date__lte=end_date
         )
 
+        # временная заглушка
+        if reader_number == 6:
+            query = Count('pk')
+        else:
+            query = Count('pk', filter=Q(nfc_tag__isnull=True))
         # Общее количество баллонов с меткой и без, пройдённое через считыватель
         stats = queryset.aggregate(
             total_rfid=Count('pk', filter=Q(nfc_tag__isnull=False)),
-            total_balloons=Count('pk')
+            total_balloons=query,
         )
 
         # Список баллонов для отображения в шаблоне
@@ -189,13 +192,15 @@ class Reader(models.Model):
             stats['loading_ttn_quantity'] = BalloonsBatch.objects.filter(
                 batch_type='l',
                 reader_number=reader_number,
-                started_at__range=(start_datetime, end_datetime)
+                started_at__date__gte=start_date,
+                started_at__date__lte=end_date
             ).aggregate(total_ttn=Sum('amount_of_ttn'))['total_ttn'] or 0
         elif reader_number in [3, 4]:
             stats['unloading_ttn_quantity'] = BalloonsBatch.objects.filter(
                 batch_type='u',
                 reader_number=reader_number,
-                started_at__range=(start_datetime, end_datetime)
+                started_at__date__gte=start_date,
+                started_at__date__lte=end_date
             ).aggregate(total_ttn=Sum('amount_of_ttn'))['total_ttn'] or 0
 
         return stats
