@@ -1,13 +1,45 @@
 from django.contrib import admin
-from .models import Carousel
+from .models import Carousel, CarouselSettings
 from import_export import resources
+
+
+@admin.register(Carousel)
+class CarouselAdmin(admin.ModelAdmin):
+    list_display = [
+        'id',
+        'post_number',
+        'empty_weight',
+        'full_weight',
+        'nfc_tag',
+        'serial_number',
+        'filling_status',
+        'change_at',
+    ]
+    list_filter = [
+        'change_at',
+    ]
+    search_fields = ['post_number', 'nfc_tag', 'serial_number']
+
+
+@admin.register(CarouselSettings)
+class CarouselSettingsAdmin(admin.ModelAdmin):
+    list_display = [
+        'id',
+        'read_only',
+        'use_weight_management',
+        'use_common_correction',
+        'weight_correction_value',
+        'min_balloon_weight',
+        'max_balloon_weight',
+        'max_passport_weight_diff',
+    ]
+    exclude = ['user']
+
 
 class CarouselResources(resources.ModelResource):
     class Meta:
         model = Carousel
         fields = (
-            'carousel_number',
-            'is_empty',
             'post_number',
             'empty_weight',
             'full_weight',
@@ -17,7 +49,6 @@ class CarouselResources(resources.ModelResource):
             'netto',
             'brutto',
             'filling_status',
-            'change_date',
-            'change_time'
+            'change_at',
         )
         export_order = fields

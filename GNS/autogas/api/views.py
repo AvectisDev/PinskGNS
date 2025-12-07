@@ -99,7 +99,6 @@ class AutoGasBatchView(viewsets.ViewSet):
                 'truck_gas_capacity': active_batch.truck.max_gas_volume if active_batch.truck.max_gas_volume else 0,
                 'scale_empty_weight': active_batch.scale_empty_weight if active_batch.scale_empty_weight else 0,
                 'scale_full_weight': active_batch.scale_full_weight if active_batch.scale_full_weight else 0,
-                # ttn данные исключены, так как нет связанного поля
             }
 
         cache.set(cache_key, response)

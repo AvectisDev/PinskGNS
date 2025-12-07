@@ -3,7 +3,6 @@ from django.contrib.auth.models import User
 from django.urls import reverse
 from django.conf import settings
 from django.db.models import Count, Sum
-from datetime import datetime, time
 
 
 class RailwayTank(models.Model):
@@ -104,11 +103,12 @@ class RailwayBatch(models.Model):
 
     @classmethod
     def get_period_stats(cls, start_date, end_date):
-        start_datetime = datetime.combine(start_date, time.min)
-        end_datetime = datetime.combine(end_date, time.max)
-        return cls.objects.filter(
-            begin_date__range=[start_datetime, end_datetime]
-        ).annotate(
+        queryset = cls.objects.filter(
+            begin_date__date__gte=start_date,
+            begin_date__date__lte=end_date
+        )
+
+        return queryset.annotate(
             tanks_count=Count('railway_tank_list'),
             total_gas_in_tanks=Sum('railway_tank_list__tank_history__gas_weight')
         ).aggregate(

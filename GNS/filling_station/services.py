@@ -45,7 +45,7 @@ def processing_request_with_nfc(nfc_tag: str, reader_number: int) -> Union[Tuple
         logger.info(f"Сохранение баллона с меткой {nfc_tag} успешно. Ридер {reader.number}")
 
         # Проверяем необходимость обновления данных
-        if balloon.update_passport_required or reader.number in [1, 6]:
+        if balloon.update_passport_required or reader.number in [1, 6, 7, 8]:
             update_balloon_passport(balloon)
 
         # Добавляем баллон в партию при необходимости

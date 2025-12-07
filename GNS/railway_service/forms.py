@@ -90,8 +90,19 @@ class RailwayBatchForm(forms.ModelForm):
             'is_active'
         ]
         widgets = {
-            'end_date': forms.DateTimeInput(format='%Y-%m-%d', attrs={'type': 'date'}),
-            'gas_amount_spbt': forms.NumberInput(attrs={'class': 'form-control'}),
-            'gas_amount_pba': forms.NumberInput(attrs={'class': 'form-control'}),
+            'end_date': forms.DateTimeInput(format='%Y-%m-%dT%H:%M', attrs={
+                'type': 'datetime-local',
+                'class': 'form-control'
+            }),
+            'gas_amount_spbt': forms.NumberInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'Введите количество газа СПБТ',
+                'step': '0.1'
+            }),
+            'gas_amount_pba': forms.NumberInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'Введите количество газа ПБА',
+                'step': '0.1'
+            }),
             'is_active': forms.CheckboxInput(attrs={'class': 'form-check-input'})
         }

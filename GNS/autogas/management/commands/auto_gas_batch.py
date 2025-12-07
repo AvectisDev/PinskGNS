@@ -77,17 +77,40 @@ class Command(BaseCommand):
     def set_opc_value(self, node_key, value):
         """Устанавливает значение в OPC UA сервере по ключу"""
         node_path = self.OPC_NODE_PATHS.get(node_key)
-        logger.debug(f"In set_opc_value. OPC node key: {node_key}, node_path = {node_path}")
         if not node_path:
             logger.error(f"Invalid OPC node key: {node_key}")
-            return False
+
         try:
             node = self.client.get_node(node_path)
-            node.set_attribute(ua.AttributeIds.Value, ua.DataValue(value))
-            return True
+
+            # Получаем текущий тип значения узла
+            node_value = node.get_value()
+
+            # Преобразуем value к типу current_value
+            if node_value is not None:
+                target_type = type(node_value)
+                try:
+                    if target_type == bool:
+                        converted_value = bool(value)
+                    elif target_type == int:
+                        converted_value = int(value)
+                    elif target_type == float:
+                        converted_value = float(value)
+                    elif target_type == str:
+                        converted_value = str(value)
+                    else:
+                        converted_value = value
+                except (ValueError, TypeError):
+                    logger.warning(f"Cannot convert {value} to {target_type}, using default")
+                    converted_value = target_type()  # Значение по умолчанию для типа
+            else:
+                converted_value = value
+
+            logger.debug(f"Setting {node_key} to {converted_value} (type: {type(converted_value)})")
+            node.set_attribute(ua.AttributeIds.Value, ua.DataValue(converted_value))
+
         except Exception as error:
             logger.error(f"Error setting OPC value for {node_key}: {error}", exc_info=True)
-            return False
 
     def get_transport_numbers(self):
         """Получает список номеров из Интеллекта"""
@@ -137,14 +160,9 @@ class Command(BaseCommand):
             self.set_opc_value("stop_batch", True)  # Останавливаем формирование партии
             return
 
-        trailer_info = (
-            f'{trailer.registration_number}-{trailer.type.type}'
-            if trailer and trailer.type else 'не найден'
-        )
-        logger.debug(
-            f'Грузовик: {truck.registration_number}-{truck.type.type if truck.type else "?"}, '
-            f'Прицеп: {trailer_info}'
-        )
+        logger.debug(f'Грузовик: {truck.registration_number}-{truck.type.type}')
+        if trailer:
+            logger.debug(f'Прицеп: {trailer.registration_number}-{trailer.type.type}')
 
         try:
             AutoGasBatch.objects.create(
@@ -163,8 +181,10 @@ class Command(BaseCommand):
             else:
                 capacity_value = 0.0
                 logger.warning(f'Не удалось определить объём ёмкости для {truck.registration_number}')
-            
-            self.set_opc_value("truck_capacity", capacity_value)
+
+            if capacity_value:
+                self.set_opc_value("truck_capacity", capacity_value)
+
             self.set_opc_value("response_batch_create", True)
         except Exception as e:
             logger.error(f'Ошибка при создании партии: {e}', exc_info=True)
@@ -192,7 +212,6 @@ class Command(BaseCommand):
             # Получаем все значения OPC
             opc_values = {key: self.get_opc_value(key) for key in self.OPC_NODE_PATHS.keys()}
 
-            # Кеширование, чтобы не обрабатывать одни и те же данные постоянно
             cache_key = 'autogas_batch_processing'
             cached_data = cache.get(cache_key)
             # Преобразуем словарь в строку для стабильного сравнения

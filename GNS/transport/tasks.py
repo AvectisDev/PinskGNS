@@ -8,11 +8,9 @@ logger = logging.getLogger('kpp')
 @shared_task
 def kpp_processing():
     command = KppHandleCommand()
-    logger.info('Обработка номеров на КПП...')
     command.handle()
 
 @shared_task
 def kpp_close_transport():
     command = CloseTransportHandleCommand()
-    logger.info('Обновление статусов транспорта...')
     command.handle()

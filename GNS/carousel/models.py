@@ -21,7 +21,7 @@ class Carousel(models.Model):
         return self.pk
 
     def __str__(self):
-        return self.nfc_tag
+        return self.nfc_tag if self.nfc_tag else 'Нет'
 
     class Meta:
         verbose_name = "Карусель"
