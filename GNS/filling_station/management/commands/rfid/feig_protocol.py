@@ -6,9 +6,9 @@ import struct
 import logging.config
 import django
 from typing import List, Dict, Optional
+from asgiref.sync import sync_to_async
 from django.conf import settings
 from concurrent.futures import ThreadPoolExecutor
-from filling_station.models import ReaderSettings
 
 # Инициализация Django
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'GNS.settings')
@@ -22,6 +22,7 @@ USERNAME = "reader"
 PASSWORD = "rfid-device"
 
 
+from filling_station.models import ReaderSettings
 class Reader:
     """Класс для представления RFID-ридера"""
 
@@ -405,13 +406,18 @@ def process_reader_sync(reader: Reader):
     asyncio.run(process_reader_operations(reader))
 
 
-def load_readers_from_database():
+async def load_readers_from_database():
     """
     Загрузка конфигурации ридеров из базы данных Django.
     """
     readers = []
+
+    @sync_to_async
+    def get_readers_from_db():
+        return list(ReaderSettings.objects.all().order_by('number'))
+
     try:
-        reader_settings_list = ReaderSettings.objects.all()
+        reader_settings_list = await get_readers_from_db()
 
         for reader_settings in reader_settings_list:
             # Проверяем, что у ридера есть IP адрес
@@ -432,7 +438,7 @@ async def main():
     logger.info('Запуск программы считывания RFID-меток с использованием протокола FEIG...')
 
     # Загрузка ридеров из базы данных
-    readers = load_readers_from_database()
+    readers = await load_readers_from_database()
 
     if not readers:
         logger.error('Не удалось загрузить конфигурацию ридеров. Завершение работы.')
