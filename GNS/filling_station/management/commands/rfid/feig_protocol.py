@@ -57,16 +57,21 @@ class FeigProtocol:
 
     @staticmethod
     def crc16(data: bytes) -> int:
-        """CRC-16 (Modbus) implementation"""
+        """
+        CRC-16/CCITT-FALSE implementation for Feig protocol
+        Polynomial: 0x1021 (x^16 + x^12 + x^5 + 1)
+        Initial value: 0xFFFF
+        """
         crc = 0xFFFF
         for byte in data:
-            crc ^= byte
+            crc ^= byte << 8
             for _ in range(8):
-                if crc & 0x0001:
-                    crc = (crc >> 1) ^ 0xA001
+                if crc & 0x8000:
+                    crc = (crc << 1) ^ 0x1021
                 else:
-                    crc >>= 1
-        return crc
+                    crc <<= 1
+                crc &= 0xFFFF  # Keep only 16 bits
+        return crc & 0xFFFF
 
     @staticmethod
     def create_request(com_adr: int, command: int, data: bytes = b'') -> bytes:
