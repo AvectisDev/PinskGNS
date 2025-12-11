@@ -56,41 +56,44 @@ class FeigProtocol:
     STX = 0x02  # Protocol Frame Identifier
 
     @staticmethod
-    def crc16(data: bytes) -> int:
+    def crc16_feig(data: bytes) -> int:
         """
-        CRC-16/CCITT-FALSE implementation for Feig protocol
-        Polynomial: 0x1021 (x^16 + x^12 + x^5 + 1)
+        CRC-16 implementation for Feig protocol
+        Polynomial: 0x8408 (x^16 + x^12 + x^5 + 1)
         Initial value: 0xFFFF
+        Bit order: LSB first (right shift)
         """
         crc = 0xFFFF
         for byte in data:
-            crc ^= byte << 8
+            crc ^= byte
             for _ in range(8):
-                if crc & 0x8000:
-                    crc = (crc << 1) ^ 0x1021
+                if crc & 0x0001:
+                    crc = (crc >> 1) ^ 0x8408
                 else:
-                    crc <<= 1
+                    crc >>= 1
                 crc &= 0xFFFF  # Keep only 16 bits
         return crc & 0xFFFF
 
     @staticmethod
     def create_request(com_adr: int, command: int, data: bytes = b'') -> bytes:
         """Создание запроса согласно протоколу FEIG"""
-        # PFI + LENGTH + COM-ADR + COMMAND + DATA + CRC16
+        # COM-ADR + COMMAND + DATA
         payload = bytes([com_adr, command]) + data
-
-        # Длина включает PFI (1) + LENGTH (2) + payload + CRC16 (2)
-        length = 1 + 2 + len(payload) + 2
-
-        # Собираем пакет
-        packet = bytes([FeigProtocol.STX])  # STX
-        packet += struct.pack('>H', length)  # LENGTH (big-endian)
-        packet += payload  # COM-ADR + COMMAND + DATA
-
-        # Расчет CRC16 (LSB first, MSB last)
-        crc = FeigProtocol.crc16(packet)
-        packet += struct.pack('<H', crc)  # CRC16 (little-endian)
-
+        
+        # Длина включает STX (1) + LEN (2) + payload + CRC16 (2)
+        length = 1 + 2 + len(payload) + 2  # STX + LEN + payload + CRC16
+        
+        # Собираем пакет без CRC
+        packet_without_crc = bytes([FeigProtocol.STX])  # STX
+        packet_without_crc += struct.pack('>H', length)  # LENGTH (big-endian)
+        packet_without_crc += payload  # COM-ADR + COMMAND + DATA
+        
+        # Расчет CRC16 от всего пакета БЕЗ CRC
+        crc = FeigProtocol.crc16_feig(packet_without_crc)
+        
+        # Добавляем CRC (little-endian - LSB first)
+        packet = packet_without_crc + struct.pack('<H', crc)
+        
         return packet
 
     @staticmethod
@@ -102,25 +105,34 @@ class FeigProtocol:
         if response[0] != FeigProtocol.STX:
             return {'error': 'Invalid STX byte'}
 
-        # Получаем длину пакета
+        # Получаем полную длину пакета
         length = struct.unpack('>H', response[1:3])[0]
-
+        
+        # Проверяем длину
         if len(response) < length:
-            return {'error': 'Incomplete response'}
+            return {'error': f'Incomplete response: expected {length}, got {len(response)}'}
 
-        # Проверяем CRC
-        packet_without_crc = response[:length - 2]
-        received_crc = struct.unpack('<H', response[length - 2:length])[0]
-        calculated_crc = FeigProtocol.crc16(packet_without_crc)
+        # Проверяем CRC (на всем кроме CRC байтов)
+        data_for_crc = response[:length-2]  # всё до CRC
+        received_crc = struct.unpack('<H', response[length-2:length])[0]
+        calculated_crc = FeigProtocol.crc16_feig(data_for_crc)
 
         if received_crc != calculated_crc:
+            logger.error(f'CRC mismatch: received {received_crc:04x}, calculated {calculated_crc:04x}')
+            logger.error(f'Data for CRC: {data_for_crc.hex()}')
             return {'error': 'CRC mismatch'}
 
         # Извлекаем данные
         com_adr = response[3]
         command = response[4]
-        status = response[5]
-        response_data = response[6:length - 2]
+        
+        # Статус и данные есть только если длина пакета достаточна
+        if length > 5:
+            status = response[5]
+            response_data = response[6:length-2]
+        else:
+            status = 0
+            response_data = b''
 
         return {
             'com_adr': com_adr,
@@ -242,24 +254,33 @@ async def data_exchange_with_reader(reader: Reader, command_name: str, data: byt
         # Создаем запрос согласно протоколу
         # COM-ADR = 255 для не-последовательной коммуникации
         request = FeigProtocol.create_request(255, command_code, data)
+        
+        # Логируем отправку
+        logger.info(f"Отправляем пакет на {reader.ip}:{reader.port}: {request.hex()}")
+        
         writer.write(request)
         await writer.drain()
 
+        # Читаем заголовок (STX + LEN)
         header = await asyncio.wait_for(reader_conn.read(5), timeout=1)
         if len(header) < 5:
-            logger.error(f'Неполный заголовок от контроллера {reader.ip}')
+            logger.error(f'Неполный заголовок от контроллера {reader.ip}: {header.hex()}')
             return {'error': 'Incomplete header', 'valid': False}
 
-        # Получаем длину полного ответа
+        # Получаем полную длину пакета
         length = struct.unpack('>H', header[1:3])[0]
+        
+        logger.info(f"Получен заголовок от {reader.ip}: {header.hex()}, полная длина: {length}")
 
         # Читаем оставшуюся часть пакета
-        remaining = length - 5
+        remaining = length - len(header)
         if remaining > 0:
             body = await asyncio.wait_for(reader_conn.read(remaining), timeout=1)
             response = header + body
         else:
             response = header
+            
+        logger.info(f"Полный ответ от {reader.ip}: {response.hex()}")
 
         # Парсим ответ
         parsed = FeigProtocol.parse_response(response)
@@ -381,7 +402,7 @@ async def process_reader_operations(reader: Reader):
                 await data_exchange_with_reader(reader, 'CLEAR_BUFFER')
 
             # Небольшая задержка перед следующей итерацией
-            await asyncio.sleep(0.1)
+            await asyncio.sleep(0.3)
 
         except Exception as error:
             logger.error(f"Ошибка в process_reader_operations для ридера {reader.ip}: {error}")
