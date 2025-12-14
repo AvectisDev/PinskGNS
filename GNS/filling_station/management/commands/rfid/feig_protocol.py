@@ -26,6 +26,24 @@ from filling_station.models import ReaderSettings
 class Reader:
     """Класс для представления RFID-ридера"""
 
+    def __init__(self, reader_settings: ReaderSettings):
+        self.number = reader_settings.number
+        self.ip = reader_settings.ip
+        self.port = reader_settings.port
+        self.status = reader_settings.status
+        self.function = reader_settings.function
+        self.need_cache = reader_settings.need_cache
+
+        # Динамические состояния
+        self.input_state = 0
+        self.previous_nfc_tags = []
+
+    def __str__(self):
+        return f"Reader {self.number}: {self.ip}:{self.port} - {self.status}"
+
+
+class FeigProtocol:
+    """Класс для работы с протоколом FEIG"""
     # Константы класса
     FEIG_COMMANDS = {
         'GET_INPUT': 0x74,  # Чтение состояния входов
@@ -64,29 +82,6 @@ class Reader:
         0x20: 'External Device error',
     }
 
-    def __init__(self, reader_settings: ReaderSettings):
-        self.number = reader_settings.number
-        self.ip = reader_settings.ip
-        self.port = reader_settings.port
-        self.status = reader_settings.status
-        self.function = reader_settings.function
-        self.need_cache = reader_settings.need_cache
-
-        # Динамические состояния
-        self.input_state = 0
-        self.previous_nfc_tags = []
-
-    def __str__(self):
-        return f"Reader {self.number}: {self.ip}:{self.port} - {self.status}"
-
-    def get_command(self, command_name: str) -> int:
-        """Получение кода команды по имени"""
-        return self.FEIG_COMMANDS.get(command_name)
-
-
-class FeigProtocol:
-    """Класс для работы с протоколом FEIG"""
-
     STX = 0x02  # Protocol Frame Identifier
 
     @staticmethod
@@ -105,19 +100,32 @@ class FeigProtocol:
             crc &= 0xFFFF
         return crc & 0xFFFF
 
-    @staticmethod
-    def create_request(com_adr: int, command: int, data: bytes = b'') -> bytes:
-        """Создание запроса согласно протоколу FEIG"""
-        # PFI + LENGTH + COM-ADR + COMMAND + DATA + CRC16
-        payload = bytes([com_adr, command]) + data
+    @classmethod
+    def get_command(cls, name: str) -> int:
+        """Возвращает числовой код команды по имени или ошибку."""
+        try:
+            return cls.FEIG_COMMANDS[name]
+        except KeyError:
+            raise ValueError(f"Unknown FEIG command name: {name!r}")
 
-        # Длина включает PFI (1) + LENGTH (2) + payload + CRC16 (2)
-        length = 1 + 2 + len(payload) + 2
+    @classmethod
+    def create_request(cls, command_name: str, data_sets: bytes = b'') -> bytes:
+        """
+        Создание запроса согласно протоколу FEIG
+        REQUEST PROTOCOL (Host): STX + LENGTH + COM-ADR + COMMAND + REQUEST-DATA + CRC16
+        LENGTH and CRC16 in MSB/LSB (BIG-ENDIAN) mode
+        """
+        com_adr = 0xFF  # Используется протокол TCP/IP
+        command = cls.get_command(command_name)
+
+        # Длина включает STX (1) + LENGTH (2) + COM-ADR(1) + payload + CRC16 (2)
+        length = 1 + 2 + 1 + 1 + len(data_sets) + 2
 
         # Собираем пакет
-        packet = bytes([FeigProtocol.STX])  # STX
+        packet = bytes([FeigProtocol.STX])
         packet += struct.pack('>H', length)  # LENGTH (big-endian)
-        packet += payload  # COM-ADR + COMMAND + DATA
+        packet += bytes([com_adr, command])
+        packet += data_sets
 
         # Расчет CRC16 (LSB first, MSB last)
         crc = FeigProtocol.crc16(packet)
@@ -128,9 +136,6 @@ class FeigProtocol:
     @staticmethod
     def parse_response(response: bytes) -> Dict:
         """Парсинг ответа от ридера"""
-        if len(response) < 5:
-            return {'error': 'Response too short'}
-
         if response[0] != FeigProtocol.STX:
             return {'error': 'Invalid STX byte'}
 
@@ -150,81 +155,86 @@ class FeigProtocol:
 
         # Извлекаем данные
         com_adr = response[3]
-        command = response[4]
-        status = response[5]
-        response_data = response[6:length - 2]
+        response_data = response[4:length - 2]
 
         return {
             'com_adr': com_adr,
-            'command': command,
-            'status': status,
-            'data': response_data,
+            'response_data': response_data,
             'valid': True
         }
 
     @staticmethod
-    def parse_buffer_data(response_data: bytes, record_layout: int) -> List[Dict]:
+    def parse_buffer_data(response_data: bytes) -> List[Dict]:
         """Парсинг данных из буфера (команда 0x2B)"""
         tags = []
 
-        if len(response_data) < 6:
+        command = response_data[0]
+        if command != 0x2B:
+            tags.append({'error': 'Invalid command'})
             return tags
 
-        # Первые 6 байт: STATUS + DATA-SETS + RECORD-LAYOUT
-        data_sets = struct.unpack('>H', response_data[2:4])[0]
-        record_layout_bytes = struct.unpack('>I', response_data[4:8])[0]
+        status = response_data[1]
+        # Сохраняем статус ответа
+        tags.append({'status': FeigProtocol.STATUS_BYTE[status]})
 
-        pos = 8  # Начинаем после заголовка
+        # Если в буфере нет данных - завершаем обработку
+        if status == 0x92:
+            return tags
+
+        data_sets = struct.unpack('>H', response_data[2:4])[0]
+
+        pos = 4  # Начинаем после заголовка
 
         for _ in range(data_sets):
             tag_data = {}
 
+            record_layout_bits = struct.unpack('>I', response_data[pos:pos + 4])[0]
+            pos += 4
             # Проверяем наличие секции DATE
-            if record_layout_bytes & (1 << 0):
-                if pos + 5 <= len(response_data):
-                    century, year, month, day, tz = response_data[pos:pos + 5]
-                    tag_data['date'] = {
-                        'century': century,
-                        'year': year,
-                        'month': month,
-                        'day': day,
-                        'tz': tz
-                    }
-                    pos += 5
+            if record_layout_bits & (1 << 0):
+                century, year, month, day, tz = response_data[pos:pos + 5]
+                tag_data.update({
+                    'century': century,
+                    'year': year,
+                    'month': month,
+                    'day': day,
+                    'tz': tz
+                })
+                pos += 5
 
             # Проверяем наличие секции TIME
-            if record_layout_bytes & (1 << 1):
-                if pos + 4 <= len(response_data):
-                    hour, minute = response_data[pos:pos + 2]
-                    milliseconds = struct.unpack('>H', response_data[pos + 2:pos + 4])[0]
-                    tag_data['time'] = {
-                        'hour': hour,
-                        'minute': minute,
-                        'milliseconds': milliseconds
-                    }
-                    pos += 4
+            if record_layout_bits & (1 << 1):
+                hour, minute = response_data[pos:pos + 2]
+                milliseconds = struct.unpack('>H', response_data[pos + 2:pos + 4])[0]
+                tag_data.update({
+                    'hour': hour,
+                    'minute': minute,
+                    'milliseconds': milliseconds
+                })
+                pos += 4
 
             # Проверяем наличие секции IDD
-            if record_layout_bytes & (1 << 2):
-                if pos + 2 <= len(response_data):
-                    transponder_type = response_data[pos]
-                    idd_length = response_data[pos + 1]
+            if record_layout_bits & (1 << 2):
+                transponder_type = response_data[pos]
+                if transponder_type == 0x03:  # ISO 15693
+                    afi = response_data[pos + 1]
+                    dsfid = response_data[pos + 2]
+                    idd_length = response_data[pos + 3]
+                    idd_data = response_data[pos + 4:pos + 4 + idd_length]
 
-                    if transponder_type == 0x03:  # ISO 15693
-                        if pos + 4 + idd_length <= len(response_data):
-                            afi = response_data[pos + 2]
-                            dsfid = response_data[pos + 3]
-                            idd_data = response_data[pos + 4:pos + 4 + idd_length]
+                    # Конвертируем NFC Tag ID в hex строку (обратный порядок байтов)
+                    nfc_tag = binascii.hexlify(idd_data[::-1]).decode()
+                    tag_data.update({
+                        'transponder_type': transponder_type,
+                        'afi': afi,
+                        'dsfid': dsfid,
+                        'nfc_tag': nfc_tag,
+                    })
 
-                            # NFC Tag ID (обратный порядок байтов)
-                            if idd_length >= 8:
-                                # Извлекаем UID (последние 8 байт)
-                                uid_bytes = idd_data[-8:] if idd_length > 8 else idd_data
-                                # Конвертируем в hex строку
-                                nfc_tag = binascii.hexlify(uid_bytes[::-1]).decode()
-                                tag_data['nfc_tag'] = nfc_tag
-
-                            pos += 4 + idd_length
+                    # Пропускаем обработку ненужных данных в пакете
+                    pos += 4 + idd_length
+                    pos += 2  # inputs state (2 byte)
+                    pos += 4  # signals (4 byte)
 
             if 'nfc_tag' in tag_data:
                 tags.append(tag_data)
