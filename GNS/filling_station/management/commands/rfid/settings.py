@@ -1,12 +1,9 @@
 # Команды, посылаемые на считыватель
 COMMANDS = {
-    'host_read': '020009ffb001001843',
     'read_complete': '02000DFF72010181010019236B',  # зажигаем зелёную лампу на считывателе на 2.5 сек
     'read_complete_with_error': '02000DFF720101810B0014BCC3',  # мигание зелёной лампы на считывателе 2 сек
-    'buffer_read': '020009FFB02B005B9D',  # чтение буферной памяти
     'inputs_read': '020007FF746660',  # чтение состояния входов
-    'all_buffer_read': '02000AFF2B0000FF89EB',  # чтение всего буфера
-    'read_last_item_from_buffer': '02000AFF2B00FFFF4914',
+    'read_last_item_from_buffer': '02 000A FF 2B 00 FFFF 4914',
     'clean_buffer': '020007FF325447'  # команда очистки буфера
 }
 
@@ -17,5 +14,4 @@ FEIG_COMMANDS = {
     'READ_BUFFER': 0x2B,  # Чтение буфера
     'CLEAR_BUFFER': 0x32,  # Очистка буфера (только прочитанных)
     'INITIALIZE_BUFFER': 0x33,  # Инициализация буфера (полная очистка)
-    'GET_BUFFER_INFO': 0x31,  # Получение информации о буфере
 }

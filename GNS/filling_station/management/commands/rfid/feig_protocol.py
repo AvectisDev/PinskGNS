@@ -5,7 +5,7 @@ import binascii
 import struct
 import logging.config
 import django
-from typing import List, Dict, Optional
+from typing import List, Dict
 from asgiref.sync import sync_to_async
 from django.conf import settings
 from concurrent.futures import ThreadPoolExecutor
@@ -26,6 +26,44 @@ from filling_station.models import ReaderSettings
 class Reader:
     """Класс для представления RFID-ридера"""
 
+    # Константы класса
+    FEIG_COMMANDS = {
+        'GET_INPUT': 0x74,  # Чтение состояния входов
+        'SET_OUTPUT': 0x72,  # Управление выходами/LED
+        'READ_BUFFER': 0x2B,  # Чтение буфера
+        'CLEAR_BUFFER': 0x32,  # Очистка прочитанных
+        'INITIALIZE_BUFFER': 0x33,  # Полная очистка буфера
+    }
+
+    STATUS_BYTE = {
+        0x00: 'OK:',
+        0x01: 'No Transponder:',
+        0x02: 'Data False:',
+        0x03: 'Write Error:',
+        0x04: 'Address Error:',
+        0x05: 'Wrong Transponder Type:',
+        0x0F: 'Busy',
+        0x10: 'EEPROM Failure:',
+        0x11: 'Parameter Range Error',
+        0x13: 'Login Request',
+        0x14: 'Login Error',
+        0x15: 'Read Protect',
+        0x16: 'Write Protect',
+        0x17: 'Firmware Activation Required',
+        0x80: 'Unknown Command',
+        0x81: 'Length Error',
+        0x82: 'Command Not Available',
+        0x83: 'RF Communication Error',
+        0x84: 'RF Warning',
+        0x92: 'No Valid Data',
+        0x93: 'Data Buffer Overflow',
+        0x94: 'More Data',
+        0x95: 'Tag Error',
+        0xF1: 'Hardware Warning',
+        0xF2: 'Initialization Warning',
+        0x20: 'External Device error',
+    }
+
     def __init__(self, reader_settings: ReaderSettings):
         self.number = reader_settings.number
         self.ip = reader_settings.ip
@@ -38,16 +76,12 @@ class Reader:
         self.input_state = 0
         self.previous_nfc_tags = []
 
-        # Настройки из settings.py
-        from .settings import FEIG_COMMANDS
-        self.commands = FEIG_COMMANDS
-
     def __str__(self):
         return f"Reader {self.number}: {self.ip}:{self.port} - {self.status}"
 
     def get_command(self, command_name: str) -> int:
         """Получение кода команды по имени"""
-        return self.commands.get(command_name)
+        return self.FEIG_COMMANDS.get(command_name)
 
 
 class FeigProtocol:
@@ -56,12 +90,9 @@ class FeigProtocol:
     STX = 0x02  # Protocol Frame Identifier
 
     @staticmethod
-    def crc16_feig(data: bytes) -> int:
+    def crc16(data: bytes) -> int:
         """
-        CRC-16 implementation for Feig protocol
-        Polynomial: 0x8408 (x^16 + x^12 + x^5 + 1)
-        Initial value: 0xFFFF
-        Bit order: LSB first (right shift)
+        CRC-16 для FEIG (LSB-first):
         """
         crc = 0xFFFF
         for byte in data:
@@ -71,29 +102,27 @@ class FeigProtocol:
                     crc = (crc >> 1) ^ 0x8408
                 else:
                     crc >>= 1
-                crc &= 0xFFFF  # Keep only 16 bits
+            crc &= 0xFFFF
         return crc & 0xFFFF
 
     @staticmethod
     def create_request(com_adr: int, command: int, data: bytes = b'') -> bytes:
         """Создание запроса согласно протоколу FEIG"""
-        # COM-ADR + COMMAND + DATA
+        # PFI + LENGTH + COM-ADR + COMMAND + DATA + CRC16
         payload = bytes([com_adr, command]) + data
-        
-        # Длина включает STX (1) + LEN (2) + payload + CRC16 (2)
-        length = 1 + 2 + len(payload) + 2  # STX + LEN + payload + CRC16
-        
-        # Собираем пакет без CRC
-        packet_without_crc = bytes([FeigProtocol.STX])  # STX
-        packet_without_crc += struct.pack('>H', length)  # LENGTH (big-endian)
-        packet_without_crc += payload  # COM-ADR + COMMAND + DATA
-        
-        # Расчет CRC16 от всего пакета БЕЗ CRC
-        crc = FeigProtocol.crc16_feig(packet_without_crc)
-        
-        # Добавляем CRC (little-endian - LSB first)
-        packet = packet_without_crc + struct.pack('<H', crc)
-        
+
+        # Длина включает PFI (1) + LENGTH (2) + payload + CRC16 (2)
+        length = 1 + 2 + len(payload) + 2
+
+        # Собираем пакет
+        packet = bytes([FeigProtocol.STX])  # STX
+        packet += struct.pack('>H', length)  # LENGTH (big-endian)
+        packet += payload  # COM-ADR + COMMAND + DATA
+
+        # Расчет CRC16 (LSB first, MSB last)
+        crc = FeigProtocol.crc16(packet)
+        packet += struct.pack('<H', crc)  # CRC16 (little-endian)
+
         return packet
 
     @staticmethod
@@ -105,34 +134,25 @@ class FeigProtocol:
         if response[0] != FeigProtocol.STX:
             return {'error': 'Invalid STX byte'}
 
-        # Получаем полную длину пакета
+        # Получаем длину пакета
         length = struct.unpack('>H', response[1:3])[0]
-        
-        # Проверяем длину
-        if len(response) < length:
-            return {'error': f'Incomplete response: expected {length}, got {len(response)}'}
 
-        # Проверяем CRC (на всем кроме CRC байтов)
-        data_for_crc = response[:length-2]  # всё до CRC
-        received_crc = struct.unpack('<H', response[length-2:length])[0]
-        calculated_crc = FeigProtocol.crc16_feig(data_for_crc)
+        if len(response) < length:
+            return {'error': 'Incomplete response'}
+
+        # Проверяем CRC
+        packet_without_crc = response[:length - 2]
+        received_crc = struct.unpack('<H', response[length - 2:length])[0]
+        calculated_crc = FeigProtocol.crc16(packet_without_crc)
 
         if received_crc != calculated_crc:
-            logger.error(f'CRC mismatch: received {received_crc:04x}, calculated {calculated_crc:04x}')
-            logger.error(f'Data for CRC: {data_for_crc.hex()}')
             return {'error': 'CRC mismatch'}
 
         # Извлекаем данные
         com_adr = response[3]
         command = response[4]
-        
-        # Статус и данные есть только если длина пакета достаточна
-        if length > 5:
-            status = response[5]
-            response_data = response[6:length-2]
-        else:
-            status = 0
-            response_data = b''
+        status = response[5]
+        response_data = response[6:length - 2]
 
         return {
             'com_adr': com_adr,
@@ -254,33 +274,24 @@ async def data_exchange_with_reader(reader: Reader, command_name: str, data: byt
         # Создаем запрос согласно протоколу
         # COM-ADR = 255 для не-последовательной коммуникации
         request = FeigProtocol.create_request(255, command_code, data)
-        
-        # Логируем отправку
-        logger.info(f"Отправляем пакет на {reader.ip}:{reader.port}: {request.hex()}")
-        
         writer.write(request)
         await writer.drain()
 
-        # Читаем заголовок (STX + LEN)
         header = await asyncio.wait_for(reader_conn.read(5), timeout=1)
         if len(header) < 5:
-            logger.error(f'Неполный заголовок от контроллера {reader.ip}: {header.hex()}')
+            logger.error(f'Неполный заголовок от контроллера {reader.ip}')
             return {'error': 'Incomplete header', 'valid': False}
 
-        # Получаем полную длину пакета
+        # Получаем длину полного ответа
         length = struct.unpack('>H', header[1:3])[0]
-        
-        logger.info(f"Получен заголовок от {reader.ip}: {header.hex()}, полная длина: {length}")
 
         # Читаем оставшуюся часть пакета
-        remaining = length - len(header)
+        remaining = length - 5
         if remaining > 0:
             body = await asyncio.wait_for(reader_conn.read(remaining), timeout=1)
             response = header + body
         else:
             response = header
-            
-        logger.info(f"Полный ответ от {reader.ip}: {response.hex()}")
 
         # Парсим ответ
         parsed = FeigProtocol.parse_response(response)
@@ -402,7 +413,7 @@ async def process_reader_operations(reader: Reader):
                 await data_exchange_with_reader(reader, 'CLEAR_BUFFER')
 
             # Небольшая задержка перед следующей итерацией
-            await asyncio.sleep(0.3)
+            await asyncio.sleep(0.1)
 
         except Exception as error:
             logger.error(f"Ошибка в process_reader_operations для ридера {reader.ip}: {error}")
