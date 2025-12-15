@@ -169,10 +169,6 @@ class FeigProtocol:
         tags = []
 
         command = response_data[0]
-        if command != 0x2B:
-            tags.append({'error': 'Invalid command'})
-            return tags
-
         status = response_data[1]
         # Сохраняем статус ответа
         tags.append({'status': FeigProtocol.STATUS_BYTE[status]})
@@ -181,65 +177,72 @@ class FeigProtocol:
         if status == 0x92:
             return tags
 
-        data_sets = struct.unpack('>H', response_data[2:4])[0]
+        match command:
+            case 0x2B:  # READ_BUFFER
+                data_sets = struct.unpack('>H', response_data[2:4])[0]
 
-        pos = 4  # Начинаем после заголовка
+                pos = 4  # Начинаем после заголовка
 
-        for _ in range(data_sets):
-            tag_data = {}
+                for _ in range(data_sets):
+                    tag_data = {}
 
-            record_layout_bits = struct.unpack('>I', response_data[pos:pos + 4])[0]
-            pos += 4
-            # Проверяем наличие секции DATE
-            if record_layout_bits & (1 << 0):
-                century, year, month, day, tz = response_data[pos:pos + 5]
-                tag_data.update({
-                    'century': century,
-                    'year': year,
-                    'month': month,
-                    'day': day,
-                    'tz': tz
-                })
-                pos += 5
+                    record_layout_bits = struct.unpack('>I', response_data[pos:pos + 4])[0]
+                    pos += 4
+                    # Проверяем наличие секции DATE
+                    if record_layout_bits & (1 << 0):
+                        century, year, month, day, tz = response_data[pos:pos + 5]
+                        tag_data.update({
+                            'century': century,
+                            'year': year,
+                            'month': month,
+                            'day': day,
+                            'tz': tz
+                        })
+                        pos += 5
 
-            # Проверяем наличие секции TIME
-            if record_layout_bits & (1 << 1):
-                hour, minute = response_data[pos:pos + 2]
-                milliseconds = struct.unpack('>H', response_data[pos + 2:pos + 4])[0]
-                tag_data.update({
-                    'hour': hour,
-                    'minute': minute,
-                    'milliseconds': milliseconds
-                })
-                pos += 4
+                    # Проверяем наличие секции TIME
+                    if record_layout_bits & (1 << 1):
+                        hour, minute = response_data[pos:pos + 2]
+                        milliseconds = struct.unpack('>H', response_data[pos + 2:pos + 4])[0]
+                        tag_data.update({
+                            'hour': hour,
+                            'minute': minute,
+                            'milliseconds': milliseconds
+                        })
+                        pos += 4
 
-            # Проверяем наличие секции IDD
-            if record_layout_bits & (1 << 2):
-                transponder_type = response_data[pos]
-                if transponder_type == 0x03:  # ISO 15693
-                    afi = response_data[pos + 1]
-                    dsfid = response_data[pos + 2]
-                    idd_length = response_data[pos + 3]
-                    idd_data = response_data[pos + 4:pos + 4 + idd_length]
+                    # Проверяем наличие секции IDD
+                    if record_layout_bits & (1 << 2):
+                        transponder_type = response_data[pos]
+                        if transponder_type == 0x03:  # ISO 15693
+                            afi = response_data[pos + 1]
+                            dsfid = response_data[pos + 2]
+                            idd_length = response_data[pos + 3]
+                            idd_data = response_data[pos + 4:pos + 4 + idd_length]
 
-                    # Конвертируем NFC Tag ID в hex строку (обратный порядок байтов)
-                    nfc_tag = binascii.hexlify(idd_data[::-1]).decode()
-                    tag_data.update({
-                        'transponder_type': transponder_type,
-                        'afi': afi,
-                        'dsfid': dsfid,
-                        'nfc_tag': nfc_tag,
-                    })
+                            # Конвертируем NFC Tag ID в hex строку (обратный порядок байтов)
+                            nfc_tag = binascii.hexlify(idd_data[::-1]).decode()
+                            tag_data.update({
+                                'transponder_type': transponder_type,
+                                'afi': afi,
+                                'dsfid': dsfid,
+                                'nfc_tag': nfc_tag,
+                            })
 
-                    # Пропускаем обработку ненужных данных в пакете
-                    pos += 4 + idd_length
-                    pos += 2  # inputs state (2 byte)
-                    pos += 4  # signals (4 byte)
+                            # Пропускаем обработку ненужных данных в пакете
+                            pos += 4 + idd_length
+                            pos += 2  # inputs state (2 byte)
+                            pos += 4  # signals (4 byte)
 
-            if 'nfc_tag' in tag_data:
-                tags.append(tag_data)
+                    if 'nfc_tag' in tag_data:
+                        tags.append(tag_data)
 
-        return tags
+                return tags
+
+            case _:
+                tags.append({'error': f'Unsupported command: {command}'})
+                logger.error(f'Неизвестная команда: {command}')
+                return tags
 
 
 async def update_balloon(data: dict):
@@ -269,21 +272,14 @@ async def update_balloon(data: dict):
             return {'error': str(error), 'response': response_json}
 
 
-async def data_exchange_with_reader(reader: Reader, command_name: str, data: bytes = b'') -> Dict:
+async def data_exchange_with_reader(reader: Reader, command_name: str, request_data: bytes = b'') -> Dict:
     """
     Выполняет обмен данными со считывателем FEIG.
     """
     reader_conn, writer = await asyncio.open_connection(reader.ip, reader.port)
     try:
-        # Получаем код команды из настроек
-        command_code = reader.get_command(command_name)
-        if command_code is None:
-            logger.error(f'Неизвестная команда: {command_name}')
-            return {'error': f'Unknown command: {command_name}', 'valid': False}
-
         # Создаем запрос согласно протоколу
-        # COM-ADR = 255 для не-последовательной коммуникации
-        request = FeigProtocol.create_request(255, command_code, data)
+        request = FeigProtocol.create_request(command_name, request_data)
         writer.write(request)
         await writer.drain()
 
@@ -344,13 +340,13 @@ async def read_nfc_tags(reader: Reader):
     response = await data_exchange_with_reader(reader, 'READ_BUFFER', request_data)
 
     tags = []
-    if response.get('valid') and response.get('status') == 0:
+    if response.get('valid'):
         # Парсим данные буфера
-        tags_data = FeigProtocol.parse_buffer_data(response['data'], 0)
+        tags_data = FeigProtocol.parse_buffer_data(response.get('response_data'))
 
         for tag_data in tags_data:
             if 'nfc_tag' in tag_data:
-                nfc_tag = tag_data['nfc_tag'].upper()
+                nfc_tag = tag_data['nfc_tag']
 
                 # Проверяем уникальность и добавляем в кэш при необходимости
                 if work_with_nfc_tag_list(nfc_tag, reader):
@@ -365,8 +361,8 @@ async def read_input_status(reader: Reader) -> int:
     """
     response = await data_exchange_with_reader(reader, 'GET_INPUT')
 
-    if response.get('valid') and response.get('status') == 0 and len(response.get('data', [])) >= 1:
-        inputs_byte = response['data'][0]  # Байт состояния входов
+    if response.get('valid'):
+        inputs_byte = response.get('response_data')[0]  # Байт состояния входов
         # IN1 находится в бите 0
         input_state = (inputs_byte >> 0) & 0x01
         return input_state
@@ -423,7 +419,7 @@ async def process_reader_operations(reader: Reader):
                 await data_exchange_with_reader(reader, 'CLEAR_BUFFER')
 
             # Небольшая задержка перед следующей итерацией
-            await asyncio.sleep(0.1)
+            await asyncio.sleep(0.3)
 
         except Exception as error:
             logger.error(f"Ошибка в process_reader_operations для ридера {reader.ip}: {error}")
@@ -443,10 +439,6 @@ async def initialize_readers(readers: List[Reader]):
     logger.info('Инициализация RFID-считывателей...')
     await asyncio.gather(*tasks)
 
-    # Считываем начальное состояние входов
-    for reader in readers:
-        reader.input_state = await read_input_status(reader)
-
 
 def process_reader_sync(reader: Reader):
     """Синхронная обертка для запуска в ThreadPoolExecutor"""
@@ -461,19 +453,15 @@ async def load_readers_from_database():
 
     @sync_to_async
     def get_readers_from_db():
-        return list(ReaderSettings.objects.all().order_by('number'))
+        return list(ReaderSettings.objects.all())
 
     try:
         reader_settings_list = await get_readers_from_db()
 
         for reader_settings in reader_settings_list:
-            # Проверяем, что у ридера есть IP адрес
-            if reader_settings.ip:
-                reader = Reader(reader_settings)
-                readers.append(reader)
-                logger.info(f'Загружен ридер {reader}')
-            else:
-                logger.warning(f'Ридер {reader_settings.number} не имеет IP адреса, пропускаем')
+            reader = Reader(reader_settings)
+            readers.append(reader)
+            logger.info(f'Загружен ридер {reader}')
 
     except Exception as error:
         logger.error(f'Ошибка при загрузке ридеров из базы данных: {error}')
@@ -482,7 +470,7 @@ async def load_readers_from_database():
 
 
 async def main():
-    logger.info('Запуск программы считывания RFID-меток с использованием протокола FEIG...')
+    logger.info('Запуск программы считывания RFID-меток...')
 
     # Загрузка ридеров из базы данных
     readers = await load_readers_from_database()
