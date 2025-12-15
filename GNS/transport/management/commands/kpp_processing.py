@@ -18,7 +18,7 @@ class Command(BaseCommand):
         описание одной записи (цистерны)
         """
         transport_list = get_registration_number_list(INTELLECT_SERVER_LIST[2])
-        logger.debug(f'КПП. Список номеров c интеллекта: {transport_list}')
+        logger.debug(f'КПП. Список номеров c интеллекта: {[item.get('number') for item in transport_list]}')
         return transport_list
 
     def transport_process(self, registration_number, is_on_station, model):
