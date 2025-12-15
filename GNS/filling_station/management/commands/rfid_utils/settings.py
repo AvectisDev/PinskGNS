@@ -7,11 +7,6 @@ COMMANDS = {
     'clean_buffer': '020007FF325447'  # команда очистки буфера
 }
 
-# Команды FEIG
-FEIG_COMMANDS = {
-    'GET_INPUT': 0x74,  # Чтение состояния входов
-    'SET_OUTPUT': 0x72,  # Управление выходами/светодиодами
-    'READ_BUFFER': 0x2B,  # Чтение буфера
-    'CLEAR_BUFFER': 0x32,  # Очистка буфера (только прочитанных)
-    'INITIALIZE_BUFFER': 0x33,  # Инициализация буфера (полная очистка)
-}
+# Аутентификация
+USERNAME = "reader"
+PASSWORD = "rfid-device"

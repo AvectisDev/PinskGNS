@@ -116,8 +116,8 @@ services:
       - app_network
 
   rfid:
-    build: ../rfid app
-    container_name: rfid
+    build: ../rfid_utils app
+    container_name: rfid_utils
     restart: unless-stopped
     ports:
       - 8002:8002
