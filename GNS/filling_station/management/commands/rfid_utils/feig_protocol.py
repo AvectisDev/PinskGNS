@@ -184,7 +184,7 @@ async def process_reader_operations(reader: Reader):
                 await data_exchange_with_reader(reader, 'CLEAR_BUFFER')
 
             # Небольшая задержка перед следующей итерацией
-            await asyncio.sleep(1)
+            await asyncio.sleep(0.5)
 
         except Exception as error:
             logger.error(f"Ошибка в process_reader_operations для ридера {reader.ip}: {error}")

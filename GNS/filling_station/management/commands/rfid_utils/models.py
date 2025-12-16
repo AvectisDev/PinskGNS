@@ -138,6 +138,7 @@ class FeigProtocol:
         length = struct.unpack('>H', response[1:3])[0]
 
         if len(response) < length:
+            logger.error(f'Неверная длина {binascii.hex(response)}')
             return {'error': 'Incomplete response'}
 
         # Проверяем CRC
