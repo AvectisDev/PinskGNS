@@ -1,5 +1,4 @@
 from django.db import models
-from django.contrib.auth.models import User
 from django.urls import reverse
 from django.db.models import Q, Sum
 from django.conf import settings
@@ -267,7 +266,7 @@ class MiriadaTtn(models.Model):
     ttn_id = models.IntegerField(unique=True, verbose_name="ID ТТН в Мириаде")
     name = models.CharField(max_length=100, verbose_name="Номер ТТН")
     auto = models.CharField(max_length=50, verbose_name="Номер автомобиля")
-    date = models.DateTimeField(null=True, blank=True, verbose_name="Дата ТТН")
+    date = models.IntegerField(null=True, blank=True, verbose_name="Дата ТТН")
     created_at = models.DateTimeField(auto_now_add=True, verbose_name="Дата создания записи")
     updated_at = models.DateTimeField(auto_now=True, verbose_name="Дата обновления записи")
 
@@ -277,4 +276,4 @@ class MiriadaTtn(models.Model):
     class Meta:
         verbose_name = "ТТН из Мириады"
         verbose_name_plural = "ТТН из Мириады"
-        ordering = ['-date', '-created_at']
+        ordering = ['-created_at']

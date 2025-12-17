@@ -277,21 +277,12 @@ def send_status_to_miriada(reader: int, nfc_tag: str):
         batch = BalloonsBatch.objects.filter(
             batch_type='l',
             is_active=True,
-            balloon_list__nfc_tag=nfc_tag
         ).first()
         if batch and batch.id_ttn:
             id_ttn = batch.id_ttn
     elif reader == 5:
         send_type = 'registering_in_warehouse'
         fullness = 1
-        # Ищем активную партию приёмки, которая содержит этот баллон
-        batch = BalloonsBatch.objects.filter(
-            batch_type='l',
-            is_active=True,
-            balloon_list__nfc_tag=nfc_tag
-        ).first()
-        if batch and batch.id_ttn:
-            id_ttn = batch.id_ttn
     elif reader in [2, 3, 4]:
         send_type = 'loading_into_truck'
         fullness = 1
@@ -358,7 +349,7 @@ def get_current_ttn_from_miriada() -> Optional[list]:
     Возвращает список словарей с данными ТТН:
     [
         {
-            'id': int,
+            'ttn_id': int,
             'name': str,
             'auto': str,
             'date': datetime
@@ -367,46 +358,45 @@ def get_current_ttn_from_miriada() -> Optional[list]:
     ]
     или None в случае ошибки.
     """
-    url = f'{settings.MIRIADA_API_URL}/getcurrentttn?realm=brestoblgas'
+    url = f'{settings.MIRIADA_API_URL}/getcurrentttn'
+    headers = {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json'
+    }
 
+    payload = {
+        'realm': 'brestoblgas'
+    }
     try:
-        response = requests.get(url, timeout=5)
+        response = requests.get(
+            url,
+            auth=(settings.MIRIADA_AUTH_LOGIN, settings.MIRIADA_AUTH_PASSWORD),
+            headers=headers,
+            json=payload,
+            timeout=2)
         response.raise_for_status()
         result = response.json()
 
         if result.get('status') != 'ok':
             logger.warning(f'Ошибка при получении списка ТТН. Ответ: {result}')
-            return None
+            return []
 
-        ttn_list = result.get('List', [])
-        if not isinstance(ttn_list, list):
-            logger.error(f"Неправильный формат полученных данных. "
-                         f"Ожидается list, получено: {type(ttn_list)}")
-            return None
+        ttn_list = result.get('List')
+        if not isinstance(ttn_list, (list, dict)):
+            logger.error(f"Неправильный формат полученных данных. Ожидается (list, dict), получено: {type(ttn_list)}")
+            return []
 
         processed_list = []
-        for ttn_data in ttn_list:
-            if not isinstance(ttn_data, dict):
-                continue
-            
+        for ttn in ttn_list:
             try:
-                # Преобразуем date из timestamp в datetime
-                date_timestamp = ttn_data.get('date')
-                date_obj = None
-                if date_timestamp:
-                    try:
-                        date_obj = datetime.fromtimestamp(date_timestamp)
-                    except (ValueError, TypeError, OSError):
-                        logger.warning(f"Некорректный timestamp для ТТН {ttn_data.get('id')}: {date_timestamp}")
-                
                 processed_list.append({
-                    'id': ttn_data.get('id'),
-                    'name': ttn_data.get('name', ''),
-                    'auto': ttn_data.get('auto', ''),
-                    'date': date_obj
+                    'id': ttn.get('id'),
+                    'name': ttn.get('name', ''),
+                    'auto': ttn.get('auto', ''),
+                    'date': ttn.get('date', 0)
                 })
             except Exception as e:
-                logger.error(f"Ошибка обработки элемента ТТН: {e}. Данные: {ttn_data}")
+                logger.error(f"Ошибка обработки элемента ТТН: {e}. Данные: {ttn}")
                 continue
 
         logger.info(f"Получено {len(processed_list)} ТТН из Мириады")
@@ -419,7 +409,7 @@ def get_current_ttn_from_miriada() -> Optional[list]:
     except Exception as e:
         logger.error(f"Непредвиденная ошибка при получении списка ТТН из Мириады: {str(e)}")
 
-    return None
+    return []
 
 
 def close_ttn_in_miriada(id_ttn: int) -> bool:

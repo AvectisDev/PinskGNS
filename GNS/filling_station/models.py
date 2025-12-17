@@ -7,6 +7,7 @@ from django.db.models import Q, Sum, Count
 from django.conf import settings
 from typing import Dict, Any, Optional
 from datetime import datetime, date, time
+# from ttn.models import MiriadaTtn
 import pghistory
 
 
@@ -511,9 +512,13 @@ class BalloonsBatch(models.Model):
         verbose_name="Список баллонов"
     )
     is_active = models.BooleanField(default=False, verbose_name="В работе")
-    ttn = models.CharField(max_length=20, default='', verbose_name="Номер ТТН")
-    id_ttn = models.IntegerField(null=True, blank=True, verbose_name="ID ТТН в Мириаде")
-    amount_of_ttn = models.IntegerField(null=True, blank=True, verbose_name="Количество баллонов по ТТН")
+    id_ttn = models.ForeignKey(
+        'ttn.MiriadaTtn',
+        on_delete=models.DO_NOTHING,
+        null=True,
+        blank=True,
+        verbose_name="ID ТТН"
+    )
     user = models.ForeignKey(
         User,
         on_delete=models.DO_NOTHING,

@@ -147,8 +147,7 @@ class BalloonsBatchAdmin(admin.ModelAdmin):
         'amount_of_50_liters',
         'gas_amount',
         'is_active',
-        'ttn',
-        'amount_of_ttn'
+        'id_ttn',
     ]
     list_filter = ['batch_type', 'started_at', 'completed_at', 'is_active']
-    search_fields = ['truck', 'is_active', 'ttn', 'batch_type']
+    search_fields = ['truck', 'is_active', 'ttn_id', 'batch_type']
