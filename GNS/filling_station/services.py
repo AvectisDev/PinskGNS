@@ -4,10 +4,50 @@ from datetime import datetime, date
 from typing import Optional, Dict, Any, Union, Tuple
 from django.conf import settings
 from django.core.cache import cache
-from .models import Balloon, Reader, BalloonsBatch, ReaderSettings
+from .models import Balloon, Reader, BalloonsBatch, ReaderSettings, Truck, Trailer
 
 
 logger = logging.getLogger('filling_station')
+
+
+def normalize_registration_number(reg_number: str) -> str:
+    """
+    Преобразует номер машины из формата "AM 7881-2" в формат "AM78812" (убирает пробелы и дефис).
+    Args:
+        reg_number (str): Номер машины в формате "AM 7881-2"
+    Returns:
+        str: Номер машины в формате "AM78812"
+    """
+    if not reg_number:
+        return ''
+    return reg_number.replace(' ', '').replace('-', '')
+
+
+def find_transport_by_registration_number(reg_number: str) -> Tuple[Optional[Truck], Optional[Trailer]]:
+    """
+    Находит грузовик и прицеп по регистрационному номеру.
+    Номер может быть в формате "AM 7881-2" или "AM78812".
+    Args:
+        reg_number (str): Регистрационный номер
+    Returns:
+        Tuple[Optional[Truck], Optional[Trailer]]: Кортеж из найденного грузовика и прицепа
+    """
+    normalized_number = normalize_registration_number(reg_number)
+    
+    truck = None
+    trailer = None
+    
+    try:
+        # Пытаемся найти грузовик
+        truck = Truck.objects.filter(registration_number=normalized_number).first()
+        
+        # Пытаемся найти прицеп
+        trailer = Trailer.objects.filter(registration_number=normalized_number).first()
+        
+    except Exception as e:
+        logger.error(f"Ошибка при поиске транспорта по номеру {reg_number}: {e}")
+    
+    return truck, trailer
 
 
 def processing_request_without_nfc(reader_number: int) -> Optional[Reader]:
@@ -207,6 +247,7 @@ def send_status_to_miriada(reader: int, nfc_tag: str):
     loading_into_truck - Погрузка баллона в машину
     number_auto - номер машины в формате "AM 7881-2". Номер должен быть в ПК «Автопарк»
     type_car - тип машины: 0-кассета, 1 — трал
+    id_ttn - ID ТТН в системе Мириада
     """
     send_urls = {
         'filling': f'{settings.MIRIADA_API_POST_URL}/fillingballoon',
@@ -225,25 +266,48 @@ def send_status_to_miriada(reader: int, nfc_tag: str):
     }
 
     # Инициализация переменных
-    send_type = fullness = number_auto = type_car = None
+    send_type = fullness = number_auto = type_car = id_ttn = None
 
     if reader == 8:
         send_type = 'filling'
     elif reader == 6:
         send_type = 'registering_in_warehouse'
         fullness = 0
+        # Ищем активную партию приёмки, которая содержит этот баллон
+        batch = BalloonsBatch.objects.filter(
+            batch_type='l',
+            is_active=True,
+            balloon_list__nfc_tag=nfc_tag
+        ).first()
+        if batch and batch.id_ttn:
+            id_ttn = batch.id_ttn
     elif reader == 5:
         send_type = 'registering_in_warehouse'
         fullness = 1
+        # Ищем активную партию приёмки, которая содержит этот баллон
+        batch = BalloonsBatch.objects.filter(
+            batch_type='l',
+            is_active=True,
+            balloon_list__nfc_tag=nfc_tag
+        ).first()
+        if batch and batch.id_ttn:
+            id_ttn = batch.id_ttn
     elif reader in [2, 3, 4]:
         send_type = 'loading_into_truck'
         fullness = 1
-        batch = BalloonsBatch.objects.filter(batch_type='u').last()
+        # Ищем активную партию отгрузки, которая содержит этот баллон
+        batch = BalloonsBatch.objects.filter(
+            batch_type='u',
+            is_active=True,
+            balloon_list__nfc_tag=nfc_tag
+        ).first()
 
         if batch:
             number_auto = batch.truck.registration_number
             formatted_number_auto = f"{number_auto[:2]} {number_auto[2:6]}-{number_auto[6]}"
             type_car = 0 if batch.truck.type.type == 'Клетевоз' else 1
+            if batch.id_ttn:
+                id_ttn = batch.id_ttn
 
     if fullness is not None:
         payload.update({"fulness": fullness})
@@ -253,6 +317,9 @@ def send_status_to_miriada(reader: int, nfc_tag: str):
             "number_auto": formatted_number_auto,
             "type_car": type_car
         })
+    
+    if id_ttn is not None:
+        payload.update({"id_ttn": id_ttn})
 
     try:
         session = requests.Session()
@@ -283,3 +350,131 @@ def send_status_to_miriada(reader: int, nfc_tag: str):
     except Exception as error:
         logger.error(f'Ошибка при отправке {send_type} в методе отправки статуса баллона в Мириаду: '
                      f'{error}, URL: {prepared.url}')
+
+
+def get_current_ttn_from_miriada() -> Optional[list]:
+    """
+    Получает список текущих ТТН из API Мириады.
+    Возвращает список словарей с данными ТТН:
+    [
+        {
+            'id': int,
+            'name': str,
+            'auto': str,
+            'date': datetime
+        },
+        ...
+    ]
+    или None в случае ошибки.
+    """
+    url = f'{settings.MIRIADA_API_URL}/getcurrentttn?realm=brestoblgas'
+
+    try:
+        response = requests.get(url, timeout=5)
+        response.raise_for_status()
+        result = response.json()
+
+        if result.get('status') != 'ok':
+            logger.warning(f'Ошибка при получении списка ТТН. Ответ: {result}')
+            return None
+
+        ttn_list = result.get('List', [])
+        if not isinstance(ttn_list, list):
+            logger.error(f"Неправильный формат полученных данных. "
+                         f"Ожидается list, получено: {type(ttn_list)}")
+            return None
+
+        processed_list = []
+        for ttn_data in ttn_list:
+            if not isinstance(ttn_data, dict):
+                continue
+            
+            try:
+                # Преобразуем date из timestamp в datetime
+                date_timestamp = ttn_data.get('date')
+                date_obj = None
+                if date_timestamp:
+                    try:
+                        date_obj = datetime.fromtimestamp(date_timestamp)
+                    except (ValueError, TypeError, OSError):
+                        logger.warning(f"Некорректный timestamp для ТТН {ttn_data.get('id')}: {date_timestamp}")
+                
+                processed_list.append({
+                    'id': ttn_data.get('id'),
+                    'name': ttn_data.get('name', ''),
+                    'auto': ttn_data.get('auto', ''),
+                    'date': date_obj
+                })
+            except Exception as e:
+                logger.error(f"Ошибка обработки элемента ТТН: {e}. Данные: {ttn_data}")
+                continue
+
+        logger.info(f"Получено {len(processed_list)} ТТН из Мириады")
+        return processed_list
+
+    except requests.exceptions.RequestException as e:
+        logger.error(f"Запрос списка ТТН прошёл с ошибкой: {str(e)}")
+    except (ValueError, TypeError) as e:
+        logger.error(f"Ошибка обработки данных списка ТТН: {str(e)}")
+    except Exception as e:
+        logger.error(f"Непредвиденная ошибка при получении списка ТТН из Мириады: {str(e)}")
+
+    return None
+
+
+def close_ttn_in_miriada(id_ttn: int) -> bool:
+    """
+    Закрывает ТТН в Мириаде по её ID.
+    Args:
+        id_ttn (int): ID ТТН в системе Мириада
+    Returns:
+        bool: True при успешном закрытии, False в случае ошибки
+    """
+    url = f'{settings.MIRIADA_API_POST_URL}/closettn'
+
+    headers = {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json'
+    }
+
+    payload = {
+        'id_ttn': id_ttn,
+        'realm': 'brestoblgas'
+    }
+
+    try:
+        session = requests.Session()
+        req = requests.Request(
+            'POST',
+            url,
+            auth=(settings.MIRIADA_AUTH_LOGIN, settings.MIRIADA_AUTH_PASSWORD),
+            headers=headers,
+            json=payload
+        )
+        prepared = session.prepare_request(req)
+
+        logger.debug(
+            f"Подготовленный запрос на закрытие ТТН:\n"
+            f"URL: {prepared.url}\n"
+            f"Headers: {prepared.headers}\n"
+            f"Body: {prepared.body}"
+        )
+
+        response = session.send(prepared, timeout=5)
+        if response.status_code == 200:
+            result = response.json()
+            if result.get('result') == 'ok':
+                logger.info(f"ТТН {id_ttn} успешно закрыта в Мириаде")
+                return True
+            else:
+                logger.error(f"ТТН {id_ttn} не закрыта. Ответ: {result}")
+                return False
+        else:
+            logger.error(
+                f"Ошибка при закрытии ТТН {id_ttn}! "
+                f"Status: {response.status_code} {response.reason}, Ответ: {response.text}")
+            return False
+
+    except Exception as error:
+        logger.error(f'Ошибка при закрытии ТТН {id_ttn} в Мириаде: {error}')
+        return False

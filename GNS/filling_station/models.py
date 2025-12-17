@@ -512,6 +512,7 @@ class BalloonsBatch(models.Model):
     )
     is_active = models.BooleanField(default=False, verbose_name="В работе")
     ttn = models.CharField(max_length=20, default='', verbose_name="Номер ТТН")
+    id_ttn = models.IntegerField(null=True, blank=True, verbose_name="ID ТТН в Мириаде")
     amount_of_ttn = models.IntegerField(null=True, blank=True, verbose_name="Количество баллонов по ТТН")
     user = models.ForeignKey(
         User,

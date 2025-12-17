@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import BalloonTtn, AutoTtn, RailwayTtn, Contractor, City, FilePath, EmailRecipient
+from .models import BalloonTtn, AutoTtn, RailwayTtn, Contractor, City, FilePath, EmailRecipient, MiriadaTtn
 
 @admin.register(BalloonTtn)
 class TTNAdmin(admin.ModelAdmin):
@@ -97,3 +97,18 @@ class EmailRecipientAdmin(admin.ModelAdmin):
         'description'
     ]
     list_filter = ['active']
+
+
+@admin.register(MiriadaTtn)
+class MiriadaTtnAdmin(admin.ModelAdmin):
+    list_display = [
+        'ttn_id',
+        'name',
+        'auto',
+        'date',
+        'created_at',
+        'updated_at'
+    ]
+    search_fields = ['ttn_id', 'name', 'auto']
+    list_filter = ['date', 'created_at']
+    readonly_fields = ['created_at', 'updated_at']

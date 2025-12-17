@@ -20,6 +20,7 @@ from drf_spectacular.utils import (
 )
 from datetime import datetime, date
 from filling_station.models import Balloon, Reader, BalloonsBatch, ReaderSettings
+from ttn.models import MiriadaTtn
 from .serializers import (
     BalloonSerializer,
     BalloonsBatchSerializer,
@@ -625,7 +626,7 @@ BalloonOperationResponse = inline_serializer(
     create=extend_schema(
         tags=['Партии баллонов'],
         summary='Создать новую партию',
-        description='Создание новой партии баллонов',
+        description='Создание новой партии баллонов с привязкой к ТТН',
         request=BalloonsBatchSerializer,
         responses={
             201: BalloonsBatchSerializer,
@@ -769,7 +770,61 @@ class BalloonsBatchViewSet(viewsets.ViewSet):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        serializer = BalloonsBatchSerializer(data=request.data)
+        id_ttn = request.data.get('id_ttn')
+        data = request.data.copy()
+
+        # Если передан id_ttn, получаем данные ТТН и находим транспорт
+        if id_ttn:
+            # Сначала пытаемся получить данные из API Мириады
+            ttn_list = services.get_current_ttn_from_miriada()
+            ttn_data = None
+            if ttn_list:
+                for ttn_item in ttn_list:
+                    if ttn_item.get('id') == id_ttn:
+                        ttn_data = ttn_item
+                        break
+
+            # Сохраняем или обновляем запись MiriadaTtn
+            if ttn_data:
+                miriada_ttn, created = MiriadaTtn.objects.update_or_create(
+                    ttn_id=id_ttn,
+                    defaults={
+                        'name': ttn_data.get('name', request.data.get('ttn', '')),
+                        'auto': ttn_data.get('auto', ''),
+                        'date': ttn_data.get('date')
+                    }
+                )
+                auto_number = miriada_ttn.auto
+                ttn_name = miriada_ttn.name
+            else:
+                # Если не удалось получить из API, используем данные из запроса или БД
+                miriada_ttn, created = MiriadaTtn.objects.get_or_create(
+                    ttn_id=id_ttn,
+                    defaults={
+                        'name': request.data.get('ttn', ''),
+                        'auto': request.data.get('ttn_auto', ''),
+                        'date': None
+                    }
+                )
+                auto_number = miriada_ttn.auto or request.data.get('ttn_auto', '')
+                ttn_name = miriada_ttn.name or request.data.get('ttn', '')
+            
+            # Если номер машины есть, ищем транспорт
+            if auto_number:
+                truck, trailer = services.find_transport_by_registration_number(auto_number)
+                
+                # Устанавливаем найденные транспортные средства
+                if truck:
+                    data['truck'] = truck.id
+                if trailer:
+                    data['trailer'] = trailer.id
+
+            # Устанавливаем id_ttn и номер ТТН
+            data['id_ttn'] = id_ttn
+            if ttn_name and not data.get('ttn'):
+                data['ttn'] = ttn_name
+
+        serializer = BalloonsBatchSerializer(data=data)
         if serializer.is_valid():
             instance = serializer.save(batch_type=batch_type)
             return Response(BalloonsBatchSerializer(instance).data, status=status.HTTP_201_CREATED)
@@ -785,9 +840,18 @@ class BalloonsBatchViewSet(viewsets.ViewSet):
             
         batch = get_object_or_404(BalloonsBatch, id=pk, batch_type=batch_type)
 
-        if not request.data.get('is_active', True):
+        # Проверяем, закрывается ли партия (is_active меняется с True на False)
+        is_closing = batch.is_active and not request.data.get('is_active', True)
+        
+        if is_closing:
             current_date = datetime.now()
             request.data['completed_at'] = current_date
+            
+            # Если у партии есть id_ttn, закрываем ТТН в Мириаде
+            if batch.id_ttn:
+                success = services.close_ttn_in_miriada(batch.id_ttn)
+                if not success:
+                    logger.warning(f"Не удалось закрыть ТТН {batch.id_ttn} в Мириаде при закрытии партии {batch.id}")
 
         serializer = BalloonsBatchSerializer(batch, data=request.data, partial=True)
         if serializer.is_valid():

@@ -36,6 +36,7 @@ urlpatterns = [
     path('api/carousel/', include("carousel.api.urls", namespace='carousel_api')),
     path('api/railway-batch/', include("railway_service.api.urls", namespace='railway_api')),
     path('api/auto-gas-batch/', include("autogas.api.urls", namespace='autogas_api')),
+    path('api/ttn/', include("ttn.api.urls", namespace='ttn_api')),
 
     # OpenAPI схемы
     path('api/schema/', SpectacularAPIView.as_view(), name='schema'),

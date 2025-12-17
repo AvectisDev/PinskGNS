@@ -106,6 +106,7 @@ class BalloonsBatchSerializer(serializers.ModelSerializer):
             'gas_amount',
             'is_active',
             'ttn',
+            'id_ttn',
             'amount_of_ttn'
         ]
 
@@ -138,6 +139,7 @@ class ActiveBatchSerializer(serializers.ModelSerializer):
             'gas_amount',
             'is_active',
             'ttn',
+            'id_ttn',
             'amount_of_ttn'
         ]
 

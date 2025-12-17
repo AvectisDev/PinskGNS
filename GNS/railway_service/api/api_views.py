@@ -5,15 +5,86 @@ from django.db.models.functions import Coalesce
 from django.core.cache import cache
 from django.db.models.signals import post_save, post_delete
 from django.dispatch import receiver
-from rest_framework import generics, status, viewsets
+from rest_framework import generics, status, viewsets, serializers
 from rest_framework.response import Response
 from rest_framework.decorators import api_view, action
 from rest_framework.permissions import IsAuthenticated
+from drf_spectacular.utils import (
+    extend_schema,
+    extend_schema_view,
+    inline_serializer,
+    OpenApiTypes,
+    OpenApiExample
+)
 from datetime import datetime, date
 from railway_service.models import RailwayTank, RailwayBatch, RailwayTankHistory
 from .serializers import RailwayBatchSerializer
 
 
+@extend_schema_view(
+    statistic=extend_schema(
+        tags=['Железнодорожные партии'],
+        summary='Получить статистику по железнодорожным партиям',
+        description='Получение сводной статистики по железнодорожным цистернам и партиям. '
+                    'Включает статистику за последний месяц и за сегодня, а также информацию о цистернах на станции.',
+        responses={
+            200: OpenApiTypes.OBJECT
+        },
+        examples=[
+            OpenApiExample(
+                'Пример ответа',
+                value={
+                    'loading_batch': {
+                        'last_month_total_tanks_spbt': 10,
+                        'last_month_total_tanks_pba': 5,
+                        'last_month_gas_amount_spbt': 150000.50,
+                        'last_month_gas_amount_pba': 75000.25,
+                        'last_day_total_tanks_spbt': 2,
+                        'last_day_total_tanks_pba': 1,
+                        'last_day_gas_amount_spbt': 30000.00,
+                        'last_day_gas_amount_pba': 15000.00
+                    },
+                    '1234567': {
+                        'registration_number': '1234567',
+                        'gas_type': 'СПБТ',
+                        'full_weight': 85000.50
+                    }
+                },
+                response_only=True
+            )
+        ]
+    ),
+    list=extend_schema(
+        tags=['Железнодорожные партии'],
+        summary='Получить активную партию',
+        description='Получение данных активной железнодорожной партии',
+        responses={
+            200: RailwayBatchSerializer,
+            404: OpenApiTypes.OBJECT
+        }
+    ),
+    create=extend_schema(
+        tags=['Железнодорожные партии'],
+        summary='Создать новую партию',
+        description='Создание новой железнодорожной партии',
+        request=RailwayBatchSerializer,
+        responses={
+            201: RailwayBatchSerializer,
+            400: OpenApiTypes.OBJECT
+        }
+    ),
+    partial_update=extend_schema(
+        tags=['Железнодорожные партии'],
+        summary='Обновить партию',
+        description='Частичное обновление данных железнодорожной партии',
+        request=RailwayBatchSerializer,
+        responses={
+            200: RailwayBatchSerializer,
+            400: OpenApiTypes.OBJECT,
+            404: OpenApiTypes.OBJECT
+        }
+    )
+)
 class RailwayBatchView(viewsets.ViewSet):
     permission_classes = [IsAuthenticated]
 
