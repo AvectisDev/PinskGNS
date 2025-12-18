@@ -99,13 +99,15 @@ class BalloonsBatchSerializer(serializers.ModelSerializer):
             'trailer',
             'reader_number',
             'amount_of_rfid',
+            'amount_of_sensor',
             'amount_of_5_liters',
             'amount_of_12_liters',
             'amount_of_27_liters',
             'amount_of_50_liters',
             'gas_amount',
             'is_active',
-            'id_ttn',
+            'ttn_id',
+            'balloons_type',
         ]
 
 
@@ -130,13 +132,15 @@ class ActiveBatchSerializer(serializers.ModelSerializer):
             'trailer',
             'reader_number',
             'amount_of_rfid',
+            'amount_of_sensor',
             'amount_of_5_liters',
             'amount_of_12_liters',
             'amount_of_27_liters',
             'amount_of_50_liters',
             'gas_amount',
             'is_active',
-            'id_ttn',
+            'ttn_id',
+            'balloons_type',
         ]
 
 

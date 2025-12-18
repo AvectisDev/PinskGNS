@@ -141,13 +141,15 @@ class BalloonsBatchAdmin(admin.ModelAdmin):
         'trailer',
         'reader_number',
         'amount_of_rfid',
+        'amount_of_sensor',
         'amount_of_5_liters',
         'amount_of_12_liters',
         'amount_of_27_liters',
         'amount_of_50_liters',
         'gas_amount',
         'is_active',
-        'id_ttn',
+        'ttn_id',
+        'balloons_type',
     ]
     list_filter = ['batch_type', 'started_at', 'completed_at', 'is_active']
     search_fields = ['truck', 'is_active', 'ttn_id', 'batch_type']

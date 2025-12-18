@@ -26,7 +26,8 @@ logger = logging.getLogger('filling_station')
         summary='Получить список текущих ТТН',
         description='Получение списка текущих ТТН из системы Мириада',
         responses={
-            200: TtnListResponseSerializer,
+            200: MiriadaTtnSerializer(many=True),
+            404: OpenApiTypes.OBJECT,
             500: inline_serializer(
                 name='ErrorResponse',
                 fields={

@@ -247,7 +247,7 @@ def send_status_to_miriada(reader: int, nfc_tag: str):
     loading_into_truck - Погрузка баллона в машину
     number_auto - номер машины в формате "AM 7881-2". Номер должен быть в ПК «Автопарк»
     type_car - тип машины: 0-кассета, 1 — трал
-    id_ttn - ID ТТН в системе Мириада
+    ttn_id - ID ТТН в системе Мириада
     """
     send_urls = {
         'filling': f'{settings.MIRIADA_API_POST_URL}/fillingballoon',
@@ -266,7 +266,7 @@ def send_status_to_miriada(reader: int, nfc_tag: str):
     }
 
     # Инициализация переменных
-    send_type = fullness = number_auto = type_car = id_ttn = None
+    send_type = fullness = number_auto = type_car = ttn_id = None
 
     if reader == 8:
         send_type = 'filling'
@@ -278,8 +278,8 @@ def send_status_to_miriada(reader: int, nfc_tag: str):
             batch_type='l',
             is_active=True,
         ).first()
-        if batch and batch.id_ttn:
-            id_ttn = batch.id_ttn
+        if batch and batch.ttn_id:
+            ttn_id = batch.ttn_id
     elif reader == 5:
         send_type = 'registering_in_warehouse'
         fullness = 1
@@ -297,8 +297,8 @@ def send_status_to_miriada(reader: int, nfc_tag: str):
             number_auto = batch.truck.registration_number
             formatted_number_auto = f"{number_auto[:2]} {number_auto[2:6]}-{number_auto[6]}"
             type_car = 0 if batch.truck.type.type == 'Клетевоз' else 1
-            if batch.id_ttn:
-                id_ttn = batch.id_ttn
+            if batch.ttn_id:
+                ttn_id = batch.ttn_id
 
     if fullness is not None:
         payload.update({"fulness": fullness})
@@ -309,8 +309,8 @@ def send_status_to_miriada(reader: int, nfc_tag: str):
             "type_car": type_car
         })
     
-    if id_ttn is not None:
-        payload.update({"id_ttn": id_ttn})
+    if ttn_id is not None:
+        payload.update({"id_ttn": ttn_id})
 
     try:
         session = requests.Session()
@@ -421,11 +421,11 @@ def get_current_ttn_from_miriada() -> Optional[list]:
     return []
 
 
-def close_ttn_in_miriada(id_ttn: int) -> bool:
+def close_ttn_in_miriada(ttn_id: int) -> bool:
     """
     Закрывает ТТН в Мириаде по её ID.
     Args:
-        id_ttn (int): ID ТТН в системе Мириада
+        ttn_id (int): ID ТТН в системе Мириада
     Returns:
         bool: True при успешном закрытии, False в случае ошибки
     """
@@ -437,7 +437,7 @@ def close_ttn_in_miriada(id_ttn: int) -> bool:
     }
 
     payload = {
-        'id_ttn': id_ttn,
+        'id_ttn': ttn_id,
         'realm': 'brestoblgas'
     }
 
@@ -463,17 +463,17 @@ def close_ttn_in_miriada(id_ttn: int) -> bool:
         if response.status_code == 200:
             result = response.json()
             if result.get('result') == 'ok':
-                logger.info(f"ТТН {id_ttn} успешно закрыта в Мириаде")
+                logger.info(f"ТТН {ttn_id} успешно закрыта в Мириаде")
                 return True
             else:
-                logger.error(f"ТТН {id_ttn} не закрыта. Ответ: {result}")
+                logger.error(f"ТТН {ttn_id} не закрыта. Ответ: {result}")
                 return False
         else:
             logger.error(
-                f"Ошибка при закрытии ТТН {id_ttn}! "
+                f"Ошибка при закрытии ТТН {ttn_id}! "
                 f"Status: {response.status_code} {response.reason}, Ответ: {response.text}")
             return False
 
     except Exception as error:
-        logger.error(f'Ошибка при закрытии ТТН {id_ttn} в Мириаде: {error}')
+        logger.error(f'Ошибка при закрытии ТТН {ttn_id} в Мириаде: {error}')
         return False

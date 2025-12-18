@@ -80,7 +80,7 @@ def reader_info(request, reader_number=1):
         if action == 'export':
             dataset = BalloonResources().export(
                 Reader.objects.filter(
-                    number=reader_number,
+                    number__number=reader_number,
                     nfc_tag__isnull=False,
                     change_date__date__gte=start_date,
                     change_date__date__lte=end_date,

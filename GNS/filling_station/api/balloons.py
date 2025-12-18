@@ -563,7 +563,7 @@ BalloonOperationResponse = inline_serializer(
     name='BalloonOperationResponse',
     fields={
         'success': serializers.BooleanField(),
-        'balloon_id': serializers.IntegerField(allow_null=True),
+        'balloon_id': serializers.CharField(allow_null=True),
         'new_count': serializers.IntegerField(),
         'error': serializers.CharField()
     }
@@ -793,11 +793,11 @@ class BalloonsBatchViewSet(viewsets.ViewSet):
             current_date = datetime.now()
             request.data['completed_at'] = current_date
             
-            # Если у партии есть id_ttn, закрываем ТТН в Мириаде
-            if batch.id_ttn:
-                success = services.close_ttn_in_miriada(batch.id_ttn)
+            # Если у партии есть ttn_id, закрываем ТТН в Мириаде
+            if batch.ttn_id:
+                success = services.close_ttn_in_miriada(batch.ttn_id)
                 if not success:
-                    logger.warning(f"Не удалось закрыть ТТН {batch.id_ttn} в Мириаде при закрытии партии {batch.id}")
+                    logger.warning(f"Не удалось закрыть ТТН {batch.ttn_id} в Мириаде при закрытии партии {batch.id}")
 
         serializer = BalloonsBatchSerializer(batch, data=request.data, partial=True)
         if serializer.is_valid():

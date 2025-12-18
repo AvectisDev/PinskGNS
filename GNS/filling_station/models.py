@@ -481,7 +481,6 @@ class BalloonsBatch(models.Model):
         on_delete=models.DO_NOTHING,
         null=True,
         blank=True,
-        default=0,
         verbose_name="Прицеп"
     )
     reader_number = models.IntegerField(null=True, blank=True, verbose_name="Номер считывателя")
@@ -498,7 +497,7 @@ class BalloonsBatch(models.Model):
         verbose_name="Список баллонов"
     )
     is_active = models.BooleanField(default=False, verbose_name="В работе")
-    id_ttn = models.CharField(max_length=20, verbose_name="ID ТТН")
+    ttn_id = models.IntegerField(verbose_name="ID ТТН")
     balloons_type = models.CharField(choices=settings.BALLOON_TYPE_CHOICES, default='e', verbose_name="Пустой/полный")
     user = models.ForeignKey(
         User,
@@ -544,7 +543,7 @@ class BalloonsBatch(models.Model):
         Возвращает словарь с результатами операции:
         {
             'success': bool,
-            'balloon_id': int | None,
+            'balloon_id': str | None,
             'new_count': int,
             'error': str
         }
@@ -585,7 +584,7 @@ class BalloonsBatch(models.Model):
         Возвращает словарь с результатами операции:
         {
             'success': bool,
-            'balloon_id': int | None,
+            'balloon_id': str | None,
             'new_count': int,
             'error': str
         }
