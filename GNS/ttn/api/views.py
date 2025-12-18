@@ -1,4 +1,5 @@
 import logging
+from datetime import datetime, timezone
 from rest_framework import viewsets, status, serializers
 from rest_framework.response import Response
 from rest_framework.decorators import action
@@ -36,22 +37,20 @@ logger = logging.getLogger('filling_station')
         examples=[
             OpenApiExample(
                 'Пример успешного ответа',
-                value={
-                    'ttn_list': [
-                        {
-                            "ttn_id": 14769,
-                            "name": "ТТН №0324344",
-                            "auto": "AM 9621-1",
-                            "date": "2025-12-18"
-                        },
-                        {
-                            "ttn_id": 14796,
-                            "name": "0324576",
-                            "auto": "АН 5514-1",
-                            "date": "2025-12-18"
-                        },
-                    ]
-                },
+                value=[
+                    {
+                        "ttn_id": 14769,
+                        "name": "ТТН №0324344",
+                        "auto": "AM 9621-1",
+                        "date": "2025-12-18"
+                    },
+                    {
+                        "ttn_id": 14796,
+                        "name": "0324576",
+                        "auto": "АН 5514-1",
+                        "date": "2025-12-18"
+                    },
+                ],
                 response_only=True
             ),
             OpenApiExample(
@@ -115,7 +114,14 @@ class MiriadaTtnViewSet(viewsets.ViewSet):
 
         # Сериализуем и возвращаем сохраненные данные
         if not saved_ttns:
-            return Response(status=status.HTTP_404_NOT_FOUND)
+            local_ttn = MiriadaTtn.objects.filter(date=datetime.today().date())
+            
+            if not local_ttn:
+                return Response(status=status.HTTP_404_NOT_FOUND)
+            
+            serializer = MiriadaTtnSerializer(local_ttn, many=True)
+            return Response(serializer.data)
+
 
         serializer = MiriadaTtnSerializer(saved_ttns, many=True)
         return Response(serializer.data)

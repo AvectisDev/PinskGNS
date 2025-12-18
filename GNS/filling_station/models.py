@@ -668,17 +668,15 @@ class BalloonsBatch(models.Model):
         """
         Собирает статистику по партиям за последние день и месяц
         """
-        today = date.today()
-        first_day_of_month = today.replace(day=1)
+        now = datetime.now()
+        today_start = datetime.combine(now.date(), time.min)
+        first_day_of_month = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
 
-        month_start = datetime.combine(first_day_of_month, time.min)
-
-        queryset = cls.objects.filter(started_at__gte=month_start)
+        queryset = cls.objects.filter(started_at__gte=first_day_of_month)
         
         if batch_type:
             queryset = queryset.filter(batch_type=batch_type)
 
-        # Группируем по reader_number
         stats_by_reader = defaultdict(lambda: {"truck_month": 0, "truck_today": 0})
 
         for batch in queryset:
@@ -687,7 +685,7 @@ class BalloonsBatch(models.Model):
                 continue
 
             stats_by_reader[reader_id]["truck_month"] += 1
-            if batch.started_at >= today:
+            if batch.started_at >= today_start:
                 stats_by_reader[reader_id]["truck_today"] += 1
 
         stats = [
