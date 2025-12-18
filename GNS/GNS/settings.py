@@ -421,6 +421,11 @@ BATCH_TYPE_CHOICES = [
     ('u', 'Отгрузка'),
 ]
 
+BALLOON_TYPE_CHOICES = [
+    ('e', 'Пустой'),
+    ('f', 'Полный'),
+]
+
 BALLOON_SIZE_CHOICES = [
     (5, 5),
     (12, 12),

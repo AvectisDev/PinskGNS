@@ -78,12 +78,6 @@
                     {% if reader.number >= 3 and reader.number <= 6 %}
                     <p>Оптический датчик: <strong>{{ current_quantity_by_sensor }}</strong></p>
                     {% endif %}
-                    {% if reader.number == 6 %}
-                    <p>ТТН: <strong>{{ loading_ttn_quantity }}</strong></p>
-                    {% endif %}
-                    {% if reader.number == 3 or reader.number == 4 %}
-                    <p>ТТН: <strong>{{ unloading_ttn_quantity }}</strong></p>
-                    {% endif %}
                 </div>
                 <div class="col-md-7">
                     <form method="post" enctype="multipart/form-data" class="row g-3 ">

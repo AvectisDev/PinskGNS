@@ -189,22 +189,6 @@ class Reader(models.Model):
         # Список баллонов для отображения в шаблоне
         stats['balloons_list'] = queryset.filter(nfc_tag__isnull=False)
 
-        # Статистика по ТТН
-        if reader_number == 6:
-            stats['loading_ttn_quantity'] = BalloonsBatch.objects.filter(
-                batch_type='l',
-                reader_number=reader_number,
-                started_at__date__gte=start_date,
-                started_at__date__lte=end_date
-            ).aggregate(total_ttn=Sum('amount_of_ttn'))['total_ttn'] or 0
-        elif reader_number in [3, 4]:
-            stats['unloading_ttn_quantity'] = BalloonsBatch.objects.filter(
-                batch_type='u',
-                reader_number=reader_number,
-                started_at__date__gte=start_date,
-                started_at__date__lte=end_date
-            ).aggregate(total_ttn=Sum('amount_of_ttn'))['total_ttn'] or 0
-
         return stats
 
     @classmethod
@@ -502,6 +486,7 @@ class BalloonsBatch(models.Model):
     )
     reader_number = models.IntegerField(null=True, blank=True, verbose_name="Номер считывателя")
     amount_of_rfid = models.IntegerField(default=0, verbose_name="Количество баллонов по rfid")
+    amount_of_sensor = models.IntegerField(default=0, verbose_name="Количество баллонов по датчику")
     amount_of_5_liters = models.IntegerField(default=0, verbose_name="Количество 5л баллонов")
     amount_of_12_liters = models.IntegerField(default=0, verbose_name="Количество 12л баллонов")
     amount_of_27_liters = models.IntegerField(default=0, verbose_name="Количество 27л баллонов")
@@ -513,13 +498,8 @@ class BalloonsBatch(models.Model):
         verbose_name="Список баллонов"
     )
     is_active = models.BooleanField(default=False, verbose_name="В работе")
-    id_ttn = models.ForeignKey(
-        'ttn.MiriadaTtn',
-        on_delete=models.DO_NOTHING,
-        null=True,
-        blank=True,
-        verbose_name="ID ТТН"
-    )
+    id_ttn = models.CharField(max_length=20, verbose_name="ID ТТН")
+    balloons_type = models.CharField(choices=settings.BALLOON_TYPE_CHOICES, default='e', verbose_name="Пустой/полный")
     user = models.ForeignKey(
         User,
         on_delete=models.DO_NOTHING,
@@ -528,7 +508,7 @@ class BalloonsBatch(models.Model):
     )
 
     def __str__(self):
-        return str(self.id)
+        return f'Партия №{self.id}. Тип {self.batch_type}'
 
     class Meta:
         verbose_name = "Партия баллонов"
@@ -549,6 +529,7 @@ class BalloonsBatch(models.Model):
         Возвращает общее количество баллонов без меток
         """
         amounts = [
+            self.amount_of_sensor or 0,
             self.amount_of_5_liters or 0,
             self.amount_of_12_liters or 0,
             self.amount_of_27_liters or 0,
@@ -660,8 +641,8 @@ class BalloonsBatch(models.Model):
             batch_balloon_count=Count('balloon_list'),
         ).aggregate(
             total_batches=Count('id'),
-            total_balloon_count_by_rfid=Sum('batch_balloon_count'),
-            total_balloon_count_by_ttn=Sum('amount_of_ttn'),
+            amount_balloons_by_rfid=Sum('batch_balloon_count'),
+            amount_balloons_by_sensor=Sum('amount_of_sensor'),
         )
 
     @classmethod

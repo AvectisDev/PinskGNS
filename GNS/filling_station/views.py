@@ -104,8 +104,6 @@ def reader_info(request, reader_number=1):
         "page_obj": page_obj,
         'current_quantity_by_reader': stats['total_rfid'],
         'current_quantity_by_sensor': stats['total_balloons'],
-        'loading_ttn_quantity': stats.get('loading_ttn_quantity', 0),
-        'unloading_ttn_quantity': stats.get('unloading_ttn_quantity', 0),
         'form': form,
         'reader': reader,
         'start_date': start_date,
