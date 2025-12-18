@@ -39,17 +39,17 @@ logger = logging.getLogger('filling_station')
                 value={
                     'ttn_list': [
                         {
-                            'id': 12345,
-                            'name': '123/1',
-                            'auto': '2222 AH-2',
-                            'date': '2024-01-15T10:30:00Z'
+                            "ttn_id": 14769,
+                            "name": "ТТН №0324344",
+                            "auto": "AM 9621-1",
+                            "date": "2025-12-18"
                         },
                         {
-                            'id': 12346,
-                            'name': '124/1',
-                            'auto': '3333 BH-3',
-                            'date': '2024-01-15T11:00:00Z'
-                        }
+                            "ttn_id": 14796,
+                            "name": "0324576",
+                            "auto": "АН 5514-1",
+                            "date": "2025-12-18"
+                        },
                     ]
                 },
                 response_only=True
@@ -86,11 +86,8 @@ class MiriadaTtnViewSet(viewsets.ViewSet):
         saved_ttns = []
         try:
             for ttn_data in api_response:
-                if not isinstance(ttn_data, dict):
-                    logger.error(f"Некорректный формат данных ТТН: {ttn_data}")
-                    continue
 
-                ttn_id = ttn_data.get('id')
+                ttn_id = ttn_data.get('ttn_id')
                 if not ttn_id:
                     logger.error(f"Отсутствует ID ТТН: {ttn_data}")
                     continue
@@ -101,7 +98,7 @@ class MiriadaTtnViewSet(viewsets.ViewSet):
                         defaults={
                             'name': ttn_data.get('name', ''),
                             'auto': ttn_data.get('auto', ''),
-                            'date': ttn_data.get('date', 0)
+                            'date': ttn_data.get('date')
                         }
                     )
                     saved_ttns.append(miriada_ttn)

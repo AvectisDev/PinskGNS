@@ -356,45 +356,54 @@ def get_current_ttn_from_miriada() -> Optional[list]:
         },
         ...
     ]
-    или None в случае ошибки.
+    или [] в случае ошибки.
     """
-    url = f'{settings.MIRIADA_API_URL}/getcurrentttn'
+    url = f'{settings.MIRIADA_API_URL}/getcurrentttn?realm=brestoblgas'
     headers = {
         'Accept': 'application/json',
         'Content-Type': 'application/json'
     }
 
-    payload = {
-        'realm': 'brestoblgas'
-    }
     try:
-        response = requests.get(
+        session = requests.Session()
+        req = requests.Request(
+            'GET',
             url,
             auth=(settings.MIRIADA_AUTH_LOGIN, settings.MIRIADA_AUTH_PASSWORD),
             headers=headers,
-            json=payload,
-            timeout=2)
+        )
+        prepared = session.prepare_request(req)
+
+        logger.debug(
+            f"Подготовленный запрос:\n"
+            f"URL: {prepared.url}\n"
+            f"Headers: {prepared.headers}\n"
+            f"Body: {prepared.body}"
+        )
+
+        # Отправляем запрос в Мириада
+        response = session.send(prepared, timeout=2)
         response.raise_for_status()
+
         result = response.json()
+        
+        logger.warning(f"Данные по ТТН из Мириады: {type(result)}")
 
-        if result.get('status') != 'ok':
-            logger.warning(f'Ошибка при получении списка ТТН. Ответ: {result}')
-            return []
-
-        ttn_list = result.get('List')
-        if not isinstance(ttn_list, (list, dict)):
-            logger.error(f"Неправильный формат полученных данных. Ожидается (list, dict), получено: {type(ttn_list)}")
-            return []
-
+        # Обратботка списка ТТН из Мириады
         processed_list = []
-        for ttn in ttn_list:
+        for ttn in result:
             try:
-                processed_list.append({
-                    'id': ttn.get('id'),
+                date_obj = datetime.strptime(ttn.get('date'), "%d.%m.%Y").date()
+                
+                processed_ttn = {
+                    'ttn_id': ttn.get('id'),
                     'name': ttn.get('name', ''),
-                    'auto': ttn.get('auto', ''),
-                    'date': ttn.get('date', 0)
-                })
+                    'auto': ttn.get('car_plate', ''),
+                    'date': date_obj,
+                }
+                
+                processed_list.append(processed_ttn)
+                
             except Exception as e:
                 logger.error(f"Ошибка обработки элемента ТТН: {e}. Данные: {ttn}")
                 continue

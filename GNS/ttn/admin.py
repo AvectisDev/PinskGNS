@@ -106,9 +106,8 @@ class MiriadaTtnAdmin(admin.ModelAdmin):
         'name',
         'auto',
         'date',
-        'created_at',
         'updated_at'
     ]
     search_fields = ['ttn_id', 'name', 'auto']
-    list_filter = ['created_at']
-    readonly_fields = ['created_at', 'updated_at']
+    list_filter = ['date']
+    readonly_fields = ['date', 'updated_at']

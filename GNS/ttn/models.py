@@ -266,8 +266,7 @@ class MiriadaTtn(models.Model):
     ttn_id = models.IntegerField(unique=True, verbose_name="ID ТТН в Мириаде")
     name = models.CharField(max_length=100, verbose_name="Номер ТТН")
     auto = models.CharField(max_length=50, verbose_name="Номер автомобиля")
-    date = models.IntegerField(null=True, blank=True, verbose_name="Дата ТТН")
-    created_at = models.DateTimeField(auto_now_add=True, verbose_name="Дата создания записи")
+    date = models.DateField(null=True, blank=True, verbose_name="Дата ТТН")
     updated_at = models.DateTimeField(auto_now=True, verbose_name="Дата обновления записи")
 
     def __str__(self):
@@ -276,4 +275,4 @@ class MiriadaTtn(models.Model):
     class Meta:
         verbose_name = "ТТН из Мириады"
         verbose_name_plural = "ТТН из Мириады"
-        ordering = ['-created_at']
+        ordering = ['-updated_at']
