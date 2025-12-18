@@ -1,5 +1,6 @@
 from collections import defaultdict
 from django.db import models
+from django.utils import timezone
 from django.core.exceptions import ValidationError
 from django.contrib.auth.models import User
 from django.urls import reverse
@@ -668,11 +669,16 @@ class BalloonsBatch(models.Model):
         """
         Собирает статистику по партиям за последние день и месяц
         """
-        now = datetime.now()
-        today_start = datetime.combine(now.date(), time.min)
-        first_day_of_month = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        now = timezone.now()
+        
+        # Начало сегодняшнего дня
+        today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+        
+        # Начало месяца
+        month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
 
-        queryset = cls.objects.filter(started_at__gte=first_day_of_month)
+        # Фильтруем по месяцу
+        queryset = cls.objects.filter(started_at__gte=month_start)
         
         if batch_type:
             queryset = queryset.filter(batch_type=batch_type)
@@ -685,6 +691,8 @@ class BalloonsBatch(models.Model):
                 continue
 
             stats_by_reader[reader_id]["truck_month"] += 1
+            
+            # Все datetime теперь aware (с часовым поясом)
             if batch.started_at >= today_start:
                 stats_by_reader[reader_id]["truck_today"] += 1
 
