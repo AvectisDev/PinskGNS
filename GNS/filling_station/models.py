@@ -175,11 +175,7 @@ class Reader(models.Model):
             change_date__date__lte=end_date
         )
 
-        # временная заглушка
-        if reader_number == 6:
-            query = Count('pk')
-        else:
-            query = Count('pk', filter=Q(nfc_tag__isnull=True))
+        query = Count('pk', filter=Q(nfc_tag__isnull=True))
         # Общее количество баллонов с меткой и без, пройдённое через считыватель
         stats = queryset.aggregate(
             total_rfid=Count('pk', filter=Q(nfc_tag__isnull=False)),
