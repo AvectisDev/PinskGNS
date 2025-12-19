@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 from rest_framework import viewsets, status, serializers
 from rest_framework.response import Response
 from rest_framework.decorators import action
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated, AllowAny
 from drf_spectacular.utils import (
     extend_schema,
     extend_schema_view,
@@ -14,7 +14,6 @@ from drf_spectacular.utils import (
 from filling_station import services
 from ttn.models import MiriadaTtn
 from ttn.api.serializers import MiriadaTtnSerializer
-from .serializers import TtnListResponseSerializer
 
 
 logger = logging.getLogger('filling_station')
@@ -69,7 +68,7 @@ class MiriadaTtnViewSet(viewsets.ViewSet):
     """
     API для работы с ТТН из системы Мириада.
     """
-    permission_classes = [IsAuthenticated]
+    permission_classes = [AllowAny]
 
     @action(detail=False, methods=['get'], url_path='current')
     def get_current_ttn(self, request):
