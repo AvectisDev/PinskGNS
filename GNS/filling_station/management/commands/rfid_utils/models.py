@@ -138,8 +138,7 @@ class FeigProtocol:
         length = struct.unpack('>H', response[1:3])[0]
 
         if len(response) < length:
-            logger.error(f'Неверная длина {binascii.hex(response)}')
-            return {'error': 'Incomplete response'}
+            return {'error': f'Неверная длина {bytes(response).hex()}'}
 
         # Проверяем CRC
         packet_without_crc = response[:length - 2]
@@ -167,7 +166,10 @@ class FeigProtocol:
         command = response_data[0]
         status = response_data[1]
         # Сохраняем статус ответа
-        logger.debug(f'command {command}, status {cls.STATUS_BYTE.get(status, "Unknown")}')
+        tags.append({
+            'command': bytes(command).hex(),
+            'status': cls.STATUS_BYTE.get(status, "Unknown"),
+            })
 
         # Если в буфере нет данных - завершаем обработку
         if status == 0x92:
