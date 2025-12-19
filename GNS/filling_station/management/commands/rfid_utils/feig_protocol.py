@@ -85,7 +85,7 @@ async def read_nfc_tags(reader: Reader):
         # Парсим данные буфера
         tags_data = FeigProtocol.parse_buffer_data(response.get('response_data'))
         logger.debug(f'Данные с {reader} валидны. '
-                     f'Команда {tags_data[0].get("nfc_tag")}. '
+                     f'Команда {tags_data[0].get("command")}. '
                      f'Статус {tags_data[0].get("status")}')
 
         for tag_data in tags_data:
@@ -106,7 +106,7 @@ async def read_input_status(reader: Reader) -> int:
         logger.debug(f'Данные с ридера {reader} по входам валидны. Обработка буфера')
         inputs_state = FeigProtocol.parse_buffer_data(response.get('response_data'))
         logger.debug(f'Данные с {reader} валидны. '
-                     f'Команда {inputs_state[0].get("nfc_tag")}. '
+                     f'Команда {inputs_state[0].get("command")}. '
                      f'Статус {inputs_state[0].get("status")}')
 
         return inputs_state[1].get('IN1')

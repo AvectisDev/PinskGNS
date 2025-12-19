@@ -167,7 +167,7 @@ class FeigProtocol:
         status = response_data[1]
         # Сохраняем статус ответа
         tags.append({
-            'command': bytes(command).hex(),
+            'command': command,
             'status': cls.STATUS_BYTE.get(status, "Unknown"),
             })
 
