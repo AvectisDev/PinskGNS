@@ -147,4 +147,4 @@ class ActiveBatchSerializer(serializers.ModelSerializer):
 class BalloonAmountSerializer(serializers.ModelSerializer):
     class Meta:
         model = BalloonsBatch
-        fields = ['id', 'amount_of_rfid']
+        fields = ['id', 'amount_of_rfid', 'amount_of_sensor']
