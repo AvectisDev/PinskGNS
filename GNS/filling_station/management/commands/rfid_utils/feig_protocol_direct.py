@@ -18,10 +18,48 @@ logger = logging.getLogger('rfid')
 
 # Импорты из модулей
 from .models import Reader, FeigProtocol
+
 # Импорт моделей Django
 from filling_station.models import ReaderSettings
-# Импорт Celery задач
-from filling_station.tasks import process_rfid_balloon_data
+# Импорт сервисов для прямого вызова
+from filling_station import services
+
+
+async def process_balloon_data_direct(nfc_tag, reader_number):
+    """
+    Прямой вызов сервисов для обработки данных баллона (без HTTP/Celery).
+    """
+    try:
+        logger.debug(f'Прямая обработка RFID данных: nfc_tag={nfc_tag}, reader_number={reader_number}')
+
+        if nfc_tag is None:
+            # Обработка сигнала без NFC (оптический датчик)
+            reader = services.processing_request_without_nfc(reader_number)
+            if reader:
+                logger.debug(f'Баллон без NFC обработан на ридере {reader_number}')
+                return {'status': 'success', 'message': 'Баллон без NFC обработан'}
+            else:
+                logger.error(f'Ошибка обработки баллона без NFC на ридере {reader_number}')
+                return {'status': 'error', 'message': 'Ошибка обработки баллона без NFC'}
+
+        else:
+            # Обработка сигнала с NFC меткой
+            result = services.processing_request_with_nfc(nfc_tag=nfc_tag, reader_number=reader_number)
+            if result:
+                balloon, reader = result
+                logger.debug(f'Баллон {balloon.nfc_tag} обработан на ридере {reader.number}')
+                return {
+                    'status': 'success',
+                    'message': f'Баллон {balloon.nfc_tag} обработан',
+                    'filling_status': balloon.filling_status
+                }
+            else:
+                logger.error(f'Ошибка обработки баллона {nfc_tag} на ридере {reader_number}')
+                return {'status': 'error', 'message': f'Ошибка обработки баллона {nfc_tag}'}
+
+    except Exception as error:
+        logger.error(f'Ошибка в process_balloon_data_direct: {error}')
+        return {'error': str(error)}
 
 
 async def data_exchange_with_reader(reader: Reader, command_name: str, request_data: bytes = b'') -> Dict:
@@ -125,8 +163,8 @@ async def process_reader_operations(reader: Reader):
 
             # Если состояние изменилось с 0 на 1 (передний фронт)
             if current_input_state == 1 and reader.input_state == 0:
-                # Отправляем задачу в Celery для обработки сигнала без NFC
-                process_rfid_balloon_data.delay(nfc_tag=None, reader_number=reader.number)
+                # Прямой вызов сервиса вместо HTTP/Celery
+                await process_balloon_data_direct(nfc_tag=None, reader_number=reader.number)
                 logger.debug(f'Сработал вход на {reader}')
 
             # Обновляем состояние входа
@@ -137,15 +175,16 @@ async def process_reader_operations(reader: Reader):
 
             for nfc_tag in tags:
                 try:
-                    # Отправляем задачу в Celery для обработки NFC метки
-                    task_result = process_rfid_balloon_data.delay(nfc_tag=nfc_tag, reader_number=reader.number)
-                    # Получаем результат задачи (синхронно, но можно сделать асинхронно)
-                    # Для асинхронного получения результата можно использовать task_result.get(timeout=10)
-                    logger.debug(f'Отправлена задача обработки NFC метки {nfc_tag} на ридер {reader.number}')
+                    # Прямой вызов сервиса для обработки NFC метки
+                    result = await process_balloon_data_direct(nfc_tag=nfc_tag, reader_number=reader.number)
 
-                    # Управление светодиодами ридера - пока оставим логику по умолчанию
-                    # В будущем можно получить filling_status из результата задачи
-                    await data_exchange_with_reader(reader, 'SET_OUTPUT', b'\x01\x01\x81\x01\x00')  # Зеленый
+                    # Управление светодиодами ридера на основе результата
+                    if result.get('filling_status') == True:
+                        # Зажигаем зелёную лампу
+                        await data_exchange_with_reader(reader, 'SET_OUTPUT', b'\x01\x01\x81\x01\x00')
+                    else:
+                        # Мигание зелёной лампы
+                        await data_exchange_with_reader(reader, 'SET_OUTPUT', b'\x01\x01\x81\x0B\x00')
 
                 except Exception as error:
                     logger.error(f'Ошибка обработки метки {nfc_tag} на {reader.ip}: {error}')
@@ -207,7 +246,7 @@ async def load_readers_from_database():
 
 
 async def main():
-    logger.info('Запуск программы считывания RFID-меток...')
+    logger.info('Запуск программы считывания RFID-меток (прямой вызов сервисов)...')
 
     # Загрузка ридеров из базы данных
     readers = await load_readers_from_database()
