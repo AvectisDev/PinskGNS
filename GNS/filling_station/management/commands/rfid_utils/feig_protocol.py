@@ -36,21 +36,7 @@ async def data_exchange_with_reader(reader: Reader, command_name: str, request_d
         writer.write(request)
         await writer.drain()
 
-        header = await asyncio.wait_for(reader_conn.read(5), timeout=1)
-        if len(header) < 5:
-            logger.error(f'{reader.number} Неполный заголовок')
-            return {'error': 'Incomplete header', 'valid': False}
-
-        # Получаем длину полного ответа
-        length = struct.unpack('>H', header[1:3])[0]
-
-        # Читаем оставшуюся часть пакета
-        remaining = length - 5
-        if remaining > 0:
-            body = await asyncio.wait_for(reader_conn.read(remaining), timeout=1)
-            response = header + body
-        else:
-            response = header
+        response = await asyncio.wait_for(reader_conn.read(4096), timeout=1)
 
         # Парсим ответ
         parsed = FeigProtocol.parse_response(response)
