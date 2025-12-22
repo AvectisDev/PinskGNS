@@ -11,7 +11,7 @@ from drf_spectacular.utils import (
     OpenApiTypes,
     OpenApiExample
 )
-from filling_station import services
+from ttn import services
 from ttn.models import MiriadaTtn
 from ttn.api.serializers import MiriadaTtnSerializer
 

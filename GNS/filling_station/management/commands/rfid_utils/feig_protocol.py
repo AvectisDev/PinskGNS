@@ -56,7 +56,6 @@ async def data_exchange_with_reader(reader: Reader, command_name: str, request_d
         writer.close()
         await writer.wait_closed()
 
-
 async def read_nfc_tags(reader: Reader):
     """
     Чтение всех меток из буфера ридера. Возвращает список уникальных меток.

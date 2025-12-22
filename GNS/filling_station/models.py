@@ -8,7 +8,6 @@ from django.db.models import Q, Sum, Count
 from django.conf import settings
 from typing import Dict, Any, Optional
 from datetime import datetime, date, time
-# from ttn.models import MiriadaTtn
 import pghistory
 
 
