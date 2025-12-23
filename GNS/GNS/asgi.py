@@ -14,7 +14,7 @@ def start_processes():
     # Выберите версию RFID команды:
     # feig_protocol - использует Celery задачи (рекомендуется для высокой нагрузки)
     # feig_protocol_direct - прямой вызов сервисов (проще, без очередей)
-    rfid_command = 'filling_station.management.commands.rfid_utils.feig_protocol'
+    rfid_command = 'filling_station.management.commands.rfid_utils.feig_protocol_direct'
 
     p1 = subprocess.Popen(['python', '-m', rfid_command])
     p2 = subprocess.Popen(['python', '-m', 'carousel.management.commands.carousel.main'])

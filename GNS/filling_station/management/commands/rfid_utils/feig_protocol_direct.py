@@ -6,221 +6,206 @@ from typing import List, Dict
 from asgiref.sync import sync_to_async
 import django
 from django.conf import settings
-from concurrent.futures import ThreadPoolExecutor
 
 # Инициализация Django
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'GNS.settings')
 django.setup()
 
-# Конфигурация логирования из настроек Django
+# Логирование
 logging.config.dictConfig(settings.LOGGING)
 logger = logging.getLogger('rfid')
 
-# Импорты из модулей
-from .models import Reader, FeigProtocol
-
+# Импорт моделей/протокола и ReaderSession
+from .models import Reader, FeigProtocol, ReaderSession
 # Импорт моделей Django
 from filling_station.models import ReaderSettings
-# Импорт сервисов для прямого вызова
+# Импорт сервисов (синхронные)
 from filling_station import services
 
 
-async def process_balloon_data(nfc_tag, reader_number):
+# -------------------------------
+# Обёртки над синхронными сервисами
+# -------------------------------
+@sync_to_async
+def process_balloon_data_sync(nfc_tag, reader_number):
     """
-    Прямой вызов сервисов для обработки данных баллона
+    Прямой вызов сервисов (синхронных) в отдельном потоке через asgiref.sync_to_async,
+    чтобы не блокировать event-loop.
     """
-    try:
-        if nfc_tag is None:
-            # Обработка сигнала без NFC (оптический датчик)
-            reader = services.processing_request_without_nfc(reader_number)
-            if reader:
-                return {'status': 'success', 'message': f'Баллон без NFC обработан на ридере {reader_number}'}
-            else:
-                return {'status': 'error', 'message': 'Ошибка обработки баллона без NFC на ридере {reader_number}'}
-        else:
-            # Обработка сигнала с NFC меткой
-            result = services.processing_request_with_nfc(nfc_tag=nfc_tag, reader_number=reader_number)
-            if result:
-                balloon, reader = result
-
-                # Отправка статусов в Мириаду
-                if (2 <= reader.number <= 6) or reader.number == 8:
-                    services.send_status_to_miriada(reader=reader.number, nfc_tag=balloon.nfc_tag)
-
-                return {
-                    'status': 'success',
-                    'message': f'Баллон {balloon.nfc_tag} обработан на ридере {reader_number}',
-                    'filling_status': balloon.filling_status
-                }
-            else:
-                return {'status': 'error', 'message': f'Ошибка обработки баллона {nfc_tag} на ридере {reader_number}'}
-
-    except Exception as error:
-        logger.error(f'Ошибка в process_balloon_data: {error}')
-        return {'error': str(error)}
+    if nfc_tag is None:
+        reader = services.processing_request_without_nfc(reader_number)
+        if reader:
+            return {'status': 'success',
+                    'message': f'Баллон без NFC обработан на ридере {reader_number}'}
+        return {'status': 'error',
+                'message': f'Ошибка обработки баллона без NFC на ридере {reader_number}'}
+    else:
+        result = services.processing_request_with_nfc(nfc_tag=nfc_tag, reader_number=reader_number)
+        if result:
+            balloon, reader = result
+            # Отправка статуса в Мириаду
+            if (2 <= reader.number <= 6) or reader.number == 8:
+                services.send_status_to_miriada(reader=reader.number, nfc_tag=balloon.nfc_tag)
+            return {
+                'status': 'success',
+                'message': f'Баллон {balloon.nfc_tag} обработан на ридере {reader_number}',
+                'filling_status': balloon.filling_status
+            }
+        return {'status': 'error',
+                'message': f'Ошибка обработки баллона {nfc_tag} на ридере {reader_number}'}
 
 
-async def data_exchange_with_reader(reader: Reader, command_name: str, request_data: bytes = b'') -> Dict:
+# -------------------------------
+# Вспомогательные функции протокола FEIG
+# -------------------------------
+async def read_input_status(session: ReaderSession, reader: Reader) -> int:
     """
-    Выполняет обмен данными со считывателем FEIG.
+    Чтение состояния входов (GET_INPUT).
+    Возвращает состояние IN1: 0/1.
     """
-    reader_conn, writer = await asyncio.open_connection(reader.ip, reader.port)
-    try:
-        # Создаем запрос согласно протоколу
-        request = FeigProtocol.create_request(command_name, request_data)
-        logger.debug(f'Отправляем запрос на {reader.ip}. request: {request.hex()}')
-        writer.write(request)
-        await writer.drain()
+    response = await session.send('GET_INPUT')
+    if response.get('valid'):
+        inputs_state = FeigProtocol.parse_buffer_data(response.get('response_data'))
+        logger.debug(f'{reader} Данные валидны. Команда {inputs_state[0].get("command")}. '
+                     f'Статус {inputs_state[0].get("status")}')
+        return int(inputs_state[1].get('IN1'))
+    return reader.input_state  # при ошибке — предыдущий
 
-        header = await asyncio.wait_for(reader_conn.read(5), timeout=1)
-        if len(header) < 5:
-            logger.error(f'Неполный заголовок {reader.ip}')
-            return {'error': 'Incomplete header', 'valid': False}
 
-        # Получаем длину полного ответа
-        length = struct.unpack('>H', header[1:3])[0]
-
-        # Читаем оставшуюся часть пакета
-        remaining = length - 5
-        if remaining > 0:
-            body = await asyncio.wait_for(reader_conn.read(remaining), timeout=1)
-            response = header + body
-        else:
-            response = header
-
-        # Парсим ответ
-        parsed = FeigProtocol.parse_response(response)
-
-        if not parsed.get('valid'):
-            logger.error(f'{reader.number} Невалидный ответ: {parsed.get("error")}')
-
-        return parsed
-
-    except asyncio.TimeoutError:
-        logger.error(f'{reader.number} Таймаут при ожидании ответа')
-        return {'error': 'Timeout', 'valid': False}
-    except Exception as error:
-        logger.error(f'{reader.number} Нет связи. {error}')
-        return {'error': str(error), 'valid': False}
-    finally:
-        writer.close()
-        await writer.wait_closed()
-
-async def read_nfc_tags(reader: Reader):
+async def read_buffer_info(session: ReaderSession, reader: Reader) -> int:
     """
-    Чтение всех меток из буфера ридера. Возвращает список уникальных меток.
+    Чтение информации о буфере (READ_BUFFER_INFO).
+    Возвращает количество доступных записей (>=0).
     """
-    # MODE = 0x00, DATA-SETS = 0xFFFF (читать все доступные)
-    request_data = bytes([0x00,0xff,0xff])  # MODE + DATA-SETS
+    response = await session.send('READ_BUFFER_INFO')
+    if response.get('valid'):
+        info = FeigProtocol.parse_buffer_data(response.get('response_data'))
+        logger.debug(f'{reader} Данные валидны. Команда {info[0].get("command")}. '
+                     f'Статус {info[0].get("status")}')
+        if len(info) > 1 and 'available' in info[1]:
+            return int(info[1]['available'])
+    return 0
 
-    response = await data_exchange_with_reader(reader, 'READ_BUFFER', request_data)
+
+async def read_nfc_tags(session: ReaderSession, reader: Reader) -> List[str]:
+    """
+    Чтение всех меток из буфера ридера (READ_BUFFER) — только если они есть.
+    Возвращает список уникальных меток (отфильтрованных от повторов).
+    """
+    # MODE=0x00, DATA-SETS=0xFFFF (читать все доступные)
+    request_data = bytes([0x00, 0xFF, 0xFF])
+    response = await session.send('READ_BUFFER', request_data)
 
     tags = []
     if response.get('valid'):
-        # Парсим данные буфера
         tags_data = FeigProtocol.parse_buffer_data(response.get('response_data'))
         logger.debug(f'{reader} Данные валидны. '
                      f'Команда {tags_data[0].get("command")}. '
                      f'Статус {tags_data[0].get("status")}')
-
         for tag_data in tags_data:
-            if (nfc_tag := tag_data.get('nfc_tag')) and reader.filter_duplicate_tag(nfc_tag):
+            nfc_tag = tag_data.get('nfc_tag')
+            if nfc_tag and reader.filter_duplicate_tag(nfc_tag):
                 tags.append(nfc_tag)
-
-    if tags:
-        logger.debug(f'{reader} Список меток {tags}')
+        if tags:
+            logger.debug(f'{reader} Список меток {tags}')
     return tags
 
 
-async def read_input_status(reader: Reader) -> int:
+# -------------------------------
+# Основная «рабочая» петля одного ридера
+# -------------------------------
+async def process_reader_operations(reader: Reader, session: ReaderSession):
     """
-    Чтение состояния входов ридера (команда GET_INPUT). Возвращает состояние первого входа (IN1).
+    Основная функция обработки одного ридера:
+    - фронт IN1 → событие «без NFC»
+    - при наличии записей в буфере → чтение, обработка и очистка
+    - пейсинг/бэкофф, переподключение при таймаутах
     """
-    response = await data_exchange_with_reader(reader, 'GET_INPUT')
+    empty_rounds = 0
+    timeouts = 0
 
-    if response.get('valid'):
-        inputs_state = FeigProtocol.parse_buffer_data(response.get('response_data'))
-        logger.debug(f'{reader} Данные валидны. '
-                     f'Команда {inputs_state[0].get("command")}. '
-                     f'Статус {inputs_state[0].get("status")}')
-
-        return inputs_state[1].get('IN1')
-
-    return reader.input_state  # Возвращаем предыдущее состояние при ошибке
-
-
-async def process_reader_operations(reader: Reader):
-    """
-    Основная функция обработки операций ридера.
-    """
     while True:
         try:
-            # 1. Проверяем состояние входов
-            current_input_state = await read_input_status(reader)
-
-            # Если состояние изменилось с 0 на 1 (передний фронт)
+            # 1) входы
+            current_input_state = await read_input_status(session, reader)
             if current_input_state == 1 and reader.input_state == 0:
-                await process_balloon_data(nfc_tag=None, reader_number=reader.number)
-                logger.debug(f'{reader} Сработал вход')
-
-            # Обновляем состояние входа
+                # фронт: отправляем событие без NFC
+                await process_balloon_data_sync(nfc_tag=None, reader_number=reader.number)
+                logger.debug(f'{reader} Сработал вход IN1')
             reader.input_state = current_input_state
 
-            # 2. Читаем метки из буфера
-            tags = await read_nfc_tags(reader)
+            # 2) буфер: сначала смотрим, есть ли записи
+            available = await read_buffer_info(session, reader)
+            if available > 0:
+                # есть записи: читаем все
+                tags = await read_nfc_tags(session, reader)
+                empty_rounds = 0  # сброс бэкоффа
 
-            for nfc_tag in tags:
-                try:
-                    # Прямой вызов сервиса для обработки NFC метки
-                    result = await process_balloon_data(nfc_tag=nfc_tag, reader_number=reader.number)
+                for nfc_tag in tags:
+                    try:
+                        result = await process_balloon_data_sync(nfc_tag=nfc_tag, reader_number=reader.number)
+                        # управление LED
+                        if result.get('filling_status'):
+                            await session.send('SET_OUTPUT', b'\x01\x01\x81\x01\x00')  # зелёный
+                        else:
+                            await session.send('SET_OUTPUT', b'\x01\x01\x81\x0B\x00')  # мигание
+                    except Exception as error:
+                        logger.error(f'{reader.number} Ошибка обработки метки {nfc_tag}: {error}')
 
-                    # Управление светодиодами ридера
-                    if result.get('filling_status'):
-                        # Зажигаем зелёную лампу
-                        await data_exchange_with_reader(reader, 'SET_OUTPUT', b'\x01\x01\x81\x01\x00')
-                    else:
-                        # Мигание зелёной лампы
-                        await data_exchange_with_reader(reader, 'SET_OUTPUT', b'\x01\x01\x81\x0B\x00')
+                # очистка буфера после чтения
+                await session.send('CLEAR_BUFFER')
 
-                except Exception as error:
-                    logger.error(f'{reader.number} Ошибка обработки метки {nfc_tag}: {error}')
+            else:
+                # записей нет → бэкофф
+                empty_rounds += 1
+                delay = min(0.3 + empty_rounds * 0.1, 1.0)  # от 0.3 до 1.0 c
+                await asyncio.sleep(delay)
 
-            # 3. Очищаем буфер (только прочитанные записи)
-            if tags:
-                logger.debug(f'{reader.number} Очистка буфера считанных меток')
-                await data_exchange_with_reader(reader, 'CLEAR_BUFFER')
-
-            # Небольшая задержка перед следующей итерацией
+            # небольшой «пейсинг» между итерациями
             await asyncio.sleep(0.3)
+
+            # сброс счётчика таймаутов при успешном круге
+            timeouts = 0
+
+        except asyncio.TimeoutError:
+            # таймауты подряд → переподключение
+            timeouts += 1
+            if timeouts >= 3:
+                logger.warning(f'{reader} подряд таймауты, переподключение...')
+                await session.close()
+                await asyncio.sleep(0.5)
+                await session.connect()
+                timeouts = 0
+            else:
+                await asyncio.sleep(0.3)
 
         except Exception as error:
             logger.error(f"{reader.number} Ошибка в process_reader_operations: {error}")
-            await asyncio.sleep(1)  # Пауза при ошибке
+            await asyncio.sleep(1)  # пауза при ошибке
 
 
-async def initialize_readers(readers: List[Reader]):
-    """
-    Инициализация ридеров при запуске.
-    """
+# -------------------------------
+# Инициализация ридеров (очистка буферов и старт постоянных TCP-сессий)
+# -------------------------------
+async def initialize_readers(readers: List[Reader], sessions: Dict[int, ReaderSession]):
     tasks = []
     for reader in readers:
-        # Очищаем буфер при запуске
-        task = asyncio.create_task(data_exchange_with_reader(reader, 'INITIALIZE_BUFFER'))
-        tasks.append(task)
-
-    logger.info('Инициализация RFID-считывателей...')
+        session = ReaderSession(reader)
+        sessions[reader.number] = session
+        tasks.append(session.connect())
+    logger.info('Установка TCP-сессий к RFID-ридерам...')
     await asyncio.gather(*tasks)
 
+    # на старте — полная очистка буферов
+    init_tasks = [sessions[r.number].send('INITIALIZE_BUFFER') for r in readers]
+    logger.info('Инициализация (полная очистка буферов)...')
+    await asyncio.gather(*init_tasks)
 
-def process_reader_sync(reader: Reader):
-    """Синхронная обертка для запуска в ThreadPoolExecutor"""
-    asyncio.run(process_reader_operations(reader))
 
-
-async def load_readers_from_database():
-    """
-    Загрузка конфигурации ридеров из базы данных Django.
-    """
+# -------------------------------
+# Загрузка конфигурации ридеров из БД
+# -------------------------------
+async def load_readers_from_database() -> List[Reader]:
     readers = []
 
     @sync_to_async
@@ -229,40 +214,34 @@ async def load_readers_from_database():
 
     try:
         reader_settings_list = await get_readers_from_db()
-
         for reader_settings in reader_settings_list:
             reader = Reader(reader_settings)
             readers.append(reader)
             logger.info(f'Загружен ридер {reader}')
-
     except Exception as error:
         logger.error(f'Ошибка при загрузке ридеров из базы данных: {error}')
 
     return readers
 
 
+# -------------------------------
+# Точка входа: один event-loop, по задаче на ридер
+# -------------------------------
 async def main():
     logger.info('Запуск программы считывания RFID-меток...')
-
-    # Загрузка ридеров из базы данных
     readers = await load_readers_from_database()
-
     if not readers:
         logger.error('Не удалось загрузить конфигурацию ридеров. Завершение работы.')
         return
 
-    # Инициализация ридеров
-    await initialize_readers(readers)
+    sessions: Dict[int, ReaderSession] = {}
+    await initialize_readers(readers, sessions)
 
-    # Запуск обработки для каждого ридера
-    with ThreadPoolExecutor(max_workers=len(readers)) as executor:
-        logger.info('Программа в работе')
-        loop = asyncio.get_running_loop()
-        tasks = [
-            loop.run_in_executor(executor, process_reader_sync, reader)
-            for reader in readers
-        ]
-        await asyncio.gather(*tasks)
+    # по задаче на каждый ридер в одном event-loop
+    tasks = [asyncio.create_task(process_reader_operations(reader, sessions[reader.number]))
+             for reader in readers]
+    logger.info('Программа в работе')
+    await asyncio.gather(*tasks)
 
 
 if __name__ == "__main__":

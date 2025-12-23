@@ -27,6 +27,7 @@ from .serializers import (
     BalloonAmountSerializer
 )
 from .. import services
+from ttn.services import close_ttn_in_miriada
 
 
 logger = logging.getLogger('filling_station')
@@ -355,7 +356,12 @@ class BalloonViewSet(viewsets.ViewSet):
         Raises:
             Http404: Если баллон с указанной меткой не существует
         """
-        balloon = get_object_or_404(Balloon, nfc_tag=nfc_tag)
+        balloon = Balloon.objects.filter(nfc_tag=nfc_tag).first()
+        if not balloon:
+            return Response(
+                {"message": f"Баллон с NFC-тегом {nfc_tag} не найден"},
+                status=status.HTTP_404_NOT_FOUND
+            )
         serializer = BalloonSerializer(balloon)
         return Response(serializer.data)
 
@@ -371,6 +377,11 @@ class BalloonViewSet(viewsets.ViewSet):
                      (может быть пустым)
         """
         balloons = Balloon.objects.filter(serial_number=serial_number)
+        if not balloons:
+            return Response(
+                {"message": f"Баллон с серийным номером {serial_number} не найден"},
+                status=status.HTTP_404_NOT_FOUND
+            )
         serializer = BalloonSerializer(balloons, many=True)
         return Response(serializer.data)
 
@@ -509,7 +520,9 @@ class BalloonViewSet(viewsets.ViewSet):
                 serializer.save()
                 return Response(serializer.data, status=status.HTTP_201_CREATED)
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-        return Response(status=status.HTTP_409_CONFLICT)
+        return Response(
+            {'message': f'Баллон с такой NFC меткой уже существует'},
+            status=status.HTTP_409_CONFLICT)
 
 
     def partial_update(self, request, pk=None):
@@ -524,7 +537,29 @@ class BalloonViewSet(viewsets.ViewSet):
                 - 400 Bad Request с ошибками валидации
                 - 404 Not Found если баллон не существует
         """
-        balloon = get_object_or_404(Balloon, nfc_tag=pk)
+        balloon = Balloon.objects.filter(nfc_tag=pk).first()
+        if not balloon:
+            return Response(
+                {"message": f"Баллон с NFC-тегом {pk} не найден"},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        new_tag = request.data.get('nfc_tag', None)
+
+        if pk != new_tag: # Процедура смены метки
+            if Balloon.objects.filter(nfc_tag=new_tag).exists():
+                return Response(
+                    {"message": f"Баллон с NFC-тегом {new_tag} уже существует"},
+                    status=status.HTTP_400_BAD_REQUEST
+                    )
+            else:
+                balloon.delete()
+                # new_balloon = Balloon.objects.create(request.data)
+                serializer = BalloonSerializer(data=request.data, partial=True)
+                if serializer.is_valid():
+                    serializer.save()
+                    return Response(serializer.data)
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
         serializer = BalloonSerializer(balloon, data=request.data, partial=True)
         if serializer.is_valid():
@@ -794,7 +829,7 @@ class BalloonsBatchViewSet(viewsets.ViewSet):
             
             # Если у партии есть ttn_id, закрываем ТТН в Мириаде
             if batch.ttn_id:
-                success = services.close_ttn_in_miriada(batch.ttn_id)
+                success = close_ttn_in_miriada(batch.ttn_id)
                 if not success:
                     logger.warning(f"Не удалось закрыть ТТН {batch.ttn_id} в Мириаде при закрытии партии {batch.id}")
 

@@ -1,15 +1,14 @@
+import asyncio
 import struct
 import binascii
 from collections import deque
 from typing import List, Dict
 import logging
-
 logger = logging.getLogger('rfid')
 
 
 class Reader:
     """Класс для представления RFID-ридера"""
-
     def __init__(self, reader_settings):
         self.number = reader_settings.number
         self.ip = reader_settings.ip
@@ -17,7 +16,6 @@ class Reader:
         self.status = reader_settings.status
         self.function = reader_settings.function
         self.need_cache = reader_settings.need_cache
-
         # Динамические состояния
         self.input_state = 0
         self.previous_nfc_tags = deque(maxlen=5)  # кеш последних меток
@@ -32,20 +30,20 @@ class Reader:
         """
         if nfc_tag in self.previous_nfc_tags:
             return False
-
         self.previous_nfc_tags.append(nfc_tag)
         return True
 
 
 class FeigProtocol:
     """Класс для работы с протоколом FEIG"""
-    # Константы класса
+    # Команды протокола
     FEIG_COMMANDS = {
-        'GET_INPUT': 0x74,  # Чтение состояния входов
-        'SET_OUTPUT': 0x72,  # Управление выходами/LED
-        'READ_BUFFER': 0x2B,  # Чтение буфера
-        'CLEAR_BUFFER': 0x32,  # Очистка прочитанных
-        'INITIALIZE_BUFFER': 0x33,  # Полная очистка буфера
+        'GET_INPUT': 0x74,           # чтение состояния входов
+        'SET_OUTPUT': 0x72,          # управление выходами/LED
+        'READ_BUFFER': 0x2B,         # чтение буфера (data sets)
+        'READ_BUFFER_INFO': 0x31,    # информация о буфере (наличие записей)
+        'CLEAR_BUFFER': 0x32,        # очистка прочитанных записей
+        'INITIALIZE_BUFFER': 0x33,   # полная очистка буфера
     }
 
     STATUS_BYTE = {
@@ -82,7 +80,7 @@ class FeigProtocol:
     @staticmethod
     def crc16(data: bytes) -> int:
         """
-        CRC-16 для FEIG (LSB-first):
+        CRC-16 для FEIG (LSB-first, полином 0x8408)
         """
         crc = 0xFFFF
         for byte in data:
@@ -104,54 +102,44 @@ class FeigProtocol:
             raise ValueError(f"Unknown FEIG command name: {name!r}")
 
     @classmethod
-    def create_request(cls, command_name: str, data_sets: bytes = b'') -> bytes:
+    def create_request(cls, command_name: str, request_data: bytes = b'') -> bytes:
         """
         Создание запроса согласно протоколу FEIG
-        REQUEST PROTOCOL (Host): STX + LENGTH + COM-ADR + COMMAND + REQUEST-DATA + CRC16
-        LENGTH and CRC16 in MSB/LSB (BIG-ENDIAN) mode
+        Advanced frame: STX + ALENGTH(2) + COM-ADR(1) + COMMAND(1) + DATA + CRC16(LSB,MSB)
+        ALENGTH и CRC16 кодируются в MSB/LSB (big-endian для длины; CRC упаковываем little-endian).
         """
-        com_adr = 0xFF  # Используется протокол TCP/IP
+        com_adr = 0xFF  # при TCP/IP обычно используется широковещательный адрес шины
         command = cls.get_command(command_name)
+        # Общая длина кадра: STX(1) + ALENGTH(2) + COM(1) + CMD(1) + data + CRC(2)
+        length = 1 + 2 + 1 + 1 + len(request_data) + 2
 
-        # Длина включает STX (1) + LENGTH (2) + COM-ADR(1) + payload + CRC16 (2)
-        length = 1 + 2 + 1 + 1 + len(data_sets) + 2
-
-        # Собираем пакет
         packet = bytes([FeigProtocol.STX])
-        packet += struct.pack('>H', length)  # LENGTH (big-endian)
+        packet += struct.pack('>H', length)      # ALENGTH
         packet += bytes([com_adr, command])
-        packet += data_sets
+        packet += request_data
 
-        # Расчет CRC16 (LSB first, MSB last)
-        crc = FeigProtocol.crc16(packet)
-        packet += struct.pack('<H', crc)  # CRC16 (little-endian)
-
+        crc = FeigProtocol.crc16(packet)         # CRC над всем кадром, кроме самого CRC
+        packet += struct.pack('<H', crc)         # CRC16: LSB first
         return packet
 
     @classmethod
     def parse_response(cls, response: bytes) -> Dict:
-        """Парсинг ответа от ридера"""
-        if response[0] != cls.STX:
-            return {'error': 'Invalid STX byte'}
+        """Парсинг ответа от ридера с проверкой длины и CRC."""
+        if not response or response[0] != cls.STX:
+            return {'error': 'Invalid STX byte', 'valid': False}
 
-        # Получаем длину пакета
         length = struct.unpack('>H', response[1:3])[0]
-
         if len(response) < length:
-            return {'error': f'Неверная длина {bytes(response).hex()}'}
+            return {'error': f'Неверная длина {bytes(response).hex()}', 'valid': False}
 
-        # Проверяем CRC
         packet_without_crc = response[:length - 2]
         received_crc = struct.unpack('<H', response[length - 2:length])[0]
         calculated_crc = cls.crc16(packet_without_crc)
-
         if received_crc != calculated_crc:
-            return {'error': 'CRC mismatch'}
+            return {'error': 'CRC mismatch', 'valid': False}
 
-        # Извлекаем данные
         com_adr = response[3]
         response_data = response[4:length - 2]
-
         return {
             'com_adr': com_adr,
             'response_data': response_data,
@@ -160,33 +148,34 @@ class FeigProtocol:
 
     @classmethod
     def parse_buffer_data(cls, response_data: bytes) -> List[Dict]:
-        """Парсинг данных из буфера (команда 0x2B)"""
+        """
+        Парсинг данных из буфера (команды 0x2B, 0x31) и входов (0x74)
+        """
         tags = []
-
         command = response_data[0]
         status = response_data[1]
-        # Сохраняем статус ответа
+
+        # сохраняем статус ответа
         tags.append({
             'command': command,
             'status': cls.STATUS_BYTE.get(status, "Unknown"),
-            })
+        })
 
-        # Если в буфере нет данных - завершаем обработку
+        # Нет валидных данных
         if status == 0x92:
             return tags
 
         match command:
             case 0x2B:  # READ_BUFFER
                 data_sets = struct.unpack('>H', response_data[2:4])[0]
-
-                pos = 4  # Начинаем после заголовка
+                pos = 4  # начало записей
 
                 for _ in range(data_sets):
                     tag_data = {}
-
                     record_layout_bits = struct.unpack('>I', response_data[pos:pos + 4])[0]
                     pos += 4
-                    # Проверяем наличие секции DATE
+
+                    # DATE
                     if record_layout_bits & (1 << 0):
                         century, year, month, day, tz = response_data[pos:pos + 5]
                         tag_data.update({
@@ -198,7 +187,7 @@ class FeigProtocol:
                         })
                         pos += 5
 
-                    # Проверяем наличие секции TIME
+                    # TIME
                     if record_layout_bits & (1 << 1):
                         hour, minute = response_data[pos:pos + 2]
                         milliseconds = struct.unpack('>H', response_data[pos + 2:pos + 4])[0]
@@ -209,7 +198,7 @@ class FeigProtocol:
                         })
                         pos += 4
 
-                    # Проверяем наличие секции IDD
+                    # IDD (ISO15693)
                     if record_layout_bits & (1 << 2):
                         transponder_type = response_data[pos]
                         if transponder_type == 0x03:  # ISO 15693
@@ -217,8 +206,7 @@ class FeigProtocol:
                             dsfid = response_data[pos + 2]
                             idd_length = response_data[pos + 3]
                             idd_data = response_data[pos + 4:pos + 4 + idd_length]
-
-                            # Конвертируем NFC Tag ID в hex строку (обратный порядок байтов)
+                            # NFC Tag ID в обратном порядке байтов -> hex
                             nfc_tag = binascii.hexlify(idd_data[::-1]).decode()
                             tag_data.update({
                                 'transponder_type': transponder_type,
@@ -226,15 +214,20 @@ class FeigProtocol:
                                 'dsfid': dsfid,
                                 'nfc_tag': nfc_tag,
                             })
-
-                            # Пропускаем обработку ненужных данных в пакете
-                            pos += 4 + idd_length
-                            pos += 2  # inputs state (2 byte)
-                            pos += 4  # signals (4 byte)
+                        pos += 4 + idd_length
+                        pos += 2  # inputs state (2 byte)
+                        pos += 4  # signals (4 byte)
 
                     if 'nfc_tag' in tag_data:
                         tags.append(tag_data)
 
+                return tags
+
+            case 0x31:  # READ_BUFFER_INFO
+                # Минимально необходимое: первые 2 байта после статуса трактуем
+                # как число доступных записей (DATA-SETS/AVAILABLE)
+                available = struct.unpack('>H', response_data[2:4])[0]
+                tags.append({'available': available})
                 return tags
 
             case 0x74:  # GET_INPUT
@@ -244,10 +237,71 @@ class FeigProtocol:
                     'IN2': bool(inputs_byte & (1 << 1)),
                     'IN3': bool(inputs_byte & (1 << 2)),
                 }
-
                 tags.append(input_state)
                 return tags
 
             case _:  # UNKNOWN
                 logger.error(f'Неизвестная команда: {command}')
                 return tags
+
+
+class ReaderSession:
+    """
+    Постоянная TCP-сессия к ридеру FEIG.
+    Обеспечивает последовательную отправку команд и точное чтение ответа по длине (ALENGTH).
+    """
+    def __init__(self, reader: Reader):
+        self.reader = reader
+        self.conn = None
+        self.writer = None
+        self.lock = None  # создаётся при подключении
+
+    async def connect(self):
+        if self.conn is None or self.writer is None:
+            self.conn, self.writer = await asyncio.open_connection(self.reader.ip, self.reader.port)
+            self.lock = asyncio.Lock()
+            logger.info(f'{self.reader} TCP connected')
+
+    async def close(self):
+        if self.writer:
+            try:
+                self.writer.close()
+                await self.writer.wait_closed()
+            finally:
+                self.conn = None
+                self.writer = None
+                self.lock = None
+                logger.info(f'{self.reader} TCP closed')
+
+    async def send(self, command_name: str, request_data: bytes = b'') -> Dict:
+        """
+        Последовательная отправка команды с корректным чтением полного кадра ответа.
+        """
+        if self.conn is None or self.writer is None:
+            await self.connect()
+
+        async with self.lock:
+            req = FeigProtocol.create_request(command_name, request_data)
+            logger.debug(f'{self.reader.number} Отправляем запрос: {req.hex()}')
+            self.writer.write(req)
+            await self.writer.drain()
+
+            # читаем заголовок (5 байт): STX(1) + ALENGTH(2) + COM-ADR(1) + COMMAND(1)
+            try:
+                header = await asyncio.wait_for(self.conn.read(5), timeout=1.0)
+                if len(header) < 5 or header[0] != FeigProtocol.STX:
+                    return {'valid': False, 'error': 'Incomplete/invalid header'}
+
+                length = struct.unpack('>H', header[1:3])[0]  # ALENGTH
+                remaining = length - 5
+                body = b''
+                if remaining > 0:
+                    body = await asyncio.wait_for(self.conn.read(remaining), timeout=1.0)
+
+                response = header + body
+                return FeigProtocol.parse_response(response)
+
+            except asyncio.TimeoutError:
+                return {'valid': False, 'error': 'Timeout'}
+            except Exception as e:
+                return {'valid': False, 'error': str(e)}
