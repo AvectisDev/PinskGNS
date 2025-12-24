@@ -1,6 +1,7 @@
 import logging
 from collections import defaultdict
 from django.http import JsonResponse
+from django.utils import timezone
 from django.db.models import Q, Sum, Count
 from django.shortcuts import get_object_or_404
 from django.core.cache import cache
@@ -147,64 +148,6 @@ UpdateByReaderResponseSerializer = inline_serializer(
                     "status": "На складе",
                     "filling_status": True
                 }],
-                response_only=True
-            )
-        ]
-    ),
-    update_by_reader=extend_schema(
-        tags=['Баллоны'],
-        summary='Обновить данные баллона через считыватель',
-        description='Обновление данных баллона при срабатывании RFID считывателя',
-        request=inline_serializer(
-            name='UpdateByReaderRequest',
-            fields={
-                'nfc_tag': serializers.CharField(allow_null=True),
-                'reader_number': serializers.IntegerField()
-            }
-        ),
-        responses={
-            200: UpdateByReaderResponseSerializer,
-            400: ErrorResponseSerializer
-        },
-        examples=[
-            OpenApiExample(
-                'Запрос с NFC меткой',
-                value={
-                    "nfc_tag": "1234567890ABCDEF",
-                    "reader_number": 1
-                },
-                request_only=True
-            ),
-            OpenApiExample(
-                'Запрос без NFC метки',
-                value={
-                    "nfc_tag": None,
-                    "reader_number": 6
-                },
-                request_only=True
-            ),
-            OpenApiExample(
-                'Успешный ответ',
-                value={
-                    "status": "Данные обновлены",
-                    "balloon": {
-                        "nfc_tag": "1234567890ABCDEF",
-                        "serial_number": "B12345",
-                        "size": 50,
-                        "netto": 18.5,
-                        "brutto": 40.2,
-                        "status": "На складе",
-                        "filling_status": True
-                    }
-                },
-                response_only=True
-            ),
-            OpenApiExample(
-                'Ответ без NFC',
-                value={
-                    "status": "Добавлен баллон без NFC",
-                    "balloon": None
-                },
                 response_only=True
             )
         ]
@@ -385,7 +328,6 @@ class BalloonViewSet(viewsets.ViewSet):
         serializer = BalloonSerializer(balloons, many=True)
         return Response(serializer.data)
 
-
     @action(detail=False, methods=['get'], url_path='statistic')
     def get_statistic(self, request):
         """
@@ -459,46 +401,6 @@ class BalloonViewSet(viewsets.ViewSet):
         cache.set(cache_key, data, cache_time)
         return JsonResponse(data, safe=False)
 
-
-    @action(detail=False, methods=['post'], url_path='update-by-reader')
-    def update_by_reader(self, request):
-        """
-        Обновление данных баллона при срабатывании RFID считывателя.
-        Логика работы:
-        1. Если передан nfc_tag - обновляем данные соответствующего баллона
-        2. Если nfc_tag отсутствует - создаем запись о баллоне без метки
-        3. Для определенных считывателей (2-6, 8) отправляет статус в Мириаду
-        Args:
-            request: HTTP запрос с параметрами:
-                - reader_number (int): Номер считывателя (обязательный)
-                - nfc_tag (str, optional): NFC метка баллона
-        Returns:
-            Response: Статус операции и данные баллона (если есть)
-        Raises:
-            HTTP 400: Если не указан номер считывателя
-        """
-        reader_number = request.data.get('reader_number')
-        if reader_number is None:
-            self.logger.error("Номер ридера отсутствует в теле запроса")
-            return Response({"error": "Номер считывателя отсутствует в теле запроса"}, status=400)
-
-        nfc_tag = request.data.get('nfc_tag')
-        # Ситуация, когда нет метки
-        if nfc_tag is None:
-            services.processing_request_without_nfc(reader_number)
-            return Response({"status": "Добавлен баллон без NFC"}, status=200)
-
-        # Ситуация, когда есть метка
-        balloon, reader = services.processing_request_with_nfc(nfc_tag=nfc_tag, reader_number=reader_number)
-
-        # Отправка статусов в Мириаду
-        if (2 <= reader.number <= 6) or reader.number == 8:
-            services.send_status_to_miriada(reader=reader.number, nfc_tag=balloon.nfc_tag)
-
-        serializer = BalloonSerializer(balloon)
-        return Response(serializer.data)
-
-
     def create(self, request):
         """
         Создает новый баллон после проверки уникальности NFC метки.
@@ -523,7 +425,6 @@ class BalloonViewSet(viewsets.ViewSet):
         return Response(
             {'message': f'Баллон с такой NFC меткой уже существует'},
             status=status.HTTP_409_CONFLICT)
-
 
     def partial_update(self, request, pk=None):
         """
@@ -554,7 +455,6 @@ class BalloonViewSet(viewsets.ViewSet):
                     )
             else:
                 balloon.delete()
-                # new_balloon = Balloon.objects.create(request.data)
                 serializer = BalloonSerializer(data=request.data, partial=True)
                 if serializer.is_valid():
                     serializer.save()
@@ -760,7 +660,7 @@ class BalloonsBatchViewSet(viewsets.ViewSet):
         batch_type = self.get_batch_type(request)
         if not batch_type:
             return Response(
-                {"error": "Параметр batch_type обязателен (l для приёмки, u для отгрузки)"},
+                {"message": "Параметр batch_type обязателен (l для приёмки, u для отгрузки)"},
                 status=status.HTTP_400_BAD_REQUEST
             )
         
@@ -773,13 +673,16 @@ class BalloonsBatchViewSet(viewsets.ViewSet):
         batch_type = self.get_batch_type(request)
         if not batch_type:
             return Response(
-                {"error": "Параметр batch_type обязателен (l для приёмки, u для отгрузки)"},
+                {"message": "Параметр batch_type обязателен (l для приёмки, u для отгрузки)"},
                 status=status.HTTP_400_BAD_REQUEST
             )
             
         batch = BalloonsBatch.objects.filter(batch_type=batch_type, is_active=True).first()
         if not batch:
-            return Response(status=status.HTTP_404_NOT_FOUND)
+            return Response(
+                {"message": 'Нет активных партий'},
+                status=status.HTTP_404_NOT_FOUND
+            )
         serializer = BalloonsBatchSerializer(batch)
         return Response(serializer.data)
 
@@ -788,7 +691,7 @@ class BalloonsBatchViewSet(viewsets.ViewSet):
         batch_type = self.get_batch_type(request)
         if not batch_type:
             return Response(
-                {"error": "Параметр batch_type обязателен (l для приёмки, u для отгрузки)"},
+                {"message": "Параметр batch_type обязателен (l для приёмки, u для отгрузки)"},
                 status=status.HTTP_400_BAD_REQUEST
             )
             
@@ -800,7 +703,7 @@ class BalloonsBatchViewSet(viewsets.ViewSet):
         batch_type = self.get_batch_type(request)
         if not batch_type:
             return Response(
-                {"error": "Параметр batch_type обязателен (l для приёмки, u для отгрузки)"},
+                {"message": "Параметр batch_type обязателен (l для приёмки, u для отгрузки)"},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
@@ -814,7 +717,7 @@ class BalloonsBatchViewSet(viewsets.ViewSet):
         batch_type = self.get_batch_type(request)
         if not batch_type:
             return Response(
-                {"error": "Параметр batch_type обязателен (l для приёмки, u для отгрузки)"},
+                {"message": "Параметр batch_type обязателен (l для приёмки, u для отгрузки)"},
                 status=status.HTTP_400_BAD_REQUEST
             )
             
@@ -822,10 +725,8 @@ class BalloonsBatchViewSet(viewsets.ViewSet):
 
         # Проверяем, закрывается ли партия (is_active меняется с True на False)
         is_closing = batch.is_active and not request.data.get('is_active', True)
-        
         if is_closing:
-            current_date = datetime.now()
-            request.data['completed_at'] = current_date
+            request.data['completed_at'] = timezone.now()
             
             # Если у партии есть ttn_id, закрываем ТТН в Мириаде
             if batch.ttn_id:
@@ -844,58 +745,46 @@ class BalloonsBatchViewSet(viewsets.ViewSet):
         batch_type = self.get_batch_type(request)
         if not batch_type:
             return Response(
-                {"error": "Параметр batch_type обязателен (l для приёмки, u для отгрузки)"},
+                {"message": "Параметр batch_type обязателен (l для приёмки, u для отгрузки)"},
                 status=status.HTTP_400_BAD_REQUEST
             )
             
         nfc = request.data.get('nfc')
         if not nfc:
             return Response(
-                {"error": "Параметр 'nfc' обязателен"},
+                {"message": "Параметр 'nfc' обязателен"},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
         batch = get_object_or_404(BalloonsBatch, id=pk, batch_type=batch_type)
         result = batch.add_balloon(nfc)
-
         if result['success']:
             return Response(result, status=status.HTTP_200_OK)
 
-        error_status = {
-            'Баллон уже в партии': status.HTTP_409_CONFLICT,
-            'Баллон не найден': status.HTTP_404_NOT_FOUND
-        }.get(result['error'], status.HTTP_400_BAD_REQUEST)
-
-        return Response(result, status=error_status)
+        return Response({'message': result.get('message')}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
     @action(detail=True, methods=['patch'], url_path='remove-balloon')
     def remove_balloon(self, request, pk=None):
         batch_type = self.get_batch_type(request)
         if not batch_type:
             return Response(
-                {"error": "Параметр batch_type обязателен (l для приёмки, u для отгрузки)"},
+                {"message": "Параметр batch_type обязателен (l для приёмки, u для отгрузки)"},
                 status=status.HTTP_400_BAD_REQUEST
             )
             
         nfc = request.data.get('nfc')
         if not nfc:
             return Response(
-                {"error": "Параметр 'nfc' обязателен"},
+                {"message": "Параметр 'nfc' обязателен"},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
         batch = get_object_or_404(BalloonsBatch, id=pk, batch_type=batch_type)
         result = batch.remove_balloon(nfc)
-
         if result['success']:
             return Response(result, status=status.HTTP_200_OK)
 
-        error_status = {
-            'Баллон не найден в партии': status.HTTP_404_NOT_FOUND,
-            'Баллон не найден': status.HTTP_404_NOT_FOUND
-        }.get(result['error'], status.HTTP_400_BAD_REQUEST)
-
-        return Response(result, status=error_status)
+        return Response({'message': result.get('message')}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 @api_view(['GET'])

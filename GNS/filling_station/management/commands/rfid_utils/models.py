@@ -201,19 +201,41 @@ class FeigProtocol:
                     # IDD (ISO15693)
                     if record_layout_bits & (1 << 2):
                         transponder_type = response_data[pos]
-                        if transponder_type == 0x03:  # ISO 15693
-                            afi = response_data[pos + 1]
-                            dsfid = response_data[pos + 2]
-                            idd_length = response_data[pos + 3]
-                            idd_data = response_data[pos + 4:pos + 4 + idd_length]
-                            # NFC Tag ID в обратном порядке байтов -> hex
-                            nfc_tag = binascii.hexlify(idd_data[::-1]).decode()
-                            tag_data.update({
-                                'transponder_type': transponder_type,
-                                'afi': afi,
-                                'dsfid': dsfid,
-                                'nfc_tag': nfc_tag,
-                            })
+                        match transponder_type:
+                            case 0x00: # I-CODE1 (TR-TYPE = 0x00)
+                                idd_length = response_data[pos + 1]
+                                idd_data = response_data[pos + 2:pos + 2 + idd_length]
+                                # NFC Tag ID в обратном порядке байтов -> hex
+                                nfc_tag = binascii.hexlify(idd_data[::-1]).decode()
+                                tag_data.update({
+                                    'transponder_type': transponder_type,
+                                    'nfc_tag': nfc_tag,
+                                })
+                            case 0x03: # ISO 15693 (TR-TYPE = 0x03)
+                                afi = response_data[pos + 1]
+                                dsfid = response_data[pos + 2]
+                                idd_length = response_data[pos + 3]
+                                idd_data = response_data[pos + 4:pos + 4 + idd_length]
+                                # NFC Tag ID в обратном порядке байтов -> hex
+                                nfc_tag = binascii.hexlify(idd_data[::-1]).decode()
+                                tag_data.update({
+                                    'transponder_type': transponder_type,
+                                    'afi': afi,
+                                    'dsfid': dsfid,
+                                    'nfc_tag': nfc_tag,
+                                })
+                            case 0x09:  # ISO 18000-3M3 (TR-TYPE = 0x09)
+                                iddt = response_data[pos + 1]
+                                idd_length = response_data[pos + 2]
+                                idd_data = response_data[pos + 3:pos + 3 + idd_length]
+                                # NFC Tag ID в обратном порядке байтов -> hex
+                                nfc_tag = binascii.hexlify(idd_data[::-1]).decode()
+                                tag_data.update({
+                                    'transponder_type': transponder_type,
+                                    'iddt': iddt,
+                                    'nfc_tag': nfc_tag,
+                                })
+
                         pos += 4 + idd_length
                         pos += 2  # inputs state (2 byte)
                         pos += 4  # signals (4 byte)

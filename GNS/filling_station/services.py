@@ -1,10 +1,10 @@
 import requests
 import logging
-from datetime import datetime, date
+from django.utils import timezone
 from typing import Optional, Dict, Any, Union, Tuple
 from django.conf import settings
 from django.core.cache import cache
-from .models import Balloon, Reader, BalloonsBatch, ReaderSettings, Truck, Trailer
+from .models import Balloon, Reader, BalloonsBatch, ReaderSettings, Truck, Trailer, DailyReaderCounter, TotalReadersCounter
 
 
 logger = logging.getLogger('filling_station')
@@ -50,25 +50,31 @@ def find_transport_by_registration_number(reg_number: str) -> Tuple[Optional[Tru
     return truck, trailer
 
 
-def processing_request_without_nfc(reader_number: int) -> Optional[Reader]:
-    """
-    Обрабатывает сигнал от ридера о сработке оптического датчика.
-    Возвращает созданный объект Reader или None в случае ошибки.
-    """
+def processing_request_without_nfc(reader_number: int):
+    """Обрабатывает сигнал от ридера о сработке оптического датчика"""
     try:
-        reader_settings = ReaderSettings.objects.get(number=reader_number)
-        reader = Reader.objects.create(number=reader_settings)
-        logger.info(f"Создана запись баллона без NFC. Ридер {reader_number}")
-        return reader
+        reader = ReaderSettings.objects.get(number=reader_number)
+
+        # Подсчёт количества
+        DailyReaderCounter.add_sensor(reader)
+        # Оптический датчик установлен только на считывателях 3,4,5,6
+        match reader.number:
+            case 6:
+                TotalReadersCounter.add_empty_balloon()
+            case 5:
+                TotalReadersCounter.add_full_balloon()
+                TotalReadersCounter.sub_empty_balloon()
+            case [3, 4]:
+                TotalReadersCounter.sub_full_balloon()
+
+        logger.info(f'Ридер {reader_number}. Создана запись баллона без NFC')
     except ReaderSettings.DoesNotExist:
-        logger.error(f"Ридер с номером {reader_number} не найден в настройках")
-        return None
+        logger.error(f"Ридер {reader_number} не найден в настройках")
     except Exception as error:
         logger.error(f"Ошибка обработки сигнала от оптического датчика: {error}")
-        return None
 
 
-def processing_request_with_nfc(nfc_tag: str, reader_number: int) -> Union[Tuple[Balloon, Reader], None]:
+def processing_request_with_nfc(nfc_tag: str, reader_number: int) -> Union[Tuple[Balloon, ReaderSettings], None]:
     """
     Обрабатывает сигнал от ридера при получении метки.
     Возвращает кортеж (Balloon, Reader) или None в случае ошибки.
@@ -84,13 +90,21 @@ def processing_request_with_nfc(nfc_tag: str, reader_number: int) -> Union[Tuple
         )
         logger.info(f"Ридер {reader.number}: Сохранение баллона с меткой {nfc_tag} успешно")
 
+        # Подсчёт количества
+        DailyReaderCounter.add_rfid(reader)
+        match reader.number:
+            case 1:
+                TotalReadersCounter.add_empty_balloon()
+            case 2:
+                TotalReadersCounter.sub_full_balloon()
+
         # Проверяем необходимость обновления данных
         if balloon.update_passport_required or reader.number in [1, 6, 7, 8]:
             update_balloon_passport(balloon)
 
         # Добавляем баллон в партию при необходимости
         if reader.function in ['l', 'u']:
-            add_balloon_to_batch(balloon, reader)
+            add_balloon_to_batch(reader, balloon)
 
         # Добавляем баллон в таблицу считывателей
         add_balloon_to_reader_table(balloon, reader)
@@ -120,33 +134,30 @@ def update_balloon_passport(balloon: Balloon):
             balloon.save()
             logger.info(f"Обновление паспорта баллона с меткой {balloon.nfc_tag} успешно")
     except Exception as e:
-            logger.error(f"Ошибка при обновлении паспорта баллона {balloon.nfc_tag}: {e}")
+        logger.error(f"Ошибка при обновлении паспорта баллона {balloon.nfc_tag}: {e}")
 
 
-def add_balloon_to_batch(balloon: Balloon, reader: ReaderSettings):
+def add_balloon_to_batch(reader: ReaderSettings, balloon: Balloon = None):
     """
     Добавляет баллон в активную партию в зависимости от номера ридера, к которому привязана партия.
     """
-    today = date.today()
-
     try:
-        function_type = reader.function
+        batch = BalloonsBatch.objects.filter(
+            batch_type=reader.function,
+            started_at__date=timezone.now().today(),
+            reader_number=reader.number,
+            is_active=True
+        ).first()
 
-        if function_type in ['l', 'u']:
-            batch = BalloonsBatch.objects.filter(batch_type=function_type,
-                                                started_at__date=today,
-                                                reader_number=reader.number,
-                                                is_active=True).first()
-        else:
-            batch = None
+        if not batch:
+            return {'message': f'Нет подходящей партии баллонов'}
 
-        if batch:
-            batch.balloon_list.add(balloon)
-            batch.amount_of_rfid = (batch.amount_of_rfid or 0) + 1
-            batch.save()
+        result = batch.add_balloon(balloon.nfc_tag if balloon else None)
+        if result.get('success', False):
             logger.info(f"Баллон {balloon.nfc_tag} добавлен в партию {batch.id}")
+
     except Exception as e:
-            logger.error(f"Ошибка добавления баллона {balloon.nfc_tag} в партию: {e}")
+        logger.error(f"Ошибка добавления баллона {balloon.nfc_tag} в партию: {e}")
 
 
 def add_balloon_to_reader_table(balloon: Balloon, reader: ReaderSettings):
@@ -163,7 +174,6 @@ def add_balloon_to_reader_table(balloon: Balloon, reader: ReaderSettings):
             brutto=balloon.brutto,
             filling_status=balloon.filling_status
         )
-        logger.info(f"Создана запись баллона с NFC {balloon.nfc_tag}. Ридер {reader.number}")
     except Exception as error:
         logger.error(f"Ошибка добавления баллона с NFC {balloon.nfc_tag} в таблицу считывателей: {error}")
 

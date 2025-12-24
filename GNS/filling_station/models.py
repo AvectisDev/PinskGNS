@@ -290,6 +290,9 @@ class DailyReaderCounter(models.Model):
         verbose_name = "Счетчики по ридерам за день"
         verbose_name_plural = "Счетчики по ридерам за день"
         ordering = ['-day']
+        constraints = [
+            models.UniqueConstraint(fields=['number', 'day'], name='uniq_number_day'),
+        ]
 
     @classmethod
     def add_rfid(cls, reader: ReaderSettings):
@@ -614,36 +617,40 @@ class BalloonsBatch(models.Model):
         Возвращает общее количество баллонов без меток
         """
         amounts = [
-            self.amount_of_sensor or 0,
             self.amount_of_5_liters or 0,
             self.amount_of_12_liters or 0,
             self.amount_of_27_liters or 0,
             self.amount_of_50_liters or 0
         ]
-        total_amount = sum(amounts)
+        total_amount = sum(amounts) if not self.amount_of_sensor else self.amount_of_sensor
         return total_amount
 
-    def add_balloon(self, nfc_tag) -> dict:
+    def add_balloon(self, nfc_tag: str = None) -> dict:
         """
-        Добавляет баллон в партию по NFC-метке
+        Добавляет баллон в партию по NFC-метке. Добавляет общее количество баллонов, посчитанное оптическим датчиком.
         Возвращает словарь с результатами операции:
         {
             'success': bool,
             'balloon_id': str | None,
-            'new_count': int,
-            'error': str
+            'message': str
         }
         """
         result = {
             'success': False,
             'balloon_id': None,
-            'new_count': self.amount_of_rfid or 0,
-            'error': 'ok'
+            'message': 'ok'
         }
+
+        # Добавляем баллон, прошедший через оптический датчик
+        if not nfc_tag:
+            self.amount_of_sensor = (self.amount_of_sensor or 0) + 1
+            self.save()
+            result['success'] = True
+            return result
 
         try:
             if self.balloon_list.filter(nfc_tag=nfc_tag).exists():
-                result['error'] = 'Баллон уже в партии'
+                result['message'] = f'Баллон с меткой {nfc_tag} уже в партии'
                 return result
 
             balloon = Balloon.objects.get(nfc_tag=nfc_tag)
@@ -654,37 +661,33 @@ class BalloonsBatch(models.Model):
             result.update({
                 'success': True,
                 'balloon_id': balloon.nfc_tag,
-                'new_count': self.amount_of_rfid
             })
 
         except Balloon.DoesNotExist:
-            result['error'] = 'Баллон не найден'
+            result['message'] = f'Баллон с меткой {nfc_tag} не найден'
         except Exception as e:
-            result['error'] = f'Ошибка сервера: {str(e)}'
+            result['message'] = f'Ошибка сервера: {str(e)}'
 
         return result
 
     def remove_balloon(self, nfc_tag) -> dict:
         """
-        Удаляет баллон из партии по NFC-метке
-        Возвращает словарь с результатами операции:
+        Удаляет баллон из партии по NFC-метке. Возвращает словарь с результатами операции:
         {
             'success': bool,
             'balloon_id': str | None,
-            'new_count': int,
-            'error': str
+            'message': str
         }
         """
         result = {
             'success': False,
             'balloon_id': None,
-            'new_count': self.amount_of_rfid or 0,
-            'error': 'ok'
+            'message': 'ok'
         }
 
         try:
             if not self.balloon_list.filter(nfc_tag=nfc_tag).exists():
-                result['error'] = 'Баллон не найден в партии'
+                result['message'] = f'Баллон с меткой {nfc_tag} не найден в партии'
                 return result
 
             balloon = Balloon.objects.get(nfc_tag=nfc_tag)
@@ -695,13 +698,12 @@ class BalloonsBatch(models.Model):
             result.update({
                 'success': True,
                 'balloon_id': balloon.nfc_tag,
-                'new_count': self.amount_of_rfid
             })
 
         except Balloon.DoesNotExist:
-            result['error'] = 'Баллон не найден'
+            result['message'] = f'Баллон с меткой {nfc_tag} не найден'
         except Exception as e:
-            result['error'] = f'Ошибка сервера: {str(e)}'
+            result['message'] = f'Ошибка сервера: {str(e)}'
 
         return result
 

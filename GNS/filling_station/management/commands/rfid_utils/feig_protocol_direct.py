@@ -114,14 +114,12 @@ async def process_reader_operations(reader: Reader, session: ReaderSession):
     Основная функция обработки одного ридера:
     - фронт IN1 → событие «без NFC»
     - при наличии записей в буфере → чтение, обработка и очистка
-    - пейсинг/бэкофф, переподключение при таймаутах
     """
-    empty_rounds = 0
     timeouts = 0
 
     while True:
         try:
-            # 1) входы
+            # 1 - опрос входов
             current_input_state = await read_input_status(session, reader)
             if current_input_state == 1 and reader.input_state == 0:
                 # фронт: отправляем событие без NFC
@@ -129,44 +127,34 @@ async def process_reader_operations(reader: Reader, session: ReaderSession):
                 logger.debug(f'{reader.number} Сработал вход IN1')
             reader.input_state = current_input_state
 
-            # 2) буфер: сначала смотрим, есть ли записи
-            available = await read_buffer_info(session, reader)
-            if available:
-                # есть записи: читаем все
-                tags = await read_nfc_tags(session, reader)
-                empty_rounds = 0  # сброс бэкоффа
+            # 2 - чтение буфера
+            tags = await read_nfc_tags(session, reader)
 
-                for nfc_tag in tags:
-                    try:
-                        result = await process_balloon_data_sync(nfc_tag=nfc_tag, reader_number=reader.number)
-                        # управление LED
-                        if result.get('filling_status'):
-                            await session.send('SET_OUTPUT', b'\x01\x01\x81\x01\x00')  # зелёный
-                        else:
-                            await session.send('SET_OUTPUT', b'\x01\x01\x81\x0B\x00')  # мигание
-                    except Exception as error:
-                        logger.error(f'{reader.number} Ошибка обработки метки {nfc_tag}: {error}')
+            for nfc_tag in tags:
+                try:
+                    result = await process_balloon_data_sync(nfc_tag=nfc_tag, reader_number=reader.number)
+                    # управление LED
+                    if result.get('filling_status'):
+                        await session.send('SET_OUTPUT', b'\x01\x01\x81\x01\x00')  # зелёный
+                    else:
+                        await session.send('SET_OUTPUT', b'\x01\x01\x81\x0B\x00')  # мигание
+                except Exception as error:
+                    logger.error(f'{reader.number} Ошибка обработки метки {nfc_tag}: {error}')
 
-                # очистка буфера после чтения
-                await session.send('CLEAR_BUFFER')
+            # очистка буфера после чтения
+            await session.send('CLEAR_BUFFER')
 
-            else:
-                # записей нет → бэкофф
-                empty_rounds += 1
-                delay = min(0.3 + empty_rounds * 0.1, 1.0)  # от 0.3 до 1.0 c
-                await asyncio.sleep(delay)
-
-            # небольшой «пейсинг» между итерациями
+            # задержка между итерациями
             await asyncio.sleep(0.3)
 
-            # сброс счётчика таймаутов при успешном круге
+            # сброс счётчика тайм-аутов при успешном круге
             timeouts = 0
 
         except asyncio.TimeoutError:
             # таймауты подряд → переподключение
             timeouts += 1
             if timeouts >= 3:
-                logger.warning(f'{reader} подряд таймауты, переподключение...')
+                logger.warning(f'{reader}: таймаутов подряд = {timeouts} , переподключение...')
                 await session.close()
                 await asyncio.sleep(0.5)
                 await session.connect()
@@ -176,7 +164,7 @@ async def process_reader_operations(reader: Reader, session: ReaderSession):
 
         except Exception as error:
             logger.error(f"{reader.number} Ошибка в process_reader_operations: {error}")
-            await asyncio.sleep(1)  # пауза при ошибке
+            await asyncio.sleep(1)
 
 
 async def initialize_readers(readers: List[Reader], sessions: Dict[int, ReaderSession]):
