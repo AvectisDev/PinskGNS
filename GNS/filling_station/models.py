@@ -276,15 +276,12 @@ class DailyReaderCounter(models.Model):
         ReaderSettings,
         on_delete=models.PROTECT,
         verbose_name="Номер считывателя",
-        related_name='reader_settings'
+        related_name='daily_counters'
     )
     day = models.DateField(verbose_name="Дата", db_index=True)
     amount_of_rfid = models.IntegerField(default=0, verbose_name="Баллонов по RFID")
     amount_of_sensor = models.IntegerField(default=0, verbose_name="Баллонов по сенсору")
     change_at = models.DateTimeField(auto_now=True, verbose_name="Дата последнего изменения")
-
-    def __int__(self):
-        return self.number
 
     def __str__(self):
         return f'Количество баллонов на ридере {self.number}'
@@ -294,8 +291,33 @@ class DailyReaderCounter(models.Model):
         verbose_name_plural = "Счетчики по ридерам за день"
         ordering = ['-day']
 
+    @classmethod
+    def add_rfid(cls, reader: ReaderSettings):
+        obj, created = cls.objects.get_or_create(
+            number=reader,
+            day=timezone.now().date(),
+            defaults={'amount_of_rfid': 0, 'amount_of_sensor': 0}
+        )
+        # атомарный инкремент:
+        cls.objects.filter(pk=obj.pk).update(
+            amount_of_rfid=F('amount_of_rfid') + 1,
+            change_at=timezone.now()
+        )
 
-class TotalsReaderCounter(models.Model):
+    @classmethod
+    def add_sensor(cls, reader: ReaderSettings):
+        obj, created = cls.objects.get_or_create(
+            number=reader,
+            day=timezone.now().date(),
+            defaults={'amount_of_rfid': 0, 'amount_of_sensor': 0}
+        )
+        cls.objects.filter(pk=obj.pk).update(
+            amount_of_sensor=F('amount_of_sensor') + 1,
+            change_at=timezone.now()
+        )
+
+
+class TotalReadersCounter(models.Model):
     """
     Свод по складу. Можно хранить ручные базовые значения (от которых ведется отсчет).
     """

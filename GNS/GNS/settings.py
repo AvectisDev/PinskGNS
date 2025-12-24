@@ -25,11 +25,7 @@ SESSION_COOKIE_HTTPONLY = True
 ALLOWED_HOSTS = [
     'localhost',
     '127.0.0.1',
-    '0.0.0.0',
-    '10.0.2.2',
     '10.10.12.253',
-    'django',
-    '10.10.12.253:8000',
     '10.0.3.2'
 ]
 
@@ -38,7 +34,6 @@ CSRF_TRUSTED_ORIGINS = [
     'http://localhost:8000',
     'http://127.0.0.1:8000',
     'http://10.10.12.253:8000',
-    'http://0.0.0.0:8000',
 ]
 
 # Application definition

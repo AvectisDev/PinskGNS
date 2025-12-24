@@ -8,7 +8,7 @@ from .models import (
     TrailerType,
     BalloonsBatch,
     ReaderSettings,
-    TotalsReaderCounter,
+    TotalReadersCounter,
     DailyReaderCounter,
 )
 
@@ -157,15 +157,15 @@ class BalloonsBatchAdmin(admin.ModelAdmin):
     search_fields = ['truck', 'is_active', 'ttn_id', 'batch_type']
 
 
-@admin.register(TotalsReaderCounter)
+@admin.register(TotalReadersCounter)
 class TotalsReaderCounterAdmin(admin.ModelAdmin):
-    list_display = ('total_empty', 'total_full', 'changed_at'),
+    list_display = ['total_empty', 'total_full', 'changed_at']
 
     def has_add_permission(self, request):
-        return not TotalsReaderCounter.objects.exists()
+        return not TotalReadersCounter.objects.exists()
 
 
 @admin.register(DailyReaderCounter)
 class DailyReaderCounterAdmin(admin.ModelAdmin):
-    list_display = ('number', 'day', 'amount_of_rfid', 'amount_of_sensor', 'change_at'),
+    list_display = ['number', 'day', 'amount_of_rfid', 'amount_of_sensor', 'change_at']
     list_filter = ['number', 'day', 'change_at']
