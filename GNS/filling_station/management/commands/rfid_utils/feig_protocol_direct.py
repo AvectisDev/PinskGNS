@@ -1,6 +1,5 @@
 import os
 import asyncio
-import struct
 import logging
 from typing import List, Dict
 from asgiref.sync import sync_to_async
@@ -23,9 +22,6 @@ from filling_station.models import ReaderSettings
 from filling_station import services
 
 
-# -------------------------------
-# Обёртки над синхронными сервисами
-# -------------------------------
 @sync_to_async
 def process_balloon_data_sync(nfc_tag, reader_number):
     """
@@ -66,7 +62,7 @@ async def read_input_status(session: ReaderSession, reader: Reader) -> int:
     response = await session.send('GET_INPUT')
     if response.get('valid'):
         inputs_state = FeigProtocol.parse_buffer_data(response.get('response_data'))
-        logger.debug(f'{reader} Данные валидны. Команда {inputs_state[0].get("command")}. '
+        logger.debug(f'{reader.number} Данные валидны. Команда {inputs_state[0].get("command")}. '
                      f'Статус {inputs_state[0].get("status")}')
         return int(inputs_state[1].get('IN1'))
     return reader.input_state  # при ошибке — предыдущий
@@ -80,11 +76,13 @@ async def read_buffer_info(session: ReaderSession, reader: Reader) -> int:
     response = await session.send('READ_BUFFER_INFO')
     if response.get('valid'):
         info = FeigProtocol.parse_buffer_data(response.get('response_data'))
-        logger.debug(f'{reader} Данные валидны. Команда {info[0].get("command")}. '
+        logger.debug(f'{reader.number} Данные валидны. Команда {info[0].get("command")}. '
                      f'Статус {info[0].get("status")}')
-        if len(info) > 1 and 'available' in info[1]:
-            return int(info[1]['available'])
-    return 0
+
+        amount_of_data_sets = info[1].get("available")
+        if amount_of_data_sets > 0:
+            return True
+    return False
 
 
 async def read_nfc_tags(session: ReaderSession, reader: Reader) -> List[str]:
@@ -99,7 +97,7 @@ async def read_nfc_tags(session: ReaderSession, reader: Reader) -> List[str]:
     tags = []
     if response.get('valid'):
         tags_data = FeigProtocol.parse_buffer_data(response.get('response_data'))
-        logger.debug(f'{reader} Данные валидны. '
+        logger.debug(f'{reader.number} Данные валидны. '
                      f'Команда {tags_data[0].get("command")}. '
                      f'Статус {tags_data[0].get("status")}')
         for tag_data in tags_data:
@@ -107,13 +105,10 @@ async def read_nfc_tags(session: ReaderSession, reader: Reader) -> List[str]:
             if nfc_tag and reader.filter_duplicate_tag(nfc_tag):
                 tags.append(nfc_tag)
         if tags:
-            logger.debug(f'{reader} Список меток {tags}')
+            logger.debug(f'{reader.number} Список меток {tags}')
     return tags
 
 
-# -------------------------------
-# Основная «рабочая» петля одного ридера
-# -------------------------------
 async def process_reader_operations(reader: Reader, session: ReaderSession):
     """
     Основная функция обработки одного ридера:
@@ -131,12 +126,12 @@ async def process_reader_operations(reader: Reader, session: ReaderSession):
             if current_input_state == 1 and reader.input_state == 0:
                 # фронт: отправляем событие без NFC
                 await process_balloon_data_sync(nfc_tag=None, reader_number=reader.number)
-                logger.debug(f'{reader} Сработал вход IN1')
+                logger.debug(f'{reader.number} Сработал вход IN1')
             reader.input_state = current_input_state
 
             # 2) буфер: сначала смотрим, есть ли записи
             available = await read_buffer_info(session, reader)
-            if available > 0:
+            if available:
                 # есть записи: читаем все
                 tags = await read_nfc_tags(session, reader)
                 empty_rounds = 0  # сброс бэкоффа
@@ -184,10 +179,10 @@ async def process_reader_operations(reader: Reader, session: ReaderSession):
             await asyncio.sleep(1)  # пауза при ошибке
 
 
-# -------------------------------
-# Инициализация ридеров (очистка буферов и старт постоянных TCP-сессий)
-# -------------------------------
 async def initialize_readers(readers: List[Reader], sessions: Dict[int, ReaderSession]):
+    """
+    Инициализация ридеров (очистка буферов и старт постоянных TCP-сессий)
+    """
     tasks = []
     for reader in readers:
         session = ReaderSession(reader)
@@ -202,10 +197,10 @@ async def initialize_readers(readers: List[Reader], sessions: Dict[int, ReaderSe
     await asyncio.gather(*init_tasks)
 
 
-# -------------------------------
-# Загрузка конфигурации ридеров из БД
-# -------------------------------
 async def load_readers_from_database() -> List[Reader]:
+    """
+    Загрузка конфигурации ридеров из БД
+    """
     readers = []
 
     @sync_to_async
@@ -224,10 +219,10 @@ async def load_readers_from_database() -> List[Reader]:
     return readers
 
 
-# -------------------------------
-# Точка входа: один event-loop, по задаче на ридер
-# -------------------------------
 async def main():
+    """
+    Точка входа: один event-loop, по задаче на ридер
+    """
     logger.info('Запуск программы считывания RFID-меток...')
     readers = await load_readers_from_database()
     if not readers:
@@ -237,7 +232,6 @@ async def main():
     sessions: Dict[int, ReaderSession] = {}
     await initialize_readers(readers, sessions)
 
-    # по задаче на каждый ридер в одном event-loop
     tasks = [asyncio.create_task(process_reader_operations(reader, sessions[reader.number]))
              for reader in readers]
     logger.info('Программа в работе')

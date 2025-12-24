@@ -220,7 +220,7 @@ class FeigProtocol:
 
                     if 'nfc_tag' in tag_data:
                         tags.append(tag_data)
-
+                logger.debug(f'Распаршены метки: {tags}')
                 return tags
 
             case 0x31:  # READ_BUFFER_INFO
@@ -282,7 +282,7 @@ class ReaderSession:
 
         async with self.lock:
             req = FeigProtocol.create_request(command_name, request_data)
-            logger.debug(f'{self.reader.number} Отправляем запрос: {req.hex()}')
+            logger.debug(f'{self.reader.number} Отправляем запрос: {req.hex()}, Команда {command_name}')
             self.writer.write(req)
             await self.writer.drain()
 
@@ -299,6 +299,7 @@ class ReaderSession:
                     body = await asyncio.wait_for(self.conn.read(remaining), timeout=1.0)
 
                 response = header + body
+                logger.debug(f'{self.reader.number} Ответ ридера: {response.hex()}, Команда {command_name}')
                 return FeigProtocol.parse_response(response)
 
             except asyncio.TimeoutError:

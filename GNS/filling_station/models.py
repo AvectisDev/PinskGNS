@@ -4,7 +4,7 @@ from django.utils import timezone
 from django.core.exceptions import ValidationError
 from django.contrib.auth.models import User
 from django.urls import reverse
-from django.db.models import Q, Sum, Count
+from django.db.models import Q, F, Sum, Count
 from django.conf import settings
 from typing import Dict, Any, Optional
 from datetime import datetime, date, time
@@ -266,6 +266,75 @@ class Reader(models.Model):
             })
 
         return stats
+
+
+class DailyReaderCounter(models.Model):
+    """
+    Ежедневные счетчики по конкретному ридеру
+    """
+    number = models.ForeignKey(
+        ReaderSettings,
+        on_delete=models.PROTECT,
+        verbose_name="Номер считывателя",
+        related_name='reader_settings'
+    )
+    day = models.DateField(verbose_name="Дата", db_index=True)
+    amount_of_rfid = models.IntegerField(default=0, verbose_name="Баллонов по RFID")
+    amount_of_sensor = models.IntegerField(default=0, verbose_name="Баллонов по сенсору")
+    change_at = models.DateTimeField(auto_now=True, verbose_name="Дата последнего изменения")
+
+    def __int__(self):
+        return self.number
+
+    def __str__(self):
+        return f'Количество баллонов на ридере {self.number}'
+
+    class Meta:
+        verbose_name = "Счетчики по ридерам за день"
+        verbose_name_plural = "Счетчики по ридерам за день"
+        ordering = ['-day']
+
+
+class TotalsReaderCounter(models.Model):
+    """
+    Свод по складу. Можно хранить ручные базовые значения (от которых ведется отсчет).
+    """
+    total_empty = models.IntegerField(default=0, verbose_name="Всего пустых баллонов")
+    total_full = models.IntegerField(default=0, verbose_name="Всего полных баллонов")
+    changed_at = models.DateTimeField(auto_now=True, verbose_name='Дата последнего изменения')
+
+    class Meta:
+        verbose_name = "Свод по складу"
+        verbose_name_plural = "Свод по складу"
+        ordering = ['-changed_at']
+
+    def __str__(self):
+        return f'Свод (E={self.total_empty}, F={self.total_full})'
+
+    @classmethod
+    def add_full_balloon(cls):
+        cls.objects.filter(pk=1).update(total_full=F('total_full') + 1, changed_at=timezone.now())
+
+    @classmethod
+    def add_empty_balloon(cls):
+        cls.objects.filter(pk=1).update(total_empty=F('total_empty') + 1, changed_at=timezone.now())
+
+    @classmethod
+    def sub_full_balloon(cls):
+        cls.objects.filter(pk=1, total_full__gt=0).update(total_full=F('total_full') - 1, changed_at=timezone.now())
+
+    @classmethod
+    def sub_empty_balloon(cls):
+        cls.objects.filter(pk=1, total_empty__gt=0).update(total_empty=F('total_empty') - 1, changed_at=timezone.now())
+
+    @classmethod
+    def insert_manual_values(cls, empty: int = None, full: int = None):
+        """Ввод значений со SCADA системы"""
+        cls.objects.filter(pk=1).update(
+            total_empty=empty if empty is not None else F('total_empty'),
+            total_full=full if full is not None else F('total_full'),
+            changed_at=timezone.now()
+        )
 
 
 class TruckType(models.Model):
