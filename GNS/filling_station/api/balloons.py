@@ -20,7 +20,7 @@ from drf_spectacular.utils import (
     inline_serializer
 )
 from datetime import datetime, date
-from filling_station.models import Balloon, Reader, BalloonsBatch
+from filling_station.models import Balloon, Reader, BalloonsBatch, DailyReaderCounter, TotalReadersCounter
 from .serializers import (
     BalloonSerializer,
     BalloonsBatchSerializer,
@@ -359,15 +359,15 @@ class BalloonViewSet(viewsets.ViewSet):
             JsonResponse:
                 - 200 OK с данными статистики
         """
-        cache_key = 'get_balloon_statistic'
-        cache_time = 600  # 10 минут
+        cache_key = STATISTIC_CACHE_KEY
+        cache_time = STATISTIC_CACHE_TIME
         data = cache.get(cache_key)
 
         if not data:
-            reader_stats = Reader.get_common_stats_for_gns()
+            reader_stats = DailyReaderCounter.get_common_stats_for_gns()
             loading_batches = BalloonsBatch.get_common_stats_for_gns(batch_type='l')
             unloading_batches = BalloonsBatch.get_common_stats_for_gns(batch_type='u')
-            balloons_stat = Balloon.get_balloons_stats()
+            balloons_stat = TotalReadersCounter.get_balloons_stats()
 
             # Словарь для хранения суммарной статистики по грузовикам
             truck_stats = defaultdict(lambda: {"truck_month": 0, "truck_today": 0})
