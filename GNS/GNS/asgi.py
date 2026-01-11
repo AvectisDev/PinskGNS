@@ -11,12 +11,7 @@ def start_processes():
     global processes
     print('Starting processes...')
 
-    # Выберите версию RFID команды:
-    # feig_protocol - использует Celery задачи (рекомендуется для высокой нагрузки)
-    # feig_protocol_direct - прямой вызов сервисов (проще, без очередей)
-    rfid_command = 'filling_station.management.commands.rfid_utils.feig_protocol_direct'
-
-    p1 = subprocess.Popen(['python', '-m', rfid_command])
+    p1 = subprocess.Popen(['python', '-m', 'filling_station.management.commands.rfid_utils.feig_protocol'])
     p2 = subprocess.Popen(['python', '-m', 'carousel.management.commands.carousel.main'])
     processes.extend([p1, p2])
     print(f'Processes is started: {processes}')

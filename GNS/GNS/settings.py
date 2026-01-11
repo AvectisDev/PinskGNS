@@ -231,6 +231,7 @@ CELERY_REDIS_MAX_CONNECTIONS = 20
 CELERY_WORKER_HIJACK_ROOT_LOGGER = False
 CELERY_WORKER_MAX_TASKS_PER_CHILD = 100
 CELERY_WORKER_MAX_MEMORY_PER_CHILD = 200000  # 200MB в KiB
+CELERY_WORKER_PREFETCH_MULTIPLIER = 1
 CELERY_TASK_TIME_LIMIT = 300  # 5 минут
 CELERY_TASK_SOFT_TIME_LIMIT = 240  # 4 минуты
 CELERY_HIJACK_ROOT_LOGGER = False
@@ -276,13 +277,14 @@ LOGGING = {
     'handlers': {
         'filling_station_file': {
             'level': 'DEBUG',
-            'class': 'logging.handlers.TimedRotatingFileHandler',
+            'class': 'concurrent_log_handler.ConcurrentRotatingFileHandler',
             'filename': os.path.join(LOGS_DIR, 'filling_station/filling_station.log'),
-            'when': 'midnight',
+            'maxBytes': 50 * 1024 * 1024,  # 50MB
             'backupCount': 30,
             'formatter': 'verbose',
             'encoding': 'utf-8',
             'delay': True,
+            'use_gzip': False,
         },
         'carousel_file': {
             'level': 'DEBUG',
@@ -296,23 +298,25 @@ LOGGING = {
         },
         'rfid_file': {
             'level': 'DEBUG',
-            'class': 'logging.handlers.TimedRotatingFileHandler',
+            'class': 'concurrent_log_handler.ConcurrentRotatingFileHandler',
             'filename': os.path.join(LOGS_DIR, 'rfid/rfid.log'),
-            'when': 'midnight',
+            'maxBytes': 100 * 1024 * 1024,  # 100MB
             'backupCount': 30,
             'formatter': 'verbose',
             'encoding': 'utf-8',
             'delay': True,
+            'use_gzip': False,
         },
         'celery_file': {
             'level': 'DEBUG',
-            'class': 'logging.handlers.TimedRotatingFileHandler',
+            'class': 'concurrent_log_handler.ConcurrentRotatingFileHandler',
             'filename': os.path.join(LOGS_DIR, 'celery/celery.log'),
-            'when': 'midnight',
+            'maxBytes': 100 * 1024 * 1024,  # 100MB
             'backupCount': 30,
             'formatter': 'verbose',
             'encoding': 'utf-8',
             'delay': True,
+            'use_gzip': False,
         },
         'railway_file': {
             'level': 'DEBUG',
@@ -358,12 +362,12 @@ LOGGING = {
         },
         'rfid': {
             'handlers': ['rfid_file'],
-            'level': 'DEBUG',
+            'level': 'INFO',
             'propagate': True,
         },
         'celery': {
             'handlers': ['celery_file'],
-            'level': 'DEBUG',
+            'level': 'INFO',
             'propagate': False,
         },
         'railway': {

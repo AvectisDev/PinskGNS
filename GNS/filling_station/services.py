@@ -93,7 +93,7 @@ def processing_request_with_nfc(nfc_tag: str, reader_number: int) -> Union[Tuple
         # Подсчёт количества
         DailyReaderCounter.add_rfid(reader)
         match reader.number:
-            case 1:
+            case [1, 6]:    #временно пока не заменят оптический датчик
                 TotalReadersCounter.add_empty_balloon()
             case 2:
                 TotalReadersCounter.sub_full_balloon()
