@@ -359,8 +359,8 @@ class BalloonViewSet(viewsets.ViewSet):
             JsonResponse:
                 - 200 OK с данными статистики
         """
-        cache_key = STATISTIC_CACHE_KEY
-        cache_time = STATISTIC_CACHE_TIME
+        cache_key = 'get_balloon_statistic'
+        cache_time = 600  # 10 минут
         data = cache.get(cache_key)
 
         if not data:
