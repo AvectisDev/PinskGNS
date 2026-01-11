@@ -299,7 +299,7 @@ class BalloonViewSet(viewsets.ViewSet):
         Raises:
             Http404: Если баллон с указанной меткой не существует
         """
-        balloon = Balloon.objects.filter(nfc_tag=nfc_tag).first()
+        balloon = Balloon.objects.select_related('user').filter(nfc_tag=nfc_tag).first()
         if not balloon:
             return Response(
                 {"message": f"Баллон с NFC-тегом {nfc_tag} не найден"},
@@ -319,7 +319,7 @@ class BalloonViewSet(viewsets.ViewSet):
             Response: Список баллонов с указанным серийным номером
                      (может быть пустым)
         """
-        balloons = Balloon.objects.filter(serial_number=serial_number)
+        balloons = Balloon.objects.select_related('user').filter(serial_number=serial_number)
         if not balloons:
             return Response(
                 {"message": f"Баллон с серийным номером {serial_number} не найден"},
@@ -438,7 +438,7 @@ class BalloonViewSet(viewsets.ViewSet):
                 - 400 Bad Request с ошибками валидации
                 - 404 Not Found если баллон не существует
         """
-        balloon = Balloon.objects.filter(nfc_tag=pk).first()
+        balloon = Balloon.objects.select_related('user').filter(nfc_tag=pk).first()
         if not balloon:
             return Response(
                 {"message": f"Баллон с NFC-тегом {pk} не найден"},
@@ -447,7 +447,7 @@ class BalloonViewSet(viewsets.ViewSet):
 
         new_tag = request.data.get('nfc_tag', None)
 
-        if pk != new_tag: # Процедура смены метки
+        if pk != new_tag:  # Процедура смены метки
             if Balloon.objects.filter(nfc_tag=new_tag).exists():
                 return Response(
                     {"message": f"Баллон с NFC-тегом {new_tag} уже существует"},
@@ -664,7 +664,9 @@ class BalloonsBatchViewSet(viewsets.ViewSet):
                 status=status.HTTP_400_BAD_REQUEST
             )
         
-        batches = BalloonsBatch.objects.filter(batch_type=batch_type, is_active=True)
+        batches = BalloonsBatch.objects.select_related('truck', 'trailer', 'truck__type').filter(
+            batch_type=batch_type, is_active=True
+        )
         serializer = ActiveBatchSerializer(batches, many=True)
         return Response(serializer.data)
 
@@ -677,7 +679,9 @@ class BalloonsBatchViewSet(viewsets.ViewSet):
                 status=status.HTTP_400_BAD_REQUEST
             )
             
-        batch = BalloonsBatch.objects.filter(batch_type=batch_type, is_active=True).first()
+        batch = BalloonsBatch.objects.select_related('truck', 'trailer', 'truck__type').filter(
+            batch_type=batch_type, is_active=True
+        ).first()
         if not batch:
             return Response(
                 {"message": 'Нет активных партий'},
@@ -793,8 +797,12 @@ def get_active_balloon_batch(request):
     Метод получения списков активных партий
     """
     today = date.today()
-    loading_batches = BalloonsBatch.objects.filter(batch_type='l', started_at__date=today, is_active=True)
-    unloading_batches = BalloonsBatch.objects.filter(batch_type='u', started_at__date=today, is_active=True)
+    loading_batches = BalloonsBatch.objects.select_related('truck', 'trailer').filter(
+        batch_type='l', started_at__date=today, is_active=True
+    )
+    unloading_batches = BalloonsBatch.objects.select_related('truck', 'trailer').filter(
+        batch_type='u', started_at__date=today, is_active=True
+    )
 
     response = []
     for batch in loading_batches:

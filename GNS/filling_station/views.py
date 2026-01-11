@@ -16,7 +16,6 @@ from .forms import (
     BalloonsBatchForm
 )
 from datetime import datetime, time, timedelta
-from filling_station.constants import READER_STATUS_MAP, SENSOR_READERS_RANGE
 
 
 class BalloonListView(generic.ListView):
@@ -93,7 +92,7 @@ def reader_info(request, reader_number=1):
         change_date__date__gte=start_date,
         change_date__date__lte=end_date,
         nfc_tag__isnull=False
-    )
+    ).select_related('number').order_by('-change_date')
 
     paginator = Paginator(balloons_list, 10)
     page_num = request.GET.get('page', 1)
@@ -129,9 +128,10 @@ class BalloonBatchListView(generic.ListView):
 
     def get_queryset(self):
         batch_type = self.get_batch_type()
+        queryset = BalloonsBatch.objects.select_related('truck', 'trailer', 'truck__type')
         if batch_type:
-            return BalloonsBatch.objects.filter(batch_type=batch_type)
-        return BalloonsBatch.objects.all()
+            return queryset.filter(batch_type=batch_type)
+        return queryset.all()
 
 
 class BalloonBatchDetailView(generic.DetailView):
@@ -177,9 +177,10 @@ class BalloonBatchDeleteView(generic.DeleteView):
     
     def get_queryset(self):
         batch_type = self.get_batch_type()
+        queryset = BalloonsBatch.objects.select_related('truck', 'trailer', 'truck__type')
         if batch_type:
-            return BalloonsBatch.objects.filter(batch_type=batch_type)
-        return BalloonsBatch.objects.all()
+            return queryset.filter(batch_type=batch_type)
+        return queryset.all()
     
     def get_success_url(self):
         """Определяет правильный URL для редиректа после удаления"""
