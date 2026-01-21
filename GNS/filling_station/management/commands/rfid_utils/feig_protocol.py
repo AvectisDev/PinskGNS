@@ -62,9 +62,19 @@ async def read_input_status(session: ReaderSession, reader: Reader) -> int:
     response = await session.send('GET_INPUT')
     if response.get('valid'):
         inputs_state = FeigProtocol.parse_buffer_data(response.get('response_data'))
+        if len(inputs_state) < 1:
+            logger.warning(f'{reader.number} Пустой ответ от ридера при чтении входов')
+            return reader.input_state
+        
         logger.debug(f'{reader.number} Данные валидны. Команда {inputs_state[0].get("command")}. '
                      f'Статус {inputs_state[0].get("status")}')
-        return int(inputs_state[1].get('IN1'))
+        
+        # Проверяем, что есть данные о входах (второй элемент списка)
+        if len(inputs_state) >= 2 and 'IN1' in inputs_state[1]:
+            return int(inputs_state[1].get('IN1'))
+        else:
+            logger.warning(f'{reader.number} Нет данных о входах в ответе. Структура: {inputs_state}')
+            return reader.input_state
     return reader.input_state  # при ошибке — предыдущий
 
 
@@ -76,12 +86,20 @@ async def read_buffer_info(session: ReaderSession, reader: Reader) -> int:
     response = await session.send('READ_BUFFER_INFO')
     if response.get('valid'):
         info = FeigProtocol.parse_buffer_data(response.get('response_data'))
+        if len(info) < 1:
+            logger.warning(f'{reader.number} Пустой ответ от ридера при чтении информации о буфере')
+            return False
+        
         logger.debug(f'{reader.number} Данные валидны. Команда {info[0].get("command")}. '
                      f'Статус {info[0].get("status")}')
 
-        amount_of_data_sets = info[1].get("available")
-        if amount_of_data_sets > 0:
-            return True
+        # Проверяем, что есть данные о доступных записях (второй элемент списка)
+        if len(info) >= 2 and "available" in info[1]:
+            amount_of_data_sets = info[1].get("available")
+            if amount_of_data_sets > 0:
+                return True
+        else:
+            logger.warning(f'{reader.number} Нет данных о доступных записях в ответе. Структура: {info}')
     return False
 
 
@@ -97,15 +115,41 @@ async def read_nfc_tags(session: ReaderSession, reader: Reader) -> List[str]:
     tags = []
     if response.get('valid'):
         tags_data = FeigProtocol.parse_buffer_data(response.get('response_data'))
+        if len(tags_data) < 1:
+            logger.warning(f'{reader.number} Пустой ответ от ридера при чтении меток')
+            return tags
+        
+        # Проверяем, что первый элемент содержит информацию о команде
+        first_element = tags_data[0]
+        command = first_element.get('command')
+        status = first_element.get('status')
+        
         logger.debug(f'{reader.number} Данные валидны. '
-                     f'Команда {tags_data[0].get("command")}. '
-                     f'Статус {tags_data[0].get("status")}')
-        for tag_data in tags_data:
+                     f'Команда {command}. '
+                     f'Статус {status}')
+        
+        # Проверяем, что команда действительно READ_BUFFER (0x2B)
+        if command != 0x2B:
+            logger.warning(f'{reader.number} Ожидалась команда READ_BUFFER (0x2B), получена: 0x{command:02X}')
+            return tags
+        
+        # Проверяем статус на ошибки
+        if status != 'OK:':
+            logger.warning(f'{reader.number} Статус ответа указывает на проблему: {status}')
+            return tags
+        
+        # Пропускаем первый элемент (команда и статус), обрабатываем только метки
+        for tag_data in tags_data[1:]:
+            if not isinstance(tag_data, dict):
+                continue
             nfc_tag = tag_data.get('nfc_tag')
             if nfc_tag and reader.filter_duplicate_tag(nfc_tag):
                 tags.append(nfc_tag)
         if tags:
             logger.info(f'{reader.number} Список меток {tags}')
+    else:
+        error_msg = response.get('error', 'Unknown error')
+        logger.warning(f'{reader.number} Ошибка при чтении буфера: {error_msg}')
     return tags
 
 

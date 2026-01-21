@@ -353,7 +353,9 @@ def _format_registration_number(reg_number: str) -> str:
 
 def _get_batch_data_for_loading(reader: int, nfc_tag: str) -> Dict[str, Any]:
     """
-    Получает данные партии для отправки статуса загрузки.
+    Получает данные партии для отправки статуса загрузки в /balloontocar.
+    
+    Обязательные параметры: nfctag, fulness, id_ttn, type_car, number_auto, realm
     
     Args:
         reader: Номер считывателя
@@ -361,8 +363,11 @@ def _get_batch_data_for_loading(reader: int, nfc_tag: str) -> Dict[str, Any]:
         
     Returns:
         Словарь с данными для payload
+        
+    Raises:
+        ValueError: Если не найдена партия или отсутствуют обязательные данные
     """
-    data = {'send_type': 'loading_into_truck', 'fulness': 1}
+    data = {'fulness': 1}  # 1 - полный баллон при погрузке
     
     batch = BalloonsBatch.objects.select_related('truck', 'truck__type', 'trailer').filter(
         batch_type='u',
@@ -370,35 +375,65 @@ def _get_batch_data_for_loading(reader: int, nfc_tag: str) -> Dict[str, Any]:
         balloon_list__nfc_tag=nfc_tag
     ).first()
 
-    if batch:
-        number_auto = batch.truck.registration_number
-        data['number_auto'] = _format_registration_number(number_auto)
+    if not batch:
+        raise ValueError(f"Не найдена активная партия отгрузки для баллона {nfc_tag}")
+    
+    if not batch.truck:
+        raise ValueError(f"У партии {batch.id} отсутствует информация о грузовике")
+    
+    number_auto = batch.truck.registration_number
+    data['number_auto'] = _format_registration_number(number_auto)
+    
+    # type_car: 1-трал, 0-кассета
+    if batch.truck.type and batch.truck.type.type:
         data['type_car'] = 0 if batch.truck.type.type == 'Клетевоз' else 1
-        if batch.ttn_id:
-            data['ttn_id'] = batch.ttn_id
+    else:
+        raise ValueError(f"У грузовика {number_auto} отсутствует тип транспорта")
+    
+    if batch.ttn_id:
+        data['id_ttn'] = batch.ttn_id
     
     return data
 
 
 def _get_batch_data_for_unloading(reader: int) -> Dict[str, Any]:
     """
-    Получает данные партии для отправки статуса разгрузки.
+    Получает данные партии для отправки статуса разгрузки в /balloontosklad.
+    
+    Обязательные параметры: nfctag, fulness, id_ttn, realm
+    
+    Параметр fulness определяется на основе поля balloons_type партии:
+    - 'e' (пустой) -> fulness = 0
+    - 'f' (полный) -> fulness = 1
     
     Args:
         reader: Номер считывателя
         
     Returns:
         Словарь с данными для payload
+        
+    Raises:
+        ValueError: Если не найдена партия или отсутствует balloons_type
     """
-    data = {'send_type': 'registering_in_warehouse', 'fulness': 0}
-    
     batch = BalloonsBatch.objects.select_related('truck', 'trailer').filter(
         batch_type='l',
         is_active=True,
     ).first()
     
-    if batch and batch.ttn_id:
-        data['ttn_id'] = batch.ttn_id
+    if not batch:
+        raise ValueError(f"Не найдена активная партия приёмки для считывателя {reader}")
+    
+    if batch.balloons_type == 'e':
+        fulness = 0
+    elif batch.balloons_type == 'f':
+        fulness = 1
+    else:
+        raise ValueError(f"Неизвестное значение balloons_type '{batch.balloons_type}' в партии {batch.id}")
+    
+    data = {'fulness': fulness}
+    
+    if batch.ttn_id:
+        data['id_ttn'] = batch.ttn_id
     
     return data
 
@@ -422,26 +457,29 @@ def _prepare_payload_for_miriada(reader: int, nfc_tag: str) -> Tuple[str, Dict[s
         
     Returns:
         Кортеж (url, payload, send_type)
+        
+    Raises:
+        ValueError: При ошибках подготовки данных
     """
     send_urls = _get_send_urls()
     
+    # Базовый payload с обязательными полями
     payload = {
-        'nfctag': nfc_tag,
+        'nfctag': nfc_tag,  # Используем nfctag как в API
         'realm': 'brestoblgas'
     }
     
     if reader == 8:
         send_type = 'filling'
     elif reader == 6:
+        # Регистрация баллона на складе (разгрузка)
         batch_data = _get_batch_data_for_unloading(reader)
-        send_type = batch_data.pop('send_type')
-        payload.update(batch_data)
-    elif reader == 5:
         send_type = 'registering_in_warehouse'
-        payload['fulness'] = 1
+        payload.update(batch_data)
     elif reader in [2, 3, 4]:
+        # Погрузка баллона в машину
         batch_data = _get_batch_data_for_loading(reader, nfc_tag)
-        send_type = batch_data.pop('send_type')
+        send_type = 'loading_into_truck'
         payload.update(batch_data)
     else:
         raise ValueError(f"Неизвестный номер считывателя: {reader}")

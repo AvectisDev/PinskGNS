@@ -152,31 +152,53 @@ class FeigProtocol:
         Парсинг данных из буфера (команды 0x2B, 0x31) и входов (0x74)
         """
         tags = []
+        
+        # Проверка минимальной длины ответа
+        if len(response_data) < 2:
+            logger.error(f'Недостаточно данных в ответе: {len(response_data)} байт')
+            return tags
+        
         command = response_data[0]
         status = response_data[1]
 
         # сохраняем статус ответа
         tags.append({
             'command': command,
-            'status': cls.STATUS_BYTE.get(status, "Unknown"),
+            'status': cls.STATUS_BYTE.get(status, f"Unknown status: 0x{status:02X}"),
         })
 
-        # Нет валидных данных
-        if status == 0x92:
+        # Проверяем статус на ошибки перед парсингом
+        if status != 0x00:  # 0x00 = OK
+            error_msg = cls.STATUS_BYTE.get(status, f"Unknown status: 0x{status:02X}")
+            logger.warning(f'Статус ответа указывает на проблему: {error_msg} (0x{status:02X})')
+            # Нет валидных данных или другая ошибка - возвращаем только статус
+            if status == 0x92:  # No Valid Data
+                return tags
+            # Для других ошибок также возвращаем только статус, чтобы избежать парсинга некорректных данных
             return tags
 
         match command:
             case 0x2B:  # READ_BUFFER
+                if len(response_data) < 4:
+                    logger.warning(f'Недостаточно данных для READ_BUFFER: {len(response_data)} байт')
+                    return tags
                 data_sets = struct.unpack('>H', response_data[2:4])[0]
                 pos = 4  # начало записей
 
                 for _ in range(data_sets):
+                    # Проверяем, что у нас достаточно данных для чтения record_layout_bits
+                    if len(response_data) < pos + 4:
+                        logger.warning(f'Недостаточно данных для чтения record_layout_bits. Позиция: {pos}, длина данных: {len(response_data)}')
+                        break
                     tag_data = {}
                     record_layout_bits = struct.unpack('>I', response_data[pos:pos + 4])[0]
                     pos += 4
 
                     # DATE
                     if record_layout_bits & (1 << 0):
+                        if len(response_data) < pos + 5:
+                            logger.warning(f'Недостаточно данных для DATE. Позиция: {pos}, длина данных: {len(response_data)}')
+                            break
                         century, year, month, day, tz = response_data[pos:pos + 5]
                         tag_data.update({
                             'century': century,
@@ -189,6 +211,9 @@ class FeigProtocol:
 
                     # TIME
                     if record_layout_bits & (1 << 1):
+                        if len(response_data) < pos + 4:
+                            logger.warning(f'Недостаточно данных для TIME. Позиция: {pos}, длина данных: {len(response_data)}')
+                            break
                         hour, minute = response_data[pos:pos + 2]
                         milliseconds = struct.unpack('>H', response_data[pos + 2:pos + 4])[0]
                         tag_data.update({
@@ -200,10 +225,19 @@ class FeigProtocol:
 
                     # IDD (ISO15693)
                     if record_layout_bits & (1 << 2):
+                        if len(response_data) < pos + 1:
+                            logger.warning(f'Недостаточно данных для IDD. Позиция: {pos}, длина данных: {len(response_data)}')
+                            break
                         transponder_type = response_data[pos]
                         match transponder_type:
                             case 0x00: # I-CODE1 (TR-TYPE = 0x00)
+                                if len(response_data) < pos + 3:
+                                    logger.warning(f'Недостаточно данных для I-CODE1. Позиция: {pos}, длина данных: {len(response_data)}')
+                                    break
                                 idd_length = response_data[pos + 1]
+                                if len(response_data) < pos + 2 + idd_length:
+                                    logger.warning(f'Недостаточно данных для I-CODE1 IDD. Позиция: {pos}, длина: {idd_length}, доступно: {len(response_data) - pos - 2}')
+                                    break
                                 idd_data = response_data[pos + 2:pos + 2 + idd_length]
                                 # NFC Tag ID в обратном порядке байтов -> hex
                                 nfc_tag = binascii.hexlify(idd_data[::-1]).decode()
@@ -211,10 +245,17 @@ class FeigProtocol:
                                     'transponder_type': transponder_type,
                                     'nfc_tag': nfc_tag,
                                 })
+                                pos += 2 + idd_length
                             case 0x03: # ISO 15693 (TR-TYPE = 0x03)
+                                if len(response_data) < pos + 5:
+                                    logger.warning(f'Недостаточно данных для ISO 15693. Позиция: {pos}, длина данных: {len(response_data)}')
+                                    break
                                 afi = response_data[pos + 1]
                                 dsfid = response_data[pos + 2]
                                 idd_length = response_data[pos + 3]
+                                if len(response_data) < pos + 4 + idd_length:
+                                    logger.warning(f'Недостаточно данных для ISO 15693 IDD. Позиция: {pos}, длина: {idd_length}, доступно: {len(response_data) - pos - 4}')
+                                    break
                                 idd_data = response_data[pos + 4:pos + 4 + idd_length]
                                 # NFC Tag ID в обратном порядке байтов -> hex
                                 nfc_tag = binascii.hexlify(idd_data[::-1]).decode()
@@ -224,9 +265,16 @@ class FeigProtocol:
                                     'dsfid': dsfid,
                                     'nfc_tag': nfc_tag,
                                 })
+                                pos += 4 + idd_length
                             case 0x09:  # ISO 18000-3M3 (TR-TYPE = 0x09)
+                                if len(response_data) < pos + 4:
+                                    logger.warning(f'Недостаточно данных для ISO 18000-3M3. Позиция: {pos}, длина данных: {len(response_data)}')
+                                    break
                                 iddt = response_data[pos + 1]
                                 idd_length = response_data[pos + 2]
+                                if len(response_data) < pos + 3 + idd_length:
+                                    logger.warning(f'Недостаточно данных для ISO 18000-3M3 IDD. Позиция: {pos}, длина: {idd_length}, доступно: {len(response_data) - pos - 3}')
+                                    break
                                 idd_data = response_data[pos + 3:pos + 3 + idd_length]
                                 # NFC Tag ID в обратном порядке байтов -> hex
                                 nfc_tag = binascii.hexlify(idd_data[::-1]).decode()
@@ -235,10 +283,19 @@ class FeigProtocol:
                                     'iddt': iddt,
                                     'nfc_tag': nfc_tag,
                                 })
+                                pos += 3 + idd_length
+                            case _:
+                                logger.warning(f'Неизвестный тип транспондера: 0x{transponder_type:02X}')
+                                # Пропускаем эту запись, так как не знаем структуру данных
+                                break
 
-                        pos += 4 + idd_length
-                        pos += 2  # inputs state (2 byte)
-                        pos += 4  # signals (4 byte)
+                        # inputs state (2 byte) и signals (4 byte) - только если IDD был успешно обработан
+                        if 'nfc_tag' in tag_data:
+                            if len(response_data) < pos + 6:
+                                logger.warning(f'Недостаточно данных для inputs/signals. Позиция: {pos}, длина данных: {len(response_data)}')
+                                break
+                            pos += 2  # inputs state (2 byte)
+                            pos += 4  # signals (4 byte)
 
                     if 'nfc_tag' in tag_data:
                         tags.append(tag_data)
@@ -248,11 +305,17 @@ class FeigProtocol:
             case 0x31:  # READ_BUFFER_INFO
                 # Минимально необходимое: первые 2 байта после статуса трактуем
                 # как число доступных записей (DATA-SETS/AVAILABLE)
+                if len(response_data) < 4:
+                    logger.warning(f'Недостаточно данных для READ_BUFFER_INFO: {len(response_data)} байт')
+                    return tags
                 available = struct.unpack('>H', response_data[2:4])[0]
                 tags.append({'available': available})
                 return tags
 
             case 0x74:  # GET_INPUT
+                if len(response_data) < 3:
+                    logger.warning(f'Недостаточно данных для GET_INPUT: {len(response_data)} байт')
+                    return tags
                 inputs_byte = response_data[2]
                 input_state = {
                     'IN1': bool(inputs_byte & (1 << 0)),
@@ -262,8 +325,19 @@ class FeigProtocol:
                 tags.append(input_state)
                 return tags
 
+            case 0x32:  # CLEAR_BUFFER
+                # Команда очистки буфера - возвращает только статус
+                logger.debug('CLEAR_BUFFER выполнен')
+                return tags
+
+            case 0x33:  # INITIALIZE_BUFFER
+                # Команда полной инициализации буфера - возвращает только статус
+                logger.debug('INITIALIZE_BUFFER выполнен')
+                return tags
+
             case _:  # UNKNOWN
-                logger.error(f'Неизвестная команда: {command}')
+                logger.error(f'Неизвестная команда: 0x{command:02X} ({command}) в ответе от ридера')
+                # Возвращаем только информацию о команде и статусе, без попытки парсинга
                 return tags
 
 
