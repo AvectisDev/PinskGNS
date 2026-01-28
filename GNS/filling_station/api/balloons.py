@@ -9,7 +9,7 @@ from django.db.models.signals import post_save, post_delete
 from django.dispatch import receiver
 from rest_framework import generics, status, viewsets, serializers
 from rest_framework.response import Response
-from rest_framework.decorators import api_view, action
+from rest_framework.decorators import api_view, action, permission_classes
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from drf_spectacular.utils import (
     extend_schema,
@@ -491,6 +491,97 @@ def get_loading_balloon_reader_list(request):
 @api_view(['GET'])
 def get_unloading_balloon_reader_list(request):
     return Response(BALLOONS_UNLOADING_READER_LIST)
+
+# --- TotalReadersCounter (ручной ввод) ---
+ManualTotalReadersCounterRequestSerializer = inline_serializer(
+    name='ManualTotalReadersCounterRequest',
+    fields={
+        'empty': serializers.IntegerField(
+            required=False,
+            min_value=0,
+            help_text='Ручное значение для количества пустых баллонов (total_empty)'
+        ),
+        'full': serializers.IntegerField(
+            required=False,
+            min_value=0,
+            help_text='Ручное значение для количества полных баллонов (total_full)'
+        ),
+    }
+)
+
+ManualTotalReadersCounterResponseSerializer = inline_serializer(
+    name='ManualTotalReadersCounterResponse',
+    fields={
+        'total_empty': serializers.IntegerField(),
+        'total_full': serializers.IntegerField(),
+        'changed_at': serializers.DateTimeField(),
+    }
+)
+
+
+@extend_schema(
+    tags=['Свод по складу'],
+    summary='Ручной ввод итоговых счетчиков (пустые/полные)',
+    description=(
+        'Записывает переданные значения в таблицу `TotalReadersCounter` (singleton `pk=1`). '
+        'Можно передать только `empty`, только `full` или оба поля.'
+    ),
+    request=ManualTotalReadersCounterRequestSerializer,
+    responses={
+        200: ManualTotalReadersCounterResponseSerializer,
+        400: ErrorResponseSerializer,
+    },
+    examples=[
+        OpenApiExample(
+            'Пример запроса (оба поля)',
+            value={'empty': 25, 'full': 7},
+            request_only=True
+        ),
+        OpenApiExample(
+            'Пример запроса (только empty)',
+            value={'empty': 10},
+            request_only=True
+        ),
+        OpenApiExample(
+            'Пример успешного ответа',
+            value={'total_empty': 25, 'total_full': 7, 'changed_at': '2026-01-28T10:15:30Z'},
+            response_only=True
+        ),
+    ]
+)
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def set_total_readers_counter_manual_values(request):
+    """
+    Запись ручных значений `TotalReadersCounter` через API.
+    """
+    empty = request.data.get('empty', None)
+    full = request.data.get('full', None)
+
+    # Валидируем через DRF поля (включая min_value)
+    req_serializer = ManualTotalReadersCounterRequestSerializer(data={'empty': empty, 'full': full})
+    if not req_serializer.is_valid():
+        return Response({'error': req_serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
+
+    validated = req_serializer.validated_data
+    if 'empty' not in validated and 'full' not in validated:
+        return Response({'error': 'Нужно передать хотя бы одно поле: empty или full'}, status=status.HTTP_400_BAD_REQUEST)
+
+    # гарантируем, что singleton существует
+    TotalReadersCounter.objects.get_or_create(pk=1, defaults={'total_empty': 0, 'total_full': 0})
+    TotalReadersCounter.insert_manual_values(
+        empty=validated.get('empty', None),
+        full=validated.get('full', None)
+    )
+    obj = TotalReadersCounter.objects.get(pk=1)
+    return Response(
+        {
+            'total_empty': obj.total_empty,
+            'total_full': obj.total_full,
+            'changed_at': obj.changed_at,
+        },
+        status=status.HTTP_200_OK
+    )
 
 # Схемы для Swagger
 BalloonOperationResponse = inline_serializer(
