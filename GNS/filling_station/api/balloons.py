@@ -398,7 +398,7 @@ class BalloonViewSet(viewsets.ViewSet):
                 'empty_balloons_on_station': balloons_stat['empty']
             })
             data = response
-        cache.set(cache_key, data, cache_time)
+            cache.set(cache_key, data, cache_time)
         return JsonResponse(data, safe=False)
 
     def create(self, request):
@@ -564,6 +564,10 @@ def set_total_readers_counter_manual_values(request):
         full=validated.get('full', None)
     )
     obj = TotalReadersCounter.objects.get(pk=1)
+
+    # Очистка кеша статистики при внесении изменений
+    cache.delete('get_balloon_statistic')
+
     return Response(
         {
             'total_empty': obj.total_empty,
