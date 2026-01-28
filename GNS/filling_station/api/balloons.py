@@ -493,30 +493,23 @@ def get_unloading_balloon_reader_list(request):
     return Response(BALLOONS_UNLOADING_READER_LIST)
 
 # --- TotalReadersCounter (ручной ввод) ---
-ManualTotalReadersCounterRequestSerializer = inline_serializer(
-    name='ManualTotalReadersCounterRequest',
-    fields={
-        'empty': serializers.IntegerField(
-            required=False,
-            min_value=0,
-            help_text='Ручное значение для количества пустых баллонов (total_empty)'
-        ),
-        'full': serializers.IntegerField(
-            required=False,
-            min_value=0,
-            help_text='Ручное значение для количества полных баллонов (total_full)'
-        ),
-    }
-)
+class ManualTotalReadersCounterRequestSerializer(serializers.Serializer):
+    empty = serializers.IntegerField(
+        required=False,
+        min_value=0,
+        help_text='Ручное значение для количества пустых баллонов (total_empty)'
+    )
+    full = serializers.IntegerField(
+        required=False,
+        min_value=0,
+        help_text='Ручное значение для количества полных баллонов (total_full)'
+    )
 
-ManualTotalReadersCounterResponseSerializer = inline_serializer(
-    name='ManualTotalReadersCounterResponse',
-    fields={
-        'total_empty': serializers.IntegerField(),
-        'total_full': serializers.IntegerField(),
-        'changed_at': serializers.DateTimeField(),
-    }
-)
+
+class ManualTotalReadersCounterResponseSerializer(serializers.Serializer):
+    total_empty = serializers.IntegerField()
+    total_full = serializers.IntegerField()
+    changed_at = serializers.DateTimeField()
 
 
 @extend_schema(
@@ -555,11 +548,8 @@ def set_total_readers_counter_manual_values(request):
     """
     Запись ручных значений `TotalReadersCounter` через API.
     """
-    empty = request.data.get('empty', None)
-    full = request.data.get('full', None)
-
     # Валидируем через DRF поля (включая min_value)
-    req_serializer = ManualTotalReadersCounterRequestSerializer(data={'empty': empty, 'full': full})
+    req_serializer = ManualTotalReadersCounterRequestSerializer(data=request.data)
     if not req_serializer.is_valid():
         return Response({'error': req_serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
 
