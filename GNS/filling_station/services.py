@@ -1,5 +1,6 @@
 import requests
 import logging
+import time
 from django.utils import timezone
 from typing import Optional, Dict, Any, Union, Tuple
 from django.conf import settings
@@ -277,63 +278,67 @@ def add_balloon_to_cache(balloon: Balloon, reader: ReaderSettings) -> None:
 def get_balloon_data_from_miriada(nfc_tag: str) -> Optional[Dict[str, Any]]:
     """
     Получает данные баллона по NFC-метке из API Мириады.
-    
+    При неуспешном запросе выполняется до 2 повторных попыток.
+
     Args:
         nfc_tag: NFC метка баллона
-        
+
     Returns:
         Словарь с данными баллона при успешном ответе, None при ошибке
-        
+
     Raises:
-        MiriadaAPIError: При критических ошибках взаимодействия с API
+        MiriadaAPIError: При критических ошибках взаимодействия с API после всех попыток
     """
     if not nfc_tag:
         logger.warning("Пустая NFC метка при запросе данных из Мириады")
         return None
-        
+
     url = f'{settings.MIRIADA_API_URL}/getballoonbynfctag?nfctag={nfc_tag}&realm=brestoblgas'
 
-    try:
-        response = requests.get(url, timeout=2)
-        response.raise_for_status()
-        result = response.json()
+    for attempt in range(settings.MIRIADA_REQUEST_RETRIES + 1):
+        try:
+            response = requests.get(url, timeout=2)
+            response.raise_for_status()
+            result = response.json()
 
-        if result.get('status') != "Ok":
-            error_msg = f'Ошибка при получении паспорта баллона. Метка: {nfc_tag}. Ответ: {result}'
-            logger.warning(error_msg)
-            raise MiriadaAPIError(error_msg)
+            if result.get('status') != "Ok":
+                error_msg = f'Ошибка при получении паспорта баллона. Метка: {nfc_tag}. Ответ: {result}'
+                logger.warning(error_msg)
+                raise MiriadaAPIError(error_msg)
 
-        balloon_data = result.get('List')
-        if not isinstance(balloon_data, dict):
-            error_msg = (f"Неправильный формат полученных данных. Метка: {nfc_tag}. "
-                        f"Ожидается dict, получено: {type(balloon_data)}")
+            balloon_data = result.get('List')
+            if not isinstance(balloon_data, dict):
+                error_msg = (f"Неправильный формат полученных данных. Метка: {nfc_tag}. "
+                            f"Ожидается dict, получено: {type(balloon_data)}")
+                logger.error(error_msg)
+                raise MiriadaAPIError(error_msg)
+
+            processed_data = {
+                'number': balloon_data.get('number'),
+                'netto': float(balloon_data.get('netto', 0)),
+                'brutto': float(balloon_data.get('brutto', 0)),
+                'status': bool(balloon_data.get('status', 0))
+            }
+
+            logger.info(f"Данные баллона получены из Мириады: {nfc_tag}")
+            return processed_data
+
+        except (MiriadaAPIError, requests.exceptions.RequestException, ValueError, TypeError) as e:
+            if attempt < settings.MIRIADA_REQUEST_RETRIES:
+                logger.warning(
+                    f"Запрос к Мириаде (метка {nfc_tag}) неуспешен, повтор {attempt + 2}/{settings.MIRIADA_REQUEST_RETRIES + 1}: {e}"
+                )
+                time.sleep(settings.MIRIADA_RETRY_DELAY_SECONDS)
+            else:
+                if isinstance(e, MiriadaAPIError):
+                    raise
+                error_msg = f"Запрос баллона с меткой {nfc_tag} прошёл с ошибкой после {settings.MIRIADA_REQUEST_RETRIES + 1} попыток: {str(e)}"
+                logger.error(error_msg)
+                raise MiriadaAPIError(error_msg) from e
+        except Exception as e:
+            error_msg = f"Непредвиденная ошибка при получении данных из Мириады. Метка {nfc_tag}: {str(e)}"
             logger.error(error_msg)
-            raise MiriadaAPIError(error_msg)
-
-        processed_data = {
-            'number': balloon_data.get('number'),
-            'netto': float(balloon_data.get('netto', 0)),
-            'brutto': float(balloon_data.get('brutto', 0)),
-            'status': bool(balloon_data.get('status', 0))
-        }
-
-        logger.info(f"Данные баллона получены из Мириады: {nfc_tag}")
-        return processed_data
-
-    except requests.exceptions.RequestException as e:
-        error_msg = f"Запрос баллона с меткой {nfc_tag} прошёл с ошибкой: {str(e)}"
-        logger.error(error_msg)
-        raise MiriadaAPIError(error_msg) from e
-    except (ValueError, TypeError) as e:
-        error_msg = f"Ошибка обработки данных. Метка {nfc_tag}: {str(e)}"
-        logger.error(error_msg)
-        raise MiriadaAPIError(error_msg) from e
-    except MiriadaAPIError:
-        raise
-    except Exception as e:
-        error_msg = f"Непредвиденная ошибка при получении данных из Мириады. Метка {nfc_tag}: {str(e)}"
-        logger.error(error_msg)
-        raise MiriadaAPIError(error_msg) from e
+            raise MiriadaAPIError(error_msg) from e
 
 
 def _format_registration_number(reg_number: str) -> str:
@@ -494,62 +499,78 @@ def _prepare_payload_for_miriada(reader: int, nfc_tag: str) -> Tuple[str, Dict[s
 def send_status_to_miriada(reader: int, nfc_tag: str) -> None:
     """
     Отправляет статусы баллонов по NFC-метке в Мириаду.
-    
+    При неуспешном запросе выполняется до 2 повторных попыток.
+
     Поддерживается 3 основных типа отправки:
     - filling - Наполнение баллона (reader == 8)
     - registering_in_warehouse - Регистрация баллона на склад (reader == 5, 6)
     - loading_into_truck - Погрузка баллона в машину (reader == 2, 3, 4)
-    
+
     Args:
         reader: Номер считывателя
         nfc_tag: NFC метка баллона
-        
+
     Raises:
-        MiriadaAPIError: При ошибках отправки
+        MiriadaAPIError: При ошибках отправки после всех попыток
     """
     try:
         url, payload, send_type = _prepare_payload_for_miriada(reader, nfc_tag)
-        
-        headers = {
-            'Accept': 'application/json',
-            'Content-Type': 'application/json'
-        }
-        
-        session = requests.Session()
-        req = requests.Request(
-            'POST',
-            url,
-            auth=(settings.MIRIADA_AUTH_LOGIN, settings.MIRIADA_AUTH_PASSWORD),
-            headers=headers,
-            json=payload
-        )
-        prepared = session.prepare_request(req)
+    except ValueError as e:
+        error_msg = f"Ошибка подготовки данных для отправки: {str(e)}"
+        logger.error(error_msg)
+        raise MiriadaAPIError(error_msg) from e
 
-        logger.debug(
-            f"Подготовленный запрос:\n"
-            f"URL: {prepared.url}\n"
-            f"Headers: {prepared.headers}\n"
-            f"Body: {prepared.body}"
-        )
+    headers = {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json'
+    }
 
-        response = session.send(prepared, timeout=2)
-        if response.status_code == 200:
-            logger.info(f"Статус по {send_type} успешно отправлен")
-        else:
+    for attempt in range(settings.MIRIADA_REQUEST_RETRIES + 1):
+        try:
+            session = requests.Session()
+            req = requests.Request(
+                'POST',
+                url,
+                auth=(settings.MIRIADA_AUTH_LOGIN, settings.MIRIADA_AUTH_PASSWORD),
+                headers=headers,
+                json=payload
+            )
+            prepared = session.prepare_request(req)
+
+            logger.debug(
+                f"Подготовленный запрос:\n"
+                f"URL: {prepared.url}\n"
+                f"Headers: {prepared.headers}\n"
+                f"Body: {prepared.body}"
+            )
+
+            response = session.send(prepared, timeout=2)
+            if response.status_code == 200:
+                logger.info(f"Статус по {send_type} успешно отправлен")
+                return
             error_msg = (
                 f"Ошибка при отправке {send_type}! "
                 f"Status: {response.status_code} {response.reason}, Ответ: {response.json()}"
             )
             logger.error(error_msg)
             raise MiriadaAPIError(error_msg)
-
-    except MiriadaAPIError:
-        raise
-    except ValueError as e:
-        error_msg = f"Ошибка подготовки данных для отправки: {str(e)}"
-        logger.error(error_msg)
-        raise MiriadaAPIError(error_msg) from e
-    except Exception as error:
-        error_msg = f'Ошибка при отправке статуса баллона в Мириаду: {error}'
-        logger.error(error_msg)
-        raise MiriadaAPIError(error_msg) from error
+        except MiriadaAPIError:
+            if attempt < settings.MIRIADA_REQUEST_RETRIES:
+                logger.warning(
+                    f"Отправка статуса в Мириаду ({send_type}) неуспешна, "
+                    f"повтор {attempt + 2}/{settings.MIRIADA_REQUEST_RETRIES + 1}"
+                )
+                time.sleep(settings.MIRIADA_RETRY_DELAY_SECONDS)
+            else:
+                raise
+        except requests.exceptions.RequestException as e:
+            if attempt < settings.MIRIADA_REQUEST_RETRIES:
+                logger.warning(
+                    f"Запрос к Мириаде ({send_type}) неуспешен, "
+                    f"повтор {attempt + 2}/{settings.MIRIADA_REQUEST_RETRIES + 1}: {e}"
+                )
+                time.sleep(settings.MIRIADA_RETRY_DELAY_SECONDS)
+            else:
+                error_msg = f'Ошибка при отправке статуса баллона в Мириаду после {settings.MIRIADA_REQUEST_RETRIES + 1} попыток: {e}'
+                logger.error(error_msg)
+                raise MiriadaAPIError(error_msg) from e

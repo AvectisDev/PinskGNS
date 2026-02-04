@@ -408,6 +408,9 @@ MIRIADA_API_URL = os.environ.get('MIRIADA_API_URL')
 MIRIADA_API_POST_URL = os.environ.get('MIRIADA_API_POST_URL')
 MIRIADA_AUTH_LOGIN = os.environ.get('MIRIADA_AUTH_LOGIN')
 MIRIADA_AUTH_PASSWORD = os.environ.get('MIRIADA_AUTH_PASSWORD')
+# Количество повторов неуспешного запроса к API Мириады (всего попыток = MIRIADA_REQUEST_RETRIES + 1)
+MIRIADA_REQUEST_RETRIES = 2
+MIRIADA_RETRY_DELAY_SECONDS = 1
 
 GAS_TYPE_CHOICES = [
     ('Не выбран', 'Не выбран'),
