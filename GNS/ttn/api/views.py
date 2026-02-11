@@ -1,5 +1,5 @@
 import logging
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from rest_framework import viewsets, status, serializers
 from rest_framework.response import Response
 from rest_framework.decorators import action
@@ -114,7 +114,9 @@ class MiriadaTtnViewSet(viewsets.ViewSet):
 
         # Сериализуем и возвращаем сохраненные данные
         if not saved_ttns:
-            local_ttn = MiriadaTtn.objects.filter(date=datetime.today().date())
+            # Последние 5 дней включая сегодня
+            start_date = datetime.today().date() - timedelta(days=5)
+            local_ttn = MiriadaTtn.objects.filter(date__gte=start_date)
             
             if not local_ttn:
                 return Response(status=status.HTTP_404_NOT_FOUND)
