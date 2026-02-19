@@ -82,7 +82,6 @@ class MiriadaTtnViewSet(viewsets.ViewSet):
         api_response = services.get_current_ttn_from_miriada()
 
         # Сохраняем ТТН в базу данных
-        saved_ttns = []
         try:
             for ttn_data in api_response:
 
@@ -100,7 +99,6 @@ class MiriadaTtnViewSet(viewsets.ViewSet):
                             'date': ttn_data.get('date')
                         }
                     )
-                    saved_ttns.append(miriada_ttn)
 
                     logger.info(
                         f"ТТН {'создана' if created else 'обновлена'}: ID={ttn_id}, name={ttn_data.get('name')}")
@@ -113,17 +111,12 @@ class MiriadaTtnViewSet(viewsets.ViewSet):
             return Response(status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
         # Сериализуем и возвращаем сохраненные данные
-        if not saved_ttns:
-            # Последние 5 дней включая сегодня
-            start_date = datetime.today().date() - timedelta(days=5)
-            local_ttn = MiriadaTtn.objects.filter(date__gte=start_date)
-            
-            if not local_ttn:
-                return Response(status=status.HTTP_404_NOT_FOUND)
-            
-            serializer = MiriadaTtnSerializer(local_ttn, many=True)
-            return Response(serializer.data)
+        # Последние 5 дней включая сегодня
+        start_date = datetime.today().date() - timedelta(days=5)
+        local_ttn = MiriadaTtn.objects.filter(date__gte=start_date)
 
+        if not local_ttn:
+            return Response(status=status.HTTP_404_NOT_FOUND)
 
-        serializer = MiriadaTtnSerializer(saved_ttns, many=True)
+        serializer = MiriadaTtnSerializer(local_ttn, many=True)
         return Response(serializer.data)
