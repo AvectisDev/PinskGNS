@@ -44,6 +44,9 @@ class FeigProtocol:
         'READ_BUFFER_INFO': 0x31,    # информация о буфере (наличие записей)
         'CLEAR_BUFFER': 0x32,        # очистка прочитанных записей
         'INITIALIZE_BUFFER': 0x33,   # полная очистка буфера
+        'READER_IDENTIFICATION_EVENT': 0x2A,  # Notification Mode: hello/heartbeat
+        'TAG_READ_EVENT': 0x2B,      # Notification Mode: event with tag data
+        'INPUT_EVENT': 0x2C,         # Notification Mode: digital input change
     }
 
     STATUS_BYTE = {
@@ -120,6 +123,24 @@ class FeigProtocol:
 
         crc = FeigProtocol.crc16(packet)         # CRC над всем кадром, кроме самого CRC
         packet += struct.pack('<H', crc)         # CRC16: LSB first
+        return packet
+
+    @classmethod
+    def create_request_by_code(cls, command_code: int, request_data: bytes = b'') -> bytes:
+        """
+        Создание запроса по числовому коду команды.
+        Используется для ACK Notification Mode events (0x2A/0x2B/0x2C).
+        """
+        com_adr = 0xFF
+        length = 1 + 2 + 1 + 1 + len(request_data) + 2
+
+        packet = bytes([FeigProtocol.STX])
+        packet += struct.pack('>H', length)
+        packet += bytes([com_adr, command_code & 0xFF])
+        packet += request_data
+
+        crc = FeigProtocol.crc16(packet)
+        packet += struct.pack('<H', crc)
         return packet
 
     @classmethod
@@ -335,6 +356,49 @@ class FeigProtocol:
                 logger.debug('INITIALIZE_BUFFER выполнен')
                 return tags
 
+            case 0x2A:  # READER_IDENTIFICATION / HEARTBEAT EVENT
+                # Для текущей логики нам достаточно command/status + сырой payload.
+                tags.append({'raw_event_payload': response_data[2:]})
+                return tags
+
+            case 0x2C:  # INPUT EVENT
+                if len(response_data) < 8:
+                    logger.warning(f'Недостаточно данных для INPUT_EVENT: {len(response_data)} байт')
+                    return tags
+
+                data_sets = struct.unpack('>H', response_data[2:4])[0]
+                record_layout_bits = struct.unpack('>I', response_data[4:8])[0]
+                pos = 8
+
+                # Для 0x2C интересует бит 2 в RECORD-LAYOUT (Input sector)
+                has_input_sector = bool(record_layout_bits & (1 << 2))
+                if not has_input_sector:
+                    logger.debug('INPUT_EVENT без input-сектора в layout')
+                    return tags
+
+                for _ in range(data_sets):
+                    if len(response_data) < pos + 8:
+                        logger.warning(
+                            f'Недостаточно данных для INPUT_EVENT record. Позиция: {pos}, длина: {len(response_data)}'
+                        )
+                        break
+
+                    previous_state = struct.unpack('>I', response_data[pos:pos + 4])[0]
+                    current_state = struct.unpack('>I', response_data[pos + 4:pos + 8])[0]
+                    pos += 8
+
+                    tags.append({
+                        'previous_state': previous_state,
+                        'current_state': current_state,
+                        'IN1_previous': bool(previous_state & (1 << 0)),
+                        'IN1_current': bool(current_state & (1 << 0)),
+                        'IN2_previous': bool(previous_state & (1 << 1)),
+                        'IN2_current': bool(current_state & (1 << 1)),
+                        'IN3_previous': bool(previous_state & (1 << 2)),
+                        'IN3_current': bool(current_state & (1 << 2)),
+                    })
+                return tags
+
             case _:  # UNKNOWN
                 logger.error(f'Неизвестная команда: 0x{command:02X} ({command}) в ответе от ридера')
                 # Возвращаем только информацию о команде и статусе, без попытки парсинга
@@ -398,6 +462,44 @@ class ReaderSession:
                 logger.debug(f'{self.reader.number} Ответ ридера: {response.hex()}, Команда {command_name}')
                 return FeigProtocol.parse_response(response)
 
+            except asyncio.TimeoutError:
+                return {'valid': False, 'error': 'Timeout'}
+            except Exception as e:
+                return {'valid': False, 'error': str(e)}
+
+    async def send_event_ack(self, event_command: int, status: int = 0x00) -> Dict:
+        """
+        ACK для Notification Mode event.
+        В FEIG кадре COMMAND=event_command, DATA[0]=STATUS.
+        """
+        return await self.send_by_code(event_command, bytes([status]))
+
+    async def send_by_code(self, command_code: int, request_data: bytes = b'') -> Dict:
+        if self.conn is None or self.writer is None:
+            await self.connect()
+
+        async with self.lock:
+            req = FeigProtocol.create_request_by_code(command_code, request_data)
+            logger.debug(
+                f'{self.reader.number} Отправляем raw-запрос: {req.hex()}, Команда 0x{command_code:02X}'
+            )
+            self.writer.write(req)
+            await self.writer.drain()
+
+            try:
+                header = await asyncio.wait_for(self.conn.read(5), timeout=1.0)
+                if len(header) < 5 or header[0] != FeigProtocol.STX:
+                    return {'valid': False, 'error': 'Incomplete/invalid header'}
+
+                length = struct.unpack('>H', header[1:3])[0]
+                remaining = length - 5
+                body = b''
+                if remaining > 0:
+                    body = await asyncio.wait_for(self.conn.read(remaining), timeout=1.0)
+
+                response = header + body
+                logger.debug(f'{self.reader.number} Ответ ридера: {response.hex()}, Команда 0x{command_code:02X}')
+                return FeigProtocol.parse_response(response)
             except asyncio.TimeoutError:
                 return {'valid': False, 'error': 'Timeout'}
             except Exception as e:

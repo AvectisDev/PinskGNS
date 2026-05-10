@@ -1,6 +1,8 @@
 import os
 import asyncio
 import logging
+import logging.config
+import struct
 from typing import List, Dict
 from asgiref.sync import sync_to_async
 import django
@@ -20,6 +22,9 @@ from .models import Reader, FeigProtocol, ReaderSession
 from filling_station.models import ReaderSettings
 # Импорт сервисов (синхронные)
 from filling_station import services
+
+NOTIFICATION_LISTEN_HOST = os.getenv('RFID_NOTIFICATION_LISTEN_HOST', '0.0.0.0')
+NOTIFICATION_LISTEN_PORT = int(os.getenv('RFID_NOTIFICATION_LISTEN_PORT', '10002'))
 
 
 @sync_to_async
@@ -51,182 +56,159 @@ def process_balloon_data_sync(nfc_tag, reader_number):
                 'message': f'Ошибка обработки баллона {nfc_tag} на ридере {reader_number}'}
 
 
-# -------------------------------
-# Вспомогательные функции протокола FEIG
-# -------------------------------
-async def read_input_status(session: ReaderSession, reader: Reader) -> int:
-    """
-    Чтение состояния входов (GET_INPUT).
-    Возвращает состояние IN1: 0/1.
-    """
-    response = await session.send('GET_INPUT')
-    if response.get('valid'):
-        inputs_state = FeigProtocol.parse_buffer_data(response.get('response_data'))
-        if len(inputs_state) < 1:
-            logger.warning(f'{reader.number} Пустой ответ от ридера при чтении входов')
-            return reader.input_state
-        
-        logger.debug(f'{reader.number} Данные валидны. Команда {inputs_state[0].get("command")}. '
-                     f'Статус {inputs_state[0].get("status")}')
-        
-        # Проверяем, что есть данные о входах (второй элемент списка)
-        if len(inputs_state) >= 2 and 'IN1' in inputs_state[1]:
-            return int(inputs_state[1].get('IN1'))
+async def read_frame(reader_stream: asyncio.StreamReader) -> bytes:
+    header = await reader_stream.readexactly(3)
+    if header[0] != FeigProtocol.STX:
+        raise ValueError(f'Invalid STX byte: 0x{header[0]:02X}')
+    frame_len = struct.unpack('>H', header[1:3])[0]
+    if frame_len < 7:
+        raise ValueError(f'Invalid FEIG frame length: {frame_len}')
+    body = await reader_stream.readexactly(frame_len - 3)
+    return header + body
+
+
+def get_peer_ip(writer: asyncio.StreamWriter) -> str:
+    peer = writer.get_extra_info('peername')
+    if isinstance(peer, tuple) and peer:
+        return str(peer[0])
+    return 'unknown'
+
+
+async def send_notification_ack(writer: asyncio.StreamWriter, command: int, status: int = 0x00):
+    ack = FeigProtocol.create_request_by_code(command, bytes([status]))
+    writer.write(ack)
+    await writer.drain()
+
+
+async def process_tag_event(
+    reader_obj: Reader,
+    command_session: ReaderSession,
+    parsed_records: List[Dict],
+) -> None:
+    tags: List[str] = []
+    for tag_data in parsed_records[1:]:
+        nfc_tag = tag_data.get('nfc_tag') if isinstance(tag_data, dict) else None
+        if nfc_tag and reader_obj.filter_duplicate_tag(nfc_tag):
+            tags.append(nfc_tag)
+
+    if tags:
+        logger.info(f'{reader_obj.number} Получены метки из Notification Mode: {tags}')
+
+    for nfc_tag in tags:
+        result = await process_balloon_data_sync(nfc_tag=nfc_tag, reader_number=reader_obj.number)
+        if result.get('filling_status'):
+            await command_session.send('SET_OUTPUT', b'\x01\x01\x81\x01\x00')  # зелёный
         else:
-            logger.warning(f'{reader.number} Нет данных о входах в ответе. Структура: {inputs_state}')
-            return reader.input_state
-    return reader.input_state  # при ошибке — предыдущий
+            await command_session.send('SET_OUTPUT', b'\x01\x01\x81\x0B\x00')  # мигание
 
 
-async def read_buffer_info(session: ReaderSession, reader: Reader) -> int:
-    """
-    Чтение информации о буфере (READ_BUFFER_INFO).
-    Возвращает количество доступных записей (>=0).
-    """
-    response = await session.send('READ_BUFFER_INFO')
-    if response.get('valid'):
-        info = FeigProtocol.parse_buffer_data(response.get('response_data'))
-        if len(info) < 1:
-            logger.warning(f'{reader.number} Пустой ответ от ридера при чтении информации о буфере')
-            return False
-        
-        logger.debug(f'{reader.number} Данные валидны. Команда {info[0].get("command")}. '
-                     f'Статус {info[0].get("status")}')
-
-        # Проверяем, что есть данные о доступных записях (второй элемент списка)
-        if len(info) >= 2 and "available" in info[1]:
-            amount_of_data_sets = info[1].get("available")
-            if amount_of_data_sets > 0:
-                return True
-        else:
-            logger.warning(f'{reader.number} Нет данных о доступных записях в ответе. Структура: {info}')
-    return False
+async def process_input_event(reader_obj: Reader, parsed_records: List[Dict]) -> None:
+    for event_data in parsed_records[1:]:
+        if not isinstance(event_data, dict):
+            continue
+        in1_previous = bool(event_data.get('IN1_previous', False))
+        in1_current = bool(event_data.get('IN1_current', False))
+        if in1_current and not in1_previous:
+            await process_balloon_data_sync(nfc_tag=None, reader_number=reader_obj.number)
+            logger.info(f'{reader_obj.number} Сработал вход IN1 (Notification Mode)')
+        reader_obj.input_state = int(in1_current)
 
 
-async def read_nfc_tags(session: ReaderSession, reader: Reader) -> List[str]:
-    """
-    Чтение всех меток из буфера ридера (READ_BUFFER) — только если они есть.
-    Возвращает список уникальных меток (отфильтрованных от повторов).
-    """
-    # MODE=0x00, DATA-SETS=0xFFFF (читать все доступные)
-    request_data = bytes([0x00, 0xFF, 0xFF])
-    response = await session.send('READ_BUFFER', request_data)
+async def process_notification_payload(
+    reader_obj: Reader,
+    command_session: ReaderSession,
+    payload: bytes,
+) -> int:
+    parsed = FeigProtocol.parse_buffer_data(payload)
+    if not parsed:
+        logger.warning(f'{reader_obj.number} Пустой payload события')
+        return 0x81
 
-    tags = []
-    if response.get('valid'):
-        tags_data = FeigProtocol.parse_buffer_data(response.get('response_data'))
-        if len(tags_data) < 1:
-            logger.warning(f'{reader.number} Пустой ответ от ридера при чтении меток')
-            return tags
-        
-        # Проверяем, что первый элемент содержит информацию о команде
-        first_element = tags_data[0]
-        command = first_element.get('command')
-        status = first_element.get('status')
-        
-        logger.debug(f'{reader.number} Данные валидны. '
-                     f'Команда {command}. '
-                     f'Статус {status}')
-        
-        # Проверяем, что команда действительно READ_BUFFER (0x2B)
-        if command != 0x2B:
-            logger.warning(f'{reader.number} Ожидалась команда READ_BUFFER (0x2B), получена: 0x{command:02X}')
-            return tags
-        
-        # Проверяем статус на ошибки
-        if status != 'OK:':
-            logger.warning(f'{reader.number} Статус ответа указывает на проблему: {status}')
-            return tags
-        
-        # Пропускаем первый элемент (команда и статус), обрабатываем только метки
-        for tag_data in tags_data[1:]:
-            if not isinstance(tag_data, dict):
-                continue
-            nfc_tag = tag_data.get('nfc_tag')
-            if nfc_tag and reader.filter_duplicate_tag(nfc_tag):
-                tags.append(nfc_tag)
-        if tags:
-            logger.info(f'{reader.number} Список меток {tags}')
-    else:
-        error_msg = response.get('error', 'Unknown error')
-        logger.warning(f'{reader.number} Ошибка при чтении буфера: {error_msg}')
-    return tags
+    command = parsed[0].get('command')
+    if command == 0x2A:
+        logger.debug(f'{reader_obj.number} Получен Reader Identification / Heartbeat')
+        return 0x00
+    if command == 0x2B:
+        await process_tag_event(reader_obj, command_session, parsed)
+        return 0x00
+    if command == 0x2C:
+        await process_input_event(reader_obj, parsed)
+        return 0x00
+
+    logger.warning(f'{reader_obj.number} Неподдерживаемый Notification Event 0x{command:02X}')
+    return 0x80
 
 
-async def process_reader_operations(reader: Reader, session: ReaderSession):
-    """
-    Основная функция обработки одного ридера:
-    - фронт IN1 → событие «без NFC»
-    - при наличии записей в буфере → чтение, обработка и очистка
-    """
-    timeouts = 0
-
-    while True:
-        try:
-            # 1 - опрос входов
-            current_input_state = await read_input_status(session, reader)
-            if current_input_state == 1 and reader.input_state == 0:
-                # фронт: отправляем событие без NFC
-                await process_balloon_data_sync(nfc_tag=None, reader_number=reader.number)
-                logger.info(f'{reader.number} Сработал вход IN1')
-            reader.input_state = current_input_state
-
-            # 2 - чтение буфера
-            tags = await read_nfc_tags(session, reader)
-
-            for nfc_tag in tags:
-                try:
-                    result = await process_balloon_data_sync(nfc_tag=nfc_tag, reader_number=reader.number)
-                    # управление LED
-                    if result.get('filling_status'):
-                        await session.send('SET_OUTPUT', b'\x01\x01\x81\x01\x00')  # зелёный
-                    else:
-                        await session.send('SET_OUTPUT', b'\x01\x01\x81\x0B\x00')  # мигание
-                except Exception as error:
-                    logger.error(f'{reader.number} Ошибка обработки метки {nfc_tag}: {error}')
-
-            # очистка буфера после чтения
-            await session.send('CLEAR_BUFFER')
-
-            # задержка между итерациями
-            await asyncio.sleep(0.3)
-
-            # сброс счётчика тайм-аутов при успешном круге
-            timeouts = 0
-
-        except asyncio.TimeoutError:
-            # таймауты подряд → переподключение
-            timeouts += 1
-            if timeouts >= 3:
-                logger.warning(f'{reader}: таймаутов подряд = {timeouts} , переподключение...')
-                await session.close()
-                await asyncio.sleep(0.5)
-                await session.connect()
-                timeouts = 0
-            else:
-                await asyncio.sleep(0.3)
-
-        except Exception as error:
-            logger.error(f"{reader.number} Ошибка в process_reader_operations: {error}")
-            await asyncio.sleep(1)
-
-
-async def initialize_readers(readers: List[Reader], sessions: Dict[int, ReaderSession]):
-    """
-    Инициализация ридеров (очистка буферов и старт постоянных TCP-сессий)
-    """
-    tasks = []
+async def initialize_command_sessions(readers: List[Reader]) -> Dict[int, ReaderSession]:
+    sessions: Dict[int, ReaderSession] = {}
     for reader in readers:
-        session = ReaderSession(reader)
-        sessions[reader.number] = session
-        tasks.append(session.connect())
-    logger.info('Установка TCP-сессий к RFID-ридерам...')
-    await asyncio.gather(*tasks)
+        sessions[reader.number] = ReaderSession(reader)
 
-    # на старте — полная очистка буферов
-    init_tasks = [sessions[r.number].send('INITIALIZE_BUFFER') for r in readers]
-    logger.info('Инициализация (полная очистка буферов)...')
-    await asyncio.gather(*init_tasks)
+    logger.info('Открытие управляющих TCP-сессий к RFID-ридерам...')
+    connect_tasks = [sessions[reader.number].connect() for reader in readers]
+    results = await asyncio.gather(*connect_tasks, return_exceptions=True)
+    for reader, result in zip(readers, results):
+        if isinstance(result, Exception):
+            logger.warning(f'{reader.number} Не удалось открыть управляющую сессию: {result}')
+    return sessions
+
+
+async def handle_notification_connection(
+    stream_reader: asyncio.StreamReader,
+    stream_writer: asyncio.StreamWriter,
+    readers_by_ip: Dict[str, Reader],
+    sessions: Dict[int, ReaderSession],
+):
+    peer_ip = get_peer_ip(stream_writer)
+    reader_obj = readers_by_ip.get(peer_ip)
+
+    if reader_obj is None:
+        logger.warning(f'Подключение от неизвестного ридера: {peer_ip}')
+    else:
+        logger.info(f'Notification connection от ридера {reader_obj.number} ({peer_ip})')
+
+    try:
+        while True:
+            frame = await read_frame(stream_reader)
+            parsed_response = FeigProtocol.parse_response(frame)
+            if not parsed_response.get('valid'):
+                logger.warning(f'Невалидный кадр от {peer_ip}: {parsed_response.get("error")}')
+                break
+
+            payload = parsed_response.get('response_data', b'')
+            if len(payload) < 1:
+                logger.warning(f'Пустой response_data от {peer_ip}')
+                break
+
+            event_command = payload[0]
+            ack_status = 0x00
+
+            if reader_obj is not None and reader_obj.number in sessions:
+                try:
+                    ack_status = await process_notification_payload(
+                        reader_obj=reader_obj,
+                        command_session=sessions[reader_obj.number],
+                        payload=payload,
+                    )
+                except Exception as error:
+                    logger.error(f'{reader_obj.number} Ошибка обработки события 0x{event_command:02X}: {error}')
+                    ack_status = 0x01
+            else:
+                ack_status = 0x04
+
+            await send_notification_ack(stream_writer, event_command, ack_status)
+
+    except asyncio.IncompleteReadError:
+        pass
+    except Exception as error:
+        logger.error(f'Ошибка Notification connection ({peer_ip}): {error}')
+    finally:
+        stream_writer.close()
+        await stream_writer.wait_closed()
+        if reader_obj is not None:
+            logger.info(f'Notification connection закрыт для ридера {reader_obj.number} ({peer_ip})')
+        else:
+            logger.info(f'Notification connection закрыт ({peer_ip})')
 
 
 async def load_readers_from_database() -> List[Reader]:
@@ -253,21 +235,33 @@ async def load_readers_from_database() -> List[Reader]:
 
 async def main():
     """
-    Точка входа: один event-loop, по задаче на ридер
+    Точка входа Notification Mode:
+    сервер слушает TCP-порт и принимает события от ридеров.
     """
-    logger.info('Запуск программы считывания RFID-меток...')
+    logger.info('Запуск Notification Mode сервера RFID...')
     readers = await load_readers_from_database()
     if not readers:
         logger.error('Не удалось загрузить конфигурацию ридеров. Завершение работы.')
         return
 
-    sessions: Dict[int, ReaderSession] = {}
-    await initialize_readers(readers, sessions)
+    readers_by_ip: Dict[str, Reader] = {reader.ip: reader for reader in readers if reader.ip}
+    sessions = await initialize_command_sessions(readers)
 
-    tasks = [asyncio.create_task(process_reader_operations(reader, sessions[reader.number]))
-             for reader in readers]
-    logger.info('Программа в работе')
-    await asyncio.gather(*tasks)
+    async def _handler(reader_stream: asyncio.StreamReader, writer_stream: asyncio.StreamWriter):
+        await handle_notification_connection(
+            stream_reader=reader_stream,
+            stream_writer=writer_stream,
+            readers_by_ip=readers_by_ip,
+            sessions=sessions,
+        )
+
+    server = await asyncio.start_server(_handler, host=NOTIFICATION_LISTEN_HOST, port=NOTIFICATION_LISTEN_PORT)
+    sockets = server.sockets or []
+    socket_info = ', '.join(f'{sock.getsockname()}' for sock in sockets)
+    logger.info(f'Notification listener запущен: {socket_info}')
+
+    async with server:
+        await server.serve_forever()
 
 
 if __name__ == "__main__":
