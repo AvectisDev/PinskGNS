@@ -45,7 +45,7 @@ def process_balloon_data_sync(nfc_tag, reader_number):
         if result:
             balloon, reader = result
             # Отправка статуса в Мириаду
-            if (2 <= reader.number <= 6) or reader.number == 8:
+            if reader.number in [3, 4, 6, 8]:
                 services.send_status_to_miriada(reader=reader.number, nfc_tag=balloon.nfc_tag)
             return {
                 'status': 'success',
@@ -103,11 +103,24 @@ async def process_tag_event(
 
 
 async def process_input_event(reader_obj: Reader, parsed_records: List[Dict]) -> None:
+    logger.info(f'{reader_obj.number} Получен Input Event (0x2C), records={len(parsed_records) - 1}')
     for event_data in parsed_records[1:]:
         if not isinstance(event_data, dict):
+            logger.warning(f'{reader_obj.number} Input Event record не dict: {event_data!r}')
             continue
         in1_previous = bool(event_data.get('IN1_previous', False))
         in1_current = bool(event_data.get('IN1_current', False))
+        in2_previous = bool(event_data.get('IN2_previous', False))
+        in2_current = bool(event_data.get('IN2_current', False))
+        in3_previous = bool(event_data.get('IN3_previous', False))
+        in3_current = bool(event_data.get('IN3_current', False))
+
+        logger.info(
+            f'{reader_obj.number} Input Event states: '
+            f'IN1 {int(in1_previous)}->{int(in1_current)}, '
+            f'IN2 {int(in2_previous)}->{int(in2_current)}, '
+            f'IN3 {int(in3_previous)}->{int(in3_current)}'
+        )
         if in1_current and not in1_previous:
             await process_balloon_data_sync(nfc_tag=None, reader_number=reader_obj.number)
             logger.info(f'{reader_obj.number} Сработал вход IN1 (Notification Mode)')
@@ -119,12 +132,15 @@ async def process_notification_payload(
     command_session: ReaderSession,
     payload: bytes,
 ) -> int:
+    logger.debug(f'{reader_obj.number} Event payload: {payload.hex()}')
     parsed = FeigProtocol.parse_buffer_data(payload)
     if not parsed:
         logger.warning(f'{reader_obj.number} Пустой payload события')
         return 0x81
 
     command = parsed[0].get('command')
+    status = parsed[0].get('status')
+    logger.info(f'{reader_obj.number} Notification Event 0x{command:02X} status={status}')
     if command == 0x2A:
         logger.debug(f'{reader_obj.number} Получен Reader Identification / Heartbeat')
         return 0x00
@@ -132,6 +148,7 @@ async def process_notification_payload(
         await process_tag_event(reader_obj, command_session, parsed)
         return 0x00
     if command == 0x2C:
+        logger.debug(f'{reader_obj.number} Parsed Input Event records: {parsed[1:]}')
         await process_input_event(reader_obj, parsed)
         return 0x00
 
@@ -182,6 +199,8 @@ async def handle_notification_connection(
 
             event_command = payload[0]
             ack_status = 0x00
+
+            logger.debug(f'Event from {peer_ip}: cmd=0x{event_command:02X} frame={frame.hex()}')
 
             if reader_obj is not None and reader_obj.number in sessions:
                 try:

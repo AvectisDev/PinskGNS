@@ -370,10 +370,15 @@ class FeigProtocol:
                 record_layout_bits = struct.unpack('>I', response_data[4:8])[0]
                 pos = 8
 
+                logger.debug(
+                    f'INPUT_EVENT header: data_sets={data_sets}, record_layout=0x{record_layout_bits:08X}, '
+                    f'payload_len={len(response_data)}'
+                )
+
                 # Для 0x2C интересует бит 2 в RECORD-LAYOUT (Input sector)
                 has_input_sector = bool(record_layout_bits & (1 << 2))
                 if not has_input_sector:
-                    logger.debug('INPUT_EVENT без input-сектора в layout')
+                    logger.warning(f'INPUT_EVENT без input-сектора в layout (0x{record_layout_bits:08X})')
                     return tags
 
                 for _ in range(data_sets):
