@@ -14,6 +14,9 @@ logger = logging.getLogger('autogas')
 
 
 class Command(BaseCommand):
+    DEFAULT_CACHE_TIMEOUT = 1200
+    PENDING_REQUEST_CACHE_TIMEOUT = 30
+
     OPC_NODE_PATHS = {
         "batch_type_code": "ns=4; s=Address Space.PLC_SU2.batch.batch_type", # 1-приёмка, 2-отгрузка
         "gas_type": "ns=4; s=Address Space.PLC_SU2.batch.gas_type", # 1-Не выбран, 2-СПБТ, 3-ПБА
@@ -216,11 +219,18 @@ class Command(BaseCommand):
             cached_data = cache.get(cache_key)
             # Преобразуем словарь в строку для стабильного сравнения
             opc_values_str = ';'.join(f'{k}={opc_values[k]}' for k in sorted(opc_values.keys()))
+            has_pending_create = opc_values.get("request_batch_create") and not opc_values.get("response_batch_create")
+            has_pending_complete = opc_values.get("request_batch_complete") and not opc_values.get("response_batch_complete")
+            cache_timeout = (
+                self.PENDING_REQUEST_CACHE_TIMEOUT
+                if (has_pending_create or has_pending_complete)
+                else self.DEFAULT_CACHE_TIMEOUT
+            )
 
             if opc_values_str == cached_data:
                 return
 
-            cache.set(cache_key, opc_values_str, timeout=3600)
+            cache.set(cache_key, opc_values_str, timeout=cache_timeout)
 
             logger.debug(
                 f'Тип партии={opc_values["batch_type_code"]}, '
