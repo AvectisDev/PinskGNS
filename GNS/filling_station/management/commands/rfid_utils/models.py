@@ -375,10 +375,18 @@ class FeigProtocol:
                     f'payload_len={len(response_data)}'
                 )
 
-                # Для 0x2C интересует бит 2 в RECORD-LAYOUT (Input sector)
-                has_input_sector = bool(record_layout_bits & (1 << 2))
+                # Input sector в RECORD-LAYOUT:
+                # - в разделе Input Event (0x2C) в мануале указан бит 2;
+                # - на практике LRM5400 шлёт тот же bitfield, что и для Tag Read Event (0x2B),
+                #   где INPUT — бит 12 (0x00001000).
+                has_input_sector = bool(record_layout_bits & (1 << 2)) or bool(
+                    record_layout_bits & (1 << 12)
+                )
                 if not has_input_sector:
-                    logger.warning(f'INPUT_EVENT без input-сектора в layout (0x{record_layout_bits:08X})')
+                    logger.warning(
+                        f'INPUT_EVENT без input-сектора в layout (0x{record_layout_bits:08X}); '
+                        f'ожидались биты 2 или 12'
+                    )
                     return tags
 
                 for _ in range(data_sets):
