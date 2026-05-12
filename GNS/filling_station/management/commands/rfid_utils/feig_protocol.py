@@ -131,6 +131,11 @@ async def process_tag_event(
 
 
 async def process_input_event(reader_obj: Reader, parsed_records: List[Dict]) -> None:
+    """
+    Input Event (0x2C): в Notification Mode ридер присылает уведомление при активации входа;
+    при переходе IN1 с 1 на 0 событие не приходит — сравнивать с предыдущим состоянием не нужно.
+    Все оптические датчики на IN1: при IN1=1 в текущем состоянии записи — выполняем сценарий «без NFC».
+    """
     logger.info(f'{reader_obj.number} Получен Input Event (0x2C), records={len(parsed_records) - 1}')
     for event_data in parsed_records[1:]:
         if not isinstance(event_data, dict):
@@ -149,9 +154,9 @@ async def process_input_event(reader_obj: Reader, parsed_records: List[Dict]) ->
             f'IN2 {int(in2_previous)}->{int(in2_current)}, '
             f'IN3 {int(in3_previous)}->{int(in3_current)}'
         )
-        if in1_current and not in1_previous:
+        if in1_current:
             await process_balloon_data_sync(nfc_tag=None, reader_number=reader_obj.number)
-            logger.info(f'{reader_obj.number} Сработал вход IN1 (Notification Mode)')
+            logger.info(f'{reader_obj.number} IN1 активен в Input Event (Notification Mode), обработка «без NFC»')
         reader_obj.input_state = int(in1_current)
 
 
