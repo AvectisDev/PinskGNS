@@ -24,7 +24,28 @@ from filling_station.models import ReaderSettings
 from filling_station import services
 
 NOTIFICATION_LISTEN_HOST = os.getenv('RFID_NOTIFICATION_LISTEN_HOST', '0.0.0.0')
-NOTIFICATION_LISTEN_PORT = int(os.getenv('RFID_NOTIFICATION_LISTEN_PORT', '10002'))
+NOTIFICATION_LISTEN_PORT = int(os.getenv('RFID_NOTIFICATION_LISTEN_PORT', '8002'))
+# UID баллонов в проекте — hex-строка, оканчивающаяся на этот суффикс (например ...1be0).
+TAG_HEX_SUFFIX = os.getenv('RFID_TAG_HEX_SUFFIX', 'e0').strip().lower()
+
+
+def is_balloon_nfc_tag(nfc_tag: str) -> bool:
+    """
+    True, если метка похожа на ожидаемый UID баллона: корректный hex и суффикс TAG_HEX_SUFFIX.
+    Иные значения (шум, чужие транспондеры) логируются и не идут в бизнес-логику.
+    """
+    if not nfc_tag or not isinstance(nfc_tag, str):
+        return False
+    tag = nfc_tag.strip().lower()
+    if not tag.endswith(TAG_HEX_SUFFIX):
+        return False
+    if len(tag) % 2 != 0:
+        return False
+    try:
+        bytes.fromhex(tag)
+    except ValueError:
+        return False
+    return True
 
 
 @sync_to_async
@@ -88,7 +109,14 @@ async def process_tag_event(
     tags: List[str] = []
     for tag_data in parsed_records[1:]:
         nfc_tag = tag_data.get('nfc_tag') if isinstance(tag_data, dict) else None
-        if nfc_tag and reader_obj.filter_duplicate_tag(nfc_tag):
+        if not nfc_tag:
+            continue
+        if not is_balloon_nfc_tag(nfc_tag):
+            logger.info(
+                f'{reader_obj.number} Метка {nfc_tag} не проходит фильтр UID (suffix={TAG_HEX_SUFFIX!r})'
+            )
+            continue
+        if reader_obj.filter_duplicate_tag(nfc_tag):
             tags.append(nfc_tag)
 
     if tags:
