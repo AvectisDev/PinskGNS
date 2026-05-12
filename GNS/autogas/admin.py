@@ -12,8 +12,6 @@ class AutoGasBatchAdmin(admin.ModelAdmin):
         'trailer',
         'gas_amount',
         'gas_type',
-        'scale_empty_weight',
-        'scale_full_weight',
         'weight_gas_amount',
         'is_active',
     ]

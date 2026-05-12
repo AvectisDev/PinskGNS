@@ -3,12 +3,10 @@ from django.contrib.auth.models import User
 from django.urls import reverse
 from django.conf import settings
 from django.db.models import Count, Sum
-from datetime import datetime, time
 
 
 class RailwayTank(models.Model):
     registration_number = models.IntegerField(unique=True, blank=False, verbose_name="Номер ж/д цистерны")
-    gas_type = models.CharField(max_length=10, choices=settings.GAS_TYPE_CHOICES, default='Не выбран', verbose_name="Тип газа")
     is_on_station = models.BooleanField(default=False, verbose_name="Находится на станции")
     user = models.ForeignKey(
         User,
@@ -54,6 +52,7 @@ class RailwayTankHistory(models.Model):
     full_weight = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True, verbose_name="Вес полной цистерны")
     empty_weight = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True, verbose_name="Вес пустой цистерны")
     gas_weight = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True, verbose_name="Поставлено газа")
+    gas_type = models.CharField(max_length=10, choices=settings.GAS_TYPE_CHOICES, default='Не выбран', verbose_name="Тип газа")
     railway_ttn = models.CharField(null=True, blank=True, max_length=50, verbose_name="Номер ж/д накладной")
     netto_weight_ttn = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True, verbose_name="Вес НЕТТО ж/д цистерны по накладной")
     arrival_img = models.ImageField(null=True, blank=True, upload_to='railway_tanks/', verbose_name="Фото номера при въезде")
@@ -104,11 +103,12 @@ class RailwayBatch(models.Model):
 
     @classmethod
     def get_period_stats(cls, start_date, end_date):
-        start_datetime = datetime.combine(start_date, time.min)
-        end_datetime = datetime.combine(end_date, time.max)
-        return cls.objects.filter(
-            begin_date__range=[start_datetime, end_datetime]
-        ).annotate(
+        queryset = cls.objects.filter(
+            begin_date__date__gte=start_date,
+            begin_date__date__lte=end_date
+        )
+
+        return queryset.annotate(
             tanks_count=Count('railway_tank_list'),
             total_gas_in_tanks=Sum('railway_tank_list__tank_history__gas_weight')
         ).aggregate(

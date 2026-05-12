@@ -1,14 +1,27 @@
 {% extends 'base.html' %}
 {% load custom_filters %}
 
-{% block title %} {{ title }} №{{ batch.id }}{% endblock %}
+{% block title %}
+    {% if batch.batch_type == 'l' %}
+        Детали партии приёмки баллонов №{{ batch.id }}
+    {% elif batch.batch_type == 'u' %}
+        Детали партии отгрузки баллонов №{{ batch.id }}
+    {% endif %}
+{% endblock %}
 
 {% block content %}
 <div class="container mt-4">
     <div class="card shadow-sm">
         <div class="card-header card-header-custom">
             <div class="d-flex justify-content-between align-items-center">
-                <h4 class="mb-0"> {{ title }} №{{ batch.id }}</h4>
+                <h4 class="mb-2">
+                    {% if batch.batch_type == 'l' %}
+                        Детали партии приёмки баллонов №{{ batch.id }}
+                    {% elif batch.batch_type == 'u' %}
+                        Детали партии отгрузки баллонов №{{ batch.id }}
+                    {% endif %}
+                </h4>
+
                 <div>
                     <span class="badge bg-{% if batch.is_active %}success{% else %}secondary{% endif %}">
                         {% if batch.is_active %}Активна{% else %}Завершена{% endif %}
@@ -51,18 +64,18 @@
                         <dd class="col-sm-6">{{ batch.gas_amount|float_format|default:"-" }} кг</dd>
                         <hr>
                         <dt class="col-sm-6">ТТН:</dt>
-                        <dd class="col-sm-6">{{ batch.ttn|default:"Не указана" }}</dd>
+                        <dd class="col-sm-6">{{ batch.ttn_id|default:"Не указана" }}</dd>
 
-                        <dt class="col-sm-6">Количество баллонов по ТТН:</dt>
-                        <dd class="col-sm-6">{{ batch.amount_of_ttn|default:"-" }}</dd>
+                        <dt class="col-sm-6">Баллонов с RFID:</dt>
+                        <dd class="col-sm-6">{{ batch.amount_of_rfid|default:"-" }}</dd>
+
+                        <dt class="col-sm-6">Баллонов по оптическому датчику:</dt>
+                        <dd class="col-sm-6">{{ batch.amount_of_sensor|default:"-" }}</dd>
                     </dl>
                 </div>
 
                 <div class="col-md-6">
                     <dl class="row">
-                        <dt class="col-sm-6">Баллонов с RFID:</dt>
-                        <dd class="col-sm-6">{{ batch.amount_of_rfid|default:"-" }}</dd>
-
                         <dt class="col-sm-6">5л баллонов:</dt>
                         <dd class="col-sm-6">{{ batch.amount_of_5_liters|default:"-" }}</dd>
 
@@ -84,13 +97,21 @@
 
         <div class="card-footer bg-light">
             <div class="d-flex justify-content-between">
-                <a href="{% url 'filling_station:balloon_loading_batch_list' %}" class="btn btn-custom">
+
+                {% if batch.batch_type == 'l' %}
+                    <a href="{% url 'filling_station:balloon_loading_batch_list' %}" class="btn btn-custom">
                     <i class="bi bi-arrow-left"></i> Назад
                 </a>
+                {% elif batch.batch_type == 'u' %}
+                    <a href="{% url 'filling_station:balloon_unloading_batch_list' %}" class="btn btn-custom">
+                    <i class="bi bi-arrow-left"></i> Назад
+                {% endif %}
+
                 <div>
                     <a href="{{ batch.get_update_url }}" class="btn btn-custom me-2">
                         <i class="bi bi-pencil"></i> Редактировать
                     </a>
+
                     <a href="{{ batch.get_delete_url }}" class="btn btn-danger">
                         <i class="bi bi-trash"></i> Удалить
                     </a>

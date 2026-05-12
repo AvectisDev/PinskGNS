@@ -1,9 +1,10 @@
 from collections import defaultdict
 from django.db import models
+from django.utils import timezone
 from django.core.exceptions import ValidationError
 from django.contrib.auth.models import User
 from django.urls import reverse
-from django.db.models import Q, Sum, Count
+from django.db.models import Q, F, Sum, Count
 from django.conf import settings
 from typing import Dict, Any, Optional
 from datetime import datetime, date, time
@@ -61,25 +62,6 @@ class Balloon(models.Model):
     def clean(self):
         if self.brutto and self.netto and self.brutto < self.netto:
             raise ValidationError("Вес наполненного баллона должен быть больше веса пустого баллона.")
-
-    @classmethod
-    def get_balloons_stats(cls):
-        """
-        Получение статистики полных и пустых баллонов на станции
-        """
-        stat = {
-            # Полных баллонов на станции
-            'filled': cls.objects.filter(
-                status='Регистрация полного баллона на складе'
-                ).count(),
-            # Пустых
-            'empty': (cls.objects.filter(
-                status__in=['Регистрация пустого баллона на складе (рампа)',
-                            'Регистрация пустого баллона на складе (цех)']
-                ).count())
-        }
-        return stat
-
 
 READER_FUNCTION_CHOICES = [
     ('l', 'Приёмка'),
@@ -142,65 +124,6 @@ class Reader(models.Model):
         ordering = ['-change_date']
 
     @classmethod
-    def get_reader_stats(cls, reader_number: int, start_date: datetime, end_date: datetime) -> Dict[str, Any]:
-        """
-        Получает статистику по считывателю за указанный период.
-    
-        Собирает:
-        - Количество баллонов с RFID-метками (total_rfid)
-        - Общее количество баллонов (total_balloons)
-        - Список всех баллонов (balloons_list)
-        - Для специализированных считывателей (3,4,6) - количество баллонов по ТТН
-
-        Args:
-            reader_number: Номер считывателя
-            start_date: Начальная дата периода
-            end_date: Конечная дата периода
-
-        Returns:
-            Словарь с статистикой:
-            {
-                'total_rfid': int,
-                'total_balloons': int,
-                'balloons_list': QuerySet['Reader'],
-                'loading_ttn_quantity': Optional[int],  # Только для reader_number=6
-                'unloading_ttn_quantity': Optional[int]  # Только для reader_number=3,4
-            }
-        """
-        start_datetime = datetime.combine(start_date, time.min)
-        end_datetime = datetime.combine(end_date, time.max)
-
-        queryset = cls.objects.filter(
-            number=reader_number,
-            change_date__range=(start_datetime, end_datetime)
-        )
-
-        # Общее количество баллонов с меткой и без, пройдённое через считыватель
-        stats = queryset.aggregate(
-            total_rfid=Count('pk', filter=Q(nfc_tag__isnull=False)),
-            total_balloons=Count('pk')
-        )
-
-        # Список баллонов для отображения в шаблоне
-        stats['balloons_list'] = queryset.filter(nfc_tag__isnull=False)
-
-        # Статистика по ТТН
-        if reader_number == 6:
-            stats['loading_ttn_quantity'] = BalloonsBatch.objects.filter(
-                batch_type='l',
-                reader_number=reader_number,
-                started_at__range=(start_datetime, end_datetime)
-            ).aggregate(total_ttn=Sum('amount_of_ttn'))['total_ttn'] or 0
-        elif reader_number in [3, 4]:
-            stats['unloading_ttn_quantity'] = BalloonsBatch.objects.filter(
-                batch_type='u',
-                reader_number=reader_number,
-                started_at__range=(start_datetime, end_datetime)
-            ).aggregate(total_ttn=Sum('amount_of_ttn'))['total_ttn'] or 0
-
-        return stats
-
-    @classmethod
     def get_all_readers_stats(cls, start_date: date, end_date: date) -> Dict[str, Any]:
         """
         Получает статистику по всем считывателям за указанный период.
@@ -239,31 +162,107 @@ class Reader(models.Model):
 
         return result
 
+class DailyReaderCounter(models.Model):
+    """
+    Ежедневные счетчики по конкретному ридеру
+    """
+    number = models.ForeignKey(
+        ReaderSettings,
+        on_delete=models.PROTECT,
+        verbose_name="Номер считывателя",
+        related_name='daily_counters'
+    )
+    day = models.DateField(verbose_name="Дата", db_index=True)
+    amount_of_rfid = models.IntegerField(default=0, verbose_name="Баллонов по RFID")
+    amount_of_sensor = models.IntegerField(default=0, verbose_name="Баллонов по сенсору")
+    change_at = models.DateTimeField(auto_now=True, verbose_name="Дата последнего изменения")
+
+    def __str__(self):
+        return f'Количество баллонов на ридере {self.number}'
+
+    class Meta:
+        verbose_name = "Счетчики по ридерам за день"
+        verbose_name_plural = "Счетчики по ридерам за день"
+        ordering = ['-day']
+        constraints = [
+            models.UniqueConstraint(fields=['number', 'day'], name='uniq_number_day'),
+        ]
+
+    @classmethod
+    def add_rfid(cls, reader: ReaderSettings):
+        obj, created = cls.objects.get_or_create(
+            number=reader,
+            day=timezone.now().date(),
+            defaults={'amount_of_rfid': 0, 'amount_of_sensor': 0}
+        )
+        # атомарный инкремент:
+        cls.objects.filter(pk=obj.pk).update(
+            amount_of_rfid=F('amount_of_rfid') + 1,
+            change_at=timezone.now()
+        )
+
+    @classmethod
+    def add_sensor(cls, reader: ReaderSettings):
+        obj, created = cls.objects.get_or_create(
+            number=reader,
+            day=timezone.now().date(),
+            defaults={'amount_of_rfid': 0, 'amount_of_sensor': 0}
+        )
+        cls.objects.filter(pk=obj.pk).update(
+            amount_of_sensor=F('amount_of_sensor') + 1,
+            change_at=timezone.now()
+        )
+
+    @classmethod
+    def get_reader_period_stats(cls, reader: ReaderSettings, start_date: date, end_date: date) -> dict:
+        """
+        Получение статистики по конкретному ридеру за указанный период.
+        Возвращает словарь с количеством баллонов по RFID и по сенсору.
+        """
+        stats = cls.objects.filter(
+            number=reader,
+            day__gte=start_date,
+            day__lte=end_date
+        ).aggregate(
+            total_rfid=Sum('amount_of_rfid'),
+            total_sensor=Sum('amount_of_sensor')
+        )
+        
+        return {
+            'total_rfid': stats.get('total_rfid', 0) or 0,
+            'total_sensor': stats.get('total_sensor', 0) or 0
+        }
+
     @classmethod
     def get_common_stats_for_gns(cls) -> list:
+        """
+        Получение статистики по ридерам за месяц и сегодня.
+        Возвращает список словарей с данными по каждому ридеру.
+        balloons_month/balloons_today - только баллоны, подсчитанные сенсором (amount_of_sensor)
+        rfid_month/rfid_today - только баллоны, подсчитанные по RFID (amount_of_rfid)
+        """
         today = date.today()
         first_day_of_month = today.replace(day=1)
 
-        month_start = datetime.combine(first_day_of_month, time.min)
-        today_start = datetime.combine(today, time.min)
-
-        # Получаем все записи за месяц и день
-        month_queryset = cls.objects.filter(change_date__gte=month_start)
-        today_queryset = cls.objects.filter(change_date__gte=today_start)
-
-        month_stats = month_queryset.values('number').annotate(
-            balloons_month=Count('pk'),
-            rfid_month=Count('pk', filter=Q(nfc_tag__isnull=False))
+        # Получаем агрегированные данные за месяц
+        month_stats = cls.objects.filter(
+            day__gte=first_day_of_month
+        ).values('number__number').annotate(
+            rfid_month=Sum('amount_of_rfid'),
+            balloons_month=Sum('amount_of_sensor')
         )
 
-        today_stats = today_queryset.values('number').annotate(
-            balloons_today=Count('pk'),
-            rfid_today=Count('pk', filter=Q(nfc_tag__isnull=False))
+        # Получаем агрегированные данные за сегодня
+        today_stats = cls.objects.filter(
+            day=today
+        ).values('number__number').annotate(
+            rfid_today=Sum('amount_of_rfid'),
+            balloons_today=Sum('amount_of_sensor')
         )
 
         # Преобразуем в словари для быстрого доступа
-        month_dict = {stat['number']: stat for stat in month_stats}
-        today_dict = {stat['number']: stat for stat in today_stats}
+        month_dict = {stat['number__number']: stat for stat in month_stats}
+        today_dict = {stat['number__number']: stat for stat in today_stats}
 
         stats = []
         for reader in ReaderSettings.objects.all():
@@ -273,13 +272,72 @@ class Reader(models.Model):
 
             stats.append({
                 "reader_id": reader_id,
-                "balloons_month": month.get('balloons_month', 0),
-                "rfid_month": month.get('rfid_month', 0),
-                "balloons_today": today.get('balloons_today', 0),
-                "rfid_today": today.get('rfid_today', 0),
+                "balloons_month": month.get('balloons_month', 0) or 0,
+                "rfid_month": month.get('rfid_month', 0) or 0,
+                "balloons_today": today.get('balloons_today', 0) or 0,
+                "rfid_today": today.get('rfid_today', 0) or 0,
             })
 
         return stats
+
+
+class TotalReadersCounter(models.Model):
+    """
+    Свод по складу. Можно хранить ручные базовые значения (от которых ведется отсчет).
+    """
+    total_empty = models.IntegerField(default=0, verbose_name="Всего пустых баллонов")
+    total_full = models.IntegerField(default=0, verbose_name="Всего полных баллонов")
+    changed_at = models.DateTimeField(auto_now=True, verbose_name='Дата последнего изменения')
+
+    class Meta:
+        verbose_name = "Свод по складу"
+        verbose_name_plural = "Свод по складу"
+        ordering = ['-changed_at']
+
+    def __str__(self):
+        return f'Свод (E={self.total_empty}, F={self.total_full})'
+
+    @classmethod
+    def add_full_balloon(cls):
+        cls.objects.filter(pk=1).update(total_full=F('total_full') + 1, changed_at=timezone.now())
+
+    @classmethod
+    def add_empty_balloon(cls):
+        cls.objects.filter(pk=1).update(total_empty=F('total_empty') + 1, changed_at=timezone.now())
+
+    @classmethod
+    def sub_full_balloon(cls):
+        cls.objects.filter(pk=1, total_full__gt=0).update(total_full=F('total_full') - 1, changed_at=timezone.now())
+
+    @classmethod
+    def sub_empty_balloon(cls):
+        cls.objects.filter(pk=1, total_empty__gt=0).update(total_empty=F('total_empty') - 1, changed_at=timezone.now())
+
+    @classmethod
+    def insert_manual_values(cls, empty: int = None, full: int = None):
+        """Ввод значений со SCADA системы"""
+        cls.objects.filter(pk=1).update(
+            total_empty=empty if empty is not None else F('total_empty'),
+            total_full=full if full is not None else F('total_full'),
+            changed_at=timezone.now()
+        )
+
+    @classmethod
+    def get_balloons_stats(cls):
+        """
+        Получение статистики полных и пустых баллонов на станции.
+        Возвращает словарь с количеством полных и пустых баллонов.
+        """
+        counter = cls.objects.filter(pk=1).first()
+        if counter:
+            return {
+                'filled': counter.total_full,
+                'empty': counter.total_empty
+            }
+        return {
+            'filled': 0,
+            'empty': 0
+        }
 
 
 class TruckType(models.Model):
@@ -490,11 +548,11 @@ class BalloonsBatch(models.Model):
         on_delete=models.DO_NOTHING,
         null=True,
         blank=True,
-        default=0,
         verbose_name="Прицеп"
     )
     reader_number = models.IntegerField(null=True, blank=True, verbose_name="Номер считывателя")
     amount_of_rfid = models.IntegerField(default=0, verbose_name="Количество баллонов по rfid")
+    amount_of_sensor = models.IntegerField(default=0, verbose_name="Количество баллонов по датчику")
     amount_of_5_liters = models.IntegerField(default=0, verbose_name="Количество 5л баллонов")
     amount_of_12_liters = models.IntegerField(default=0, verbose_name="Количество 12л баллонов")
     amount_of_27_liters = models.IntegerField(default=0, verbose_name="Количество 27л баллонов")
@@ -506,8 +564,8 @@ class BalloonsBatch(models.Model):
         verbose_name="Список баллонов"
     )
     is_active = models.BooleanField(default=False, verbose_name="В работе")
-    ttn = models.CharField(max_length=20, default='', verbose_name="Номер ТТН")
-    amount_of_ttn = models.IntegerField(null=True, blank=True, verbose_name="Количество баллонов по ТТН")
+    ttn_id = models.IntegerField(verbose_name="ID ТТН")
+    balloons_type = models.CharField(choices=settings.BALLOON_TYPE_CHOICES, default='e', verbose_name="Пустой/полный")
     user = models.ForeignKey(
         User,
         on_delete=models.DO_NOTHING,
@@ -516,7 +574,7 @@ class BalloonsBatch(models.Model):
     )
 
     def __str__(self):
-        return str(self.id)
+        return f'Партия №{self.id}. Тип {self.batch_type}'
 
     class Meta:
         verbose_name = "Партия баллонов"
@@ -542,30 +600,35 @@ class BalloonsBatch(models.Model):
             self.amount_of_27_liters or 0,
             self.amount_of_50_liters or 0
         ]
-        total_amount = sum(amounts)
+        total_amount = sum(amounts) if not self.amount_of_sensor else self.amount_of_sensor
         return total_amount
 
-    def add_balloon(self, nfc_tag) -> dict:
+    def add_balloon(self, nfc_tag: str = None) -> dict:
         """
-        Добавляет баллон в партию по NFC-метке
+        Добавляет баллон в партию по NFC-метке. Добавляет общее количество баллонов, посчитанное оптическим датчиком.
         Возвращает словарь с результатами операции:
         {
             'success': bool,
-            'balloon_id': int | None,
-            'new_count': int,
-            'error': str
+            'balloon_id': str | None,
+            'message': str
         }
         """
         result = {
             'success': False,
             'balloon_id': None,
-            'new_count': self.amount_of_rfid or 0,
-            'error': 'ok'
+            'message': 'ok'
         }
+
+        # Добавляем баллон, прошедший через оптический датчик
+        if not nfc_tag:
+            self.amount_of_sensor = (self.amount_of_sensor or 0) + 1
+            self.save()
+            result['success'] = True
+            return result
 
         try:
             if self.balloon_list.filter(nfc_tag=nfc_tag).exists():
-                result['error'] = 'Баллон уже в партии'
+                result['message'] = f'Баллон с меткой {nfc_tag} уже в партии'
                 return result
 
             balloon = Balloon.objects.get(nfc_tag=nfc_tag)
@@ -576,37 +639,33 @@ class BalloonsBatch(models.Model):
             result.update({
                 'success': True,
                 'balloon_id': balloon.nfc_tag,
-                'new_count': self.amount_of_rfid
             })
 
         except Balloon.DoesNotExist:
-            result['error'] = 'Баллон не найден'
+            result['message'] = f'Баллон с меткой {nfc_tag} не найден'
         except Exception as e:
-            result['error'] = f'Ошибка сервера: {str(e)}'
+            result['message'] = f'Ошибка сервера: {str(e)}'
 
         return result
 
     def remove_balloon(self, nfc_tag) -> dict:
         """
-        Удаляет баллон из партии по NFC-метке
-        Возвращает словарь с результатами операции:
+        Удаляет баллон из партии по NFC-метке. Возвращает словарь с результатами операции:
         {
             'success': bool,
-            'balloon_id': int | None,
-            'new_count': int,
-            'error': str
+            'balloon_id': str | None,
+            'message': str
         }
         """
         result = {
             'success': False,
             'balloon_id': None,
-            'new_count': self.amount_of_rfid or 0,
-            'error': 'ok'
+            'message': 'ok'
         }
 
         try:
             if not self.balloon_list.filter(nfc_tag=nfc_tag).exists():
-                result['error'] = 'Баллон не найден в партии'
+                result['message'] = f'Баллон с меткой {nfc_tag} не найден в партии'
                 return result
 
             balloon = Balloon.objects.get(nfc_tag=nfc_tag)
@@ -617,13 +676,12 @@ class BalloonsBatch(models.Model):
             result.update({
                 'success': True,
                 'balloon_id': balloon.nfc_tag,
-                'new_count': self.amount_of_rfid
             })
 
         except Balloon.DoesNotExist:
-            result['error'] = 'Баллон не найден'
+            result['message'] = f'Баллон с меткой {nfc_tag} не найден'
         except Exception as e:
-            result['error'] = f'Ошибка сервера: {str(e)}'
+            result['message'] = f'Ошибка сервера: {str(e)}'
 
         return result
 
@@ -648,8 +706,8 @@ class BalloonsBatch(models.Model):
             batch_balloon_count=Count('balloon_list'),
         ).aggregate(
             total_batches=Count('id'),
-            total_balloon_count_by_rfid=Sum('batch_balloon_count'),
-            total_balloon_count_by_ttn=Sum('amount_of_ttn'),
+            amount_balloons_by_rfid=Sum('batch_balloon_count'),
+            amount_balloons_by_sensor=Sum('amount_of_sensor'),
         )
 
     @classmethod
@@ -657,17 +715,20 @@ class BalloonsBatch(models.Model):
         """
         Собирает статистику по партиям за последние день и месяц
         """
-        today = date.today()
-        first_day_of_month = today.replace(day=1)
+        now = timezone.now()
+        
+        # Начало сегодняшнего дня
+        today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+        
+        # Начало месяца
+        month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
 
-        month_start = datetime.combine(first_day_of_month, time.min)
-
+        # Фильтруем по месяцу
         queryset = cls.objects.filter(started_at__gte=month_start)
         
         if batch_type:
             queryset = queryset.filter(batch_type=batch_type)
 
-        # Группируем по reader_number
         stats_by_reader = defaultdict(lambda: {"truck_month": 0, "truck_today": 0})
 
         for batch in queryset:
@@ -676,7 +737,9 @@ class BalloonsBatch(models.Model):
                 continue
 
             stats_by_reader[reader_id]["truck_month"] += 1
-            if batch.started_at >= today:
+            
+            # Все datetime теперь aware (с часовым поясом)
+            if batch.started_at >= today_start:
                 stats_by_reader[reader_id]["truck_today"] += 1
 
         stats = [

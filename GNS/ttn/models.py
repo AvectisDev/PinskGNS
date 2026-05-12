@@ -1,5 +1,4 @@
 from django.db import models
-from django.contrib.auth.models import User
 from django.urls import reverse
 from django.db.models import Q, Sum
 from django.conf import settings
@@ -257,3 +256,23 @@ class EmailRecipient(models.Model):
 
     def __str__(self):
         return f"{self.email} ({'активен' if self.active else 'неактивен'})"
+
+
+class MiriadaTtn(models.Model):
+    """
+    Модель для хранения ТТН из системы Мириада.
+    Используется для интеграции с API Мириады при работе с партиями баллонов.
+    """
+    ttn_id = models.IntegerField(unique=True, verbose_name="ID ТТН в Мириаде")
+    name = models.CharField(max_length=100, verbose_name="Номер ТТН")
+    auto = models.CharField(max_length=50, verbose_name="Номер автомобиля")
+    date = models.DateField(null=True, blank=True, verbose_name="Дата ТТН")
+    updated_at = models.DateTimeField(auto_now=True, verbose_name="Дата обновления записи")
+
+    def __str__(self):
+        return f"{self.name} (ID: {self.ttn_id})"
+
+    class Meta:
+        verbose_name = "ТТН из Мириады"
+        verbose_name_plural = "ТТН из Мириады"
+        ordering = ['-updated_at']

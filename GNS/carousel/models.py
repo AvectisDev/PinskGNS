@@ -21,7 +21,7 @@ class Carousel(models.Model):
         return self.pk
 
     def __str__(self):
-        return self.nfc_tag
+        return self.nfc_tag if self.nfc_tag else 'Нет'
 
     class Meta:
         verbose_name = "Карусель"
@@ -36,6 +36,7 @@ class CarouselSettings(models.Model):
     weight_correction_value = models.FloatField(default=0.0, verbose_name="Значение корректировки веса")
     min_balloon_weight = models.FloatField(default=17.8, verbose_name="Минимальный вес баллона")
     max_balloon_weight = models.FloatField(default=46.5, verbose_name="Максимальный вес баллона")
+    max_passport_weight_diff = models.FloatField(default=21.5, verbose_name="Максимальная разница в паспортных весах баллона")
     post_1_correction = models.FloatField(default=0.0, verbose_name="Корректор для 1 поста")
     post_2_correction = models.FloatField(default=0.0, verbose_name="Корректор для 2 поста")
     post_3_correction = models.FloatField(default=0.0, verbose_name="Корректор для 3 поста")

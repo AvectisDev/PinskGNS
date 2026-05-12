@@ -23,12 +23,10 @@ class RailwayTankForm(forms.ModelForm):
         model = RailwayTank
         fields = [
             'registration_number',
-            'gas_type',
             'is_on_station',
         ]
         widgets = {
             'registration_number': forms.NumberInput(attrs={'class': 'form-control'}),
-            'gas_type': forms.Select(choices=settings.GAS_TYPE_CHOICES, attrs={'class': 'form-control'}),
             'is_on_station': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
         }
 
@@ -57,6 +55,7 @@ class RailwayTankHistoryForm(forms.ModelForm):
             'full_weight',
             'empty_weight',
             'gas_weight',
+            'gas_type',
             'railway_ttn',
             'netto_weight_ttn',
         ]
@@ -66,6 +65,7 @@ class RailwayTankHistoryForm(forms.ModelForm):
             'full_weight': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
             'empty_weight': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
             'gas_weight': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
+            'gas_type': forms.Select(choices=settings.GAS_TYPE_CHOICES, attrs={'class': 'form-control'}),
             'railway_ttn': forms.TextInput(attrs={'class': 'form-control'}),
             'netto_weight_ttn': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
         }
@@ -90,8 +90,19 @@ class RailwayBatchForm(forms.ModelForm):
             'is_active'
         ]
         widgets = {
-            'end_date': forms.DateTimeInput(format='%Y-%m-%d', attrs={'type': 'date'}),
-            'gas_amount_spbt': forms.NumberInput(attrs={'class': 'form-control'}),
-            'gas_amount_pba': forms.NumberInput(attrs={'class': 'form-control'}),
+            'end_date': forms.DateTimeInput(format='%Y-%m-%dT%H:%M', attrs={
+                'type': 'datetime-local',
+                'class': 'form-control'
+            }),
+            'gas_amount_spbt': forms.NumberInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'Введите количество газа СПБТ',
+                'step': '0.1'
+            }),
+            'gas_amount_pba': forms.NumberInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'Введите количество газа ПБА',
+                'step': '0.1'
+            }),
             'is_active': forms.CheckboxInput(attrs={'class': 'form-check-input'})
         }

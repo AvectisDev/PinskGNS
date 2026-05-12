@@ -28,6 +28,8 @@
                             </span>
                         </dd>
 
+                        <hr>
+                        
                         <dt class="col-sm-8">Использовать общее значение коррекции:</dt>
                         <dd class="col-sm-4">
                             <span class="badge bg-{% if carousel_settings.use_common_correction %}success{% else %}secondary{% endif %}">
@@ -46,6 +48,9 @@
 
                         <dt class="col-sm-8">Максимальный вес баллона:</dt>
                         <dd class="col-sm-4">{{ carousel_settings.max_balloon_weight|floatformat:2 }} кг</dd>
+
+                        <dt class="col-sm-8">Максимальная разница паспортных весов:</dt>
+                        <dd class="col-sm-4">{{ carousel_settings.max_passport_weight_diff|floatformat:2 }} кг</dd>
                     </dl>
                 </div>
             </div>

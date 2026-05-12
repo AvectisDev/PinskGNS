@@ -54,7 +54,10 @@ class AutoGasBatch(models.Model):
 
     @classmethod
     def get_period_stats(cls, start_date=None, end_date=None):
-        queryset = cls.objects.filter(begin_at__range=[start_date, end_date])
+        queryset = cls.objects.filter(
+            begin_at__date__gte=start_date,
+            begin_at__date__lte=end_date
+        )
 
         return queryset.aggregate(
             loading_batches=Count('id', filter=Q(batch_type='l')),

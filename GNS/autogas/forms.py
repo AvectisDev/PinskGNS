@@ -20,18 +20,7 @@ class AutoGasBatchForm(forms.ModelForm):
 
     class Meta:
         model = AutoGasBatch
-        fields = [
-            'batch_type',
-            'completed_at',
-            'truck',
-            'trailer',
-            'gas_amount',
-            'gas_type',
-            'scale_empty_weight',
-            'scale_full_weight',
-            'weight_gas_amount',
-            'is_active',
-        ]
+        exclude = ['user']
         widgets = {
             'batch_type': forms.Select(attrs={
                 'class': 'form-control',
@@ -49,7 +38,7 @@ class AutoGasBatchForm(forms.ModelForm):
             'gas_amount': forms.NumberInput(attrs={
                 'class': 'form-control',
                 'placeholder': 'Введите количество газа по массомеру',
-                'step': '0.01'
+                'step': '0.1'
             }),
             'gas_type': forms.Select(attrs={
                 'class': 'form-control',
@@ -57,17 +46,17 @@ class AutoGasBatchForm(forms.ModelForm):
             'scale_empty_weight': forms.NumberInput(attrs={
                 'class': 'form-control',
                 'placeholder': 'Вес пустого транспорта',
-                'step': '0.01'
+                'step': '0.1'
             }),
             'scale_full_weight': forms.NumberInput(attrs={
                 'class': 'form-control',
                 'placeholder': 'Вес груженого транспорта',
-                'step': '0.01'
+                'step': '0.1'
             }),
             'weight_gas_amount': forms.NumberInput(attrs={
                 'class': 'form-control',
                 'placeholder': 'Количество газа по весам',
-                'step': '0.01'
+                'step': '0.1'
             }),
             'is_active': forms.CheckboxInput(attrs={
                 'class': 'form-check-input',

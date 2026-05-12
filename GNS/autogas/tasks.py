@@ -7,5 +7,4 @@ logger = logging.getLogger('autogas')
 @shared_task
 def auto_gas_processing():
     command = AutoGasBatchHandleCommand()
-    logger.info('Начало обработки автоцистерн...')
     command.handle()

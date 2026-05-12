@@ -6,7 +6,7 @@ from django.views import generic
 from django.db.models import Q, Sum, Count
 from autogas.models import AutoGasBatch
 from railway_service.models import RailwayBatch
-from .models import Balloon, Truck, Trailer, BalloonsBatch, Reader, ReaderSettings
+from .models import Balloon, Truck, Trailer, BalloonsBatch, Reader, ReaderSettings, DailyReaderCounter
 from .admin import BalloonResources
 from .forms import (
     GetBalloonsAmount,
@@ -16,17 +16,6 @@ from .forms import (
     BalloonsBatchForm
 )
 from datetime import datetime, time, timedelta
-
-STATUS_LIST = {
-    1: 'Регистрация пустого баллона на складе (из кассеты)',
-    2: 'Погрузка полного баллона в кассету',
-    3: 'Погрузка полного баллона на трал 1',
-    4: 'Погрузка полного баллона на трал 2',
-    5: 'Регистрация полного баллона на складе',
-    6: 'Регистрация пустого баллона на складе (рампа)',
-    7: 'Регистрация пустого баллона на складе (цех)',
-    8: 'Наполнение баллона сжиженным газом',
-}
 
 
 class BalloonListView(generic.ListView):
@@ -80,8 +69,10 @@ def reader_info(request, reader_number=1):
         if action == 'export':
             dataset = BalloonResources().export(
                 Reader.objects.filter(
-                    number=reader_number,
-                    change_date__range=(start_date, end_date)
+                    number__number=reader_number,
+                    nfc_tag__isnull=False,
+                    change_date__date__gte=start_date,
+                    change_date__date__lte=end_date,
                 )
             )
             response = HttpResponse(dataset.xlsx, content_type='xlsx')
@@ -90,20 +81,27 @@ def reader_info(request, reader_number=1):
     else:
         start_date = end_date = current_date
 
-    # Получаем все данные через метод модели
-    stats = Reader.get_reader_stats(reader_number, start_date, end_date)
+    # Получаем статистику из DailyReaderCounter
     reader = ReaderSettings.objects.get(number=reader_number)
+    counter_stats = DailyReaderCounter.get_reader_period_stats(reader, start_date, end_date)
+    
+    # Получаем список баллонов из Reader для отображения в таблице
+    # (только баллоны с RFID метками)
+    balloons_list = Reader.objects.filter(
+        number=reader_number,
+        change_date__date__gte=start_date,
+        change_date__date__lte=end_date,
+        nfc_tag__isnull=False
+    ).select_related('number').order_by('-change_date')
 
-    paginator = Paginator(stats['balloons_list'], 10)
+    paginator = Paginator(balloons_list, 10)
     page_num = request.GET.get('page', 1)
     page_obj = paginator.get_page(page_num)
 
     context = {
         "page_obj": page_obj,
-        'current_quantity_by_reader': stats['total_rfid'],
-        'current_quantity_by_sensor': stats['total_balloons'],
-        'loading_ttn_quantity': stats.get('loading_ttn_quantity', 0),
-        'unloading_ttn_quantity': stats.get('unloading_ttn_quantity', 0),
+        'current_quantity_by_reader': counter_stats['total_rfid'],
+        'current_quantity_by_sensor': counter_stats['total_sensor'],
         'form': form,
         'reader': reader,
         'start_date': start_date,
@@ -130,9 +128,10 @@ class BalloonBatchListView(generic.ListView):
 
     def get_queryset(self):
         batch_type = self.get_batch_type()
+        queryset = BalloonsBatch.objects.select_related('truck', 'trailer', 'truck__type')
         if batch_type:
-            return BalloonsBatch.objects.filter(batch_type=batch_type)
-        return BalloonsBatch.objects.all()
+            return queryset.filter(batch_type=batch_type)
+        return queryset.all()
 
 
 class BalloonBatchDetailView(generic.DetailView):
@@ -178,9 +177,10 @@ class BalloonBatchDeleteView(generic.DeleteView):
     
     def get_queryset(self):
         batch_type = self.get_batch_type()
+        queryset = BalloonsBatch.objects.select_related('truck', 'trailer', 'truck__type')
         if batch_type:
-            return BalloonsBatch.objects.filter(batch_type=batch_type)
-        return BalloonsBatch.objects.all()
+            return queryset.filter(batch_type=batch_type)
+        return queryset.all()
     
     def get_success_url(self):
         """Определяет правильный URL для редиректа после удаления"""

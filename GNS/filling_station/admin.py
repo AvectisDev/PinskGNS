@@ -7,7 +7,9 @@ from .models import (
     Trailer,
     TrailerType,
     BalloonsBatch,
-    ReaderSettings
+    ReaderSettings,
+    TotalReadersCounter,
+    DailyReaderCounter,
 )
 
 
@@ -141,14 +143,29 @@ class BalloonsBatchAdmin(admin.ModelAdmin):
         'trailer',
         'reader_number',
         'amount_of_rfid',
+        'amount_of_sensor',
         'amount_of_5_liters',
         'amount_of_12_liters',
         'amount_of_27_liters',
         'amount_of_50_liters',
         'gas_amount',
         'is_active',
-        'ttn',
-        'amount_of_ttn'
+        'ttn_id',
+        'balloons_type',
     ]
     list_filter = ['batch_type', 'started_at', 'completed_at', 'is_active']
-    search_fields = ['truck', 'is_active', 'ttn', 'batch_type']
+    search_fields = ['truck', 'is_active', 'ttn_id', 'batch_type']
+
+
+@admin.register(TotalReadersCounter)
+class TotalsReaderCounterAdmin(admin.ModelAdmin):
+    list_display = ['total_empty', 'total_full', 'changed_at']
+
+    def has_add_permission(self, request):
+        return not TotalReadersCounter.objects.exists()
+
+
+@admin.register(DailyReaderCounter)
+class DailyReaderCounterAdmin(admin.ModelAdmin):
+    list_display = ['number', 'day', 'amount_of_rfid', 'amount_of_sensor', 'change_at']
+    list_filter = ['number', 'day', 'change_at']

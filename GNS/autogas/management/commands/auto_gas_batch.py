@@ -3,6 +3,7 @@ from opcua import Client, ua
 from django.conf import settings
 from django.core.management.base import BaseCommand
 from django.db.models import Q
+from django.core.cache import cache
 from datetime import datetime
 from filling_station.models import Truck, Trailer, TrailerType
 from autogas.models import AutoGasBatch
@@ -13,16 +14,20 @@ logger = logging.getLogger('autogas')
 
 
 class Command(BaseCommand):
+    DEFAULT_CACHE_TIMEOUT = 1200
+    PENDING_REQUEST_CACHE_TIMEOUT = 30
+
     OPC_NODE_PATHS = {
         "batch_type_code": "ns=4; s=Address Space.PLC_SU2.batch.batch_type", # 1-приёмка, 2-отгрузка
         "gas_type": "ns=4; s=Address Space.PLC_SU2.batch.gas_type", # 1-Не выбран, 2-СПБТ, 3-ПБА
+        "stop_batch": "ns=4; s=Address Space.PLC_SU2.batch.stop_batch",
         "initial_mass_meter": "ns=4; s=Address Space.PLC_SU2.batch.initial_mass_meter",
         "final_mass_meter": "ns=4; s=Address Space.PLC_SU2.batch.final_mass_meter",
         "gas_amount": "ns=4; s=Address Space.PLC_SU2.batch.gas_amount",
         "truck_full_weight": "ns=4; s=Address Space.PLC_SU2.batch.truck_full_weight",
         "truck_empty_weight": "ns=4; s=Address Space.PLC_SU2.batch.truck_empty_weight",
         "weight_gas_amount": "ns=4; s=Address Space.PLC_SU2.batch.weight_gas_amount",
-        "truck_capacity ": "ns=4; s=Address Space.PLC_SU2.batch.truck_capacity",
+        "truck_capacity": "ns=4; s=Address Space.PLC_SU2.batch.truck_capacity",
         "request_batch_create": "ns=4; s=Address Space.PLC_SU2.batch.request_number_identification",
         "response_batch_create": "ns=4; s=Address Space.PLC_SU2.batch.response_number_detect",
         "request_batch_complete": "ns=4; s=Address Space.PLC_SU2.batch.request_batch_complete",
@@ -75,17 +80,40 @@ class Command(BaseCommand):
     def set_opc_value(self, node_key, value):
         """Устанавливает значение в OPC UA сервере по ключу"""
         node_path = self.OPC_NODE_PATHS.get(node_key)
-        logger.debug(f"In set_opc_value. OPC node key: {node_key}, node_path = {node_path}")
         if not node_path:
             logger.error(f"Invalid OPC node key: {node_key}")
-            return False
+
         try:
             node = self.client.get_node(node_path)
-            node.set_attribute(ua.AttributeIds.Value, ua.DataValue(value))
-            return True
+
+            # Получаем текущий тип значения узла
+            node_value = node.get_value()
+
+            # Преобразуем value к типу current_value
+            if node_value is not None:
+                target_type = type(node_value)
+                try:
+                    if target_type == bool:
+                        converted_value = bool(value)
+                    elif target_type == int:
+                        converted_value = int(value)
+                    elif target_type == float:
+                        converted_value = float(value)
+                    elif target_type == str:
+                        converted_value = str(value)
+                    else:
+                        converted_value = value
+                except (ValueError, TypeError):
+                    logger.warning(f"Cannot convert {value} to {target_type}, using default")
+                    converted_value = target_type()  # Значение по умолчанию для типа
+            else:
+                converted_value = value
+
+            logger.debug(f"Setting {node_key} to {converted_value} (type: {type(converted_value)})")
+            node.set_attribute(ua.AttributeIds.Value, ua.DataValue(converted_value))
+
         except Exception as error:
             logger.error(f"Error setting OPC value for {node_key}: {error}", exc_info=True)
-            return False
 
     def get_transport_numbers(self):
         """Получает список номеров из Интеллекта"""
@@ -129,12 +157,15 @@ class Command(BaseCommand):
         logger.debug(f'Список номеров: {registration_numbers}')
 
         truck, trailer = self.find_transports(registration_numbers)
-        logger.debug(f'Грузовик: {truck.registration_number}-{truck.type.type}, Прицеп: {trailer.registration_number}-{trailer.type.type}')
 
         if not truck:
             logger.error('Не найден подходящий грузовик')
-            self.set_opc_value("response_batch_create", True)
+            self.set_opc_value("stop_batch", True)  # Останавливаем формирование партии
             return
+
+        logger.debug(f'Грузовик: {truck.registration_number}-{truck.type.type}')
+        if trailer:
+            logger.debug(f'Прицеп: {trailer.registration_number}-{trailer.type.type}')
 
         try:
             AutoGasBatch.objects.create(
@@ -153,8 +184,10 @@ class Command(BaseCommand):
             else:
                 capacity_value = 0.0
                 logger.warning(f'Не удалось определить объём ёмкости для {truck.registration_number}')
-            
-            self.set_opc_value("truck_capacity", capacity_value)
+
+            if capacity_value:
+                self.set_opc_value("truck_capacity", capacity_value)
+
             self.set_opc_value("response_batch_create", True)
         except Exception as e:
             logger.error(f'Ошибка при создании партии: {e}', exc_info=True)
@@ -181,6 +214,23 @@ class Command(BaseCommand):
 
             # Получаем все значения OPC
             opc_values = {key: self.get_opc_value(key) for key in self.OPC_NODE_PATHS.keys()}
+
+            cache_key = 'autogas_batch_processing'
+            cached_data = cache.get(cache_key)
+            # Преобразуем словарь в строку для стабильного сравнения
+            opc_values_str = ';'.join(f'{k}={opc_values[k]}' for k in sorted(opc_values.keys()))
+            has_pending_create = opc_values.get("request_batch_create") and not opc_values.get("response_batch_create")
+            has_pending_complete = opc_values.get("request_batch_complete") and not opc_values.get("response_batch_complete")
+            cache_timeout = (
+                self.PENDING_REQUEST_CACHE_TIMEOUT
+                if (has_pending_create or has_pending_complete)
+                else self.DEFAULT_CACHE_TIMEOUT
+            )
+
+            if opc_values_str == cached_data:
+                return
+
+            cache.set(cache_key, opc_values_str, timeout=cache_timeout)
 
             logger.debug(
                 f'Тип партии={opc_values["batch_type_code"]}, '

@@ -1,10 +1,8 @@
-from django.urls import reverse_lazy, reverse
+from django.urls import reverse_lazy
 from django.views import generic
 from django.shortcuts import redirect
 from .models import RailwayTank, RailwayBatch, RailwayTankHistory
 from .forms import RailwayTankForm, RailwayBatchForm, RailwayTankHistoryForm
-from django.shortcuts import get_object_or_404
-from django.contrib import messages
 from django.db import transaction
 from django.db.models import Prefetch, Max
 

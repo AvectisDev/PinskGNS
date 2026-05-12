@@ -39,8 +39,8 @@
                                 {{ tank.registration_number }}
                             </a>
                         </td>
-                        <td>{{ tank.get_gas_type_display|default:"-" }}</td>
                         {% with last=tank.tank_history.all.0 %}
+                        <td>{{ last.get_gas_type_display|default:"-" }}</td>
                         <td>{{ last.full_weight|float_format|default:"-" }} т</td>
                         <td>{{ last.empty_weight|float_format|default:"-" }} т</td>
                         <td>{{ last.gas_weight|float_format|default:"-" }} т</td>

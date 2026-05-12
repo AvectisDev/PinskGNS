@@ -13,9 +13,28 @@ LOGS_DIR = os.path.join(BASE_DIR, 'log')
 SECRET_KEY = os.environ.get('SECRET_KEY')
 DEBUG = os.environ.get('DEBUG')
 
-ALLOWED_HOSTS = ['localhost', '127.0.0.1', '0.0.0.0', '10.0.2.2', '10.10.12.253', 'django']
-CSRF_COOKIE_SECURE = True
-SESSION_COOKIE_SECURE = True
+# CSRF и сессии
+CSRF_COOKIE_SECURE = False  # True только для HTTPS
+SESSION_COOKIE_SECURE = False  # True только для HTTPS
+CSRF_COOKIE_SAMESITE = 'Lax'
+SESSION_COOKIE_SAMESITE = 'Lax'
+CSRF_COOKIE_HTTPONLY = False
+SESSION_COOKIE_HTTPONLY = True
+
+# Разрешенные хосты
+ALLOWED_HOSTS = [
+    'localhost',
+    '127.0.0.1',
+    '10.10.12.253',
+    '10.0.3.2'
+]
+
+# Доверенные источники для CSRF
+CSRF_TRUSTED_ORIGINS = [
+    'http://localhost:8000',
+    'http://127.0.0.1:8000',
+    'http://10.10.12.253:8000',
+]
 
 # Application definition
 INSTALLED_APPS = [
@@ -33,6 +52,7 @@ INSTALLED_APPS = [
     'ttn.apps.TtnConfig',
     'railway_service.apps.RailwayServiceConfig',
     'autogas.apps.AutogasConfig',
+    'transport.apps.TransportConfig',
     'drf_spectacular',
     'import_export',
     'rest_framework',
@@ -211,6 +231,7 @@ CELERY_REDIS_MAX_CONNECTIONS = 20
 CELERY_WORKER_HIJACK_ROOT_LOGGER = False
 CELERY_WORKER_MAX_TASKS_PER_CHILD = 100
 CELERY_WORKER_MAX_MEMORY_PER_CHILD = 200000  # 200MB в KiB
+CELERY_WORKER_PREFETCH_MULTIPLIER = 1
 CELERY_TASK_TIME_LIMIT = 300  # 5 минут
 CELERY_TASK_SOFT_TIME_LIMIT = 240  # 4 минуты
 CELERY_HIJACK_ROOT_LOGGER = False
@@ -230,8 +251,12 @@ CELERY_BEAT_SCHEDULE = {
         'schedule': 10.0,
     },
     'kpp_processing': {
-        'task': 'filling_station.tasks.kpp_processing',
+        'task': 'transport.tasks.kpp_processing',
         'schedule': 60.0,
+    },
+    'kpp_close_transport': {
+        'task': 'transport.tasks.kpp_close_transport',
+        'schedule': crontab(hour=18, minute=0),
     },
 }
 
@@ -252,13 +277,14 @@ LOGGING = {
     'handlers': {
         'filling_station_file': {
             'level': 'DEBUG',
-            'class': 'logging.handlers.TimedRotatingFileHandler',
+            'class': 'concurrent_log_handler.ConcurrentRotatingFileHandler',
             'filename': os.path.join(LOGS_DIR, 'filling_station/filling_station.log'),
-            'when': 'midnight',
+            'maxBytes': 50 * 1024 * 1024,  # 50MB
             'backupCount': 30,
             'formatter': 'verbose',
             'encoding': 'utf-8',
             'delay': True,
+            'use_gzip': False,
         },
         'carousel_file': {
             'level': 'DEBUG',
@@ -272,23 +298,25 @@ LOGGING = {
         },
         'rfid_file': {
             'level': 'DEBUG',
-            'class': 'logging.handlers.TimedRotatingFileHandler',
+            'class': 'concurrent_log_handler.ConcurrentRotatingFileHandler',
             'filename': os.path.join(LOGS_DIR, 'rfid/rfid.log'),
-            'when': 'midnight',
+            'maxBytes': 10 * 1024 * 1024,  # 10MB
             'backupCount': 30,
             'formatter': 'verbose',
             'encoding': 'utf-8',
             'delay': True,
+            'use_gzip': False,
         },
         'celery_file': {
             'level': 'DEBUG',
-            'class': 'logging.handlers.TimedRotatingFileHandler',
+            'class': 'concurrent_log_handler.ConcurrentRotatingFileHandler',
             'filename': os.path.join(LOGS_DIR, 'celery/celery.log'),
-            'when': 'midnight',
+            'maxBytes': 10 * 1024 * 1024,  # 10MB
             'backupCount': 30,
             'formatter': 'verbose',
             'encoding': 'utf-8',
             'delay': True,
+            'use_gzip': False,
         },
         'railway_file': {
             'level': 'DEBUG',
@@ -310,6 +338,16 @@ LOGGING = {
             'encoding': 'utf-8',
             'delay': True,
         },
+        'kpp_file': {
+            'level': 'DEBUG',
+            'class': 'logging.handlers.TimedRotatingFileHandler',
+            'filename': os.path.join(LOGS_DIR, 'transport/kpp.log'),
+            'when': 'midnight',
+            'backupCount': 30,
+            'formatter': 'verbose',
+            'encoding': 'utf-8',
+            'delay': True,
+        },
     },
     'loggers': {
         'filling_station': {
@@ -324,12 +362,12 @@ LOGGING = {
         },
         'rfid': {
             'handlers': ['rfid_file'],
-            'level': 'DEBUG',
+            'level': 'INFO',
             'propagate': True,
         },
         'celery': {
             'handlers': ['celery_file'],
-            'level': 'DEBUG',
+            'level': 'INFO',
             'propagate': False,
         },
         'railway': {
@@ -339,6 +377,11 @@ LOGGING = {
         },
         'autogas': {
             'handlers': ['autogas_file'],
+            'level': 'DEBUG',
+            'propagate': False,
+        },
+        'kpp': {
+            'handlers': ['kpp_file'],
             'level': 'DEBUG',
             'propagate': False,
         },
@@ -365,6 +408,9 @@ MIRIADA_API_URL = os.environ.get('MIRIADA_API_URL')
 MIRIADA_API_POST_URL = os.environ.get('MIRIADA_API_POST_URL')
 MIRIADA_AUTH_LOGIN = os.environ.get('MIRIADA_AUTH_LOGIN')
 MIRIADA_AUTH_PASSWORD = os.environ.get('MIRIADA_AUTH_PASSWORD')
+# Количество повторов неуспешного запроса к API Мириады (всего попыток = MIRIADA_REQUEST_RETRIES + 1)
+MIRIADA_REQUEST_RETRIES = 2
+MIRIADA_RETRY_DELAY_SECONDS = 1
 
 GAS_TYPE_CHOICES = [
     ('Не выбран', 'Не выбран'),
@@ -375,6 +421,11 @@ GAS_TYPE_CHOICES = [
 BATCH_TYPE_CHOICES = [
     ('l', 'Приёмка'),
     ('u', 'Отгрузка'),
+]
+
+BALLOON_TYPE_CHOICES = [
+    ('e', 'Пустой'),
+    ('f', 'Полный'),
 ]
 
 BALLOON_SIZE_CHOICES = [

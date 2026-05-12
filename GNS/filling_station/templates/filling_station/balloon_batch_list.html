@@ -14,8 +14,8 @@
                     <thead class="table-light">
                         <tr>
                             <th>Номер партии</th>
-                            <th>Дата и время начала</th>
-                            <th>Дата и время окончания</th>
+                            <th>Начата</th>
+                            <th>Завершена</th>
                             <th>Автомобиль</th>
                             <th>Прицеп</th>
                             <th>Баллонов (RFID)</th>
@@ -53,7 +53,7 @@
                             <td>{{ batch.trailer|default:"-" }}</td>
                             <td>{{ batch.amount_of_rfid|default:"-" }}</td>
                             <td>{{ batch.get_amount_without_rfid|default:"-" }}</td>
-                            <td>{{ batch.ttn|default:"-" }}</td>
+                            <td>{{ batch.ttn_id|default:"-" }}</td>
                             <td>
                                 {% if batch.is_active %}
                                     <span class="badge bg-success">Активна</span>

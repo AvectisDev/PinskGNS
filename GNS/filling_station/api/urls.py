@@ -17,6 +17,7 @@ urlpatterns = [
     path('loading-balloon-reader-list', balloons.get_loading_balloon_reader_list),
     path('unloading-balloon-reader-list', balloons.get_unloading_balloon_reader_list),
     path('get-active-balloon-batch', balloons.get_active_balloon_batch),
+    path('total-readers-counter/manual-values', balloons.set_total_readers_counter_manual_values),
 
     path('trucks', transport.TruckView.as_view()),
     path('trailers', transport.TrailerView.as_view()),

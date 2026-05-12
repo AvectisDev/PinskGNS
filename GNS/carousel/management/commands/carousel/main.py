@@ -57,7 +57,7 @@ def get_and_remove_last_balloon():
 
 def put_carousel_data(data: dict, session: requests.Session):
     """
-    Функция работает как шлюз между сервером и постом наполнения, т.к. пост может слать запрос только через COM-порт в
+    работает как шлюз между сервером и постом наполнения, т.к. пост может слать запрос только через COM-порт в
     виде набора байт по проприетарному протоколу. Функция отправляет POST-запрос с текущими показаниями поста карусели
     на сервер. В ответ сервер должен прислать требуемый вес газа, которым нужно заправить баллон.
     :param data: Содержит словарь с ключами 'request_type'-тип запроса с поста наполнения, 'post_number' -
@@ -81,7 +81,7 @@ def put_carousel_data(data: dict, session: requests.Session):
 
 def calc_crc(message):
     """
-    Функция для вычисления CRC-16/AUG-CCITT
+    вычисляет CRC-16/AUG-CCITT
     """
     poly = 0x1021
     reg = 0xFFFF
@@ -101,7 +101,7 @@ def calc_crc(message):
 
 def post_processing(post_number: int):
     """
-    Функция контролирует порядок обработки постов. Запросы с постов идут в обратном порядке, например 2-1-20-19-18 и т.д.
+    контролирует порядок обработки постов. Запросы с постов идут в обратном порядке, например 2-1-20-19-18 и т.д.
     Если в определённый порядок вклинивается неверный пост, то такую обработку пропускаем.
     Используется только для типов запроса 0x7a (установка пустого баллона на пост).
     :param post_number: Номер текущего поста наполнения
@@ -131,7 +131,7 @@ def post_processing(post_number: int):
 
 def check_settings(post_number: int):
     """
-    Функция проверят настройки обработки постов в базе данных. Если установлено только чтение, то на пост не должны
+    проверяет настройки обработки постов в базе данных. Если установлено только чтение, то на пост не должны
     передаваться данные. Если установлена корректировка веса, то вес на пост должен быть отправлен с учётом корректировки
     :param post_number: Номер текущего поста наполнения
     :return: tuple: Кортеж со значениями - Нужна ли передача веса на пост и параметр коррекции веса
@@ -144,8 +144,15 @@ def check_settings(post_number: int):
 
     if post_settings:
         logger.debug(f'Настройки поста наполнения {post_settings}')
+        
         if post_settings.get('read_only'):
-            return transmit_command, weight_correction_value, post_settings.get('min_balloon_weight'), post_settings.get('max_balloon_weight')
+            return (
+                transmit_command,
+                weight_correction_value,
+                post_settings.get('min_balloon_weight'),
+                post_settings.get('max_balloon_weight'),
+                post_settings.get('max_passport_weight_diff'),
+            )
 
         transmit_command = True
         logger.debug(f'Требуется отправка веса на пост {post_number}')
@@ -156,12 +163,21 @@ def check_settings(post_number: int):
                 weight_correction_value = post_settings.get(f'post_{post_number}_correction')
         logger.debug(f'Требуется отправка веса на пост. weight_correction_value = {post_settings}')
 
-    return transmit_command, weight_correction_value, post_settings.get('min_balloon_weight'), post_settings.get('max_balloon_weight')
+    if not post_settings:
+        post_settings = {}
+
+    return (
+        transmit_command,
+        weight_correction_value,
+        post_settings.get('min_balloon_weight'),
+        post_settings.get('max_balloon_weight'),
+        post_settings.get('max_passport_weight_diff'),
+    )
 
 
 def check_balloon_size(weight: int) -> int:
     """
-    Функция определяет объём баллона по весу пустого баллона, который передаёт пост наполнения.
+    определяет объём баллона по весу пустого баллона, который передаёт пост наполнения.
     :param weight: Вес баллона перед наполнением
     :return: int: Объём баллона
     """
@@ -176,7 +192,7 @@ def check_balloon_size(weight: int) -> int:
 
 def request_caching(request_type: str, post_number: int, weight: int) -> bool:
     """
-    Функция кеширует запрос от поста наполнения.
+    кеширует запрос от поста наполнения.
     :param weight: Вес баллона перед наполнением
     :return: bool: требуется обработка запроса
     """
@@ -231,11 +247,21 @@ def request_processing(request_type: str, post_number: int, weight: int) -> tupl
 
         # Обработка данных баллона
         if balloon_from_cache.get('filling_status') and (brutto := balloon_from_cache.get('brutto')):
-            response_required, weight_correction, min_balloon_weight, max_balloon_weight = check_settings(post_number)
+            response_required, weight_correction, min_balloon_weight, max_balloon_weight, max_passport_weight_diff = check_settings(post_number)
             
-            if balloon_from_cache.get('netto') < min_balloon_weight or brutto > max_balloon_weight:
+            netto = balloon_from_cache.get('netto')
+
+            if (
+                (min_balloon_weight is not None and netto is not None and netto < min_balloon_weight) or
+                (max_balloon_weight is not None and brutto > max_balloon_weight)
+            ):
                 response_required = False
-                logger.debug(f"Вес баллона не входит в допустимый диапазон")
+                logger.debug("Вес баллона не входит в допустимый диапазон")
+
+            passport_diff = abs(brutto - netto)
+            if passport_diff > max_passport_weight_diff:
+                response_required = False
+                logger.debug(f"Разница между паспортными весами превышает допустимое значение: {passport_diff} > {max_passport_weight_diff}")
 
             if response_required:
                 full_weight = int((brutto + weight_correction) * 1000)

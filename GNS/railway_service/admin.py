@@ -11,6 +11,7 @@ class RailwayTankHistoryInline(admin.TabularInline):
         'full_weight',
         'empty_weight',
         'gas_weight',
+        'gas_type',
         'railway_ttn',
         'netto_weight_ttn',
     )
@@ -21,7 +22,6 @@ class RailwayTankHistoryInline(admin.TabularInline):
 class RailwayTankAdmin(admin.ModelAdmin):
     list_display = [
         'registration_number',
-        'gas_type',
         'is_on_station',
         ]
     search_fields = ['registration_number']
