@@ -300,7 +300,7 @@ LOGGING = {
             'level': 'DEBUG',
             'class': 'concurrent_log_handler.ConcurrentRotatingFileHandler',
             'filename': os.path.join(LOGS_DIR, 'rfid/rfid.log'),
-            'maxBytes': 100 * 1024 * 1024,  # 100MB
+            'maxBytes': 10 * 1024 * 1024,  # 10MB
             'backupCount': 30,
             'formatter': 'verbose',
             'encoding': 'utf-8',
@@ -311,7 +311,7 @@ LOGGING = {
             'level': 'DEBUG',
             'class': 'concurrent_log_handler.ConcurrentRotatingFileHandler',
             'filename': os.path.join(LOGS_DIR, 'celery/celery.log'),
-            'maxBytes': 100 * 1024 * 1024,  # 100MB
+            'maxBytes': 10 * 1024 * 1024,  # 10MB
             'backupCount': 30,
             'formatter': 'verbose',
             'encoding': 'utf-8',
