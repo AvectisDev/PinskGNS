@@ -97,15 +97,13 @@
 
         <div class="card-footer bg-light">
             <div class="d-flex justify-content-between">
-
                 {% if batch.batch_type == 'l' %}
                     <a href="{% url 'filling_station:balloon_loading_batch_list' %}" class="btn btn-custom">
+                {% else %}
+                    <a href="{% url 'filling_station:balloon_unloading_batch_list' %}" class="btn btn-custom">
+                {% endif %}
                     <i class="bi bi-arrow-left"></i> Назад
                 </a>
-                {% elif batch.batch_type == 'u' %}
-                    <a href="{% url 'filling_station:balloon_unloading_batch_list' %}" class="btn btn-custom">
-                    <i class="bi bi-arrow-left"></i> Назад
-                {% endif %}
 
                 <div>
                     <a href="{{ batch.get_update_url }}" class="btn btn-custom me-2">

@@ -581,14 +581,17 @@ class BalloonsBatch(models.Model):
         verbose_name_plural = "Партии баллонов"
         ordering = ['-started_at']
 
+    def _batch_url_prefix(self) -> str:
+        return 'balloon_loading_batch' if self.batch_type == 'l' else 'balloon_unloading_batch'
+
     def get_absolute_url(self):
-        return reverse('filling_station:balloon_loading_batch_detail', args=[self.pk])
+        return reverse(f'filling_station:{self._batch_url_prefix()}_detail', args=[self.pk])
 
     def get_update_url(self):
-        return reverse('filling_station:balloon_loading_batch_update', args=[self.pk])
+        return reverse(f'filling_station:{self._batch_url_prefix()}_update', args=[self.pk])
 
     def get_delete_url(self):
-        return reverse('filling_station:balloon_loading_batch_delete', args=[self.pk])
+        return reverse(f'filling_station:{self._batch_url_prefix()}_delete', args=[self.pk])
 
     def get_ttn_name(self) -> Optional[str]:
         """Номер ТТН из Мириады по сохранённому ttn_id"""

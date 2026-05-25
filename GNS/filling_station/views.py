@@ -111,21 +111,25 @@ def reader_info(request, reader_number=1):
     return render(request, 'filling_station/rfid_tables.html', context)
 
 
+class BalloonBatchTypeMixin:
+    """Определяет тип партии (приёмка/отгрузка) по URL."""
+
+    def get_batch_type(self):
+        path = self.request.path.lower()
+        if 'unloading' in path:
+            return 'u'
+        if 'loading' in path:
+            return 'l'
+        return None
+
+
 # Единые классы для работы с партиями баллонов
-class BalloonBatchListView(generic.ListView):
+class BalloonBatchListView(BalloonBatchTypeMixin, generic.ListView):
     """Отображает список партий баллонов в зависимости от типа"""
     model = BalloonsBatch
     form_class = BalloonsBatchForm
     paginate_by = 10
     template_name = 'filling_station/balloon_batch_list.html'
-    
-    def get_batch_type(self):
-        path = self.request.path.lower()
-        if 'unloading' in path:
-            return 'u'
-        elif 'loading' in path:
-            return 'l'
-        return None
 
     def get_queryset(self):
         batch_type = self.get_batch_type()
@@ -140,7 +144,7 @@ class BalloonBatchListView(generic.ListView):
         return queryset.all()
 
 
-class BalloonBatchDetailView(generic.DetailView):
+class BalloonBatchDetailView(BalloonBatchTypeMixin, generic.DetailView):
     """Отображает детальное представление партии баллонов"""
     model = BalloonsBatch
     context_object_name = 'batch'
@@ -150,59 +154,52 @@ class BalloonBatchDetailView(generic.DetailView):
         ttn_name_sq = MiriadaTtn.objects.filter(
             ttn_id=OuterRef('ttn_id')
         ).values('name')[:1]
-        return BalloonsBatch.objects.select_related(
+        queryset = BalloonsBatch.objects.select_related(
             'truck', 'trailer', 'truck__type'
         ).annotate(ttn_name=Subquery(ttn_name_sq))
-    
+        batch_type = self.get_batch_type()
+        if batch_type:
+            queryset = queryset.filter(batch_type=batch_type)
+        return queryset
 
-class BalloonBatchUpdateView(generic.UpdateView):
+
+class BalloonBatchUpdateView(BalloonBatchTypeMixin, generic.UpdateView):
     """Универсальное редактирование партии баллонов"""
     model = BalloonsBatch
     form_class = BalloonsBatchForm
     template_name = 'filling_station/_equipment_form.html'
-    
+
+    def get_queryset(self):
+        queryset = BalloonsBatch.objects.select_related('truck', 'trailer', 'truck__type')
+        batch_type = self.get_batch_type()
+        if batch_type:
+            queryset = queryset.filter(batch_type=batch_type)
+        return queryset
+
     def get_success_url(self):
         return self.object.get_absolute_url()
 
     def post(self, request, *args, **kwargs):
         if 'cancel' in request.POST:
-            # Определяем правильный URL для редиректа
-            url_name = self.request.resolver_match.url_name
-            if 'loading' in url_name:
-                return redirect('filling_station:balloon_loading_batch_detail', pk=self.get_object().pk)
-            elif 'unloading' in url_name:
-                return redirect('filling_station:balloon_unloading_batch_detail', pk=self.get_object().pk)
+            return redirect(self.get_object().get_absolute_url())
         return super().post(request, *args, **kwargs)
 
 
-class BalloonBatchDeleteView(ModalDeleteMixin, generic.DeleteView):
+class BalloonBatchDeleteView(BalloonBatchTypeMixin, ModalDeleteMixin, generic.DeleteView):
     """Универсальное удаление партии баллонов"""
     model = BalloonsBatch
-    
-    def get_batch_type(self):
-        """Определяет тип партии из URL"""
-        url_name = self.request.resolver_match.url_name
-        if 'loading' in url_name:
-            return 'l'
-        elif 'unloading' in url_name:
-            return 'u'
-        return None
-    
+
     def get_queryset(self):
-        batch_type = self.get_batch_type()
         queryset = BalloonsBatch.objects.select_related('truck', 'trailer', 'truck__type')
+        batch_type = self.get_batch_type()
         if batch_type:
-            return queryset.filter(batch_type=batch_type)
-        return queryset.all()
-    
+            queryset = queryset.filter(batch_type=batch_type)
+        return queryset
+
     def get_success_url(self):
-        """Определяет правильный URL для редиректа после удаления"""
-        url_name = self.request.resolver_match.url_name
-        if 'loading' in url_name:
-            return reverse_lazy("filling_station:balloon_loading_batch_list")
-        elif 'unloading' in url_name:
+        if self.get_batch_type() == 'u':
             return reverse_lazy("filling_station:balloon_unloading_batch_list")
-        return reverse_lazy("filling_station:balloon_loading_batch_list")  # fallback
+        return reverse_lazy("filling_station:balloon_loading_batch_list")
 
 
 # Алиасы для обратной совместимости
