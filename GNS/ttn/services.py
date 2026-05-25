@@ -2,8 +2,11 @@ import requests
 import logging
 import time
 from datetime import datetime
-from typing import Optional
+from typing import Optional, TYPE_CHECKING
 from django.conf import settings
+
+if TYPE_CHECKING:
+    from filling_station.models import BalloonsBatch
 
 
 logger = logging.getLogger('filling_station')
@@ -106,15 +109,48 @@ def get_current_ttn_from_miriada() -> Optional[list]:
     return []
 
 
-def close_ttn_in_miriada(ttn_id: int) -> bool:
+def _log_batch_balloons_on_ttn_close(ttn_id: int, batch: Optional['BalloonsBatch'] = None) -> None:
+    from filling_station.models import BalloonsBatch
+
+    if batch is None:
+        batch = (
+            BalloonsBatch.objects.filter(ttn_id=ttn_id, is_active=True)
+            .prefetch_related('balloon_list')
+            .first()
+        )
+        if batch is None:
+            batch = (
+                BalloonsBatch.objects.filter(ttn_id=ttn_id)
+                .prefetch_related('balloon_list')
+                .order_by('-started_at')
+                .first()
+            )
+    else:
+        batch = BalloonsBatch.objects.prefetch_related('balloon_list').get(pk=batch.pk)
+
+    if batch is None:
+        logger.info(f"Закрытие ТТН {ttn_id}: партия с этим ttn_id не найдена")
+        return
+
+    nfc_tags = list(batch.balloon_list.values_list('nfc_tag', flat=True))
+    logger.info(
+        f"Закрытие ТТН {ttn_id}, партия №{batch.id}: "
+        f"количество баллонов={len(nfc_tags)}, nfc_tag={nfc_tags}"
+    )
+
+
+def close_ttn_in_miriada(ttn_id: int, batch: Optional['BalloonsBatch'] = None) -> bool:
     """
     Закрывает ТТН в Мириаде по её ID.
     При неуспешном запросе выполняется до 2 повторных попыток.
     Args:
         ttn_id (int): ID ТТН в системе Мириада
+        batch: партия баллонов (для логирования состава на момент закрытия)
     Returns:
         bool: True при успешном закрытии, False в случае ошибки после всех попыток
     """
+    _log_batch_balloons_on_ttn_close(ttn_id, batch=batch)
+
     url = f'{settings.MIRIADA_API_POST_URL}/closettn'
 
     headers = {
