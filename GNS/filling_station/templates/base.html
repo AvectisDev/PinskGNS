@@ -153,8 +153,34 @@
     {% endblock content %}
 </div>
 
+{% include 'core/_delete_modal.html' %}
+
 <script src="/static/filling_station/bootstrap/jquery-3.5.1.slim.min.js"></script>
 <script type="text/javascript" src="/static/filling_station/bootstrap/js/bootstrap.bundle.min.js"></script>
+<script>
+    (function () {
+        const modalEl = document.getElementById('deleteConfirmModal');
+        if (!modalEl) return;
+
+        const modal = new bootstrap.Modal(modalEl);
+        const form = document.getElementById('deleteConfirmForm');
+        const messageEl = document.getElementById('deleteConfirmMessage');
+
+        document.addEventListener('click', function (event) {
+            const trigger = event.target.closest('.js-delete-trigger');
+            if (!trigger) return;
+
+            event.preventDefault();
+            const url = trigger.getAttribute('href');
+            if (!url || url === '#') return;
+
+            form.action = url;
+            messageEl.textContent = trigger.dataset.deleteMessage
+                || 'Вы уверены, что хотите удалить запись?';
+            modal.show();
+        });
+    })();
+</script>
 {% block extra_scripts %}{% endblock %}
     <script>
         // Активация текущего пункта меню

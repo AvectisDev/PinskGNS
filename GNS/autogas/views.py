@@ -3,6 +3,7 @@ from django.views import generic
 from .models import AutoGasBatch
 from .forms import AutoGasBatchForm
 from django.shortcuts import redirect
+from core.mixins import ModalDeleteMixin
 
 
 # Партии автоцистерн
@@ -32,7 +33,6 @@ class AutoGasBatchUpdateView(generic.UpdateView):
         return super().post(request, *args, **kwargs)
 
 
-class AutoGasBatchDeleteView(generic.DeleteView):
+class AutoGasBatchDeleteView(ModalDeleteMixin, generic.DeleteView):
     model = AutoGasBatch
     success_url = reverse_lazy("autogas:auto_gas_batch_list")
-    template_name = 'autogas/auto_batch_confirm_delete.html'

@@ -1,4 +1,5 @@
 from django.shortcuts import render, redirect
+from core.mixins import ModalDeleteMixin
 from django.http import HttpResponse
 from django.core.paginator import Paginator
 from django.urls import reverse_lazy, reverse
@@ -52,10 +53,9 @@ class BalloonUpdateView(generic.UpdateView):
         return super().post(request, *args, **kwargs)
 
 
-class BalloonDeleteView(generic.DeleteView):
+class BalloonDeleteView(ModalDeleteMixin, generic.DeleteView):
     model = Balloon
     success_url = reverse_lazy("filling_station:balloon_list")
-    template_name = 'filling_station/balloon_confirm_delete.html'
 
 
 def reader_info(request, reader_number=1):
@@ -175,10 +175,9 @@ class BalloonBatchUpdateView(generic.UpdateView):
         return super().post(request, *args, **kwargs)
 
 
-class BalloonBatchDeleteView(generic.DeleteView):
+class BalloonBatchDeleteView(ModalDeleteMixin, generic.DeleteView):
     """Универсальное удаление партии баллонов"""
     model = BalloonsBatch
-    template_name = 'filling_station/balloon_batch_confirm_delete.html'
     
     def get_batch_type(self):
         """Определяет тип партии из URL"""
@@ -251,10 +250,9 @@ class TruckUpdateView(generic.UpdateView):
         return super().post(request, *args, **kwargs)
 
 
-class TruckDeleteView(generic.DeleteView):
+class TruckDeleteView(ModalDeleteMixin, generic.DeleteView):
     model = Truck
     success_url = reverse_lazy("filling_station:truck_list")
-    template_name = 'filling_station/truck_confirm_delete.html'
 
 
 # Прицепы
@@ -290,10 +288,9 @@ class TrailerUpdateView(generic.UpdateView):
         return super().post(request, *args, **kwargs)
 
 
-class TrailerDeleteView(generic.DeleteView):
+class TrailerDeleteView(ModalDeleteMixin, generic.DeleteView):
     model = Trailer
     success_url = reverse_lazy("filling_station:trailer_list")
-    template_name = 'filling_station/trailer_confirm_delete.html'
 
 
 # Обработка данных для вкладки "Статистика"

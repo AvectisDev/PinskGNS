@@ -1,4 +1,5 @@
 from django.shortcuts import render, redirect
+from core.mixins import ModalDeleteMixin
 from django.urls import reverse_lazy, reverse
 from django.views import generic
 from django.db.models import Q, Sum
@@ -52,10 +53,9 @@ class TTNUpdateView(generic.UpdateView):
         return response
 
 
-class TTNDeleteView(generic.DeleteView):
+class TTNDeleteView(ModalDeleteMixin, generic.DeleteView):
     model = BalloonTtn
     success_url = reverse_lazy("ttn:ttn_list")
-    template_name = 'ttn/balloonttn_confirm_delete.html'
 
 
 # ТТН для жд цистерн
@@ -123,10 +123,9 @@ class RailwayTtnUpdateView(generic.UpdateView):
         return super().form_valid(form)
 
 
-class RailwayTtnDeleteView(generic.DeleteView):
+class RailwayTtnDeleteView(ModalDeleteMixin, generic.DeleteView):
     model = RailwayTtn
     success_url = reverse_lazy("ttn:railway_ttn_list")
-    template_name = 'ttn/railwayttn_confirm_delete.html'
 
 
 # ТТН для автоцистерн
@@ -223,7 +222,6 @@ class AutoTtnUpdateView(generic.UpdateView):
             self.object.save()
 
 
-class AutoTtnDeleteView(generic.DeleteView):
+class AutoTtnDeleteView(ModalDeleteMixin, generic.DeleteView):
     model = AutoTtn
     success_url = reverse_lazy("ttn:auto_ttn_list")
-    template_name = 'ttn/autottn_confirm_delete.html'

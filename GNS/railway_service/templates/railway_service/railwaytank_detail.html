@@ -101,9 +101,7 @@
                     <a href="{{ object.get_update_url }}" class="btn btn-custom me-2">
                         <i class="bi bi-pencil"></i> Редактировать
                     </a>
-                    <a href="{{ object.get_delete_url }}" class="btn btn-danger">
-                        <i class="bi bi-trash"></i> Удалить
-                    </a>
+                    {% include 'core/_delete_trigger.html' with url=object.get_delete_url message="Вы уверены, что хотите удалить цистерну?" %}
                 </div>
             </div>
         </div>

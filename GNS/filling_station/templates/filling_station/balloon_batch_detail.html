@@ -112,9 +112,7 @@
                         <i class="bi bi-pencil"></i> Редактировать
                     </a>
 
-                    <a href="{{ batch.get_delete_url }}" class="btn btn-danger">
-                        <i class="bi bi-trash"></i> Удалить
-                    </a>
+                    {% include 'core/_delete_trigger.html' with url=batch.get_delete_url message="Вы уверены, что хотите удалить партию?" %}
                 </div>
             </div>
         </div>
