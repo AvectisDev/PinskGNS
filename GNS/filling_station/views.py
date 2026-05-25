@@ -3,7 +3,8 @@ from django.http import HttpResponse
 from django.core.paginator import Paginator
 from django.urls import reverse_lazy, reverse
 from django.views import generic
-from django.db.models import Q, Sum, Count
+from django.db.models import Q, Sum, Count, OuterRef, Subquery
+from ttn.models import MiriadaTtn
 from autogas.models import AutoGasBatch
 from railway_service.models import RailwayBatch
 from .models import Balloon, Truck, Trailer, BalloonsBatch, Reader, ReaderSettings, DailyReaderCounter
@@ -128,7 +129,12 @@ class BalloonBatchListView(generic.ListView):
 
     def get_queryset(self):
         batch_type = self.get_batch_type()
-        queryset = BalloonsBatch.objects.select_related('truck', 'trailer', 'truck__type')
+        ttn_name_sq = MiriadaTtn.objects.filter(
+            ttn_id=OuterRef('ttn_id')
+        ).values('name')[:1]
+        queryset = BalloonsBatch.objects.select_related(
+            'truck', 'trailer', 'truck__type'
+        ).annotate(ttn_name=Subquery(ttn_name_sq))
         if batch_type:
             return queryset.filter(batch_type=batch_type)
         return queryset.all()
@@ -139,6 +145,14 @@ class BalloonBatchDetailView(generic.DetailView):
     model = BalloonsBatch
     context_object_name = 'batch'
     template_name = 'filling_station/balloon_batch_detail.html'
+
+    def get_queryset(self):
+        ttn_name_sq = MiriadaTtn.objects.filter(
+            ttn_id=OuterRef('ttn_id')
+        ).values('name')[:1]
+        return BalloonsBatch.objects.select_related(
+            'truck', 'trailer', 'truck__type'
+        ).annotate(ttn_name=Subquery(ttn_name_sq))
     
 
 class BalloonBatchUpdateView(generic.UpdateView):

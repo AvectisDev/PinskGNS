@@ -150,11 +150,15 @@ class BalloonsBatchAdmin(admin.ModelAdmin):
         'amount_of_50_liters',
         'gas_amount',
         'is_active',
-        'ttn_id',
+        'display_ttn_name',
         'balloons_type',
     ]
     list_filter = ['batch_type', 'started_at', 'completed_at', 'is_active']
     search_fields = ['truck', 'is_active', 'ttn_id', 'batch_type']
+
+    @admin.display(description='Номер ТТН')
+    def display_ttn_name(self, obj):
+        return obj.get_ttn_name() or '—'
 
 
 @admin.register(TotalReadersCounter)

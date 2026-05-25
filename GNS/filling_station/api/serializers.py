@@ -88,6 +88,8 @@ class TrailerSerializer(serializers.ModelSerializer):
 
 class BalloonsBatchSerializer(serializers.ModelSerializer):
     batch_type = serializers.CharField(read_only=True)
+    ttn_name = serializers.SerializerMethodField()
+
     class Meta:
         model = BalloonsBatch
         fields = [
@@ -107,8 +109,12 @@ class BalloonsBatchSerializer(serializers.ModelSerializer):
             'gas_amount',
             'is_active',
             'ttn_id',
+            'ttn_name',
             'balloons_type',
         ]
+
+    def get_ttn_name(self, obj):
+        return obj.get_ttn_name()
 
 
 # Кастомные сериализаторы для партий приёмки/отгрузки баллонов
@@ -120,6 +126,7 @@ class BalloonsTruckSerializer(serializers.ModelSerializer):
 
 class ActiveBatchSerializer(serializers.ModelSerializer):
     truck = BalloonsTruckSerializer(read_only=True)
+    ttn_name = serializers.SerializerMethodField()
 
     class Meta:
         model = BalloonsBatch
@@ -140,8 +147,12 @@ class ActiveBatchSerializer(serializers.ModelSerializer):
             'gas_amount',
             'is_active',
             'ttn_id',
+            'ttn_name',
             'balloons_type',
         ]
+
+    def get_ttn_name(self, obj):
+        return obj.get_ttn_name()
 
 
 class BalloonAmountSerializer(serializers.ModelSerializer):

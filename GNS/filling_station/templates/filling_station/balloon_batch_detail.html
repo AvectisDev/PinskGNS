@@ -64,7 +64,7 @@
                         <dd class="col-sm-6">{{ batch.gas_amount|float_format|default:"-" }} кг</dd>
                         <hr>
                         <dt class="col-sm-6">ТТН:</dt>
-                        <dd class="col-sm-6">{{ batch.ttn_id|default:"Не указана" }}</dd>
+                        <dd class="col-sm-6">{{ batch.ttn_name|default:"Не указана" }}</dd>
 
                         <dt class="col-sm-6">Баллонов с RFID:</dt>
                         <dd class="col-sm-6">{{ batch.amount_of_rfid|default:"-" }}</dd>

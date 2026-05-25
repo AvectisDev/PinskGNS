@@ -590,6 +590,13 @@ class BalloonsBatch(models.Model):
     def get_delete_url(self):
         return reverse('filling_station:balloon_loading_batch_delete', args=[self.pk])
 
+    def get_ttn_name(self) -> Optional[str]:
+        """Номер ТТН из Мириады по сохранённому ttn_id"""
+        if not self.ttn_id:
+            return None
+        from ttn.models import MiriadaTtn
+        return MiriadaTtn.objects.filter(ttn_id=self.ttn_id).values_list('name', flat=True).first()
+
     def get_amount_without_rfid(self) -> int:
         """
         Возвращает общее количество баллонов без меток
