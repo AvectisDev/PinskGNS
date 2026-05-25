@@ -6,10 +6,10 @@ class MiriadaTtnSerializer(serializers.ModelSerializer):
     class Meta:
         model = MiriadaTtn
         fields = [
-            'ttn_id',
             'name',
             'auto',
             'date',
+            'ttn_id',
         ]
 
 

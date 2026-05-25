@@ -57,10 +57,14 @@ def process_balloon_data_sync(nfc_tag, reader_number):
     if nfc_tag is None:
         reader = services.processing_request_without_nfc(reader_number)
         if reader:
-            return {'status': 'success',
-                    'message': f'Баллон без NFC обработан на ридере {reader_number}'}
-        return {'status': 'error',
-                'message': f'Ошибка обработки баллона без NFC на ридере {reader_number}'}
+            return {
+                'status': 'success',
+                'message': f'Баллон без NFC обработан на ридере {reader_number}'
+                }
+        return {
+            'status': 'error',
+            'message': f'Ошибка обработки баллона без NFC на ридере {reader_number}'
+            }
     else:
         result = services.processing_request_with_nfc(nfc_tag=nfc_tag, reader_number=reader_number)
         if result:
@@ -136,7 +140,6 @@ async def process_input_event(reader_obj: Reader, parsed_records: List[Dict]) ->
     при переходе IN1 с 1 на 0 событие не приходит — сравнивать с предыдущим состоянием не нужно.
     Все оптические датчики на IN1: при IN1=1 в текущем состоянии записи — выполняем сценарий «без NFC».
     """
-    logger.info(f'{reader_obj.number} Получен Input Event (0x2C), records={len(parsed_records) - 1}')
     for event_data in parsed_records[1:]:
         if not isinstance(event_data, dict):
             logger.warning(f'{reader_obj.number} Input Event record не dict: {event_data!r}')

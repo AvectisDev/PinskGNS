@@ -65,9 +65,7 @@
                                     <a href="{{ truck.get_update_url }}" class="btn-icon btn-edit" title="Редактировать">
                                         <i class="bi bi-pencil"></i>
                                     </a>
-                                    <a href="{{ truck.get_delete_url }}" class="btn-icon btn-delete" title="Удалить">
-                                        <i class="bi bi-trash"></i>
-                                    </a>
+                                    {% include 'core/_delete_trigger.html' with url=truck.get_delete_url message="Вы уверены, что хотите удалить грузовик?" icon_only=True %}
                                 </div>
                             </td>
                         </tr>

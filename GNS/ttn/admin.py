@@ -102,10 +102,10 @@ class EmailRecipientAdmin(admin.ModelAdmin):
 @admin.register(MiriadaTtn)
 class MiriadaTtnAdmin(admin.ModelAdmin):
     list_display = [
-        'ttn_id',
         'name',
         'auto',
         'date',
+        'ttn_id',
         'updated_at'
     ]
     search_fields = ['ttn_id', 'name', 'auto']

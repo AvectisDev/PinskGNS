@@ -819,7 +819,7 @@ class BalloonsBatchViewSet(viewsets.ViewSet):
             
             # Если у партии есть ttn_id, закрываем ТТН в Мириаде
             if batch.ttn_id:
-                success = close_ttn_in_miriada(batch.ttn_id)
+                success = close_ttn_in_miriada(batch.ttn_id, batch=batch)
                 if not success:
                     logger.warning(f"Не удалось закрыть ТТН {batch.ttn_id} в Мириаде при закрытии партии {batch.id}")
 

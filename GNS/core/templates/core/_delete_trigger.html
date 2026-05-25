@@ -1,0 +1,6 @@
+<a href="{{ url }}"
+   class="{% if icon_only %}btn-icon btn-delete{% else %}btn btn-danger {{ extra_class }}{% endif %} js-delete-trigger"
+   title="Удалить"
+   data-delete-message="{{ message }}">
+    <i class="bi bi-trash"></i>{% if not icon_only %} Удалить{% endif %}
+</a>

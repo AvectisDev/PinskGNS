@@ -67,9 +67,7 @@
                                     <a href="{{ trailer.get_update_url }}" class="btn-icon btn-edit" title="Редактировать">
                                         <i class="bi bi-pencil"></i>
                                     </a>
-                                    <a href="{{ trailer.get_delete_url }}" class="btn-icon btn-delete" title="Удалить">
-                                        <i class="bi bi-trash"></i>
-                                    </a>
+                                    {% include 'core/_delete_trigger.html' with url=trailer.get_delete_url message="Вы уверены, что хотите удалить прицеп?" icon_only=True %}
                                 </div>
                             </td>
                         </tr>

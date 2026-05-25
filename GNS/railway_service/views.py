@@ -1,6 +1,7 @@
 from django.urls import reverse_lazy
 from django.views import generic
 from django.shortcuts import redirect
+from core.mixins import ModalDeleteMixin
 from .models import RailwayTank, RailwayBatch, RailwayTankHistory
 from .forms import RailwayTankForm, RailwayBatchForm, RailwayTankHistoryForm
 from django.db import transaction
@@ -116,10 +117,9 @@ class RailwayTankUpdateView(generic.UpdateView):
         return context
 
 
-class RailwayTankDeleteView(generic.DeleteView):
+class RailwayTankDeleteView(ModalDeleteMixin, generic.DeleteView):
     model = RailwayTank
     success_url = reverse_lazy("railway_service:railway_tank_list")
-    template_name = 'railway_service/railway_tank_confirm_delete.html'
 
 
 # Партии приёмки газа в ж/д цистернах
@@ -150,7 +150,6 @@ class RailwayBatchUpdateView(generic.UpdateView):
         return super().post(request, *args, **kwargs)
 
 
-class RailwayBatchDeleteView(generic.DeleteView):
+class RailwayBatchDeleteView(ModalDeleteMixin, generic.DeleteView):
     model = RailwayBatch
     success_url = reverse_lazy("railway_service:railway_batch_list")
-    template_name = 'railway_service/railway_batch_confirm_delete.html'

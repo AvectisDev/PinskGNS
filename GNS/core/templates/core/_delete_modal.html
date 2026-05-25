@@ -1,0 +1,16 @@
+<div class="modal fade" id="deleteConfirmModal" tabindex="-1" aria-labelledby="deleteConfirmModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content shadow-sm">
+            <div class="modal-body text-center py-4 px-4">
+                <h6 class="mb-0" id="deleteConfirmMessage"></h6>
+            </div>
+            <div class="modal-footer border-0 justify-content-center pb-4 pt-0">
+                <form method="post" id="deleteConfirmForm" class="d-flex gap-2">
+                    {% csrf_token %}
+                    <button type="button" class="btn btn-custom" data-bs-dismiss="modal">Отмена</button>
+                    <button type="submit" class="btn btn-danger">Удалить</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
