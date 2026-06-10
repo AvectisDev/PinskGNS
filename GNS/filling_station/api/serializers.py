@@ -89,6 +89,7 @@ class TrailerSerializer(serializers.ModelSerializer):
 class BalloonsBatchSerializer(serializers.ModelSerializer):
     batch_type = serializers.CharField(read_only=True)
     ttn_name = serializers.SerializerMethodField()
+    miriada_close_failed = serializers.BooleanField(read_only=True)
 
     class Meta:
         model = BalloonsBatch
@@ -108,6 +109,7 @@ class BalloonsBatchSerializer(serializers.ModelSerializer):
             'amount_of_50_liters',
             'gas_amount',
             'is_active',
+            'miriada_close_failed',
             'ttn_id',
             'ttn_name',
             'balloons_type',
@@ -127,6 +129,7 @@ class BalloonsTruckSerializer(serializers.ModelSerializer):
 class ActiveBatchSerializer(serializers.ModelSerializer):
     truck = BalloonsTruckSerializer(read_only=True)
     ttn_name = serializers.SerializerMethodField()
+    miriada_close_failed = serializers.BooleanField(read_only=True)
 
     class Meta:
         model = BalloonsBatch
@@ -146,6 +149,7 @@ class ActiveBatchSerializer(serializers.ModelSerializer):
             'amount_of_50_liters',
             'gas_amount',
             'is_active',
+            'miriada_close_failed',
             'ttn_id',
             'ttn_name',
             'balloons_type',

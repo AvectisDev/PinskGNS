@@ -574,3 +574,32 @@ def send_status_to_miriada(reader: int, nfc_tag: str) -> None:
                 error_msg = f'Ошибка при отправке статуса баллона в Мириаду после {settings.MIRIADA_REQUEST_RETRIES + 1} попыток: {e}'
                 logger.error(error_msg)
                 raise MiriadaAPIError(error_msg) from e
+
+
+MIRIADA_CLOSE_FAILED_MESSAGE = (
+    'Не удалось закрыть ТТН в Мириаде. Партия остаётся активной — '
+    'можно добавить баллоны и повторить закрытие.'
+)
+
+
+def attempt_close_balloons_batch(batch: BalloonsBatch) -> Tuple[bool, Optional[str]]:
+    """
+    Закрывает ТТН в Мириаде (если привязана) и завершает партию баллонов.
+    При ошибке Мириады помечает партию и оставляет её активной.
+    """
+    from ttn.services import close_ttn_in_miriada
+
+    if batch.ttn_id:
+        if not close_ttn_in_miriada(batch.ttn_id, batch=batch):
+            batch.miriada_close_failed = True
+            batch.save(update_fields=['miriada_close_failed'])
+            logger.warning(
+                f"Не удалось закрыть ТТН {batch.ttn_id} в Мириаде при закрытии партии {batch.id}"
+            )
+            return False, MIRIADA_CLOSE_FAILED_MESSAGE
+
+    batch.miriada_close_failed = False
+    batch.is_active = False
+    batch.completed_at = timezone.now()
+    batch.save(update_fields=['miriada_close_failed', 'is_active', 'completed_at'])
+    return True, None

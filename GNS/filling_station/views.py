@@ -1,9 +1,12 @@
-from django.shortcuts import render, redirect
+from django.shortcuts import render, redirect, get_object_or_404
+from django.contrib import messages
 from core.mixins import ModalDeleteMixin
 from django.http import HttpResponse
 from django.core.paginator import Paginator
 from django.urls import reverse_lazy, reverse
 from django.views import generic
+from django.views.decorators.http import require_POST
+from django.contrib.auth.decorators import login_required
 from django.db.models import Q, Sum, Count, OuterRef, Subquery
 from ttn.models import MiriadaTtn
 from autogas.models import AutoGasBatch
@@ -17,6 +20,7 @@ from .forms import (
     TrailerForm,
     BalloonsBatchForm
 )
+from .services import attempt_close_balloons_batch, MIRIADA_CLOSE_FAILED_MESSAGE
 from datetime import datetime, time, timedelta
 
 
@@ -183,6 +187,27 @@ class BalloonBatchUpdateView(BalloonBatchTypeMixin, generic.UpdateView):
         if 'cancel' in request.POST:
             return redirect(self.get_object().get_absolute_url())
         return super().post(request, *args, **kwargs)
+
+
+#@login_required
+@require_POST
+def balloon_batch_retry_close(request, pk):
+    """Повторная попытка закрыть ТТН в Мириаде и завершить партию баллонов."""
+    path = request.path.lower()
+    batch_type = 'u' if 'unloading' in path else 'l'
+    batch = get_object_or_404(BalloonsBatch, pk=pk, batch_type=batch_type)
+
+    if not batch.can_retry_miriada_close():
+        messages.error(request, 'Партия не требует повторного закрытия в Мириаде.')
+        return redirect(batch.get_absolute_url())
+
+    success, error_message = attempt_close_balloons_batch(batch)
+    if success:
+        messages.success(request, f'Партия №{batch.id} успешно завершена. ТТН закрыта в Мириаде.')
+    else:
+        messages.error(request, error_message or MIRIADA_CLOSE_FAILED_MESSAGE)
+
+    return redirect(batch.get_absolute_url())
 
 
 class BalloonBatchDeleteView(BalloonBatchTypeMixin, ModalDeleteMixin, generic.DeleteView):

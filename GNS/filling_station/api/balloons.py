@@ -1,7 +1,6 @@
 import logging
 from collections import defaultdict
 from django.http import JsonResponse
-from django.utils import timezone
 from django.db.models import Q, Sum, Count
 from django.shortcuts import get_object_or_404
 from django.core.cache import cache
@@ -28,7 +27,7 @@ from .serializers import (
     BalloonAmountSerializer
 )
 from .. import services
-from ttn.services import close_ttn_in_miriada
+from ..services import attempt_close_balloons_batch, MIRIADA_CLOSE_FAILED_MESSAGE
 
 
 logger = logging.getLogger('filling_station')
@@ -711,6 +710,28 @@ BalloonOperationResponse = inline_serializer(
             400: BalloonOperationResponse,
             404: BalloonOperationResponse
         }
+    ),
+    retry_close=extend_schema(
+        tags=['Партии баллонов'],
+        summary='Повторно завершить партию',
+        description=(
+            'Повторная попытка закрыть ТТН в Мириаде и завершить партию. '
+            'Доступно только для активных партий с ошибкой закрытия в Мириаде.'
+        ),
+        parameters=[
+            OpenApiParameter(
+                name='id',
+                type=OpenApiTypes.INT,
+                location=OpenApiParameter.PATH,
+                description='ID партии'
+            )
+        ],
+        responses={
+            200: BalloonsBatchSerializer,
+            400: OpenApiTypes.OBJECT,
+            404: OpenApiTypes.OBJECT,
+            502: OpenApiTypes.OBJECT,
+        }
     )
 )
 class BalloonsBatchViewSet(viewsets.ViewSet):
@@ -815,19 +836,51 @@ class BalloonsBatchViewSet(viewsets.ViewSet):
         # Проверяем, закрывается ли партия (is_active меняется с True на False)
         is_closing = batch.is_active and not request.data.get('is_active', True)
         if is_closing:
-            request.data['completed_at'] = timezone.now()
-            
-            # Если у партии есть ttn_id, закрываем ТТН в Мириаде
-            if batch.ttn_id:
-                success = close_ttn_in_miriada(batch.ttn_id, batch=batch)
-                if not success:
-                    logger.warning(f"Не удалось закрыть ТТН {batch.ttn_id} в Мириаде при закрытии партии {batch.id}")
+            success, error_message = attempt_close_balloons_batch(batch)
+            if not success:
+                return Response(
+                    {
+                        'message': error_message or MIRIADA_CLOSE_FAILED_MESSAGE,
+                        'miriada_close_failed': True,
+                        'id': batch.id,
+                    },
+                    status=status.HTTP_502_BAD_GATEWAY,
+                )
+            return Response(BalloonsBatchSerializer(batch).data)
 
         serializer = BalloonsBatchSerializer(batch, data=request.data, partial=True)
         if serializer.is_valid():
             serializer.save()
             return Response(serializer.data)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(detail=True, methods=['post'], url_path='retry-close')
+    def retry_close(self, request, pk=None):
+        batch_type = self.get_batch_type(request)
+        if not batch_type:
+            return Response(
+                {"message": "Параметр batch_type обязателен (l для приёмки, u для отгрузки)"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        batch = get_object_or_404(BalloonsBatch, id=pk, batch_type=batch_type)
+        if not batch.can_retry_miriada_close():
+            return Response(
+                {"message": "Партия не требует повторного закрытия в Мириаде"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        success, error_message = attempt_close_balloons_batch(batch)
+        if not success:
+            return Response(
+                {
+                    'message': error_message or MIRIADA_CLOSE_FAILED_MESSAGE,
+                    'miriada_close_failed': True,
+                    'id': batch.id,
+                },
+                status=status.HTTP_502_BAD_GATEWAY,
+            )
+        return Response(BalloonsBatchSerializer(batch).data)
 
     @action(detail=True, methods=['patch'], url_path='add-balloon')
     def add_balloon(self, request, pk=None):
