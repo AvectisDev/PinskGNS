@@ -20,7 +20,7 @@ from .forms import (
     TrailerForm,
     BalloonsBatchForm
 )
-from .services import attempt_close_balloons_batch, MIRIADA_CLOSE_FAILED_MESSAGE
+from .services import save_and_close_balloons_batch, MIRIADA_CLOSE_FAILED_MESSAGE
 from datetime import datetime, time, timedelta
 
 
@@ -192,20 +192,22 @@ class BalloonBatchUpdateView(BalloonBatchTypeMixin, generic.UpdateView):
 #@login_required
 @require_POST
 def balloon_batch_retry_close(request, pk):
-    """Повторная попытка закрыть ТТН в Мириаде и завершить партию баллонов."""
+    """Завершить партию: сохранить текущие данные и закрыть ТТН в Мириаде."""
     path = request.path.lower()
     batch_type = 'u' if 'unloading' in path else 'l'
     batch = get_object_or_404(BalloonsBatch, pk=pk, batch_type=batch_type)
 
-    if not batch.can_retry_miriada_close():
-        messages.error(request, 'Партия не требует повторного закрытия в Мириаде.')
+    if not batch.is_active:
+        messages.error(request, 'Партия уже завершена.')
         return redirect(batch.get_absolute_url())
 
-    success, error_message = attempt_close_balloons_batch(batch)
+    success, error_payload, _ = save_and_close_balloons_batch(batch, request.POST)
     if success:
         messages.success(request, f'Партия №{batch.id} успешно завершена. ТТН закрыта в Мириаде.')
+    elif isinstance(error_payload, dict) and error_payload.get('message'):
+        messages.error(request, error_payload['message'])
     else:
-        messages.error(request, error_message or MIRIADA_CLOSE_FAILED_MESSAGE)
+        messages.error(request, error_payload or MIRIADA_CLOSE_FAILED_MESSAGE)
 
     return redirect(batch.get_absolute_url())
 

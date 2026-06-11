@@ -27,7 +27,7 @@ from .serializers import (
     BalloonAmountSerializer
 )
 from .. import services
-from ..services import attempt_close_balloons_batch, MIRIADA_CLOSE_FAILED_MESSAGE
+from ..services import save_and_close_balloons_batch
 
 
 logger = logging.getLogger('filling_station')
@@ -713,11 +713,13 @@ BalloonOperationResponse = inline_serializer(
     ),
     retry_close=extend_schema(
         tags=['Партии баллонов'],
-        summary='Повторно завершить партию',
+        summary='Завершить партию',
         description=(
-            'Повторная попытка закрыть ТТН в Мириаде и завершить партию. '
-            'Доступно только для активных партий с ошибкой закрытия в Мириаде.'
+            'Сохраняет данные партии из мобильного приложения и закрывает ТТН в Мириаде. '
+            'Принимает тот же набор полей, что раньше отправлялся через PATCH при завершении. '
+            'Доступно для активных партий (первичное завершение и повтор после ошибки Мириады).'
         ),
+        request=BalloonsBatchSerializer,
         parameters=[
             OpenApiParameter(
                 name='id',
@@ -836,17 +838,12 @@ class BalloonsBatchViewSet(viewsets.ViewSet):
         # Проверяем, закрывается ли партия (is_active меняется с True на False)
         is_closing = batch.is_active and not request.data.get('is_active', True)
         if is_closing:
-            success, error_message = attempt_close_balloons_batch(batch)
+            success, error_payload, response_data = save_and_close_balloons_batch(batch, request.data)
             if not success:
-                return Response(
-                    {
-                        'message': error_message or MIRIADA_CLOSE_FAILED_MESSAGE,
-                        'miriada_close_failed': True,
-                        'id': batch.id,
-                    },
-                    status=status.HTTP_502_BAD_GATEWAY,
-                )
-            return Response(BalloonsBatchSerializer(batch).data)
+                if isinstance(error_payload, dict) and 'message' in error_payload:
+                    return Response(error_payload, status=status.HTTP_502_BAD_GATEWAY)
+                return Response(error_payload, status=status.HTTP_400_BAD_REQUEST)
+            return Response(response_data)
 
         serializer = BalloonsBatchSerializer(batch, data=request.data, partial=True)
         if serializer.is_valid():
@@ -864,23 +861,18 @@ class BalloonsBatchViewSet(viewsets.ViewSet):
             )
 
         batch = get_object_or_404(BalloonsBatch, id=pk, batch_type=batch_type)
-        if not batch.can_retry_miriada_close():
+        if not batch.is_active:
             return Response(
-                {"message": "Партия не требует повторного закрытия в Мириаде"},
+                {"message": "Партия уже завершена"},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        success, error_message = attempt_close_balloons_batch(batch)
+        success, error_payload, response_data = save_and_close_balloons_batch(batch, request.data)
         if not success:
-            return Response(
-                {
-                    'message': error_message or MIRIADA_CLOSE_FAILED_MESSAGE,
-                    'miriada_close_failed': True,
-                    'id': batch.id,
-                },
-                status=status.HTTP_502_BAD_GATEWAY,
-            )
-        return Response(BalloonsBatchSerializer(batch).data)
+            if isinstance(error_payload, dict) and 'message' in error_payload:
+                return Response(error_payload, status=status.HTTP_502_BAD_GATEWAY)
+            return Response(error_payload, status=status.HTTP_400_BAD_REQUEST)
+        return Response(response_data)
 
     @action(detail=True, methods=['patch'], url_path='add-balloon')
     def add_balloon(self, request, pk=None):

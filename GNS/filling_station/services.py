@@ -603,3 +603,48 @@ def attempt_close_balloons_batch(batch: BalloonsBatch) -> Tuple[bool, Optional[s
     batch.completed_at = timezone.now()
     batch.save(update_fields=['miriada_close_failed', 'is_active', 'completed_at'])
     return True, None
+
+
+BATCH_CLOSE_SERVER_FIELDS = frozenset({
+    'is_active',
+    'completed_at',
+    'miriada_close_failed',
+    'id',
+    'batch_type',
+    'started_at',
+    'ttn_name',
+})
+
+
+def save_and_close_balloons_batch(batch: BalloonsBatch, data=None):
+    """
+    Сохраняет данные партии и закрывает ТТН в Мириаде.
+    Использует BalloonsBatchSerializer — тот же контракт, что и PATCH.
+    Пустое тело запроса допустимо: берутся текущие данные партии из БД.
+    """
+    from filling_station.api.serializers import BalloonsBatchSerializer
+
+    payload = {
+        key: value
+        for key, value in (data or {}).items()
+        if key not in BATCH_CLOSE_SERVER_FIELDS
+    }
+
+    if payload:
+        serializer = BalloonsBatchSerializer(batch, data=payload, partial=True)
+        if not serializer.is_valid():
+            return False, serializer.errors, None
+        serializer.save()
+        batch.refresh_from_db()
+
+    success, error_message = attempt_close_balloons_batch(batch)
+    batch.refresh_from_db()
+
+    if success:
+        return True, None, BalloonsBatchSerializer(batch).data
+
+    return False, {
+        'message': error_message or MIRIADA_CLOSE_FAILED_MESSAGE,
+        'miriada_close_failed': True,
+        'id': batch.id,
+    }, None
