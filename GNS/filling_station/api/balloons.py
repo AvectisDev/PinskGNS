@@ -27,7 +27,7 @@ from .serializers import (
     BalloonAmountSerializer
 )
 from .. import services
-from ..services import save_and_close_balloons_batch
+from ..services import save_and_close_balloons_batch, add_balloon_to_batch_with_miriada
 
 
 logger = logging.getLogger('filling_station')
@@ -891,8 +891,10 @@ class BalloonsBatchViewSet(viewsets.ViewSet):
             )
 
         batch = get_object_or_404(BalloonsBatch, id=pk, batch_type=batch_type)
-        result = batch.add_balloon(nfc)
+        result = add_balloon_to_batch_with_miriada(batch, nfc)
         if result['success']:
+            if result.get('miriada_error'):
+                return Response(result, status=status.HTTP_502_BAD_GATEWAY)
             return Response(result, status=status.HTTP_200_OK)
 
         return Response({'message': result.get('message')}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

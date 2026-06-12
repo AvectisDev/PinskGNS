@@ -356,91 +356,99 @@ def _format_registration_number(reg_number: str) -> str:
     return reg_number
 
 
-def _get_batch_data_for_loading(reader: int, nfc_tag: str) -> Dict[str, Any]:
-    """
-    Получает данные партии для отправки статуса загрузки в /balloontocar.
-    
-    Обязательные параметры: nfctag, fulness, id_ttn, type_car, number_auto, realm
-    
-    Args:
-        reader: Номер считывателя
-        nfc_tag: NFC метка баллона
-        
-    Returns:
-        Словарь с данными для payload
-        
-    Raises:
-        ValueError: Если не найдена партия или отсутствуют обязательные данные
-    """
-    data = {'fulness': 1}  # 1 - полный баллон при погрузке
-    
-    batch = BalloonsBatch.objects.select_related('truck', 'truck__type', 'trailer').filter(
-        batch_type='u',
-        is_active=True,
-        balloon_list__nfc_tag=nfc_tag
-    ).first()
-
-    if not batch:
-        raise ValueError(f"Не найдена активная партия отгрузки для баллона {nfc_tag}")
-    
+def _build_loading_payload(batch: BalloonsBatch) -> Dict[str, Any]:
+    """Формирует payload /balloontocar из данных партии отгрузки."""
     if not batch.truck:
         raise ValueError(f"У партии {batch.id} отсутствует информация о грузовике")
-    
+
     number_auto = batch.truck.registration_number
-    data['number_auto'] = _format_registration_number(number_auto)
-    
-    # type_car: 1-трал, 0-кассета
+    data = {
+        'fulness': 1,
+        'number_auto': _format_registration_number(number_auto),
+    }
+
     if batch.truck.type and batch.truck.type.type:
         data['type_car'] = 0 if batch.truck.type.type == 'Клетевоз' else 1
     else:
         raise ValueError(f"У грузовика {number_auto} отсутствует тип транспорта")
-    
+
     if batch.ttn_id:
         data['id_ttn'] = batch.ttn_id
-    
+
     return data
 
 
-def _get_batch_data_for_unloading(reader: int) -> Dict[str, Any]:
-    """
-    Получает данные партии для отправки статуса разгрузки в /balloontosklad.
-    
-    Обязательные параметры: nfctag, fulness, id_ttn, realm
-    
-    Параметр fulness определяется на основе поля balloons_type партии:
-    - 'e' (пустой) -> fulness = 0
-    - 'f' (полный) -> fulness = 1
-    
-    Args:
-        reader: Номер считывателя
-        
-    Returns:
-        Словарь с данными для payload
-        
-    Raises:
-        ValueError: Если не найдена партия или отсутствует balloons_type
-    """
-    batch = BalloonsBatch.objects.select_related('truck', 'trailer').filter(
-        batch_type='l',
-        is_active=True,
-    ).first()
-    
-    if not batch:
-        raise ValueError(f"Не найдена активная партия приёмки для считывателя {reader}")
-    
+def _build_unloading_payload(batch: BalloonsBatch) -> Dict[str, Any]:
+    """Формирует payload /balloontosklad из данных партии приёмки."""
     if batch.balloons_type == 'e':
         fulness = 0
     elif batch.balloons_type == 'f':
         fulness = 1
     else:
-        raise ValueError(f"Неизвестное значение balloons_type '{batch.balloons_type}' в партии {batch.id}")
-    
+        raise ValueError(
+            f"Неизвестное значение balloons_type '{batch.balloons_type}' в партии {batch.id}"
+        )
+
     data = {'fulness': fulness}
-    
     if batch.ttn_id:
         data['id_ttn'] = batch.ttn_id
-    
     return data
+
+
+def _get_batch_data_for_loading(
+    nfc_tag: str,
+    batch: Optional[BalloonsBatch] = None,
+    reader: Optional[int] = None,
+) -> Dict[str, Any]:
+    """
+    Получает данные партии для отправки статуса загрузки в /balloontocar.
+
+    Если передана партия — используются её данные. Иначе ищется активная партия
+    отгрузки с этим баллоном (с фильтром по номеру считывателя, если указан).
+    """
+    if batch is None:
+        queryset = BalloonsBatch.objects.select_related(
+            'truck', 'truck__type', 'trailer'
+        ).filter(
+            batch_type='u',
+            is_active=True,
+            balloon_list__nfc_tag=nfc_tag,
+        )
+        if reader is not None:
+            queryset = queryset.filter(reader_number=reader)
+        batch = queryset.first()
+        if not batch:
+            raise ValueError(f"Не найдена активная партия отгрузки для баллона {nfc_tag}")
+    elif batch.batch_type != 'u':
+        raise ValueError(f"Партия {batch.id} не является партией отгрузки")
+
+    return _build_loading_payload(batch)
+
+
+def _get_batch_data_for_unloading(
+    batch: Optional[BalloonsBatch] = None,
+    reader: Optional[int] = None,
+) -> Dict[str, Any]:
+    """
+    Получает данные партии для отправки статуса разгрузки в /balloontosklad.
+
+    Если передана партия — используются её данные. Иначе ищется активная партия
+    приёмки (с фильтром по номеру считывателя, если указан).
+    """
+    if batch is None:
+        queryset = BalloonsBatch.objects.select_related('truck', 'trailer').filter(
+            batch_type='l',
+            is_active=True,
+        )
+        if reader is not None:
+            queryset = queryset.filter(reader_number=reader)
+        batch = queryset.first()
+        if not batch:
+            raise ValueError(f"Не найдена активная партия приёмки для считывателя {reader}")
+    elif batch.batch_type != 'l':
+        raise ValueError(f"Партия {batch.id} не является партией приёмки")
+
+    return _build_unloading_payload(batch)
 
 
 def _get_send_urls() -> Dict[str, str]:
@@ -452,13 +460,18 @@ def _get_send_urls() -> Dict[str, str]:
     }
 
 
-def _prepare_payload_for_miriada(reader: int, nfc_tag: str) -> Tuple[str, Dict[str, Any], str]:
+def _prepare_payload_for_miriada(
+    reader: int,
+    nfc_tag: str,
+    batch: Optional[BalloonsBatch] = None,
+) -> Tuple[str, Dict[str, Any], str]:
     """
     Подготавливает payload для отправки в Мириаду в зависимости от номера считывателя.
     
     Args:
         reader: Номер считывателя
         nfc_tag: NFC метка баллона
+        batch: Партия, к которой привязано событие (если известна)
         
     Returns:
         Кортеж (url, payload, send_type)
@@ -477,13 +490,11 @@ def _prepare_payload_for_miriada(reader: int, nfc_tag: str) -> Tuple[str, Dict[s
     if reader == 8:
         send_type = 'filling'
     elif reader == 6:
-        # Регистрация баллона на складе (разгрузка)
-        batch_data = _get_batch_data_for_unloading(reader)
+        batch_data = _get_batch_data_for_unloading(batch=batch, reader=reader)
         send_type = 'registering_in_warehouse'
         payload.update(batch_data)
     elif reader in [2, 3, 4]:
-        # Погрузка баллона в машину
-        batch_data = _get_batch_data_for_loading(reader, nfc_tag)
+        batch_data = _get_batch_data_for_loading(nfc_tag=nfc_tag, batch=batch, reader=reader)
         send_type = 'loading_into_truck'
         payload.update(batch_data)
     else:
@@ -496,7 +507,11 @@ def _prepare_payload_for_miriada(reader: int, nfc_tag: str) -> Tuple[str, Dict[s
     return url, payload, send_type
 
 
-def send_status_to_miriada(reader: int, nfc_tag: str) -> None:
+def send_status_to_miriada(
+    reader: int,
+    nfc_tag: str,
+    batch: Optional[BalloonsBatch] = None,
+) -> None:
     """
     Отправляет статусы баллонов по NFC-метке в Мириаду.
     При неуспешном запросе выполняется до 2 повторных попыток.
@@ -509,12 +524,13 @@ def send_status_to_miriada(reader: int, nfc_tag: str) -> None:
     Args:
         reader: Номер считывателя
         nfc_tag: NFC метка баллона
+        batch: Партия, к которой привязано событие (если известна)
 
     Raises:
         MiriadaAPIError: При ошибках отправки после всех попыток
     """
     try:
-        url, payload, send_type = _prepare_payload_for_miriada(reader, nfc_tag)
+        url, payload, send_type = _prepare_payload_for_miriada(reader, nfc_tag, batch=batch)
     except ValueError as e:
         error_msg = f"Ошибка подготовки данных для отправки: {str(e)}"
         logger.error(error_msg)
@@ -576,6 +592,36 @@ def send_status_to_miriada(reader: int, nfc_tag: str) -> None:
                 raise MiriadaAPIError(error_msg) from e
 
 
+MIRIADA_BALLOON_STATUS_READERS = frozenset({3, 4, 6, 8})
+
+
+def add_balloon_to_batch_with_miriada(batch: BalloonsBatch, nfc_tag: str) -> dict:
+    """
+    Добавляет баллон в партию и отправляет статус в Мириаду — как при проходе
+    через стационарный считыватель (feig_protocol, readers 3/4/6/8).
+    """
+    result = batch.add_balloon(nfc_tag)
+    if not result.get('success') or not nfc_tag:
+        return result
+
+    reader_number = batch.reader_number
+    if reader_number not in MIRIADA_BALLOON_STATUS_READERS:
+        return result
+
+    batch = BalloonsBatch.objects.select_related('truck', 'truck__type', 'trailer').get(pk=batch.pk)
+
+    try:
+        send_status_to_miriada(reader=reader_number, nfc_tag=nfc_tag, batch=batch)
+    except MiriadaAPIError as exc:
+        logger.error(
+            f"Баллон {nfc_tag} добавлен в партию {batch.id}, "
+            f"но отправка статуса в Мириаду (ридер {reader_number}) не удалась: {exc}"
+        )
+        result['miriada_error'] = str(exc)
+
+    return result
+
+
 MIRIADA_CLOSE_FAILED_MESSAGE = (
     'Не удалось закрыть ТТН в Мириаде. Партия остаётся активной — '
     'можно добавить баллоны и повторить закрытие.'
@@ -618,8 +664,7 @@ BATCH_CLOSE_SERVER_FIELDS = frozenset({
 
 def save_and_close_balloons_batch(batch: BalloonsBatch, data=None):
     """
-    Сохраняет данные партии и закрывает ТТН в Мириаде.
-    Использует BalloonsBatchSerializer — тот же контракт, что и PATCH.
+    Сохраняет данные партии и закрывает ТТН в Мириаде. Использует BalloonsBatchSerializer.
     Пустое тело запроса допустимо: берутся текущие данные партии из БД.
     """
     from filling_station.api.serializers import BalloonsBatchSerializer
