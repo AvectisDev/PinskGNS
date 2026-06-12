@@ -771,10 +771,11 @@ class BalloonsBatchViewSet(viewsets.ViewSet):
                 {"message": "Параметр batch_type обязателен (l для приёмки, u для отгрузки)"},
                 status=status.HTTP_400_BAD_REQUEST
             )
-        
+
         batches = BalloonsBatch.objects.select_related('truck', 'trailer', 'truck__type').filter(
-            batch_type=batch_type, is_active=True
-        )
+            batch_type=batch_type
+        ).filter(Q(is_active=True) | Q(miriada_close_failed=True))
+
         serializer = ActiveBatchSerializer(batches, many=True)
         return Response(serializer.data)
 
@@ -861,9 +862,11 @@ class BalloonsBatchViewSet(viewsets.ViewSet):
             )
 
         batch = get_object_or_404(BalloonsBatch, id=pk, batch_type=batch_type)
-        if not batch.is_active:
+
+        # Разрешаем retry, если партия активна ИЛИ закрыта с ошибкой Мириады
+        if not batch.is_active and not batch.miriada_close_failed:
             return Response(
-                {"message": "Партия уже завершена"},
+                {"message": "Партия уже завершена и не содержит ошибок"},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 

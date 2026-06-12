@@ -630,25 +630,37 @@ MIRIADA_CLOSE_FAILED_MESSAGE = (
 
 def attempt_close_balloons_batch(batch: BalloonsBatch) -> Tuple[bool, Optional[str]]:
     """
-    Закрывает ТТН в Мириаде (если привязана) и завершает партию баллонов.
-    При ошибке Мириады помечает партию и оставляет её активной.
+    Закрывает партию баллонов (устанавливает is_active=False, completed_at).
+    Если у партии есть ТТН и тип автомобиля не "Клетевоз", пытается закрыть ТТН в Мириаде.
+    В любом случае партия завершается, а флаг miriada_close_failed отражает успех отправки.
     """
     from ttn.services import close_ttn_in_miriada
 
-    if batch.ttn_id:
+    # Решаем, нужно ли отправлять запрос в Мириаду
+    should_send = bool(batch.ttn_id)
+    if should_send:
+        # Проверяем тип автомобиля: для "Клетевоз" не отправляем
+        if batch.truck and batch.truck.type and batch.truck.type.type == "Клетевоз":
+            should_send = False
+
+    success = True
+    if should_send:
         if not close_ttn_in_miriada(batch.ttn_id, batch=batch):
-            batch.miriada_close_failed = True
-            batch.save(update_fields=['miriada_close_failed'])
+            success = False
             logger.warning(
                 f"Не удалось закрыть ТТН {batch.ttn_id} в Мириаде при закрытии партии {batch.id}"
             )
-            return False, MIRIADA_CLOSE_FAILED_MESSAGE
 
-    batch.miriada_close_failed = False
+    # Всегда завершаем партию
     batch.is_active = False
     batch.completed_at = timezone.now()
-    batch.save(update_fields=['miriada_close_failed', 'is_active', 'completed_at'])
-    return True, None
+    batch.miriada_close_failed = not success   # True, если была ошибка
+    batch.save(update_fields=['is_active', 'completed_at', 'miriada_close_failed'])
+
+    if success:
+        return True, None
+    else:
+        return False, MIRIADA_CLOSE_FAILED_MESSAGE
 
 
 BATCH_CLOSE_SERVER_FIELDS = frozenset({
