@@ -601,7 +601,7 @@ class BalloonsBatch(models.Model):
         return reverse(f'filling_station:{self._batch_url_prefix()}_retry_close', args=[self.pk])
 
     def can_retry_miriada_close(self) -> bool:
-        return self.is_active and self.miriada_close_failed and bool(self.ttn_id)
+        return self.miriada_close_failed and bool(self.ttn_id)
 
     def get_ttn_name(self) -> Optional[str]:
         """Номер ТТН из Мириады по сохранённому ttn_id"""
