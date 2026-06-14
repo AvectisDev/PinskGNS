@@ -413,7 +413,6 @@ MIRIADA_REQUEST_RETRIES = 2
 MIRIADA_RETRY_DELAY_SECONDS = 1
 
 GAS_TYPE_CHOICES = [
-    ('Не выбран', 'Не выбран'),
     ('СПБТ', 'СПБТ'),
     ('ПБА', 'ПБА'),
 ]
