@@ -52,7 +52,7 @@ def get_current_ttn_from_miriada() -> Optional[list]:
                 f"Body: {prepared.body}"
             )
 
-            response = session.send(prepared, timeout=2)
+            response = session.send(prepared, timeout=settings.MIRIADA_TIMEOUT)
             response.raise_for_status()
 
             result = response.json()
@@ -182,7 +182,7 @@ def close_ttn_in_miriada(ttn_id: int, batch: Optional['BalloonsBatch'] = None) -
                 f"Body: {prepared.body}"
             )
 
-            response = session.send(prepared, timeout=5)
+            response = session.send(prepared, timeout=settings.MIRIADA_TIMEOUT)
             if response.status_code == 200:
                 result = response.json()
                 if result.get('result') == 'ok':

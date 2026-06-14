@@ -297,7 +297,7 @@ def get_balloon_data_from_miriada(nfc_tag: str) -> Optional[Dict[str, Any]]:
 
     for attempt in range(settings.MIRIADA_REQUEST_RETRIES + 1):
         try:
-            response = requests.get(url, timeout=2)
+            response = requests.get(url, timeout=settings.MIRIADA_TIMEOUT)
             response.raise_for_status()
             result = response.json()
 
@@ -560,7 +560,7 @@ def send_status_to_miriada(
                 f"Body: {prepared.body}"
             )
 
-            response = session.send(prepared, timeout=2)
+            response = session.send(prepared, timeout=settings.MIRIADA_TIMEOUT)
             if response.status_code == 200:
                 logger.info(f"Статус по {send_type} успешно отправлен")
                 return
