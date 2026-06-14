@@ -863,8 +863,8 @@ class BalloonsBatchViewSet(viewsets.ViewSet):
 
         batch = get_object_or_404(BalloonsBatch, id=pk, batch_type=batch_type)
 
-        # Разрешаем retry, если партия активна ИЛИ закрыта с ошибкой Мириады
-        if not batch.is_active and not batch.miriada_close_failed:
+        # Разрешаем retry, если партия закрыта с ошибкой Мириады
+        if not batch.miriada_close_failed:
             return Response(
                 {"message": "Партия уже завершена и не содержит ошибок"},
                 status=status.HTTP_400_BAD_REQUEST,

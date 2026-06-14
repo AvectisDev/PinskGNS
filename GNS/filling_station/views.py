@@ -197,8 +197,9 @@ def balloon_batch_retry_close(request, pk):
     batch_type = 'u' if 'unloading' in path else 'l'
     batch = get_object_or_404(BalloonsBatch, pk=pk, batch_type=batch_type)
 
-    if not batch.is_active:
-        messages.error(request, 'Партия уже завершена.')
+    # Разрешаем повтор, только если есть флаг ошибки Мириады
+    if not batch.miriada_close_failed:
+        messages.error(request, 'Партия не содержит ошибок.')
         return redirect(batch.get_absolute_url())
 
     success, error_payload, _ = save_and_close_balloons_batch(batch, request.POST)
