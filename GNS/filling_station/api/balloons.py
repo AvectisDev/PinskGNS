@@ -19,14 +19,13 @@ from drf_spectacular.utils import (
     inline_serializer
 )
 from datetime import datetime, date
-from filling_station.models import Balloon, Reader, BalloonsBatch, DailyReaderCounter, TotalReadersCounter
+from filling_station.models import Balloon, Reader, BalloonsBatch, DailyReaderCounter, TotalReadersCounter, ReaderSettings
 from .serializers import (
     BalloonSerializer,
     BalloonsBatchSerializer,
     ActiveBatchSerializer,
     BalloonAmountSerializer
 )
-from .. import services
 from ..services import save_and_close_balloons_batch, add_balloon_to_batch_with_miriada
 
 
@@ -54,8 +53,6 @@ USER_STATUS_LIST = [
     'Опорожнение(слив) баллона',
     'Контрольное взвешивание'
 ]
-BALLOONS_LOADING_READER_LIST = [1, 6]
-BALLOONS_UNLOADING_READER_LIST = [2, 3, 4]
 
 
 # Схемы для Swagger
@@ -466,7 +463,6 @@ class BalloonViewSet(viewsets.ViewSet):
             return Response(serializer.data)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-
 @receiver(post_save, sender=Balloon)
 @receiver(post_save, sender=Reader)
 @receiver(post_save, sender=BalloonsBatch)
@@ -484,12 +480,13 @@ def get_balloon_status_options(request):
 
 @api_view(['GET'])
 def get_loading_balloon_reader_list(request):
-    return Response(BALLOONS_LOADING_READER_LIST)
-
+    loading_readers = ReaderSettings.objects.filter(function='l').values_list('number', flat=True)
+    return Response(list(loading_readers))
 
 @api_view(['GET'])
 def get_unloading_balloon_reader_list(request):
-    return Response(BALLOONS_UNLOADING_READER_LIST)
+    unloading_readers = ReaderSettings.objects.filter(function='u').values_list('number', flat=True)
+    return Response(list(unloading_readers))
 
 # --- TotalReadersCounter (ручной ввод) ---
 class ManualTotalReadersCounterRequestSerializer(serializers.Serializer):
@@ -503,6 +500,7 @@ class ManualTotalReadersCounterRequestSerializer(serializers.Serializer):
         min_value=0,
         help_text='Ручное значение для количества полных баллонов (total_full)'
     )
+
 
 
 class ManualTotalReadersCounterResponseSerializer(serializers.Serializer):
