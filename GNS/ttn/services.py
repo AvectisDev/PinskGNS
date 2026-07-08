@@ -1,8 +1,9 @@
+import json
 import requests
 import logging
 import time
 from datetime import datetime
-from typing import Optional, TYPE_CHECKING
+from typing import Optional, Tuple, TYPE_CHECKING
 from django.conf import settings
 
 if TYPE_CHECKING:
@@ -139,7 +140,22 @@ def _log_batch_balloons_on_ttn_close(ttn_id: int, batch: Optional['BalloonsBatch
     )
 
 
-def close_ttn_in_miriada(ttn_id: int, batch: Optional['BalloonsBatch'] = None) -> bool:
+def _parse_miriada_close_error(response_text: str) -> Optional[str]:
+    if not response_text:
+        return None
+    try:
+        data = json.loads(response_text)
+    except (json.JSONDecodeError, TypeError):
+        return response_text.strip() or None
+    if not isinstance(data, dict):
+        return response_text.strip() or None
+    return data.get('description') or data.get('title') or data.get('message')
+
+
+def close_ttn_in_miriada(
+    ttn_id: int,
+    batch: Optional['BalloonsBatch'] = None,
+) -> Tuple[bool, Optional[str]]:
     """
     Закрывает ТТН в Мириаде по её ID.
     При неуспешном запросе выполняется до 2 повторных попыток.
@@ -147,9 +163,10 @@ def close_ttn_in_miriada(ttn_id: int, batch: Optional['BalloonsBatch'] = None) -
         ttn_id (int): ID ТТН в системе Мириада
         batch: партия баллонов (для логирования состава на момент закрытия)
     Returns:
-        bool: True при успешном закрытии, False в случае ошибки после всех попыток
+        tuple[bool, str | None]: успех и текст ошибки из ответа Мириады
     """
     _log_batch_balloons_on_ttn_close(ttn_id, batch=batch)
+    last_error: Optional[str] = None
 
     url = f'{settings.MIRIADA_API_POST_URL}/closettn'
 
@@ -187,13 +204,23 @@ def close_ttn_in_miriada(ttn_id: int, batch: Optional['BalloonsBatch'] = None) -
                 result = response.json()
                 if result.get('result') == 'ok':
                     logger.info(f"ТТН {ttn_id} успешно закрыта в Мириаде")
-                    return True
+                    return True, None
+                last_error = (
+                    result.get('description')
+                    or result.get('message')
+                    or str(result)
+                )
                 logger.error(f"ТТН {ttn_id} не закрыта. Ответ: {result}")
             else:
+                last_error = _parse_miriada_close_error(response.text) or (
+                    f"Status: {response.status_code} {response.reason}, "
+                    f"Ответ: {response.text}"
+                )
                 logger.error(
                     f"Ошибка при закрытии ТТН {ttn_id}! "
                     f"Status: {response.status_code} {response.reason}, Ответ: {response.text}")
         except Exception as error:
+            last_error = str(error)
             logger.error(f'Ошибка при закрытии ТТН {ttn_id} в Мириаде: {error}')
 
         if attempt < settings.MIRIADA_REQUEST_RETRIES:
@@ -202,4 +229,4 @@ def close_ttn_in_miriada(ttn_id: int, batch: Optional['BalloonsBatch'] = None) -
             )
             time.sleep(settings.MIRIADA_RETRY_DELAY_SECONDS)
 
-    return False
+    return False, last_error

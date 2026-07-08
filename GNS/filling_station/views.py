@@ -20,7 +20,7 @@ from .forms import (
     TrailerForm,
     BalloonsBatchForm
 )
-from .services import save_and_close_balloons_batch, MIRIADA_CLOSE_FAILED_MESSAGE
+from .services import save_and_close_balloons_batch
 from datetime import datetime, time, timedelta
 
 
@@ -207,8 +207,8 @@ def balloon_batch_retry_close(request, pk):
         messages.success(request, f'Партия №{batch.id} успешно завершена. ТТН закрыта в Мириаде.')
     elif isinstance(error_payload, dict) and error_payload.get('message'):
         messages.error(request, error_payload['message'])
-    else:
-        messages.error(request, error_payload or MIRIADA_CLOSE_FAILED_MESSAGE)
+    elif error_payload:
+        messages.error(request, error_payload)
 
     return redirect(batch.get_absolute_url())
 

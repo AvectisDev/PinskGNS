@@ -36,8 +36,8 @@
         <div class="card-body">
             {% if batch.miriada_close_failed %}
             <div class="alert alert-warning" role="alert">
-                Не удалось закрыть ТТН в Мириаде. Партия остаётся активной — можно добавить баллоны
-                и повторить завершение.
+                Не удалось закрыть ТТН в Мириаде{% if batch.miriada_error_message %}: {{ batch.miriada_error_message }}{% endif %}.
+                Можно повторить завершение партии.
             </div>
             {% endif %}
             <div class="row">

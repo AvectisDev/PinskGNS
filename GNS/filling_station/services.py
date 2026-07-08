@@ -622,12 +622,6 @@ def add_balloon_to_batch_with_miriada(batch: BalloonsBatch, nfc_tag: str) -> dic
     return result
 
 
-MIRIADA_CLOSE_FAILED_MESSAGE = (
-    'Не удалось закрыть ТТН в Мириаде. Партия остаётся активной — '
-    'можно добавить баллоны и повторить закрытие.'
-)
-
-
 def attempt_close_balloons_batch(batch: BalloonsBatch) -> Tuple[bool, Optional[str]]:
     """
     Закрывает партию баллонов (устанавливает is_active=False, completed_at).
@@ -644,29 +638,43 @@ def attempt_close_balloons_batch(batch: BalloonsBatch) -> Tuple[bool, Optional[s
             should_send = False
 
     success = True
+    error_message: Optional[str] = None
     if should_send:
-        if not close_ttn_in_miriada(batch.ttn_id, batch=batch):
+        close_success, close_error = close_ttn_in_miriada(batch.ttn_id, batch=batch)
+        if not close_success:
             success = False
+            error_message = close_error
             logger.warning(
-                f"Не удалось закрыть ТТН {batch.ttn_id} в Мириаде при закрытии партии {batch.id}"
+                f"Не удалось закрыть ТТН {batch.ttn_id} в Мириаде при закрытии партии {batch.id}: "
+                f"{close_error}"
             )
 
     # Всегда завершаем партию
     batch.is_active = False
     batch.completed_at = timezone.now()
-    batch.miriada_close_failed = not success   # True, если была ошибка
-    batch.save(update_fields=['is_active', 'completed_at', 'miriada_close_failed'])
+    batch.miriada_close_failed = not success
+    if error_message:
+        max_len = BalloonsBatch._meta.get_field('miriada_error_message').max_length
+        if max_len and len(error_message) > max_len:
+            error_message = error_message[: max_len - 3] + '...'
+    batch.miriada_error_message = error_message if not success else None
+    batch.save(update_fields=[
+        'is_active',
+        'completed_at',
+        'miriada_close_failed',
+        'miriada_error_message',
+    ])
 
     if success:
         return True, None
-    else:
-        return False, MIRIADA_CLOSE_FAILED_MESSAGE
+    return False, error_message
 
 
 BATCH_CLOSE_SERVER_FIELDS = frozenset({
     'is_active',
     'completed_at',
     'miriada_close_failed',
+    'miriada_error_message',
     'id',
     'batch_type',
     'started_at',
@@ -701,7 +709,8 @@ def save_and_close_balloons_batch(batch: BalloonsBatch, data=None):
         return True, None, BalloonsBatchSerializer(batch).data
 
     return False, {
-        'message': error_message or MIRIADA_CLOSE_FAILED_MESSAGE,
+        'message': error_message,
         'miriada_close_failed': True,
+        'miriada_error_message': batch.miriada_error_message,
         'id': batch.id,
     }, None

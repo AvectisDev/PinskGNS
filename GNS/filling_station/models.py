@@ -568,6 +568,12 @@ class BalloonsBatch(models.Model):
         default=False,
         verbose_name="Ошибка закрытия ТТН в Мириаде",
     )
+    miriada_error_message = models.CharField(
+        null=True,
+        blank=True,
+        max_length=200,
+        verbose_name="Текст ошибки при неудачном закрытии ТТН"
+    )
     ttn_id = models.IntegerField(verbose_name="ID ТТН")
     balloons_type = models.CharField(choices=settings.BALLOON_TYPE_CHOICES, default='e', verbose_name="Пустой/полный")
     user = models.ForeignKey(
