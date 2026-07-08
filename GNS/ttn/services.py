@@ -152,6 +152,14 @@ def _parse_miriada_close_error(response_text: str) -> Optional[str]:
     return data.get('description') or data.get('title') or data.get('message')
 
 
+def _is_miriada_success_response(data: dict) -> bool:
+    """Мириада может вернуть Result/result со значением Ok/ok."""
+    for key, value in data.items():
+        if key.lower() == 'result' and str(value).lower() == 'ok':
+            return True
+    return False
+
+
 def close_ttn_in_miriada(
     ttn_id: int,
     batch: Optional['BalloonsBatch'] = None,
@@ -202,7 +210,7 @@ def close_ttn_in_miriada(
             response = session.send(prepared, timeout=settings.MIRIADA_TIMEOUT)
             if response.status_code == 200:
                 result = response.json()
-                if result.get('result') == 'ok':
+                if isinstance(result, dict) and _is_miriada_success_response(result):
                     logger.info(f"ТТН {ttn_id} успешно закрыта в Мириаде")
                     return True, None
                 last_error = (
