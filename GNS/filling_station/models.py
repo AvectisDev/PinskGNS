@@ -564,6 +564,16 @@ class BalloonsBatch(models.Model):
         verbose_name="Список баллонов"
     )
     is_active = models.BooleanField(default=False, verbose_name="В работе")
+    miriada_close_failed = models.BooleanField(
+        default=False,
+        verbose_name="Ошибка закрытия ТТН в Мириаде",
+    )
+    miriada_error_message = models.CharField(
+        null=True,
+        blank=True,
+        max_length=200,
+        verbose_name="Текст ошибки при неудачном закрытии ТТН"
+    )
     ttn_id = models.IntegerField(verbose_name="ID ТТН")
     balloons_type = models.CharField(choices=settings.BALLOON_TYPE_CHOICES, default='e', verbose_name="Пустой/полный")
     user = models.ForeignKey(
@@ -592,6 +602,12 @@ class BalloonsBatch(models.Model):
 
     def get_delete_url(self):
         return reverse(f'filling_station:{self._batch_url_prefix()}_delete', args=[self.pk])
+
+    def get_retry_close_url(self):
+        return reverse(f'filling_station:{self._batch_url_prefix()}_retry_close', args=[self.pk])
+
+    def can_retry_miriada_close(self) -> bool:
+        return self.miriada_close_failed and bool(self.ttn_id)
 
     def get_ttn_name(self) -> Optional[str]:
         """Номер ТТН из Мириады по сохранённому ttn_id"""

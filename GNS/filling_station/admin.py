@@ -150,10 +150,11 @@ class BalloonsBatchAdmin(admin.ModelAdmin):
         'amount_of_50_liters',
         'gas_amount',
         'is_active',
+        'miriada_close_failed',
         'display_ttn_name',
         'balloons_type',
     ]
-    list_filter = ['batch_type', 'started_at', 'completed_at', 'is_active']
+    list_filter = ['batch_type', 'started_at', 'completed_at', 'is_active', 'miriada_close_failed']
     search_fields = ['truck', 'is_active', 'ttn_id', 'batch_type']
 
     @admin.display(description='Номер ТТН')

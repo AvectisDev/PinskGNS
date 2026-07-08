@@ -1,7 +1,6 @@
 import logging
 from collections import defaultdict
 from django.http import JsonResponse
-from django.utils import timezone
 from django.db.models import Q, Sum, Count
 from django.shortcuts import get_object_or_404
 from django.core.cache import cache
@@ -20,15 +19,14 @@ from drf_spectacular.utils import (
     inline_serializer
 )
 from datetime import datetime, date
-from filling_station.models import Balloon, Reader, BalloonsBatch, DailyReaderCounter, TotalReadersCounter
+from filling_station.models import Balloon, Reader, BalloonsBatch, DailyReaderCounter, TotalReadersCounter, ReaderSettings
 from .serializers import (
     BalloonSerializer,
     BalloonsBatchSerializer,
     ActiveBatchSerializer,
     BalloonAmountSerializer
 )
-from .. import services
-from ttn.services import close_ttn_in_miriada
+from ..services import save_and_close_balloons_batch, add_balloon_to_batch_with_miriada
 
 
 logger = logging.getLogger('filling_station')
@@ -55,8 +53,6 @@ USER_STATUS_LIST = [
     'Опорожнение(слив) баллона',
     'Контрольное взвешивание'
 ]
-BALLOONS_LOADING_READER_LIST = [1, 6]
-BALLOONS_UNLOADING_READER_LIST = [2, 3, 4]
 
 
 # Схемы для Swagger
@@ -467,7 +463,6 @@ class BalloonViewSet(viewsets.ViewSet):
             return Response(serializer.data)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-
 @receiver(post_save, sender=Balloon)
 @receiver(post_save, sender=Reader)
 @receiver(post_save, sender=BalloonsBatch)
@@ -485,12 +480,13 @@ def get_balloon_status_options(request):
 
 @api_view(['GET'])
 def get_loading_balloon_reader_list(request):
-    return Response(BALLOONS_LOADING_READER_LIST)
-
+    loading_readers = ReaderSettings.objects.filter(function='l').values_list('number', flat=True)
+    return Response(list(loading_readers))
 
 @api_view(['GET'])
 def get_unloading_balloon_reader_list(request):
-    return Response(BALLOONS_UNLOADING_READER_LIST)
+    unloading_readers = ReaderSettings.objects.filter(function='u').values_list('number', flat=True)
+    return Response(list(unloading_readers))
 
 # --- TotalReadersCounter (ручной ввод) ---
 class ManualTotalReadersCounterRequestSerializer(serializers.Serializer):
@@ -504,6 +500,7 @@ class ManualTotalReadersCounterRequestSerializer(serializers.Serializer):
         min_value=0,
         help_text='Ручное значение для количества полных баллонов (total_full)'
     )
+
 
 
 class ManualTotalReadersCounterResponseSerializer(serializers.Serializer):
@@ -711,6 +708,30 @@ BalloonOperationResponse = inline_serializer(
             400: BalloonOperationResponse,
             404: BalloonOperationResponse
         }
+    ),
+    retry_close=extend_schema(
+        tags=['Партии баллонов'],
+        summary='Завершить партию',
+        description=(
+            'Сохраняет данные партии из мобильного приложения и закрывает ТТН в Мириаде. '
+            'Принимает тот же набор полей, что раньше отправлялся через PATCH при завершении. '
+            'Доступно для активных партий (первичное завершение и повтор после ошибки Мириады).'
+        ),
+        request=BalloonsBatchSerializer,
+        parameters=[
+            OpenApiParameter(
+                name='id',
+                type=OpenApiTypes.INT,
+                location=OpenApiParameter.PATH,
+                description='ID партии'
+            )
+        ],
+        responses={
+            200: BalloonsBatchSerializer,
+            400: OpenApiTypes.OBJECT,
+            404: OpenApiTypes.OBJECT,
+            502: OpenApiTypes.OBJECT,
+        }
     )
 )
 class BalloonsBatchViewSet(viewsets.ViewSet):
@@ -748,10 +769,11 @@ class BalloonsBatchViewSet(viewsets.ViewSet):
                 {"message": "Параметр batch_type обязателен (l для приёмки, u для отгрузки)"},
                 status=status.HTTP_400_BAD_REQUEST
             )
-        
+
         batches = BalloonsBatch.objects.select_related('truck', 'trailer', 'truck__type').filter(
-            batch_type=batch_type, is_active=True
-        )
+            batch_type=batch_type
+        ).filter(Q(is_active=True) | Q(miriada_close_failed=True))
+
         serializer = ActiveBatchSerializer(batches, many=True)
         return Response(serializer.data)
 
@@ -815,19 +837,42 @@ class BalloonsBatchViewSet(viewsets.ViewSet):
         # Проверяем, закрывается ли партия (is_active меняется с True на False)
         is_closing = batch.is_active and not request.data.get('is_active', True)
         if is_closing:
-            request.data['completed_at'] = timezone.now()
-            
-            # Если у партии есть ttn_id, закрываем ТТН в Мириаде
-            if batch.ttn_id:
-                success = close_ttn_in_miriada(batch.ttn_id, batch=batch)
-                if not success:
-                    logger.warning(f"Не удалось закрыть ТТН {batch.ttn_id} в Мириаде при закрытии партии {batch.id}")
+            success, error_payload, response_data = save_and_close_balloons_batch(batch, request.data)
+            if not success:
+                if isinstance(error_payload, dict) and 'message' in error_payload:
+                    return Response(error_payload, status=status.HTTP_502_BAD_GATEWAY)
+                return Response(error_payload, status=status.HTTP_400_BAD_REQUEST)
+            return Response(response_data)
 
         serializer = BalloonsBatchSerializer(batch, data=request.data, partial=True)
         if serializer.is_valid():
             serializer.save()
             return Response(serializer.data)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(detail=True, methods=['post'], url_path='retry-close')
+    def retry_close(self, request, pk=None):
+        batch_type = self.get_batch_type(request)
+        if not batch_type:
+            return Response(
+                {"message": "Параметр batch_type обязателен (l для приёмки, u для отгрузки)"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        batch = get_object_or_404(BalloonsBatch, id=pk, batch_type=batch_type)
+
+        if not batch.is_active and not batch.miriada_close_failed:
+            return Response(
+                {"message": "Партия уже завершена и не содержит ошибок"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        success, error_payload, response_data = save_and_close_balloons_batch(batch, request.data)
+        if not success:
+            if isinstance(error_payload, dict) and 'message' in error_payload:
+                return Response(error_payload, status=status.HTTP_502_BAD_GATEWAY)
+            return Response(error_payload, status=status.HTTP_400_BAD_REQUEST)
+        return Response(response_data)
 
     @action(detail=True, methods=['patch'], url_path='add-balloon')
     def add_balloon(self, request, pk=None):
@@ -846,8 +891,10 @@ class BalloonsBatchViewSet(viewsets.ViewSet):
             )
 
         batch = get_object_or_404(BalloonsBatch, id=pk, batch_type=batch_type)
-        result = batch.add_balloon(nfc)
+        result = add_balloon_to_batch_with_miriada(batch, nfc)
         if result['success']:
+            if result.get('miriada_error'):
+                return Response(result, status=status.HTTP_502_BAD_GATEWAY)
             return Response(result, status=status.HTTP_200_OK)
 
         return Response({'message': result.get('message')}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

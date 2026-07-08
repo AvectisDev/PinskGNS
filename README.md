@@ -11,13 +11,12 @@
 5. Обновляем pip `python -m pip install --upgrade pip`
 6. Устанавливаем в виртуальном окружении зависимости для проекта `python -m pip install --no-cache-dir -r requirements.txt`
 7. Делаем миграции для создания базы данных `python manage.py makemigrations && python manage.py migrate`
-8. Заполняем данными модели `Capital` и `auth.user` — `python manage.py loaddata db.json`
-9. Запускаем локальный сервер через **Daphne** (ASGI сервер):
+8. Запускаем локальный сервер через **Daphne** (ASGI сервер):
    ```bash
    daphne GNS.asgi:application --bind 0.0.0.0 -p 8000 --application-close-timeout 10
    ```
-10. По адресу `http://localhost:8000` будет доступна главная страница с архивом баллонов.
-11. По адресу `http://localhost:8000/api/swagger` будет доступно описание API для проекта.
+9. По адресу `http://localhost:8000` будет доступна главная страница с архивом баллонов.
+10. По адресу `http://localhost:8000/api/swagger` будет доступно описание API для проекта.
 
 ## Redis
 

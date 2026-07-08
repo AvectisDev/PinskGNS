@@ -23,7 +23,7 @@ class AutoGasBatch(models.Model):
         verbose_name="Прицеп"
     )
     gas_amount = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True, verbose_name="Количество газа (массомер)")
-    gas_type = models.CharField(choices=settings.GAS_TYPE_CHOICES, default='Не выбран', verbose_name="Тип газа")
+    gas_type = models.CharField(choices=settings.GAS_TYPE_CHOICES, default='СПБТ', verbose_name="Тип газа")
     scale_empty_weight = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True, verbose_name="Вес пустого т/с (весы)")
     scale_full_weight = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True, verbose_name="Вес полного т/с (весы)")
     weight_gas_amount = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True, verbose_name="Количество газа (весы)")

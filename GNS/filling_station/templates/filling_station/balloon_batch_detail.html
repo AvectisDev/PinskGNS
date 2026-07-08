@@ -26,11 +26,20 @@
                     <span class="badge bg-{% if batch.is_active %}success{% else %}secondary{% endif %}">
                         {% if batch.is_active %}Активна{% else %}Завершена{% endif %}
                     </span>
+                    {% if batch.miriada_close_failed %}
+                        <span class="badge bg-danger ms-1">Ошибка закрытия в Мириаде</span>
+                    {% endif %}
                 </div>
             </div>
         </div>
 
         <div class="card-body">
+            {% if batch.miriada_close_failed %}
+            <div class="alert alert-warning" role="alert">
+                Не удалось закрыть ТТН в Мириаде{% if batch.miriada_error_message %}: {{ batch.miriada_error_message }}{% endif %}.
+                Можно повторить завершение партии.
+            </div>
+            {% endif %}
             <div class="row">
                 <div class="col-md-6">
                     <dl class="row">
@@ -106,6 +115,15 @@
                 </a>
 
                 <div>
+                    {% if batch.can_retry_miriada_close %}
+                    <form method="post" action="{{ batch.get_retry_close_url }}" class="d-inline me-2">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-warning">
+                            <i class="bi bi-arrow-repeat"></i> Повторно завершить партию
+                        </button>
+                    </form>
+                    {% endif %}
+
                     <a href="{{ batch.get_update_url }}" class="btn btn-custom me-2">
                         <i class="bi bi-pencil"></i> Редактировать
                     </a>

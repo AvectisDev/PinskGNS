@@ -1,9 +1,12 @@
-from django.shortcuts import render, redirect
+from django.shortcuts import render, redirect, get_object_or_404
+from django.contrib import messages
 from core.mixins import ModalDeleteMixin
 from django.http import HttpResponse
 from django.core.paginator import Paginator
 from django.urls import reverse_lazy, reverse
 from django.views import generic
+from django.views.decorators.http import require_POST
+from django.contrib.auth.decorators import login_required
 from django.db.models import Q, Sum, Count, OuterRef, Subquery
 from ttn.models import MiriadaTtn
 from autogas.models import AutoGasBatch
@@ -17,6 +20,7 @@ from .forms import (
     TrailerForm,
     BalloonsBatchForm
 )
+from .services import save_and_close_balloons_batch
 from datetime import datetime, time, timedelta
 
 
@@ -183,6 +187,30 @@ class BalloonBatchUpdateView(BalloonBatchTypeMixin, generic.UpdateView):
         if 'cancel' in request.POST:
             return redirect(self.get_object().get_absolute_url())
         return super().post(request, *args, **kwargs)
+
+
+#@login_required
+@require_POST
+def balloon_batch_retry_close(request, pk):
+    """Завершить партию: сохранить текущие данные и закрыть ТТН в Мириаде."""
+    path = request.path.lower()
+    batch_type = 'u' if 'unloading' in path else 'l'
+    batch = get_object_or_404(BalloonsBatch, pk=pk, batch_type=batch_type)
+
+    # Разрешаем повтор, только если есть флаг ошибки Мириады
+    if not batch.miriada_close_failed:
+        messages.error(request, 'Партия не содержит ошибок.')
+        return redirect(batch.get_absolute_url())
+
+    success, error_payload, _ = save_and_close_balloons_batch(batch, request.POST)
+    if success:
+        messages.success(request, f'Партия №{batch.id} успешно завершена. ТТН закрыта в Мириаде.')
+    elif isinstance(error_payload, dict) and error_payload.get('message'):
+        messages.error(request, error_payload['message'])
+    elif error_payload:
+        messages.error(request, error_payload)
+
+    return redirect(batch.get_absolute_url())
 
 
 class BalloonBatchDeleteView(BalloonBatchTypeMixin, ModalDeleteMixin, generic.DeleteView):

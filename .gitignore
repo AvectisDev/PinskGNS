@@ -139,6 +139,12 @@ ENV/
 env.bak/
 venv.bak/
 
+# AI agents
+.continue/
+AGENTS.md
+.cursorignore
+
+
 # Spyder project settings
 .spyderproject
 .spyproject

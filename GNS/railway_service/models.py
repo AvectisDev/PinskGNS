@@ -52,7 +52,7 @@ class RailwayTankHistory(models.Model):
     full_weight = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True, verbose_name="Вес полной цистерны")
     empty_weight = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True, verbose_name="Вес пустой цистерны")
     gas_weight = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True, verbose_name="Поставлено газа")
-    gas_type = models.CharField(max_length=10, choices=settings.GAS_TYPE_CHOICES, default='Не выбран', verbose_name="Тип газа")
+    gas_type = models.CharField(max_length=10, choices=settings.GAS_TYPE_CHOICES, default='СПБТ', verbose_name="Тип газа")
     railway_ttn = models.CharField(null=True, blank=True, max_length=50, verbose_name="Номер ж/д накладной")
     netto_weight_ttn = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True, verbose_name="Вес НЕТТО ж/д цистерны по накладной")
     arrival_img = models.ImageField(null=True, blank=True, upload_to='railway_tanks/', verbose_name="Фото номера при въезде")
