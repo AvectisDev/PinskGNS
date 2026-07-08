@@ -670,15 +670,19 @@ def attempt_close_balloons_batch(batch: BalloonsBatch) -> Tuple[bool, Optional[s
     return False, error_message
 
 
-BATCH_CLOSE_SERVER_FIELDS = frozenset({
-    'is_active',
-    'completed_at',
-    'miriada_close_failed',
-    'miriada_error_message',
-    'id',
-    'batch_type',
-    'started_at',
-    'ttn_name',
+BATCH_CLOSE_WRITABLE_FIELDS = frozenset({
+    'truck',
+    'trailer',
+    'reader_number',
+    'amount_of_rfid',
+    'amount_of_sensor',
+    'amount_of_5_liters',
+    'amount_of_12_liters',
+    'amount_of_27_liters',
+    'amount_of_50_liters',
+    'gas_amount',
+    'ttn_id',
+    'balloons_type',
 })
 
 
@@ -692,7 +696,7 @@ def save_and_close_balloons_batch(batch: BalloonsBatch, data=None):
     payload = {
         key: value
         for key, value in (data or {}).items()
-        if key not in BATCH_CLOSE_SERVER_FIELDS
+        if key in BATCH_CLOSE_WRITABLE_FIELDS
     }
 
     if payload:
