@@ -110,6 +110,36 @@ def get_current_ttn_from_miriada() -> Optional[list]:
     return []
 
 
+def sync_current_ttn_from_miriada() -> int:
+    """Получает текущие ТТН из Мириады и сохраняет их в БД."""
+    from ttn.models import MiriadaTtn
+
+    api_response = get_current_ttn_from_miriada() or []
+    saved_count = 0
+
+    for ttn_data in api_response:
+        ttn_id = ttn_data.get('ttn_id')
+        if not ttn_id:
+            logger.error(f"Отсутствует ID ТТН: {ttn_data}")
+            continue
+
+        try:
+            MiriadaTtn.objects.update_or_create(
+                ttn_id=ttn_id,
+                defaults={
+                    'name': ttn_data.get('name', ''),
+                    'auto': ttn_data.get('auto', ''),
+                    'date': ttn_data.get('date'),
+                },
+            )
+            saved_count += 1
+        except Exception as e:
+            logger.error(f"Ошибка сохранения ТТН ID={ttn_id}: {e}")
+
+    logger.info(f"Синхронизировано {saved_count} ТТН из Мириады")
+    return saved_count
+
+
 def _log_batch_balloons_on_ttn_close(ttn_id: int, batch: Optional['BalloonsBatch'] = None) -> None:
     from filling_station.models import BalloonsBatch
 

@@ -78,36 +78,10 @@ class MiriadaTtnViewSet(viewsets.ViewSet):
         Returns:
             Response: Список ТТН с полями id, name, auto, date
         """
-        # Получаем данные из API Мириады
-        api_response = services.get_current_ttn_from_miriada()
-
-        # Сохраняем ТТН в базу данных
         try:
-            for ttn_data in api_response:
-
-                ttn_id = ttn_data.get('ttn_id')
-                if not ttn_id:
-                    logger.error(f"Отсутствует ID ТТН: {ttn_data}")
-                    continue
-
-                try:
-                    miriada_ttn, created = MiriadaTtn.objects.update_or_create(
-                        ttn_id=ttn_id,
-                        defaults={
-                            'name': ttn_data.get('name', ''),
-                            'auto': ttn_data.get('auto', ''),
-                            'date': ttn_data.get('date')
-                        }
-                    )
-
-                    logger.info(
-                        f"ТТН {'создана' if created else 'обновлена'}: ID={ttn_id}, name={ttn_data.get('name')}")
-
-                except Exception as e:
-                    logger.error(f"Ошибка сохранения ТТН ID={ttn_id}: {str(e)}")
-
+            services.sync_current_ttn_from_miriada()
         except Exception as e:
-            logger.error(f"Транзакционная ошибка при сохранении ТТН: {e}")
+            logger.error(f"Ошибка при синхронизации ТТН из Мириады: {e}")
             return Response(status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
         # Сериализуем и возвращаем сохраненные данные

@@ -258,6 +258,10 @@ CELERY_BEAT_SCHEDULE = {
         'task': 'transport.tasks.kpp_close_transport',
         'schedule': crontab(hour=18, minute=0),
     },
+    'fetch_current_ttn_from_miriada': {
+        'task': 'ttn.tasks.fetch_current_ttn_from_miriada',
+        'schedule': crontab(hour=22, minute=0),
+    },
 }
 
 LOGGING = {
