@@ -65,14 +65,12 @@ class BalloonDeleteView(ModalDeleteMixin, PreserveListQueryMixin, generic.Delete
 
 def reader_info(request, reader_number=1):
     current_date = datetime.now().date()
-    form = GetBalloonsAmount(request.POST or None)
 
-    if request.method == "POST" and form.is_valid():
-        start_date = form.cleaned_data['start_date']
-        end_date = form.cleaned_data['end_date']
-
-        action = request.POST.get('action')
-        if action == 'export':
+    if request.method == 'POST' and request.POST.get('action') == 'export':
+        form = GetBalloonsAmount(request.POST)
+        if form.is_valid():
+            start_date = form.cleaned_data['start_date']
+            end_date = form.cleaned_data['end_date']
             dataset = BalloonResources().export(
                 Reader.objects.filter(
                     number__number=reader_number,
@@ -82,10 +80,21 @@ def reader_info(request, reader_number=1):
                 )
             )
             response = HttpResponse(dataset.xlsx, content_type='xlsx')
-            response['Content-Disposition'] = f'attachment; filename="RFID_{reader_number}_{start_date}-{end_date}.xlsx"'
+            response['Content-Disposition'] = (
+                f'attachment; filename="RFID_{reader_number}_{start_date}-{end_date}.xlsx"'
+            )
             return response
+
+    form = GetBalloonsAmount(request.GET or None)
+    if form.is_valid():
+        start_date = form.cleaned_data['start_date']
+        end_date = form.cleaned_data['end_date']
     else:
         start_date = end_date = current_date
+        form = GetBalloonsAmount(initial={
+            'start_date': start_date,
+            'end_date': end_date,
+        })
 
     # Получаем статистику из DailyReaderCounter
     reader = ReaderSettings.objects.get(number=reader_number)
