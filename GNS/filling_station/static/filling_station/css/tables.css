@@ -185,3 +185,42 @@ a.custom-link:hover {
     background-color: #6c757d !important;
     color: white !important;
 }
+
+/* Пагинация */
+ul.pagination.pagination-custom {
+    --bs-pagination-color: #000;
+    --bs-pagination-hover-color: #000;
+    --bs-pagination-focus-color: #000;
+}
+
+ul.pagination.pagination-custom > .page-item:not(.active) > .page-link {
+    color: #000 !important;
+    background-color: #fff !important;
+    border-color: #dee2e6 !important;
+}
+
+ul.pagination.pagination-custom > .page-item:not(.active) > .page-link:hover,
+ul.pagination.pagination-custom > .page-item:not(.active) > .page-link:focus {
+    color: #000 !important;
+    background-color: rgba(60, 187, 217, 0.1) !important;
+    border-color: #3CBBD9 !important;
+    box-shadow: none !important;
+}
+
+ul.pagination.pagination-custom > .page-item.active > .page-link,
+ul.pagination.pagination-custom > .active > .page-link,
+ul.pagination.pagination-custom > .page-item > .page-link.active {
+    color: #fff !important;
+    background-color: #3CBBD9 !important;
+    border-color: #3CBBD9 !important;
+}
+
+ul.pagination.pagination-custom > .page-item.active > .page-link:hover,
+ul.pagination.pagination-custom > .page-item.active > .page-link:focus,
+ul.pagination.pagination-custom > .active > .page-link:hover,
+ul.pagination.pagination-custom > .active > .page-link:focus {
+    color: #fff !important;
+    background-color: #2CA9C7 !important;
+    border-color: #2CA9C7 !important;
+    box-shadow: none !important;
+}

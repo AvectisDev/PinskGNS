@@ -12,7 +12,7 @@
           <h5 class="mb-0">Цистерна {{ object.registration_number }}</h5>
         </div>
         <div class="card-body">
-          <form method="post" enctype="multipart/form-data">
+          <form method="post" enctype="multipart/form-data"{% if request.GET %} action="?{{ request.GET.urlencode }}"{% endif %}>
             {% csrf_token %}
             <h6 class="mt-2 mb-3">Основные данные</h6>
             {% crispy form %}

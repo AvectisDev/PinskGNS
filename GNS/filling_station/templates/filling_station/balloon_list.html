@@ -1,5 +1,5 @@
 {% extends 'base.html' %}
-{% load custom_filters %}
+{% load custom_filters navigation %}
 
 {% block title %}Архив баллонов{% endblock %}
 
@@ -40,10 +40,10 @@
                     </tr>
                     </thead>
                     <tbody>
-                    {% for balloon in balloon_list %}
+                    {% for balloon in page_obj.object_list %}
                     <tr>
                         <td>
-                            <a href="{{ balloon.get_absolute_url }}" class="custom-link fw-bold">
+                            <a href="{% url_with_query balloon.get_absolute_url %}" class="custom-link fw-bold">
                                 {{ balloon.nfc_tag|default:"-" }}
                             </a>
                         </td>
@@ -58,7 +58,7 @@
                         </td>
                         <td>
                             <div class="action-buttons">
-                                <a href="{{ balloon.get_update_url }}" class="btn-icon btn-edit" title="Редактировать">
+                                <a href="{% url_with_query balloon.get_update_url %}" class="btn-icon btn-edit" title="Редактировать">
                                     <i class="bi bi-pencil"></i>
                                 </a>
                                 {% include 'core/_delete_trigger.html' with url=balloon.get_delete_url message="Вы уверены, что хотите удалить баллон?" icon_only=True %}

@@ -1,4 +1,5 @@
-<a href="{{ url }}"
+{% load navigation %}
+<a href="{% url_with_query url %}"
    class="{% if icon_only %}btn-icon btn-delete{% else %}btn btn-danger {{ extra_class }}{% endif %} js-delete-trigger"
    title="Удалить"
    data-delete-message="{{ message }}">

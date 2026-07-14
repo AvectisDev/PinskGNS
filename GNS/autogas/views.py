@@ -3,7 +3,7 @@ from django.views import generic
 from .models import AutoGasBatch
 from .forms import AutoGasBatchForm
 from django.shortcuts import redirect
-from core.mixins import ModalDeleteMixin
+from core.mixins import ModalDeleteMixin, PreserveListQueryMixin
 
 
 # Партии автоцистерн
@@ -19,7 +19,7 @@ class AutoGasBatchDetailView(generic.DetailView):
     template_name = 'autogas/auto_batch_detail.html'
 
 
-class AutoGasBatchUpdateView(generic.UpdateView):
+class AutoGasBatchUpdateView(PreserveListQueryMixin, generic.UpdateView):
     model = AutoGasBatch
     form_class = AutoGasBatchForm
     template_name = 'autogas/_equipment_form.html'
@@ -29,10 +29,10 @@ class AutoGasBatchUpdateView(generic.UpdateView):
 
     def post(self, request, *args, **kwargs):
         if 'cancel' in request.POST:
-            return redirect('autogas:auto_gas_batch_detail', pk=self.get_object().pk)
+            return self.redirect_preserve_query('autogas:auto_gas_batch_detail', pk=self.get_object().pk)
         return super().post(request, *args, **kwargs)
 
 
-class AutoGasBatchDeleteView(ModalDeleteMixin, generic.DeleteView):
+class AutoGasBatchDeleteView(ModalDeleteMixin, PreserveListQueryMixin, generic.DeleteView):
     model = AutoGasBatch
     success_url = reverse_lazy("autogas:auto_gas_batch_list")

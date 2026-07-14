@@ -1,5 +1,5 @@
 {% extends 'base.html' %}
-{% load custom_filters %}
+{% load custom_filters navigation %}
 
 {% block title %}
     {% if batch.batch_type == 'l' %}
@@ -107,16 +107,15 @@
         <div class="card-footer bg-light">
             <div class="d-flex justify-content-between">
                 {% if batch.batch_type == 'l' %}
-                    <a href="{% url 'filling_station:balloon_loading_batch_list' %}" class="btn btn-custom">
+                    {% url 'filling_station:balloon_loading_batch_list' as list_url %}
                 {% else %}
-                    <a href="{% url 'filling_station:balloon_unloading_batch_list' %}" class="btn btn-custom">
+                    {% url 'filling_station:balloon_unloading_batch_list' as list_url %}
                 {% endif %}
-                    <i class="bi bi-arrow-left"></i> Назад
-                </a>
+                {% include 'core/_back_to_list.html' with list_url=list_url %}
 
                 <div>
                     {% if batch.can_retry_miriada_close %}
-                    <form method="post" action="{{ batch.get_retry_close_url }}" class="d-inline me-2">
+                    <form method="post" action="{% url_with_query batch.get_retry_close_url %}" class="d-inline me-2">
                         {% csrf_token %}
                         <button type="submit" class="btn btn-warning">
                             <i class="bi bi-arrow-repeat"></i> Повторно завершить партию
@@ -124,7 +123,7 @@
                     </form>
                     {% endif %}
 
-                    <a href="{{ batch.get_update_url }}" class="btn btn-custom me-2">
+                    <a href="{% url_with_query batch.get_update_url %}" class="btn btn-custom me-2">
                         <i class="bi bi-pencil"></i> Редактировать
                     </a>
 

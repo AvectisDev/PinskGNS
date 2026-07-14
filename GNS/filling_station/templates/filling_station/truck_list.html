@@ -1,5 +1,5 @@
 {% extends 'base.html' %}
-{% load custom_filters %}
+{% load custom_filters navigation %}
 
 {% block title %}Список грузовиков{% endblock %}
 
@@ -32,7 +32,7 @@
                         <tr>
                             <td>{{ truck.car_brand|default:"-" }}</td>
                             <td>
-                                <a href="{{ truck.get_absolute_url }}" class="custom-link fw-bold">
+                                <a href="{% url_with_query truck.get_absolute_url %}" class="custom-link fw-bold">
                                     {{ truck.registration_number }}
                                 </a>
                             </td>
@@ -62,7 +62,7 @@
                             </td>
                             <td>
                                 <div class="action-buttons">
-                                    <a href="{{ truck.get_update_url }}" class="btn-icon btn-edit" title="Редактировать">
+                                    <a href="{% url_with_query truck.get_update_url %}" class="btn-icon btn-edit" title="Редактировать">
                                         <i class="bi bi-pencil"></i>
                                     </a>
                                     {% include 'core/_delete_trigger.html' with url=truck.get_delete_url message="Вы уверены, что хотите удалить грузовик?" icon_only=True %}

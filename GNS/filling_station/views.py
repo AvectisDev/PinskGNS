@@ -1,6 +1,7 @@
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
-from core.mixins import ModalDeleteMixin
+from core.mixins import ModalDeleteMixin, PreserveListQueryMixin
+from core.navigation import redirect_preserve_query
 from django.http import HttpResponse
 from django.core.paginator import Paginator
 from django.urls import reverse_lazy, reverse
@@ -43,7 +44,7 @@ class BalloonDetailView(generic.DetailView):
     model = Balloon
 
 
-class BalloonUpdateView(generic.UpdateView):
+class BalloonUpdateView(PreserveListQueryMixin, generic.UpdateView):
     model = Balloon
     form_class = BalloonForm
     template_name = 'filling_station/_equipment_form.html'
@@ -53,11 +54,11 @@ class BalloonUpdateView(generic.UpdateView):
 
     def post(self, request, *args, **kwargs):
         if 'cancel' in request.POST:
-            return redirect('filling_station:balloon_detail', pk=self.get_object().pk)
+            return self.redirect_preserve_query('filling_station:balloon_detail', pk=self.get_object().pk)
         return super().post(request, *args, **kwargs)
 
 
-class BalloonDeleteView(ModalDeleteMixin, generic.DeleteView):
+class BalloonDeleteView(ModalDeleteMixin, PreserveListQueryMixin, generic.DeleteView):
     model = Balloon
     success_url = reverse_lazy("filling_station:balloon_list")
 
@@ -167,7 +168,7 @@ class BalloonBatchDetailView(BalloonBatchTypeMixin, generic.DetailView):
         return queryset
 
 
-class BalloonBatchUpdateView(BalloonBatchTypeMixin, generic.UpdateView):
+class BalloonBatchUpdateView(BalloonBatchTypeMixin, PreserveListQueryMixin, generic.UpdateView):
     """Универсальное редактирование партии баллонов"""
     model = BalloonsBatch
     form_class = BalloonsBatchForm
@@ -185,7 +186,7 @@ class BalloonBatchUpdateView(BalloonBatchTypeMixin, generic.UpdateView):
 
     def post(self, request, *args, **kwargs):
         if 'cancel' in request.POST:
-            return redirect(self.get_object().get_absolute_url())
+            return redirect_preserve_query(request, self.get_object().get_absolute_url())
         return super().post(request, *args, **kwargs)
 
 
@@ -200,7 +201,7 @@ def balloon_batch_retry_close(request, pk):
     # Разрешаем повтор, только если есть флаг ошибки Мириады
     if not batch.miriada_close_failed:
         messages.error(request, 'Партия не содержит ошибок.')
-        return redirect(batch.get_absolute_url())
+        return redirect_preserve_query(request, batch.get_absolute_url())
 
     success, error_payload, _ = save_and_close_balloons_batch(batch, request.POST)
     if success:
@@ -210,10 +211,10 @@ def balloon_batch_retry_close(request, pk):
     elif error_payload:
         messages.error(request, error_payload)
 
-    return redirect(batch.get_absolute_url())
+    return redirect_preserve_query(request, batch.get_absolute_url())
 
 
-class BalloonBatchDeleteView(BalloonBatchTypeMixin, ModalDeleteMixin, generic.DeleteView):
+class BalloonBatchDeleteView(BalloonBatchTypeMixin, ModalDeleteMixin, PreserveListQueryMixin, generic.DeleteView):
     """Универсальное удаление партии баллонов"""
     model = BalloonsBatch
 
@@ -252,7 +253,7 @@ class TruckDetailView(generic.DetailView):
     model = Truck
 
 
-class TruckCreateView(generic.CreateView):
+class TruckCreateView(PreserveListQueryMixin, generic.CreateView):
     model = Truck
     form_class = TruckForm
     template_name = 'filling_station/_equipment_form.html'
@@ -261,7 +262,7 @@ class TruckCreateView(generic.CreateView):
         return self.object.get_absolute_url()
 
 
-class TruckUpdateView(generic.UpdateView):
+class TruckUpdateView(PreserveListQueryMixin, generic.UpdateView):
     model = Truck
     form_class = TruckForm
     template_name = 'filling_station/_equipment_form.html'
@@ -271,11 +272,11 @@ class TruckUpdateView(generic.UpdateView):
 
     def post(self, request, *args, **kwargs):
         if 'cancel' in request.POST:
-            return redirect('filling_station:truck_detail', pk=self.get_object().pk)
+            return self.redirect_preserve_query('filling_station:truck_detail', pk=self.get_object().pk)
         return super().post(request, *args, **kwargs)
 
 
-class TruckDeleteView(ModalDeleteMixin, generic.DeleteView):
+class TruckDeleteView(ModalDeleteMixin, PreserveListQueryMixin, generic.DeleteView):
     model = Truck
     success_url = reverse_lazy("filling_station:truck_list")
 
@@ -290,7 +291,7 @@ class TrailerDetailView(generic.DetailView):
     model = Trailer
 
 
-class TrailerCreateView(generic.CreateView):
+class TrailerCreateView(PreserveListQueryMixin, generic.CreateView):
     model = Trailer
     form_class = TrailerForm
     template_name = 'filling_station/_equipment_form.html'
@@ -299,7 +300,7 @@ class TrailerCreateView(generic.CreateView):
         return self.object.get_absolute_url()
 
 
-class TrailerUpdateView(generic.UpdateView):
+class TrailerUpdateView(PreserveListQueryMixin, generic.UpdateView):
     model = Trailer
     form_class = TrailerForm
     template_name = 'filling_station/_equipment_form.html'
@@ -309,11 +310,11 @@ class TrailerUpdateView(generic.UpdateView):
 
     def post(self, request, *args, **kwargs):
         if 'cancel' in request.POST:
-            return redirect('filling_station:trailer_detail', pk=self.get_object().pk)
+            return self.redirect_preserve_query('filling_station:trailer_detail', pk=self.get_object().pk)
         return super().post(request, *args, **kwargs)
 
 
-class TrailerDeleteView(ModalDeleteMixin, generic.DeleteView):
+class TrailerDeleteView(ModalDeleteMixin, PreserveListQueryMixin, generic.DeleteView):
     model = Trailer
     success_url = reverse_lazy("filling_station:trailer_list")
 

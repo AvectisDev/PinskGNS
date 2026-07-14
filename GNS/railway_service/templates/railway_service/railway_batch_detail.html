@@ -1,5 +1,5 @@
 {% extends 'base.html' %}
-{% load custom_filters %}
+{% load custom_filters navigation %}
 
 {% block title %}Партия №{{ batch.id }}{% endblock %}
 
@@ -90,11 +90,10 @@
 
         <div class="card-footer bg-light">
             <div class="d-flex justify-content-between">
-                <a href="{% url 'railway_service:railway_batch_list' %}" class="btn btn-custom">
-                    <i class="bi bi-arrow-left"></i> Назад
-                </a>
+                {% url 'railway_service:railway_batch_list' as list_url %}
+                {% include 'core/_back_to_list.html' with list_url=list_url %}
                 <div>
-                    <a href="{{ batch.get_update_url }}" class="btn btn-custom me-2">
+                    <a href="{% url_with_query batch.get_update_url %}" class="btn btn-custom me-2">
                         <i class="bi bi-pencil"></i> Редактировать
                     </a>
                     {% include 'core/_delete_trigger.html' with url=batch.get_delete_url message="Вы уверены, что хотите удалить партию?" %}

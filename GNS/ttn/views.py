@@ -1,5 +1,5 @@
 from django.shortcuts import render, redirect
-from core.mixins import ModalDeleteMixin
+from core.mixins import ModalDeleteMixin, PreserveListQueryMixin
 from django.urls import reverse_lazy, reverse
 from django.views import generic
 from django.db.models import Q, Sum
@@ -20,7 +20,7 @@ class TTNDetailView(generic.DetailView):
     model = BalloonTtn
 
 
-class TTNCreateView(generic.CreateView):
+class TTNCreateView(PreserveListQueryMixin, generic.CreateView):
     model = BalloonTtn
     form_class = BalloonTtnForm
     template_name = 'ttn/_equipment_form.html'
@@ -34,7 +34,7 @@ class TTNCreateView(generic.CreateView):
         return response
 
 
-class TTNUpdateView(generic.UpdateView):
+class TTNUpdateView(PreserveListQueryMixin, generic.UpdateView):
     model = BalloonTtn
     form_class = BalloonTtnForm
     template_name = 'ttn/_equipment_form.html'
@@ -44,7 +44,7 @@ class TTNUpdateView(generic.UpdateView):
 
     def post(self, request, *args, **kwargs):
         if 'cancel' in request.POST:
-            return redirect('ttn:ttn_detail', pk=self.get_object().pk)
+            return self.redirect_preserve_query('ttn:ttn_detail', pk=self.get_object().pk)
         return super().post(request, *args, **kwargs)
 
     def form_valid(self, form):
@@ -53,7 +53,7 @@ class TTNUpdateView(generic.UpdateView):
         return response
 
 
-class TTNDeleteView(ModalDeleteMixin, generic.DeleteView):
+class TTNDeleteView(ModalDeleteMixin, PreserveListQueryMixin, generic.DeleteView):
     model = BalloonTtn
     success_url = reverse_lazy("ttn:ttn_list")
 
@@ -68,7 +68,7 @@ class RailwayTtnDetailView(generic.DetailView):
     model = RailwayTtn
 
 
-class RailwayTtnCreateView(generic.CreateView):
+class RailwayTtnCreateView(PreserveListQueryMixin, generic.CreateView):
     model = RailwayTtn
     form_class = RailwayTtnForm
     template_name = 'ttn/_equipment_form.html'
@@ -93,7 +93,7 @@ class RailwayTtnCreateView(generic.CreateView):
         return super().form_valid(form)
 
 
-class RailwayTtnUpdateView(generic.UpdateView):
+class RailwayTtnUpdateView(PreserveListQueryMixin, generic.UpdateView):
     model = RailwayTtn
     form_class = RailwayTtnForm
     template_name = 'ttn/_equipment_form.html'
@@ -103,7 +103,7 @@ class RailwayTtnUpdateView(generic.UpdateView):
 
     def post(self, request, *args, **kwargs):
         if 'cancel' in request.POST:
-            return redirect('ttn:railway_ttn_detail', pk=self.get_object().pk)
+            return self.redirect_preserve_query('ttn:railway_ttn_detail', pk=self.get_object().pk)
         return super().post(request, *args, **kwargs)
 
     def form_valid(self, form):
@@ -123,7 +123,7 @@ class RailwayTtnUpdateView(generic.UpdateView):
         return super().form_valid(form)
 
 
-class RailwayTtnDeleteView(ModalDeleteMixin, generic.DeleteView):
+class RailwayTtnDeleteView(ModalDeleteMixin, PreserveListQueryMixin, generic.DeleteView):
     model = RailwayTtn
     success_url = reverse_lazy("ttn:railway_ttn_list")
 
@@ -154,7 +154,7 @@ class AutoTtnDetailView(generic.DetailView):
     model = AutoTtn
 
 
-class AutoTtnCreateView(generic.CreateView):
+class AutoTtnCreateView(PreserveListQueryMixin, generic.CreateView):
     model = AutoTtn
     form_class = AutoTtnForm
     template_name = 'ttn/_equipment_form.html'
@@ -188,7 +188,7 @@ class AutoTtnCreateView(generic.CreateView):
             self.object.save()
 
 
-class AutoTtnUpdateView(generic.UpdateView):
+class AutoTtnUpdateView(PreserveListQueryMixin, generic.UpdateView):
     model = AutoTtn
     form_class = AutoTtnForm
     template_name = 'ttn/_equipment_form.html'
@@ -198,7 +198,7 @@ class AutoTtnUpdateView(generic.UpdateView):
 
     def post(self, request, *args, **kwargs):
         if 'cancel' in request.POST:
-            return redirect('ttn:auto_ttn_detail', pk=self.get_object().pk)
+            return self.redirect_preserve_query('ttn:auto_ttn_detail', pk=self.get_object().pk)
         return super().post(request, *args, **kwargs)
 
     def form_valid(self, form):
@@ -222,6 +222,6 @@ class AutoTtnUpdateView(generic.UpdateView):
             self.object.save()
 
 
-class AutoTtnDeleteView(ModalDeleteMixin, generic.DeleteView):
+class AutoTtnDeleteView(ModalDeleteMixin, PreserveListQueryMixin, generic.DeleteView):
     model = AutoTtn
     success_url = reverse_lazy("ttn:auto_ttn_list")

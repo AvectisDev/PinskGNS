@@ -1,5 +1,5 @@
 {% extends 'base.html' %}
-{% load custom_filters %}
+{% load custom_filters navigation %}
 
 {% block title %}Список ж/д цистерн{% endblock %}
 
@@ -35,7 +35,7 @@
                     {% for tank in page_obj.object_list %}
                     <tr>
                         <td>
-                            <a href="{{ tank.get_absolute_url }}" class="custom-link fw-bold" style="color: #051831">
+                            <a href="{% url_with_query tank.get_absolute_url %}" class="custom-link fw-bold" style="color: #051831">
                                 {{ tank.registration_number }}
                             </a>
                         </td>
@@ -78,7 +78,7 @@
                         {% endwith %}
                         <td>
                             <div class="action-buttons">
-                                <a href="{{ tank.get_update_url }}" class="btn-icon btn-edit" title="Редактировать">
+                                <a href="{% url_with_query tank.get_update_url %}" class="btn-icon btn-edit" title="Редактировать">
                                     <i class="bi bi-pencil"></i>
                                 </a>
                                 {% include 'core/_delete_trigger.html' with url=tank.get_delete_url message="Вы уверены, что хотите удалить цистерну?" icon_only=True %}

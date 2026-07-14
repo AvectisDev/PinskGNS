@@ -1,5 +1,5 @@
 {% extends 'base.html' %}
-{% load custom_filters %}
+{% load custom_filters navigation %}
 
 {% block title %}Список прицепов{% endblock %}
 
@@ -33,7 +33,7 @@
                         <tr>
                             <td>{{ trailer.trailer_brand|default:"-" }}</td>
                             <td>
-                                <a href="{{ trailer.get_absolute_url }}" class="custom-link fw-bold">
+                                <a href="{% url_with_query trailer.get_absolute_url %}" class="custom-link fw-bold">
                                     {{ trailer.registration_number }}
                                 </a>
                             </td>
@@ -64,7 +64,7 @@
                             </td>
                             <td>
                                 <div class="action-buttons">
-                                    <a href="{{ trailer.get_update_url }}" class="btn-icon btn-edit" title="Редактировать">
+                                    <a href="{% url_with_query trailer.get_update_url %}" class="btn-icon btn-edit" title="Редактировать">
                                         <i class="bi bi-pencil"></i>
                                     </a>
                                     {% include 'core/_delete_trigger.html' with url=trailer.get_delete_url message="Вы уверены, что хотите удалить прицеп?" icon_only=True %}
