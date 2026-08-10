@@ -4,13 +4,13 @@ import struct
 import logging.config
 import django
 import time
+from dataclasses import dataclass
 
 
 # Инициализация Django
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'GNS.settings')
 django.setup()
 
-from django.core.cache import cache
 from django.core.exceptions import ValidationError
 
 from carousel.services import (
@@ -19,40 +19,93 @@ from carousel.services import (
     get_carousel_settings_data,
     process_carousel_data_direct,
 )
+from core.redis_queue import (
+    get_reader_balloon_queue_key,
+    increment_metric,
+    pop_json_from_queue,
+)
 
 # Конфигурация логирования из настроек Django
 logging.config.dictConfig(django.conf.settings.LOGGING)
 logger = logging.getLogger('carousel')
 
-# Ключи Django cache (Redis DB настраивается в settings.CACHES)
-CACHE_KEY = 'reader_8_balloon_stack'
-POST_NUMBER_CACHE_KEY = 'previous_post_number'
+# Настройки экземпляра карусели. Для нескольких каруселей запускается по одному
+# процессу с собственным CAROUSEL_NUMBER и переменными CAROUSEL_<N>_*.
+CAROUSEL_NUMBER = int(os.getenv('CAROUSEL_NUMBER', '1'))
+CAROUSEL_ENV_PREFIX = f'CAROUSEL_{CAROUSEL_NUMBER}'
+PORT = os.getenv(f'{CAROUSEL_ENV_PREFIX}_COM_PORT', 'COM3')
+BAUD_RATE = int(os.getenv(f'{CAROUSEL_ENV_PREFIX}_BAUD_RATE', '9600'))
+RFID_READER_NUMBER = int(
+    os.getenv(f'{CAROUSEL_ENV_PREFIX}_RFID_READER', '8')
+)
+BALLOON_QUEUE_KEY = get_reader_balloon_queue_key(RFID_READER_NUMBER)
 
-# Указываем порт и скорость соединения
-PORT = 'COM3'
-BAUD_RATE = 9600
+REQUEST_CACHE_SECONDS = 2.0
 
 
-def get_and_remove_last_balloon():
+@dataclass(frozen=True)
+class CachedRequest:
+    expires_at: float
+    response_packet: bytes | None
+
+
+recent_requests: dict[tuple[str, int, int], CachedRequest] = {}
+
+
+@dataclass(frozen=True)
+class PostSettings:
+    available: bool
+    read_only: bool
+    weight_correction: float | None
+    min_balloon_weight: float | None
+    max_balloon_weight: float | None
+    max_passport_weight_diff: float | None
+
+
+def record_post_error(
+    post_number: int | None,
+    request_type: str | None,
+    error_code: str,
+    message: str,
+    metric_name: str = 'post_errors',
+) -> None:
+    logger.error(
+        "Карусель=%s пост=%s тип=%s ошибка=%s: %s",
+        CAROUSEL_NUMBER,
+        post_number,
+        request_type,
+        error_code,
+        message,
+    )
+    try:
+        increment_metric(CAROUSEL_NUMBER, metric_name)
+    except Exception as error:
+        logger.error(f"Не удалось обновить метрику {metric_name}: {error}")
+
+
+def get_and_remove_last_balloon(
+    post_number: int,
+    request_type: str,
+) -> tuple[dict | None, bool]:
     """
-    Извлекает последний элемент из стека баллонов в Redis и удаляет его. Работа со стеком по принципу FIFO
+    Атомарно извлекает самый старый паспорт из нативной Redis-очереди.
     """
-    cache_timeout = 600
-    balloons = cache.get(CACHE_KEY)
-
-    if balloons:
-        try:
-            if isinstance(balloons, list) and balloons:
-                last_item = balloons.pop()
-                cache.set(CACHE_KEY, balloons, timeout=cache_timeout)
-                return last_item
-            else:
-                logger.info("Кэш. Данные не являются списком или список пуст")
-                return None
-        except Exception as error:
-            logger.error(f"Кэш. Ошибка при десериализации данных: {error}")
-            return None
-    return None
+    try:
+        balloon, queue_size = pop_json_from_queue(BALLOON_QUEUE_KEY)
+        logger.debug(
+            f"Карусель={CAROUSEL_NUMBER} очередь={BALLOON_QUEUE_KEY} "
+            f"размер={queue_size}"
+        )
+        return balloon, True
+    except Exception as error:
+        record_post_error(
+            post_number,
+            request_type,
+            'queue_read_error',
+            str(error),
+            metric_name='queue_errors',
+        )
+        return None, False
 
 
 def put_carousel_data(data: dict) -> bool:
@@ -76,13 +129,24 @@ def put_carousel_data(data: dict) -> bool:
         CarouselPostNotFoundError,
         UnsupportedCarouselRequestError,
     ) as error:
-        logger.error(f"Ошибка обработки данных с поста наполнения: {error}")
+        record_post_error(
+            data.get('post_number'),
+            data.get('request_type'),
+            'persistence_validation_error',
+            str(error),
+        )
     except Exception as error:
-        logger.exception(f"Ошибка сохранения данных с поста наполнения: {error}")
+        record_post_error(
+            data.get('post_number'),
+            data.get('request_type'),
+            'persistence_error',
+            str(error),
+        )
+        logger.exception("Ошибка сохранения данных с поста наполнения")
     return False
 
 
-def calc_crc(message):
+def calc_crc(message: bytes) -> int:
     """
     вычисляет CRC-16/AUG-CCITT
     """
@@ -102,79 +166,71 @@ def calc_crc(message):
     return reg
 
 
-def post_processing(post_number: int):
-    """
-    контролирует порядок обработки постов. Запросы с постов идут в обратном порядке, например 2-1-20-19-18 и т.д.
-    Если в определённый порядок вклинивается неверный пост, то такую обработку пропускаем.
-    Используется только для типов запроса 0x7a (установка пустого баллона на пост).
-    :param post_number: Номер текущего поста наполнения
-    :return: bool: указывает нужно ли обрабатывать текущий запрос на наполнение
-    """
-    cache_timeout = 5
-    previous_post_number = cache.get(POST_NUMBER_CACHE_KEY)
-    logger.debug(f"Последний номер поста в кеше - {previous_post_number}.")
+def validate_frame_crc(frame: bytes) -> tuple[bool, int, int]:
+    """Проверяет CRC16/SPI-FUJITSU первых шести байт кадра."""
+    if len(frame) != 8:
+        return False, 0, 0
+    received_crc = int.from_bytes(frame[6:8], byteorder='big')
+    calculated_crc = calc_crc(frame[:6])
+    return received_crc == calculated_crc, received_crc, calculated_crc
 
-    if previous_post_number:
-        process_value = int(previous_post_number) - post_number
-        logger.debug(f"Значение process_value = {process_value}")
 
-        # if process_value in [0, 1, -19]:  # также разрешается повторный запрос с поста - значение 0
-        if process_value:
-            cache.set(POST_NUMBER_CACHE_KEY, post_number, timeout=cache_timeout)
-            logger.debug(f"Значение {post_number} сохранено в Redis по ключу {POST_NUMBER_CACHE_KEY}")
-            return True
-        else:
-            return False
+def build_response_packet(
+    request_type: int,
+    post_number: int,
+    full_weight: int,
+) -> bytes:
+    if request_type == 0x7A:
+        response_type = 0x5A
+    elif request_type == 0x70:
+        response_type = 0x50
     else:
-        # Если в кеше нет данных, значит это первая обработка функции
-        cache.set(POST_NUMBER_CACHE_KEY, post_number, timeout=cache_timeout)
-        logger.debug(f"Значение {post_number} сохранено в Redis по ключу {POST_NUMBER_CACHE_KEY}")
-        return True
+        raise ValueError(f'Нельзя сформировать ответ для типа 0x{request_type:02X}')
+
+    payload = struct.pack(
+        '>BBBHB',
+        response_type,
+        post_number,
+        0xFF,
+        full_weight,
+        0xFF,
+    )
+    return payload + struct.pack('>H', calc_crc(payload))
 
 
-def check_settings(post_number: int):
+def check_settings(post_number: int) -> PostSettings:
     """
-    проверяет настройки обработки постов в базе данных. Если установлено только чтение, то на пост не должны
-    передаваться данные. Если установлена корректировка веса, то вес на пост должен быть отправлен с учётом корректировки
-    :param post_number: Номер текущего поста наполнения
-    :return: tuple: Кортеж со значениями - Нужна ли передача веса на пост и параметр коррекции веса
+    Читает настройки обработки постов из базы данных.
     """
-    # Значения по умолчанию
-    weight_correction_value = 0.0
-    transmit_command = False
-
     post_settings = get_carousel_settings_data()
+    if not post_settings:
+        return PostSettings(
+            available=False,
+            read_only=True,
+            weight_correction=0.0,
+            min_balloon_weight=None,
+            max_balloon_weight=None,
+            max_passport_weight_diff=None,
+        )
 
-    if post_settings:
-        logger.debug(f'Настройки поста наполнения {post_settings}')
-        
-        if post_settings.get('read_only'):
-            return (
-                transmit_command,
-                weight_correction_value,
-                post_settings.get('min_balloon_weight'),
-                post_settings.get('max_balloon_weight'),
-                post_settings.get('max_passport_weight_diff'),
+    weight_correction = 0.0
+    if post_settings.get('use_weight_management'):
+        if post_settings.get('use_common_correction'):
+            weight_correction = post_settings.get('weight_correction_value')
+        else:
+            weight_correction = post_settings.get(
+                f'post_{post_number}_correction'
             )
 
-        transmit_command = True
-        logger.debug(f'Требуется отправка веса на пост {post_number}')
-        if post_settings.get('use_weight_management'):
-            if post_settings.get('use_common_correction'):
-                weight_correction_value = post_settings.get('weight_correction_value')
-            else:
-                weight_correction_value = post_settings.get(f'post_{post_number}_correction')
-        logger.debug(f'Требуется отправка веса на пост. weight_correction_value = {post_settings}')
-
-    if not post_settings:
-        post_settings = {}
-
-    return (
-        transmit_command,
-        weight_correction_value,
-        post_settings.get('min_balloon_weight'),
-        post_settings.get('max_balloon_weight'),
-        post_settings.get('max_passport_weight_diff'),
+    return PostSettings(
+        available=True,
+        read_only=bool(post_settings.get('read_only')),
+        weight_correction=weight_correction,
+        min_balloon_weight=post_settings.get('min_balloon_weight'),
+        max_balloon_weight=post_settings.get('max_balloon_weight'),
+        max_passport_weight_diff=post_settings.get(
+            'max_passport_weight_diff'
+        ),
     )
 
 
@@ -193,22 +249,40 @@ def check_balloon_size(weight: int) -> int:
     return balloon_size
 
 
-def request_caching(request_type: str, post_number: int, weight: int) -> bool:
-    """
-    кеширует запрос от поста наполнения.
-    :param weight: Вес баллона перед наполнением
-    :return: bool: требуется обработка запроса
-    """
-    request_processing_required = True
-    cache_key = f"carousel_request_{request_type}_{post_number}_{weight}"
-    cache_time = 1
+def get_cached_request(
+    request_type: str,
+    post_number: int,
+    weight: int,
+) -> tuple[bool, bytes | None]:
+    """Возвращает сохранённый ответ на повторный запрос контроллера."""
+    now = time.monotonic()
+    expired_keys = [
+        key for key, request in recent_requests.items()
+        if request.expires_at <= now
+    ]
+    for key in expired_keys:
+        recent_requests.pop(key, None)
 
-    if not cache.add(cache_key, "1", timeout=cache_time):
-        request_processing_required = False
-        logger.debug(f"Запрос с ключём {cache_key} уже обрабатывается")
-        return request_processing_required
+    request_key = (request_type, post_number, weight)
+    cached_request = recent_requests.get(request_key)
+    if cached_request is None:
+        return False, None
 
-    return request_processing_required
+    logger.debug(f"Повторный запрос {request_key}: используется сохранённый ответ")
+    return True, cached_request.response_packet
+
+
+def cache_request_result(
+    request_type: str,
+    post_number: int,
+    weight: int,
+    response_packet: bytes | None,
+) -> None:
+    request_key = (request_type, post_number, weight)
+    recent_requests[request_key] = CachedRequest(
+        expires_at=time.monotonic() + REQUEST_CACHE_SECONDS,
+        response_packet=response_packet,
+    )
 
 
 def request_processing(request_type: str, post_number: int, weight: int) -> tuple[bool, int, dict]:
@@ -222,7 +296,7 @@ def request_processing(request_type: str, post_number: int, weight: int) -> tupl
     response_required = False
     full_weight = 0
     process_data_to_server = {
-        'carousel_number': 1,
+        'carousel_number': CAROUSEL_NUMBER,
         'request_type': request_type,
         'post_number': post_number,
         'size': check_balloon_size(weight)
@@ -231,43 +305,118 @@ def request_processing(request_type: str, post_number: int, weight: int) -> tupl
     if request_type == '0x7a':
         logger.debug(f"Запрос 0x7a")
 
-        if not post_processing(post_number):
-            logger.debug("Пост не прошел проверку очередности")
-            return response_required, full_weight, {'error': 'post_order_failed'}
+        balloon_from_cache, queue_available = get_and_remove_last_balloon(
+            post_number,
+            request_type,
+        )
 
-        # Забираем данные по баллону из кэша
-        balloon_from_cache = get_and_remove_last_balloon()
-
-        if not balloon_from_cache:
-            logger.debug("Нет данных по баллону в кеше")
+        if balloon_from_cache is None:
+            if queue_available:
+                record_post_error(
+                    post_number,
+                    request_type,
+                    'empty_balloon_queue',
+                    f'В очереди {BALLOON_QUEUE_KEY} нет паспорта баллона',
+                    metric_name='empty_queue',
+                )
             process_data_to_server.update({
                 'is_empty': True,
                 'empty_weight': weight / 1000
             })
             return response_required, full_weight, process_data_to_server
 
-        # Обработка данных баллона
-        if balloon_from_cache.get('filling_status') and (brutto := balloon_from_cache.get('brutto')):
-            response_required, weight_correction, min_balloon_weight, max_balloon_weight, max_passport_weight_diff = check_settings(post_number)
-            
-            netto = balloon_from_cache.get('netto')
+        filling_status = bool(balloon_from_cache.get('filling_status'))
+        netto = balloon_from_cache.get('netto')
+        brutto = balloon_from_cache.get('brutto')
 
-            if (
-                (min_balloon_weight is not None and netto is not None and netto < min_balloon_weight) or
-                (max_balloon_weight is not None and brutto > max_balloon_weight)
-            ):
-                response_required = False
-                logger.debug("Вес баллона не входит в допустимый диапазон")
+        if not filling_status:
+            record_post_error(
+                post_number,
+                request_type,
+                'balloon_not_ready',
+                'Паспорт баллона не разрешает наполнение',
+                metric_name='passport_errors',
+            )
+        elif netto is None or brutto is None:
+            record_post_error(
+                post_number,
+                request_type,
+                'incomplete_passport',
+                f'Неполный паспорт: netto={netto}, brutto={brutto}',
+                metric_name='passport_errors',
+            )
+        else:
+            post_settings = check_settings(post_number)
+            if not post_settings.available:
+                record_post_error(
+                    post_number,
+                    request_type,
+                    'settings_missing',
+                    'Настройки карусели отсутствуют',
+                    metric_name='settings_errors',
+                )
+            elif not post_settings.read_only:
+                weight_is_valid = True
 
-            passport_diff = abs(brutto - netto)
-            if passport_diff > max_passport_weight_diff:
-                response_required = False
-                logger.debug(f"Разница между паспортными весами превышает допустимое значение: {passport_diff} > {max_passport_weight_diff}")
+                if (
+                    post_settings.min_balloon_weight is not None
+                    and netto < post_settings.min_balloon_weight
+                ) or (
+                    post_settings.max_balloon_weight is not None
+                    and brutto > post_settings.max_balloon_weight
+                ):
+                    weight_is_valid = False
+                    record_post_error(
+                        post_number,
+                        request_type,
+                        'weight_out_of_range',
+                        f'Паспортные веса вне диапазона: '
+                        f'netto={netto}, brutto={brutto}',
+                        metric_name='weight_rejections',
+                    )
 
-            if response_required:
-                full_weight = int((brutto + weight_correction) * 1000)
-                logger.debug(f"Требуется отправка веса на пост. Полный вес баллона по паспорту: {brutto} кг. "
-                             f"Коррекция веса: {weight_correction} кг")
+                max_passport_diff = (
+                    post_settings.max_passport_weight_diff
+                )
+                if max_passport_diff is None:
+                    weight_is_valid = False
+                    record_post_error(
+                        post_number,
+                        request_type,
+                        'invalid_settings',
+                        'Не задан max_passport_weight_diff',
+                        metric_name='settings_errors',
+                    )
+                elif abs(brutto - netto) > max_passport_diff:
+                    weight_is_valid = False
+                    record_post_error(
+                        post_number,
+                        request_type,
+                        'passport_weight_diff',
+                        f'Разница brutto/netto {abs(brutto - netto)} '
+                        f'превышает {max_passport_diff}',
+                        metric_name='weight_rejections',
+                    )
+
+                if post_settings.weight_correction is None:
+                    weight_is_valid = False
+                    record_post_error(
+                        post_number,
+                        request_type,
+                        'invalid_post_correction',
+                        'Не задан корректор веса для поста',
+                        metric_name='settings_errors',
+                    )
+
+                if weight_is_valid:
+                    response_required = True
+                    full_weight = int(
+                        (brutto + post_settings.weight_correction) * 1000
+                    )
+                    logger.debug(
+                        f"Полный вес по паспорту: {brutto} кг. "
+                        f"Коррекция: {post_settings.weight_correction} кг"
+                    )
 
         process_data_to_server.update({
             'is_empty': True,
@@ -281,6 +430,13 @@ def request_processing(request_type: str, post_number: int, weight: int) -> tupl
 
     elif request_type == '0x70':
         process_data_to_server['full_weight'] = weight / 1000
+    else:
+        record_post_error(
+            post_number,
+            request_type,
+            'unknown_request_type',
+            f'Неизвестный тип запроса {request_type}',
+        )
 
     return response_required, full_weight, process_data_to_server
 
@@ -305,56 +461,86 @@ def serial_exchange():
                 logger.info(f"Получен запрос от поста - {data}")
                 request_type = data[0]
                 post_number = data[1]
-                measurement_number = data[2]
-                # Преобразуем четвертый и пятый байты в десятичное значение массы баллона
+                service_byte = data[2]
                 weight_combined = (data[3] << 8) | data[4]
-                service_byte = int.from_bytes(data[5:7], byteorder='little')
-                crc = int.from_bytes(data[6:8], byteorder='little')
+                fill_flag = data[5]
+                request_type_in_str = hex(request_type)
 
-                request_type_in_str = str(hex(request_type))
-                logger.info(f"Парсинг: Тип запроса: {request_type_in_str}. "
-                             f"Номер поста: {post_number}. Масса баллона: {weight_combined}")
+                crc_is_valid, received_crc, calculated_crc = (
+                    validate_frame_crc(data)
+                )
+                if not crc_is_valid:
+                    record_post_error(
+                        post_number,
+                        request_type_in_str,
+                        'invalid_crc',
+                        f'Кадр={data.hex().upper()}, '
+                        f'получен CRC={received_crc:04X}, '
+                        f'рассчитан CRC={calculated_crc:04X}',
+                        metric_name='crc_errors',
+                    )
+                    continue
 
-                # Обработка запроса с поста
-                if request_caching(request_type_in_str, post_number, weight_combined):
-                    response_required, full_weight, process_data_to_server = request_processing(
+                logger.info(
+                    f"Парсинг: тип={request_type_in_str}, "
+                    f"пост={post_number}, служебный байт={service_byte:02X}, "
+                    f"масса={weight_combined}, флаг={fill_flag:02X}"
+                )
+
+                is_duplicate, cached_response = get_cached_request(
+                    request_type_in_str,
+                    post_number,
+                    weight_combined,
+                )
+                if is_duplicate:
+                    if cached_response is not None:
+                        ser.write(cached_response)
+                        logger.debug(
+                            "Повторно отправлен ответ на пост: "
+                            f"{cached_response.hex().upper()}"
+                        )
+                    continue
+
+                response_required, full_weight, process_data = (
+                    request_processing(
                         request_type_in_str,
                         post_number,
-                        weight_combined
+                        weight_combined,
+                    )
+                )
+
+                response_packet = None
+                if response_required:
+                    response_packet = build_response_packet(
+                        request_type,
+                        post_number,
+                        full_weight,
                     )
 
-                    if response_required:
-                        # Формируем ответ
-                        if request_type == 0x7A:
-                            response_type = 0x5A
-                        elif request_type == 0x70:
-                            response_type = 0x50
+                cache_request_result(
+                    request_type_in_str,
+                    post_number,
+                    weight_combined,
+                    response_packet,
+                )
 
-                        # Меняем порядок байтов для full_weight
-                        full_weight_bytes = struct.pack('>H', full_weight)  # Упаковываем в big-endian
-                        full_weight_reversed = int.from_bytes(full_weight_bytes, 'little')  # Меняем порядок байтов
+                if response_packet is not None:
+                    ser.write(response_packet)
+                    logger.debug(
+                        f"Отправлен ответ на пост: "
+                        f"{response_packet.hex().upper()}"
+                    )
 
-                        # Формируем ответный пакет без CRC
-                        response_data = struct.pack('<BBBHBH',
-                                                    response_type,
-                                                    post_number,
-                                                    0xFF,
-                                                    full_weight_reversed,
-                                                    0xFF,
-                                                    0xFFFF)
-
-                        # Вычисляем CRC-16/AUG-CCITT для ответа (без последних двух байт)
-                        crc_t = calc_crc(response_data[:-2])
-                        crc = ((crc_t & 0xFF) << 8) | ((crc_t >> 8) & 0xFF)
-
-                        response_with_crc = response_data[:-2] + struct.pack('<H', crc)
-
-                        ser.write(response_with_crc)
-                        logger.debug(f"Отправлен ответ на пост: {response_with_crc.hex().upper()}")
-
-                    # Отправляем данные на сервер для статистики
-                    if process_data_to_server and isinstance(process_data_to_server, dict):
-                        put_carousel_data(process_data_to_server)
+                if process_data and isinstance(process_data, dict):
+                    put_carousel_data(process_data)
+            elif data:
+                record_post_error(
+                    None,
+                    None,
+                    'invalid_frame_length',
+                    f'Получено {len(data)} байт: {data.hex().upper()}',
+                    metric_name='frame_errors',
+                )
 
     except serial.SerialException as error:
         logger.error(f"Ошибка: {error}. Проверьте правильность указанного порта.")
