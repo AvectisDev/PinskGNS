@@ -392,7 +392,6 @@ LOGGING = {
     },
 }
 
-DJANGO_API_HOST = 'http://localhost:8000/api'
 # OPC_SERVER_URL = "opc.tcp://host.docker.internal:4841"
 OPC_SERVER_URL = "opc.tcp://localhost:4841"
 

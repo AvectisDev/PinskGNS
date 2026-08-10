@@ -1,30 +1,31 @@
 import os
 import serial
-import pickle
 import struct
 import logging.config
 import django
-import requests
-import redis
 import time
-from . import db
-from django.conf import settings
 
 
 # Инициализация Django
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'GNS.settings')
 django.setup()
 
+from django.core.cache import cache
+from django.core.exceptions import ValidationError
+
+from carousel.services import (
+    CarouselPostNotFoundError,
+    UnsupportedCarouselRequestError,
+    get_carousel_settings_data,
+    process_carousel_data_direct,
+)
+
 # Конфигурация логирования из настроек Django
 logging.config.dictConfig(django.conf.settings.LOGGING)
 logger = logging.getLogger('carousel')
 
-# Создаем сессию для программы обработки постов наполнения
-session = requests.Session()
-
-# Подключение к Redis
-redis_client = redis.Redis(host='localhost', port=6379, db=1, decode_responses=False)
-CACHE_KEY = ':1:reader_8_balloon_stack'
+# Ключи Django cache (Redis DB настраивается в settings.CACHES)
+CACHE_KEY = 'reader_8_balloon_stack'
 POST_NUMBER_CACHE_KEY = 'previous_post_number'
 
 # Указываем порт и скорость соединения
@@ -37,14 +38,13 @@ def get_and_remove_last_balloon():
     Извлекает последний элемент из стека баллонов в Redis и удаляет его. Работа со стеком по принципу FIFO
     """
     cache_timeout = 600
-    last_balloon = redis_client.get(CACHE_KEY)
+    balloons = cache.get(CACHE_KEY)
 
-    if last_balloon:
+    if balloons:
         try:
-            balloons = pickle.loads(last_balloon)
             if isinstance(balloons, list) and balloons:
                 last_item = balloons.pop()
-                redis_client.set(CACHE_KEY, pickle.dumps(balloons), ex=cache_timeout)
+                cache.set(CACHE_KEY, balloons, timeout=cache_timeout)
                 return last_item
             else:
                 logger.info("Кэш. Данные не являются списком или список пуст")
@@ -55,28 +55,31 @@ def get_and_remove_last_balloon():
     return None
 
 
-def put_carousel_data(data: dict, session: requests.Session):
+def put_carousel_data(data: dict) -> bool:
     """
-    работает как шлюз между сервером и постом наполнения, т.к. пост может слать запрос только через COM-порт в
-    виде набора байт по проприетарному протоколу. Функция отправляет POST-запрос с текущими показаниями поста карусели
-    на сервер. В ответ сервер должен прислать требуемый вес газа, которым нужно заправить баллон.
+    Сохраняет показания поста карусели напрямую через сервис Django.
+
+    Пост передаёт данные через COM-порт в виде набора байт по
+    проприетарному протоколу, поэтому COM-процесс преобразует их в словарь
+    и передаёт напрямую в бизнес-логику приложения.
     :param data: Содержит словарь с ключами 'request_type'-тип запроса с поста наполнения, 'post_number' -
     номер поста наполнения, 'weight_combined'- текущий вес баллона, который находится на посту наполнения
-    :return: возвращает словарь со статусом ответа и весом баллона
+    :return: True при успешном сохранении
     """
     try:
-        logger.info(f"api - данные c поста отправлены - {data}")
-        response = session.post(f"{settings.DJANGO_API_HOST}/carousel/balloon-update/", json=data, timeout=2)
-        logger.info(f"api - данные от сервера получены - {response}")
-        response.raise_for_status()
-        if response.content:
-            return response.json()
-        else:
-            return {}
-
-    except requests.exceptions.RequestException as error:
-        logger.error(f"Ошибка в функции отправки данных с поста наполнения на API сервера: {error}")
-        return {}
+        logger.info(f"Данные с поста переданы в Django: {data}")
+        process_carousel_data_direct(data)
+        logger.info("Данные с поста успешно сохранены")
+        return True
+    except (
+        ValidationError,
+        CarouselPostNotFoundError,
+        UnsupportedCarouselRequestError,
+    ) as error:
+        logger.error(f"Ошибка обработки данных с поста наполнения: {error}")
+    except Exception as error:
+        logger.exception(f"Ошибка сохранения данных с поста наполнения: {error}")
+    return False
 
 
 def calc_crc(message):
@@ -108,7 +111,7 @@ def post_processing(post_number: int):
     :return: bool: указывает нужно ли обрабатывать текущий запрос на наполнение
     """
     cache_timeout = 5
-    previous_post_number = redis_client.get(POST_NUMBER_CACHE_KEY)
+    previous_post_number = cache.get(POST_NUMBER_CACHE_KEY)
     logger.debug(f"Последний номер поста в кеше - {previous_post_number}.")
 
     if previous_post_number:
@@ -117,14 +120,14 @@ def post_processing(post_number: int):
 
         # if process_value in [0, 1, -19]:  # также разрешается повторный запрос с поста - значение 0
         if process_value:
-            redis_client.set(POST_NUMBER_CACHE_KEY, post_number, ex=cache_timeout)
+            cache.set(POST_NUMBER_CACHE_KEY, post_number, timeout=cache_timeout)
             logger.debug(f"Значение {post_number} сохранено в Redis по ключу {POST_NUMBER_CACHE_KEY}")
             return True
         else:
             return False
     else:
         # Если в кеше нет данных, значит это первая обработка функции
-        redis_client.set(POST_NUMBER_CACHE_KEY, post_number)
+        cache.set(POST_NUMBER_CACHE_KEY, post_number, timeout=cache_timeout)
         logger.debug(f"Значение {post_number} сохранено в Redis по ключу {POST_NUMBER_CACHE_KEY}")
         return True
 
@@ -140,7 +143,7 @@ def check_settings(post_number: int):
     weight_correction_value = 0.0
     transmit_command = False
 
-    post_settings = db.fetch_carousel_settings()
+    post_settings = get_carousel_settings_data()
 
     if post_settings:
         logger.debug(f'Настройки поста наполнения {post_settings}')
@@ -200,13 +203,11 @@ def request_caching(request_type: str, post_number: int, weight: int) -> bool:
     cache_key = f"carousel_request_{request_type}_{post_number}_{weight}"
     cache_time = 1
 
-    cached_value = redis_client.get(cache_key)
-    if cached_value is not None:
+    if not cache.add(cache_key, "1", timeout=cache_time):
         request_processing_required = False
         logger.debug(f"Запрос с ключём {cache_key} уже обрабатывается")
         return request_processing_required
 
-    redis_client.set(cache_key, "1", cache_time)
     return request_processing_required
 
 
@@ -290,6 +291,7 @@ def serial_exchange():
     В зависимости от типа запроса в ответе должен быть либо вес баллона, либо ответ не нужен.
     :return:
     """
+    ser = None
     try:
         logger.info(f"Запуск программы обработки УНБ...")
         # Создаем объект Serial для работы с COM-портом
@@ -352,26 +354,29 @@ def serial_exchange():
 
                     # Отправляем данные на сервер для статистики
                     if process_data_to_server and isinstance(process_data_to_server, dict):
-                        put_carousel_data(process_data_to_server, session)
+                        put_carousel_data(process_data_to_server)
 
     except serial.SerialException as error:
         logger.error(f"Ошибка: {error}. Проверьте правильность указанного порта.")
     except Exception as error:
         logger.error(f"Общая ошибка: {error}.")
     finally:
-        if session:
-            session.close()
         if ser:
             # Закрываем соединение только если оно было открыто
             ser.close()
             logger.debug("Соединение закрыто")
-        if redis_client:
-            redis_client.close()
 
 
-while True:
-    try:
-        serial_exchange()
-    except Exception as e:
-        logger.error(f"Ошибка в serial_exchange: {e}. Перезапуск через 5 минут...")
-        time.sleep(300)
+def main():
+    while True:
+        try:
+            serial_exchange()
+        except Exception as error:
+            logger.error(
+                f"Ошибка в serial_exchange: {error}. Перезапуск через 5 минут..."
+            )
+            time.sleep(300)
+
+
+if __name__ == '__main__':
+    main()
