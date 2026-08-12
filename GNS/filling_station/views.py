@@ -340,15 +340,26 @@ def statistic(request):
         else:
             start_date = current_date
             end_date = current_date
+            form = GetBalloonsAmount(initial={
+                'start_date': start_date,
+                'end_date': end_date,
+            })
     else:
-        form = GetBalloonsAmount()
         start_date = current_date
         end_date = current_date
+        form = GetBalloonsAmount(initial={
+            'start_date': start_date,
+            'end_date': end_date,
+        })
 
     context = {
         'readers_stats': Reader.get_all_readers_stats(start_date, end_date),
-        'balloon_loading_stats': BalloonsBatch.get_period_stats(start_date, end_date, batch_type='l'),
-        'balloon_unloading_stats': BalloonsBatch.get_period_stats(start_date, end_date, batch_type='u'),
+        'balloon_loading_stats': BalloonsBatch.get_period_stats(
+            start_date, end_date, batch_type='l'
+        ),
+        'balloon_unloading_stats': BalloonsBatch.get_period_stats(
+            start_date, end_date, batch_type='u'
+        ),
         'auto_gas_stats': AutoGasBatch.get_period_stats(start_date, end_date),
         'railway_stats': RailwayBatch.get_period_stats(start_date, end_date),
         'form': form,

@@ -4,9 +4,10 @@ from django.utils import timezone
 from django.core.exceptions import ValidationError
 from django.contrib.auth.models import User
 from django.urls import reverse
-from django.db.models import Q, F, Sum, Count
+from django.db.models import Q, F, Sum, Count, Case, When, IntegerField
+from django.db.models.functions import Coalesce
 from django.conf import settings
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 from datetime import datetime, date, time
 import pghistory
 
@@ -124,42 +125,38 @@ class Reader(models.Model):
         ordering = ['-change_date']
 
     @classmethod
-    def get_all_readers_stats(cls, start_date: date, end_date: date) -> Dict[str, Any]:
+    def get_all_readers_stats(cls, start_date: date, end_date: date) -> List[Dict[str, Any]]:
         """
         Получает статистику по всем считывателям за указанный период.
-        Для каждого считывателя возвращает:
-        - Номер считывателя (number)
-        - Статус считывателя (status)
-        - Количество баллонов с RFID-метками (total_rfid)
-        - Общее количество баллонов (total_balloons)
-
-        Args:
-            start_date (date): Начальная дата периода
-            end_date (date): Конечная дата периода
-
-        Returns:
-        QuerySet: Результат в виде queryset словарей со следующими ключами:
-        {
-            'number': int,             # Номер считывателя
-            'status': str,             # Статус считывателя
-            'total_rfid': int,         # Количество баллонов с RFID
-            'total_balloons': int      # Общее количество баллонов
-        }
+        Источник — DailyReaderCounter (те же счётчики, что и в RFID-таблицах).
         """
-        start_datetime = datetime.combine(start_date, time.min)
-        end_datetime = datetime.combine(end_date, time.max)
+        period_stats = (
+            DailyReaderCounter.objects.filter(
+                day__gte=start_date,
+                day__lte=end_date,
+            )
+            .values('number_id')
+            .annotate(
+                total_rfid=Sum('amount_of_rfid'),
+                total_sensor=Sum('amount_of_sensor'),
+            )
+        )
+        stats_by_reader = {
+            row['number_id']: row for row in period_stats
+        }
 
-        # Получаем общее количество баллонов для каждого ридера за период
-        result = ReaderSettings.objects.annotate(
-            total_rfid=Count('number', filter=Q(
-                reader_settings__change_date__range=[start_datetime, end_datetime],
-                reader_settings__nfc_tag__isnull=False
-            )),
-            total_balloons=Count('number', filter=Q(
-                reader_settings__change_date__range=[start_datetime, end_datetime]
-            )),
-        ).values('number', 'total_rfid', 'total_balloons', 'status').order_by('number')
-
+        result: List[Dict[str, Any]] = []
+        for reader in ReaderSettings.objects.order_by('number'):
+            counter = stats_by_reader.get(reader.number, {})
+            total_rfid = counter.get('total_rfid') or 0
+            total_sensor = counter.get('total_sensor') or 0
+            result.append({
+                'number': reader.number,
+                'status': reader.status,
+                'total_rfid': total_rfid,
+                'total_sensor': total_sensor,
+                'total_balloons': total_rfid + total_sensor,
+            })
         return result
 
 class DailyReaderCounter(models.Model):
@@ -712,29 +709,48 @@ class BalloonsBatch(models.Model):
         return result
 
     @classmethod
-    def get_period_stats(cls, start_date: Optional[date]=None, end_date: Optional[date]=None, batch_type: Optional[str]=None) -> Dict[str, Optional[int]]:
+    def get_period_stats(
+        cls,
+        start_date: Optional[date] = None,
+        end_date: Optional[date] = None,
+        batch_type: Optional[str] = None,
+    ) -> Dict[str, int]:
         """
         Собирает статистику по партиям за период:
         - кол-во партий
         - кол-во баллонов с RFID
-        - кол-во баллонов по ТТН
+        - кол-во баллонов по ТТН (датчик или сумма объёмов)
         """
-        start_dt = datetime.combine(start_date, time.min)
-        end_dt = datetime.combine(end_date, time.max)
-
         queryset = cls.objects.all()
-        if start_dt and end_dt:
-            queryset = queryset.filter(started_at__range=[start_dt, end_dt])
+        if start_date is not None and end_date is not None:
+            queryset = queryset.filter(
+                started_at__date__gte=start_date,
+                started_at__date__lte=end_date,
+            )
         if batch_type:
             queryset = queryset.filter(batch_type=batch_type)
 
-        return queryset.annotate(
-            batch_balloon_count=Count('balloon_list'),
-        ).aggregate(
-            total_batches=Count('id'),
-            amount_balloons_by_rfid=Sum('batch_balloon_count'),
-            amount_balloons_by_sensor=Sum('amount_of_sensor'),
+        ttn_amount = Case(
+            When(amount_of_sensor__gt=0, then=F('amount_of_sensor')),
+            default=(
+                Coalesce(F('amount_of_5_liters'), 0)
+                + Coalesce(F('amount_of_12_liters'), 0)
+                + Coalesce(F('amount_of_27_liters'), 0)
+                + Coalesce(F('amount_of_50_liters'), 0)
+            ),
+            output_field=IntegerField(),
         )
+
+        stats = queryset.aggregate(
+            total_batches=Count('id'),
+            total_balloon_count_by_rfid=Coalesce(Sum('amount_of_rfid'), 0),
+            total_balloon_count_by_ttn=Coalesce(Sum(ttn_amount), 0),
+        )
+        return {
+            'total_batches': stats['total_batches'] or 0,
+            'total_balloon_count_by_rfid': stats['total_balloon_count_by_rfid'] or 0,
+            'total_balloon_count_by_ttn': stats['total_balloon_count_by_ttn'] or 0,
+        }
 
     @classmethod
     def get_common_stats_for_gns(cls, batch_type: Optional[str] = None) -> list:

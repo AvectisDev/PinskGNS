@@ -105,16 +105,21 @@ class RailwayBatch(models.Model):
     def get_period_stats(cls, start_date, end_date):
         queryset = cls.objects.filter(
             begin_date__date__gte=start_date,
-            begin_date__date__lte=end_date
+            begin_date__date__lte=end_date,
         )
 
-        return queryset.annotate(
-            tanks_count=Count('railway_tank_list'),
-            total_gas_in_tanks=Sum('railway_tank_list__tank_history__gas_weight')
-        ).aggregate(
+        stats = queryset.aggregate(
             total_batches=Count('id'),
-            total_tanks=Sum('tanks_count'),
+            total_tanks=Count('railway_tank_list', distinct=True),
             total_gas_spbt=Sum('gas_amount_spbt'),
             total_gas_pba=Sum('gas_amount_pba'),
-            total_gas_in_all_tanks=Sum('total_gas_in_tanks')
         )
+        total_gas_spbt = stats['total_gas_spbt'] or 0
+        total_gas_pba = stats['total_gas_pba'] or 0
+        return {
+            'total_batches': stats['total_batches'] or 0,
+            'total_tanks': stats['total_tanks'] or 0,
+            'total_gas_spbt': total_gas_spbt,
+            'total_gas_pba': total_gas_pba,
+            'total_gas_in_all_tanks': total_gas_spbt + total_gas_pba,
+        }

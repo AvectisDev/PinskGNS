@@ -44,11 +44,17 @@
                                 </tr>
                             </thead>
                             <tbody>
-                                {% for stat in readers_stats.values %}
+                                {% for stat in readers_stats %}
                                 <tr>
                                     <td>{{ stat.number }}</td>
                                     <td>{{ stat.status }}</td>
                                     <td class="text-center">{{ stat.total_rfid }}</td>
+                                </tr>
+                                {% empty %}
+                                <tr>
+                                    <td colspan="3" class="text-center text-muted">
+                                        Нет данных по считывателям
+                                    </td>
                                 </tr>
                                 {% endfor %}
                             </tbody>
@@ -81,11 +87,11 @@
                                         </div>
                                         <div class="d-flex justify-content-between">
                                             <span>Баллонов с RFID:</span>
-                                            <strong>{{ balloon_loading_stats.total_balloon_count_by_rfid|default:"-" }}</strong>
+                                            <strong>{{ balloon_loading_stats.total_balloon_count_by_rfid }}</strong>
                                         </div>
                                         <div class="d-flex justify-content-between">
                                             <span>Баллонов по ТТН:</span>
-                                            <strong>{{ balloon_loading_stats.total_balloon_count_by_ttn|default:"-" }}</strong>
+                                            <strong>{{ balloon_loading_stats.total_balloon_count_by_ttn }}</strong>
                                         </div>
                                     </div>
                                     <hr>
@@ -97,11 +103,11 @@
                                         </div>
                                         <div class="d-flex justify-content-between">
                                             <span>Баллонов с RFID:</span>
-                                            <strong>{{ balloon_unloading_stats.total_balloon_count_by_rfid|default:"-" }}</strong>
+                                            <strong>{{ balloon_unloading_stats.total_balloon_count_by_rfid }}</strong>
                                         </div>
                                         <div class="d-flex justify-content-between">
                                             <span>Баллонов по ТТН:</span>
-                                            <strong>{{ balloon_unloading_stats.total_balloon_count_by_ttn|default:"-" }}</strong>
+                                            <strong>{{ balloon_unloading_stats.total_balloon_count_by_ttn }}</strong>
                                         </div>
                                     </div>
                                 </div>
@@ -123,11 +129,11 @@
                                         </div>
                                         <div class="d-flex justify-content-between">
                                             <span>По весам:</span>
-                                            <strong>{{ auto_gas_stats.total_gas_loading_by_weight|default:"-"|floatformat:2 }} кг</strong>
+                                            <strong>{{ auto_gas_stats.total_gas_loading_by_weight|floatformat:2 }} кг</strong>
                                         </div>
                                         <div class="d-flex justify-content-between">
                                             <span>По расходомеру:</span>
-                                            <strong>{{ auto_gas_stats.total_gas_loading_by_flowmeter|default:"-"|floatformat:2 }} кг</strong>
+                                            <strong>{{ auto_gas_stats.total_gas_loading_by_flowmeter|floatformat:2 }} кг</strong>
                                         </div>
                                     </div>
                                     <hr>
@@ -139,11 +145,11 @@
                                         </div>
                                         <div class="d-flex justify-content-between">
                                             <span>По весам:</span>
-                                            <strong>{{ auto_gas_stats.total_gas_unloading_by_weight|default:"-"|floatformat:2 }} кг</strong>
+                                            <strong>{{ auto_gas_stats.total_gas_unloading_by_weight|floatformat:2 }} кг</strong>
                                         </div>
                                         <div class="d-flex justify-content-between">
                                             <span>По расходомеру:</span>
-                                            <strong>{{ auto_gas_stats.total_gas_unloading_by_flowmeter|default:"-"|floatformat:2 }} кг</strong>
+                                            <strong>{{ auto_gas_stats.total_gas_unloading_by_flowmeter|floatformat:2 }} кг</strong>
                                         </div>
                                     </div>
                                 </div>
@@ -165,23 +171,23 @@
                                             </div>
                                             <div class="d-flex justify-content-between">
                                                 <span>Цистерны:</span>
-                                                <strong>{{ railway_stats.total_tanks|default:"-" }}</strong>
+                                                <strong>{{ railway_stats.total_tanks }}</strong>
                                             </div>
                                         </div>
                                         <div class="col-md-4">
                                             <div class="d-flex justify-content-between">
                                                 <span>Газ СПБТ:</span>
-                                                <strong>{{ railway_stats.total_gas_spbt|default:"-"|floatformat:2 }} т</strong>
+                                                <strong>{{ railway_stats.total_gas_spbt|floatformat:2 }} т</strong>
                                             </div>
                                             <div class="d-flex justify-content-between">
                                                 <span>Газ ПБА:</span>
-                                                <strong>{{ railway_stats.total_gas_pba|default:"-"|floatformat:2 }} т</strong>
+                                                <strong>{{ railway_stats.total_gas_pba|floatformat:2 }} т</strong>
                                             </div>
                                         </div>
                                         <div class="col-md-4">
                                             <div class="d-flex justify-content-between">
                                                 <span>Всего газа:</span>
-                                                <strong>{{ railway_stats.total_gas_in_all_tanks|default:"-"|floatformat:2 }} т</strong>
+                                                <strong>{{ railway_stats.total_gas_in_all_tanks|floatformat:2 }} т</strong>
                                             </div>
                                         </div>
                                     </div>

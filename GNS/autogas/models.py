@@ -56,17 +56,29 @@ class AutoGasBatch(models.Model):
     def get_period_stats(cls, start_date=None, end_date=None):
         queryset = cls.objects.filter(
             begin_at__date__gte=start_date,
-            begin_at__date__lte=end_date
+            begin_at__date__lte=end_date,
         )
 
-        return queryset.aggregate(
+        stats = queryset.aggregate(
             loading_batches=Count('id', filter=Q(batch_type='l')),
             unloading_batches=Count('id', filter=Q(batch_type='u')),
-            total_gas_loading_by_weight=Sum('weight_gas_amount', filter=Q(batch_type='l')),
-            total_gas_loading_by_flowmeter=Sum('gas_amount', filter=Q(batch_type='l')),
-            total_gas_unloading_by_weight=Sum('weight_gas_amount', filter=Q(batch_type='u')),
-            total_gas_unloading_by_flowmeter = Sum('gas_amount', filter=Q(batch_type='u')),
+            total_gas_loading_by_weight=Sum(
+                'weight_gas_amount', filter=Q(batch_type='l')
+            ),
+            total_gas_loading_by_flowmeter=Sum(
+                'gas_amount', filter=Q(batch_type='l')
+            ),
+            total_gas_unloading_by_weight=Sum(
+                'weight_gas_amount', filter=Q(batch_type='u')
+            ),
+            total_gas_unloading_by_flowmeter=Sum(
+                'gas_amount', filter=Q(batch_type='u')
+            ),
         )
+        return {
+            key: value or 0
+            for key, value in stats.items()
+        }
 
 
 WEIGHT_SOURCE_CHOICES = [
