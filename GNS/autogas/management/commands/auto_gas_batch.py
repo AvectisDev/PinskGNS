@@ -1,10 +1,11 @@
 import logging
-from opcua import Client, ua
+from opcua import ua
 from django.conf import settings
 from django.core.management.base import BaseCommand
 from django.db.models import Q
 from django.core.cache import cache
 from datetime import datetime
+from core.opc import create_opc_client, disconnect_opc
 from filling_station.models import Truck, Trailer, TrailerType
 from autogas.models import AutoGasBatch
 from .intellect import get_registration_number_list, INTELLECT_SERVER_LIST
@@ -48,7 +49,8 @@ class Command(BaseCommand):
 
     def __init__(self):
         super().__init__()
-        self.client = Client(settings.OPC_SERVER_URL)
+        self.client = create_opc_client(settings.OPC_SERVER_URL)
+        self._opc_connected = False
         self._truck_type = None
         self._trailer_type = None
 
@@ -211,6 +213,7 @@ class Command(BaseCommand):
         """Обрабатывает текущую активную партию"""
         try:
             self.client.connect()
+            self._opc_connected = True
 
             # Получаем все значения OPC
             opc_values = {key: self.get_opc_value(key) for key in self.OPC_NODE_PATHS.keys()}
@@ -250,4 +253,6 @@ class Command(BaseCommand):
         except Exception as error:
             logger.error(f'Ошибка в основном цикле: {error}', exc_info=True)
         finally:
-            self.client.disconnect()
+            if self._opc_connected:
+                disconnect_opc(self.client)
+                self._opc_connected = False
