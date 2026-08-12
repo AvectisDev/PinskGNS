@@ -5,7 +5,7 @@ from railway_service.management.commands.railway_batch import Command as Railway
 
 logger = logging.getLogger('railway')
 
-@shared_task
+@shared_task(expires=9)
 def railway_tank_processing():
     command = RailwayTankHandleCommand()
     command.handle()

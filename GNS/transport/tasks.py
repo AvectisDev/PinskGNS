@@ -5,7 +5,7 @@ from transport.management.commands.kpp_close_trasport import Command as CloseTra
 
 logger = logging.getLogger('kpp')
 
-@shared_task
+@shared_task(expires=55)
 def kpp_processing():
     command = KppHandleCommand()
     command.handle()
