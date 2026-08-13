@@ -4,6 +4,7 @@ from django.http import JsonResponse
 from django.db.models import Q, Sum, Count
 from django.shortcuts import get_object_or_404
 from django.core.cache import cache
+from django.utils import timezone
 from django.db.models.signals import post_save, post_delete
 from django.dispatch import receiver
 from rest_framework import generics, status, viewsets, serializers
@@ -18,7 +19,6 @@ from drf_spectacular.utils import (
     extend_schema_view,
     inline_serializer
 )
-from datetime import datetime, date
 from filling_station.models import Balloon, Reader, BalloonsBatch, DailyReaderCounter, TotalReadersCounter, ReaderSettings
 from .serializers import (
     BalloonSerializer,
@@ -928,7 +928,7 @@ def get_active_balloon_batch(request):
     """
     Метод получения списков активных партий
     """
-    today = date.today()
+    today = timezone.localdate()
     loading_batches = BalloonsBatch.objects.select_related('truck', 'trailer').filter(
         batch_type='l', started_at__date=today, is_active=True
     )

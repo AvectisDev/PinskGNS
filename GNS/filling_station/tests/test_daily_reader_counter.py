@@ -15,7 +15,7 @@ class DailyReaderCounterTests(TestCase):
             function='full',
             need_cache=True,
         )
-        self.today = timezone.now().date()
+        self.today = timezone.localdate()
 
     def test_get_or_create_once_per_reader_day(self):
         # первая попытка

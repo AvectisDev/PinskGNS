@@ -124,7 +124,7 @@ def processing_request_with_nfc(nfc_tag: str, reader_number: int) -> Optional[Tu
         # Подсчёт количества
         DailyReaderCounter.add_rfid(reader)
         match reader.number:
-            case 1 | 6:  # временно пока не заменят оптический датчик
+            case 1:
                 TotalReadersCounter.add_empty_balloon()
             case 2:
                 TotalReadersCounter.sub_full_balloon()
@@ -198,7 +198,7 @@ def add_balloon_to_batch(reader: ReaderSettings, balloon: Optional[Balloon] = No
     try:
         batch = BalloonsBatch.objects.select_related('truck', 'trailer', 'truck__type').filter(
             batch_type=reader.function,
-            started_at__date=timezone.now().date(),
+            started_at__date=timezone.localdate(),
             reader_number=reader.number,
             is_active=True
         ).first()

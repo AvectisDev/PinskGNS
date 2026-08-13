@@ -189,7 +189,7 @@ class DailyReaderCounter(models.Model):
     def add_rfid(cls, reader: ReaderSettings):
         obj, created = cls.objects.get_or_create(
             number=reader,
-            day=timezone.now().date(),
+            day=timezone.localdate(),
             defaults={'amount_of_rfid': 0, 'amount_of_sensor': 0}
         )
         # атомарный инкремент:
@@ -202,7 +202,7 @@ class DailyReaderCounter(models.Model):
     def add_sensor(cls, reader: ReaderSettings):
         obj, created = cls.objects.get_or_create(
             number=reader,
-            day=timezone.now().date(),
+            day=timezone.localdate(),
             defaults={'amount_of_rfid': 0, 'amount_of_sensor': 0}
         )
         cls.objects.filter(pk=obj.pk).update(
@@ -238,7 +238,7 @@ class DailyReaderCounter(models.Model):
         balloons_month/balloons_today - только баллоны, подсчитанные сенсором (amount_of_sensor)
         rfid_month/rfid_today - только баллоны, подсчитанные по RFID (amount_of_rfid)
         """
-        today = date.today()
+        today = timezone.localdate()
         first_day_of_month = today.replace(day=1)
 
         # Получаем агрегированные данные за месяц
@@ -757,12 +757,8 @@ class BalloonsBatch(models.Model):
         """
         Собирает статистику по партиям за последние день и месяц
         """
-        now = timezone.now()
-        
-        # Начало сегодняшнего дня
+        now = timezone.localtime()
         today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
-        
-        # Начало месяца
         month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
 
         # Фильтруем по месяцу

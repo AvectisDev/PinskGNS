@@ -25,12 +25,12 @@ class GetBalloonsAmount(forms.Form):
     start_date = forms.DateField(
         label="Начальная дата",
         widget=forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
-        initial=timezone.now().date()
+        initial=timezone.localdate()
     )
     end_date = forms.DateField(
         label="Конечная дата",
         widget=forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
-        initial=timezone.now().date()
+        initial=timezone.localdate()
     )
 
     def __init__(self, *args, **kwargs):
