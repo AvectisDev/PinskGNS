@@ -2,13 +2,19 @@ import logging
 from opcua import ua
 from django.conf import settings
 from django.core.management.base import BaseCommand
-from django.db import IntegrityError, transaction
 from django.db.models import Q
 from django.core.cache import cache
-from django.utils import timezone
 from core.opc import create_opc_client, disconnect_opc
 from filling_station.models import Truck, Trailer, TrailerType
-from autogas.models import AutoGasBatch
+from autogas.services import (
+    ActiveBatchExistsError,
+    NoActiveBatchError,
+    complete_active_batch,
+    create_active_batch,
+    get_truck_capacity,
+    resolve_batch_type,
+    resolve_gas_type,
+)
 from .intellect import get_registration_number_list, INTELLECT_SERVER_LIST
 
 
@@ -34,16 +40,6 @@ class Command(BaseCommand):
         "response_batch_create": "ns=4; s=Address Space.PLC_SU2.batch.response_number_detect",
         "request_batch_complete": "ns=4; s=Address Space.PLC_SU2.batch.request_batch_complete",
         "response_batch_complete": "ns=4; s=Address Space.PLC_SU2.batch.response_batch_complete",
-    }
-
-    GAS_TYPES = {
-        2: 'СПБТ',
-        3: 'ПБА',
-    }
-
-    BATCH_TYPES = {
-        1: 'l',
-        2: 'u',
     }
 
     def __init__(self):
@@ -149,17 +145,14 @@ class Command(BaseCommand):
 
     def create_batch(self, batch_type_code, gas_type_code):
         """Создаёт новую партию"""
-        allowed_batch_types = {code for code, _ in settings.BATCH_TYPE_CHOICES}
-        allowed_gas_types = {code for code, _ in settings.GAS_TYPE_CHOICES}
-
-        batch_type = self.BATCH_TYPES.get(batch_type_code)
-        if batch_type not in allowed_batch_types:
+        batch_type = resolve_batch_type(batch_type_code)
+        if batch_type is None:
             logger.error(f'Неизвестный тип партии: {batch_type_code}')
             self.set_opc_value("stop_batch", True)
             return
 
-        gas_type = self.GAS_TYPES.get(gas_type_code)
-        if gas_type not in allowed_gas_types:
+        gas_type = resolve_gas_type(gas_type_code)
+        if gas_type is None:
             logger.error(f'Неизвестный тип газа: {gas_type_code}')
             self.set_opc_value("stop_batch", True)
             return
@@ -181,24 +174,14 @@ class Command(BaseCommand):
         if trailer:
             logger.debug(f'Прицеп: {trailer.registration_number}-{trailer.type.type}')
 
-        already_active = False
         try:
-            with transaction.atomic():
-                already_active = (
-                    AutoGasBatch.objects
-                    .select_for_update()
-                    .filter(is_active=True)
-                    .exists()
-                )
-                if not already_active:
-                    AutoGasBatch.objects.create(
-                        batch_type=batch_type,
-                        truck=truck,
-                        trailer=trailer,
-                        is_active=True,
-                        gas_type=gas_type,
-                    )
-        except IntegrityError:
+            create_active_batch(
+                batch_type=batch_type,
+                gas_type=gas_type,
+                truck=truck,
+                trailer=trailer,
+            )
+        except ActiveBatchExistsError:
             logger.error('Уже есть активная партия, новая не создана')
             self.set_opc_value("stop_batch", True)
             return
@@ -206,56 +189,23 @@ class Command(BaseCommand):
             logger.error(f'Ошибка при создании партии: {e}', exc_info=True)
             return
 
-        if already_active:
-            logger.error('Уже есть активная партия, новая не создана')
-            self.set_opc_value("stop_batch", True)
-            return
-
-        if truck.type.type == "Цистерна":
-            capacity_value = truck.max_gas_volume
-        elif truck.type.type == "Седельный тягач" and trailer:
-            capacity_value = trailer.max_gas_volume
-        else:
-            capacity_value = 0.0
+        capacity_value = get_truck_capacity(truck, trailer)
+        if capacity_value:
+            self.set_opc_value("truck_capacity", capacity_value)
+        elif capacity_value is None:
             logger.warning(
                 f'Не удалось определить объём ёмкости для {truck.registration_number}'
             )
-
-        if capacity_value:
-            self.set_opc_value("truck_capacity", capacity_value)
 
         self.set_opc_value("response_batch_create", True)
 
     def complete_batch(self, batch_data):
         """Завершает текущую активную партию"""
         try:
-            with transaction.atomic():
-                batch = (
-                    AutoGasBatch.objects
-                    .select_for_update()
-                    .filter(is_active=True)
-                    .order_by('-begin_at', '-pk')
-                    .first()
-                )
-                if batch is None:
-                    logger.error('Нет активной партии для завершения')
-                    return
-
-                batch.gas_amount = batch_data.get('gas_amount')
-                batch.scale_empty_weight = batch_data.get('truck_empty_weight')
-                batch.scale_full_weight = batch_data.get('truck_full_weight')
-                batch.weight_gas_amount = batch_data.get('weight_gas_amount')
-                batch.is_active = False
-                batch.completed_at = timezone.now()
-                batch.save(update_fields=[
-                    'gas_amount',
-                    'scale_empty_weight',
-                    'scale_full_weight',
-                    'weight_gas_amount',
-                    'is_active',
-                    'completed_at',
-                ])
+            complete_active_batch(batch_data)
             self.set_opc_value("response_batch_complete", True)
+        except NoActiveBatchError:
+            logger.error('Нет активной партии для завершения')
         except Exception as e:
             logger.error(f'Ошибка при завершении партии: {e}', exc_info=True)
 
