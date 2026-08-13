@@ -5,6 +5,3 @@ class TtnConfig(AppConfig):
     default_auto_field = 'django.db.models.BigAutoField'
     name = 'ttn'
     verbose_name = "ТТН"
-
-    def ready(self):
-        import ttn.signals

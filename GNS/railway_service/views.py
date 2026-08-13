@@ -1,7 +1,7 @@
 from django.urls import reverse_lazy
 from django.views import generic
 from django.shortcuts import redirect
-from core.mixins import ModalDeleteMixin
+from core.mixins import ModalDeleteMixin, PreserveListQueryMixin
 from .models import RailwayTank, RailwayBatch, RailwayTankHistory
 from .forms import RailwayTankForm, RailwayBatchForm, RailwayTankHistoryForm
 from django.db import transaction
@@ -36,7 +36,7 @@ class RailwayTankDetailView(generic.DetailView):
         )
 
 
-class RailwayTankCreateView(generic.CreateView):
+class RailwayTankCreateView(PreserveListQueryMixin, generic.CreateView):
     model = RailwayTank
     form_class = RailwayTankForm
     template_name = 'railway_service/railway_tank_combined_edit.html'
@@ -50,7 +50,7 @@ class RailwayTankCreateView(generic.CreateView):
 
     def post(self, request, *args, **kwargs):
         if 'cancel' in request.POST:
-            return redirect('railway_service:railway_tank_list')
+            return self.redirect_preserve_query('railway_service:railway_tank_list')
         self.object = None
         tank_form = RailwayTankForm(request.POST, request.FILES, show_actions=False)
         history_form = RailwayTankHistoryForm(request.POST)
@@ -74,7 +74,7 @@ class RailwayTankCreateView(generic.CreateView):
         return context
 
 
-class RailwayTankUpdateView(generic.UpdateView):
+class RailwayTankUpdateView(PreserveListQueryMixin, generic.UpdateView):
     model = RailwayTank
     form_class = RailwayTankForm
     template_name = 'railway_service/railway_tank_combined_edit.html'
@@ -84,7 +84,7 @@ class RailwayTankUpdateView(generic.UpdateView):
 
     def post(self, request, *args, **kwargs):
         if 'cancel' in request.POST:
-            return redirect('railway_service:railway_tank_detail', pk=self.get_object().pk)
+            return self.redirect_preserve_query('railway_service:railway_tank_detail', pk=self.get_object().pk)
         self.object = self.get_object()
         tank_form = RailwayTankForm(request.POST, request.FILES, instance=self.object, show_actions=False)
         last_history = self.object.tank_history.all().first()
@@ -117,7 +117,7 @@ class RailwayTankUpdateView(generic.UpdateView):
         return context
 
 
-class RailwayTankDeleteView(ModalDeleteMixin, generic.DeleteView):
+class RailwayTankDeleteView(ModalDeleteMixin, PreserveListQueryMixin, generic.DeleteView):
     model = RailwayTank
     success_url = reverse_lazy("railway_service:railway_tank_list")
 
@@ -136,7 +136,7 @@ class RailwayBatchDetailView(generic.DetailView):
     template_name = 'railway_service/railway_batch_detail.html'
 
 
-class RailwayBatchUpdateView(generic.UpdateView):
+class RailwayBatchUpdateView(PreserveListQueryMixin, generic.UpdateView):
     model = RailwayBatch
     form_class = RailwayBatchForm
     template_name = 'railway_service/_equipment_form.html'
@@ -146,10 +146,10 @@ class RailwayBatchUpdateView(generic.UpdateView):
 
     def post(self, request, *args, **kwargs):
         if 'cancel' in request.POST:
-            return redirect('railway_service:railway_batch_detail', pk=self.get_object().pk)
+            return self.redirect_preserve_query('railway_service:railway_batch_detail', pk=self.get_object().pk)
         return super().post(request, *args, **kwargs)
 
 
-class RailwayBatchDeleteView(ModalDeleteMixin, generic.DeleteView):
+class RailwayBatchDeleteView(ModalDeleteMixin, PreserveListQueryMixin, generic.DeleteView):
     model = RailwayBatch
     success_url = reverse_lazy("railway_service:railway_batch_list")

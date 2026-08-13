@@ -4,8 +4,8 @@ import time
 from django.utils import timezone
 from typing import Optional, Dict, Any, Union, Tuple
 from django.conf import settings
-from django.core.cache import cache
 from django.core.exceptions import ObjectDoesNotExist
+from core.redis_queue import get_reader_balloon_queue_key, push_json_to_queue
 from .models import Balloon, Reader, BalloonsBatch, ReaderSettings, Truck, Trailer, DailyReaderCounter, TotalReadersCounter
 from .exceptions import (
     ReaderNotFoundError,
@@ -245,33 +245,33 @@ def add_balloon_to_reader_table(balloon: Balloon, reader: ReaderSettings) -> Non
 
 def add_balloon_to_cache(balloon: Balloon, reader: ReaderSettings) -> None:
     """
-    Добавляет баллон в кеш на считывателе, который находится перед каруселью наполнения баллонов.
+    Добавляет паспорт баллона в нативную FIFO-очередь Redis.
     
     Args:
         balloon: Объект баллона
         reader: Настройки считывателя
     """
-    CACHE_TIMEOUT_MINUTES = 10
-    CACHE_TIMEOUT_SECONDS = CACHE_TIMEOUT_MINUTES * 60
-    
+    cache_timeout_seconds = 10 * 60
+
     try:
-        cache_key = f'reader_{reader.number}_balloon_stack'
-        stack = cache.get(cache_key, [])
-        
-        # Добавляем объект в стек
-        stack.insert(0, {
+        queue_key = get_reader_balloon_queue_key(reader.number)
+        queue_length = push_json_to_queue(queue_key, {
             'nfc_tag': balloon.nfc_tag,
             'serial_number': balloon.serial_number,
             'size': balloon.size,
             'netto': balloon.netto,
             'brutto': balloon.brutto,
             'filling_status': balloon.filling_status,
-        })
-        logger.debug(f'Баллон с NFC {balloon.nfc_tag} добавлен в кеш. Стек: {stack}')
-
-        cache.set(cache_key, stack, timeout=CACHE_TIMEOUT_SECONDS)
+        }, timeout=cache_timeout_seconds)
+        logger.debug(
+            f'Баллон с NFC {balloon.nfc_tag} добавлен в Redis-очередь '
+            f'{queue_key}. Размер очереди: {queue_length}'
+        )
     except Exception as error:
-        logger.error(f"Ошибка добавления баллона с NFC {balloon.nfc_tag} в кеш: {error}")
+        logger.error(
+            f"Ошибка добавления баллона с NFC {balloon.nfc_tag} "
+            f"в Redis-очередь: {error}"
+        )
         raise
 
 

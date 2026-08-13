@@ -1,6 +1,7 @@
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
-from core.mixins import ModalDeleteMixin
+from core.mixins import ModalDeleteMixin, PreserveListQueryMixin
+from core.navigation import redirect_preserve_query
 from django.http import HttpResponse
 from django.core.paginator import Paginator
 from django.urls import reverse_lazy, reverse
@@ -43,7 +44,7 @@ class BalloonDetailView(generic.DetailView):
     model = Balloon
 
 
-class BalloonUpdateView(generic.UpdateView):
+class BalloonUpdateView(PreserveListQueryMixin, generic.UpdateView):
     model = Balloon
     form_class = BalloonForm
     template_name = 'filling_station/_equipment_form.html'
@@ -53,25 +54,23 @@ class BalloonUpdateView(generic.UpdateView):
 
     def post(self, request, *args, **kwargs):
         if 'cancel' in request.POST:
-            return redirect('filling_station:balloon_detail', pk=self.get_object().pk)
+            return self.redirect_preserve_query('filling_station:balloon_detail', pk=self.get_object().pk)
         return super().post(request, *args, **kwargs)
 
 
-class BalloonDeleteView(ModalDeleteMixin, generic.DeleteView):
+class BalloonDeleteView(ModalDeleteMixin, PreserveListQueryMixin, generic.DeleteView):
     model = Balloon
     success_url = reverse_lazy("filling_station:balloon_list")
 
 
 def reader_info(request, reader_number=1):
     current_date = datetime.now().date()
-    form = GetBalloonsAmount(request.POST or None)
 
-    if request.method == "POST" and form.is_valid():
-        start_date = form.cleaned_data['start_date']
-        end_date = form.cleaned_data['end_date']
-
-        action = request.POST.get('action')
-        if action == 'export':
+    if request.method == 'POST' and request.POST.get('action') == 'export':
+        form = GetBalloonsAmount(request.POST)
+        if form.is_valid():
+            start_date = form.cleaned_data['start_date']
+            end_date = form.cleaned_data['end_date']
             dataset = BalloonResources().export(
                 Reader.objects.filter(
                     number__number=reader_number,
@@ -81,10 +80,21 @@ def reader_info(request, reader_number=1):
                 )
             )
             response = HttpResponse(dataset.xlsx, content_type='xlsx')
-            response['Content-Disposition'] = f'attachment; filename="RFID_{reader_number}_{start_date}-{end_date}.xlsx"'
+            response['Content-Disposition'] = (
+                f'attachment; filename="RFID_{reader_number}_{start_date}-{end_date}.xlsx"'
+            )
             return response
+
+    form = GetBalloonsAmount(request.GET or None)
+    if form.is_valid():
+        start_date = form.cleaned_data['start_date']
+        end_date = form.cleaned_data['end_date']
     else:
         start_date = end_date = current_date
+        form = GetBalloonsAmount(initial={
+            'start_date': start_date,
+            'end_date': end_date,
+        })
 
     # Получаем статистику из DailyReaderCounter
     reader = ReaderSettings.objects.get(number=reader_number)
@@ -167,7 +177,7 @@ class BalloonBatchDetailView(BalloonBatchTypeMixin, generic.DetailView):
         return queryset
 
 
-class BalloonBatchUpdateView(BalloonBatchTypeMixin, generic.UpdateView):
+class BalloonBatchUpdateView(BalloonBatchTypeMixin, PreserveListQueryMixin, generic.UpdateView):
     """Универсальное редактирование партии баллонов"""
     model = BalloonsBatch
     form_class = BalloonsBatchForm
@@ -185,7 +195,7 @@ class BalloonBatchUpdateView(BalloonBatchTypeMixin, generic.UpdateView):
 
     def post(self, request, *args, **kwargs):
         if 'cancel' in request.POST:
-            return redirect(self.get_object().get_absolute_url())
+            return redirect_preserve_query(request, self.get_object().get_absolute_url())
         return super().post(request, *args, **kwargs)
 
 
@@ -200,7 +210,7 @@ def balloon_batch_retry_close(request, pk):
     # Разрешаем повтор, только если есть флаг ошибки Мириады
     if not batch.miriada_close_failed:
         messages.error(request, 'Партия не содержит ошибок.')
-        return redirect(batch.get_absolute_url())
+        return redirect_preserve_query(request, batch.get_absolute_url())
 
     success, error_payload, _ = save_and_close_balloons_batch(batch, request.POST)
     if success:
@@ -210,10 +220,10 @@ def balloon_batch_retry_close(request, pk):
     elif error_payload:
         messages.error(request, error_payload)
 
-    return redirect(batch.get_absolute_url())
+    return redirect_preserve_query(request, batch.get_absolute_url())
 
 
-class BalloonBatchDeleteView(BalloonBatchTypeMixin, ModalDeleteMixin, generic.DeleteView):
+class BalloonBatchDeleteView(BalloonBatchTypeMixin, ModalDeleteMixin, PreserveListQueryMixin, generic.DeleteView):
     """Универсальное удаление партии баллонов"""
     model = BalloonsBatch
 
@@ -252,7 +262,7 @@ class TruckDetailView(generic.DetailView):
     model = Truck
 
 
-class TruckCreateView(generic.CreateView):
+class TruckCreateView(PreserveListQueryMixin, generic.CreateView):
     model = Truck
     form_class = TruckForm
     template_name = 'filling_station/_equipment_form.html'
@@ -261,7 +271,7 @@ class TruckCreateView(generic.CreateView):
         return self.object.get_absolute_url()
 
 
-class TruckUpdateView(generic.UpdateView):
+class TruckUpdateView(PreserveListQueryMixin, generic.UpdateView):
     model = Truck
     form_class = TruckForm
     template_name = 'filling_station/_equipment_form.html'
@@ -271,11 +281,11 @@ class TruckUpdateView(generic.UpdateView):
 
     def post(self, request, *args, **kwargs):
         if 'cancel' in request.POST:
-            return redirect('filling_station:truck_detail', pk=self.get_object().pk)
+            return self.redirect_preserve_query('filling_station:truck_detail', pk=self.get_object().pk)
         return super().post(request, *args, **kwargs)
 
 
-class TruckDeleteView(ModalDeleteMixin, generic.DeleteView):
+class TruckDeleteView(ModalDeleteMixin, PreserveListQueryMixin, generic.DeleteView):
     model = Truck
     success_url = reverse_lazy("filling_station:truck_list")
 
@@ -290,7 +300,7 @@ class TrailerDetailView(generic.DetailView):
     model = Trailer
 
 
-class TrailerCreateView(generic.CreateView):
+class TrailerCreateView(PreserveListQueryMixin, generic.CreateView):
     model = Trailer
     form_class = TrailerForm
     template_name = 'filling_station/_equipment_form.html'
@@ -299,7 +309,7 @@ class TrailerCreateView(generic.CreateView):
         return self.object.get_absolute_url()
 
 
-class TrailerUpdateView(generic.UpdateView):
+class TrailerUpdateView(PreserveListQueryMixin, generic.UpdateView):
     model = Trailer
     form_class = TrailerForm
     template_name = 'filling_station/_equipment_form.html'
@@ -309,11 +319,11 @@ class TrailerUpdateView(generic.UpdateView):
 
     def post(self, request, *args, **kwargs):
         if 'cancel' in request.POST:
-            return redirect('filling_station:trailer_detail', pk=self.get_object().pk)
+            return self.redirect_preserve_query('filling_station:trailer_detail', pk=self.get_object().pk)
         return super().post(request, *args, **kwargs)
 
 
-class TrailerDeleteView(ModalDeleteMixin, generic.DeleteView):
+class TrailerDeleteView(ModalDeleteMixin, PreserveListQueryMixin, generic.DeleteView):
     model = Trailer
     success_url = reverse_lazy("filling_station:trailer_list")
 
@@ -330,15 +340,26 @@ def statistic(request):
         else:
             start_date = current_date
             end_date = current_date
+            form = GetBalloonsAmount(initial={
+                'start_date': start_date,
+                'end_date': end_date,
+            })
     else:
-        form = GetBalloonsAmount()
         start_date = current_date
         end_date = current_date
+        form = GetBalloonsAmount(initial={
+            'start_date': start_date,
+            'end_date': end_date,
+        })
 
     context = {
         'readers_stats': Reader.get_all_readers_stats(start_date, end_date),
-        'balloon_loading_stats': BalloonsBatch.get_period_stats(start_date, end_date, batch_type='l'),
-        'balloon_unloading_stats': BalloonsBatch.get_period_stats(start_date, end_date, batch_type='u'),
+        'balloon_loading_stats': BalloonsBatch.get_period_stats(
+            start_date, end_date, batch_type='l'
+        ),
+        'balloon_unloading_stats': BalloonsBatch.get_period_stats(
+            start_date, end_date, batch_type='u'
+        ),
         'auto_gas_stats': AutoGasBatch.get_period_stats(start_date, end_date),
         'railway_stats': RailwayBatch.get_period_stats(start_date, end_date),
         'form': form,

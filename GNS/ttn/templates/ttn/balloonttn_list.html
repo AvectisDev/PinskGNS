@@ -1,5 +1,5 @@
 {% extends 'base.html' %}
-{% load custom_filters %}
+{% load custom_filters navigation %}
 
 {% block title %}Список ТТН{% endblock %}
 
@@ -31,7 +31,7 @@
                         {% for ttn in page_obj.object_list %}
                         <tr>
                             <td>
-                                <a href="{{ ttn.get_absolute_url }}" class="custom-link fw-bold">
+                                <a href="{% url_with_query ttn.get_absolute_url %}" class="custom-link fw-bold">
                                     {{ ttn.number }}
                                 </a>
                             </td>
@@ -50,7 +50,7 @@
                             <td>{{ ttn.date|date:"d.m.Y"|default:"-" }}</td>
                             <td>
                                 <div class="action-buttons">
-                                    <a href="{{ ttn.get_update_url }}" class="btn-icon btn-edit" title="Редактировать">
+                                    <a href="{% url_with_query ttn.get_update_url %}" class="btn-icon btn-edit" title="Редактировать">
                                         <i class="bi bi-pencil"></i>
                                     </a>
                                     {% include 'core/_delete_trigger.html' with url=ttn.get_delete_url message="Вы уверены, что хотите удалить ТТН?" icon_only=True %}

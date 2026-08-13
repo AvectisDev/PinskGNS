@@ -220,27 +220,19 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 CRISPY_ALLOWED_TEMPLATE_PACKS = "bootstrap5"
 CRISPY_TEMPLATE_PACK = "bootstrap5"
 
+# Redis DB: 0 — Celery broker, 1 — Django cache
 CELERY_BROKER_URL = 'redis://localhost:6379/0'
+CELERY_TIMEZONE = 'Europe/Minsk'
+CELERY_ENABLE_UTC = True
 CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP = True
-CELERY_BROKER_POOL_LIMIT = 15
-CELERY_BROKER_CONNECTION_TIMEOUT = 30
-CELERY_BROKER_CONNECTION_RETRY = True
-CELERY_BROKER_CONNECTION_MAX_RETRIES = 10
-CELERY_REDIS_MAX_CONNECTIONS = 20
-
 CELERY_WORKER_HIJACK_ROOT_LOGGER = False
-CELERY_WORKER_MAX_TASKS_PER_CHILD = 100
-CELERY_WORKER_MAX_MEMORY_PER_CHILD = 200000  # 200MB в KiB
 CELERY_WORKER_PREFETCH_MULTIPLIER = 1
-CELERY_TASK_TIME_LIMIT = 300  # 5 минут
-CELERY_TASK_SOFT_TIME_LIMIT = 240  # 4 минуты
-CELERY_HIJACK_ROOT_LOGGER = False
-CELERY_RESULT_BACKEND = 'redis://localhost:6379/0'
-CELERY_RESULT_EXPIRES = 3600  # 1 час
+CELERY_TASK_IGNORE_RESULT = True
 CELERY_BEAT_SCHEDULE = {
     'railway_tank_processing': {
         'task': 'railway_service.tasks.railway_tank_processing',
         'schedule': 10.0,  # каждые 10 сек
+        'options': {'expires': 9},
     },
     'railway_batch_processing': {
         'task': 'railway_service.tasks.railway_batch_processing',
@@ -249,14 +241,22 @@ CELERY_BEAT_SCHEDULE = {
     'auto_gas_processing': {
         'task': 'autogas.tasks.auto_gas_processing',
         'schedule': 10.0,
+        'options': {'expires': 9},
     },
     'kpp_processing': {
         'task': 'transport.tasks.kpp_processing',
         'schedule': 60.0,
+        'options': {'expires': 55},
     },
     'kpp_close_transport': {
         'task': 'transport.tasks.kpp_close_transport',
         'schedule': crontab(hour=18, minute=0),
+        'options': {'expires': 3600},
+    },
+    'fetch_current_ttn_from_miriada': {
+        'task': 'ttn.tasks.fetch_current_ttn_from_miriada',
+        'schedule': crontab(hour=22, minute=0),
+        'options': {'expires': 3600},
     },
 }
 
@@ -320,33 +320,36 @@ LOGGING = {
         },
         'railway_file': {
             'level': 'DEBUG',
-            'class': 'logging.handlers.TimedRotatingFileHandler',
+            'class': 'concurrent_log_handler.ConcurrentRotatingFileHandler',
             'filename': os.path.join(LOGS_DIR, 'railway/railway.log'),
-            'when': 'midnight',
+            'maxBytes': 10 * 1024 * 1024,  # 10MB
             'backupCount': 30,
             'formatter': 'verbose',
             'encoding': 'utf-8',
             'delay': True,
+            'use_gzip': False,
         },
         'autogas_file': {
             'level': 'DEBUG',
-            'class': 'logging.handlers.TimedRotatingFileHandler',
+            'class': 'concurrent_log_handler.ConcurrentRotatingFileHandler',
             'filename': os.path.join(LOGS_DIR, 'autogas/autogas.log'),
-            'when': 'midnight',
+            'maxBytes': 10 * 1024 * 1024,  # 10MB
             'backupCount': 30,
             'formatter': 'verbose',
             'encoding': 'utf-8',
             'delay': True,
+            'use_gzip': False,
         },
         'kpp_file': {
             'level': 'DEBUG',
-            'class': 'logging.handlers.TimedRotatingFileHandler',
+            'class': 'concurrent_log_handler.ConcurrentRotatingFileHandler',
             'filename': os.path.join(LOGS_DIR, 'transport/kpp.log'),
-            'when': 'midnight',
+            'maxBytes': 10 * 1024 * 1024,  # 10MB
             'backupCount': 30,
             'formatter': 'verbose',
             'encoding': 'utf-8',
             'delay': True,
+            'use_gzip': False,
         },
     },
     'loggers': {
@@ -388,7 +391,6 @@ LOGGING = {
     },
 }
 
-DJANGO_API_HOST = 'http://localhost:8000/api'
 # OPC_SERVER_URL = "opc.tcp://host.docker.internal:4841"
 OPC_SERVER_URL = "opc.tcp://localhost:4841"
 

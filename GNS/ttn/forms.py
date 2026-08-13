@@ -46,10 +46,7 @@ class BalloonTtnForm(forms.ModelForm):
 
     def format_batch_choice(self, obj):
         """Форматирует отображение партии в выпадающем списке"""
-        if obj.batch_type == 'l' or 'u':
-            batch_type = 'Приёмка'
-        else:
-            batch_type = 'Отгрузка'
+        batch_type = 'Приёмка' if obj.batch_type == 'l' else 'Отгрузка'
 
         truck_number = obj.truck.registration_number if obj.truck else '---'
         ttn_number = obj.get_ttn_name() or '---'
@@ -186,35 +183,29 @@ class AutoTtnForm(forms.ModelForm):
                 'class': 'form-control',
             }),
         }
-        labels = {
-            'source_gas_amount': 'Источник данных о весе',
-            'gas_type': 'Тип газа'
-        }
 
-        def clean(self):
-            cleaned_data = super().clean()
-            batch = cleaned_data.get('batch')
+    def clean(self):
+        cleaned_data = super().clean()
+        batch = cleaned_data.get('batch')
 
-            if batch:
-                settings = AutoGasBatchSettings.objects.first()
+        if batch:
+            batch_settings = AutoGasBatchSettings.objects.first()
 
-                # Проверка наличия данных о газе в партии
-                if settings and settings.weight_source == 'f' and not batch.gas_amount:
-                    raise forms.ValidationError(
-                        "В выбранной партии не указано количество газа по расходомеру"
-                    )
-                elif settings and settings.weight_source == 's' and not batch.weight_gas_amount:
-                    raise forms.ValidationError(
-                        "В выбранной партии не указано количество газа по весам"
-                    )
+            if batch_settings and batch_settings.weight_source == 'f' and not batch.gas_amount:
+                raise forms.ValidationError(
+                    "В выбранной партии не указано количество газа по расходомеру"
+                )
+            elif batch_settings and batch_settings.weight_source == 's' and not batch.weight_gas_amount:
+                raise forms.ValidationError(
+                    "В выбранной партии не указано количество газа по весам"
+                )
 
-                # Проверка наличия типа газа в партии
-                if not batch.gas_type or batch.gas_type == 'Не выбран':
-                    raise forms.ValidationError(
-                        "В выбранной партии не указан тип газа"
-                    )
+            if not batch.gas_type:
+                raise forms.ValidationError(
+                    "В выбранной партии не указан тип газа"
+                )
 
-            return cleaned_data
+        return cleaned_data
 
 
 class RailwayTtnForm(forms.ModelForm):

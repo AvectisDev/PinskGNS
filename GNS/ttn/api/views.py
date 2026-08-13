@@ -1,14 +1,14 @@
 import logging
-from datetime import datetime, timezone, timedelta
+from datetime import timedelta
+
+from django.utils import timezone
 from rest_framework import viewsets, status, serializers
 from rest_framework.response import Response
 from rest_framework.decorators import action
-from rest_framework.permissions import IsAuthenticated, AllowAny
 from drf_spectacular.utils import (
     extend_schema,
     extend_schema_view,
     inline_serializer,
-    OpenApiTypes,
     OpenApiExample
 )
 from ttn import services
@@ -26,7 +26,6 @@ logger = logging.getLogger('filling_station')
         description='Получение списка текущих ТТН из системы Мириада',
         responses={
             200: MiriadaTtnSerializer(many=True),
-            404: OpenApiTypes.OBJECT,
             500: inline_serializer(
                 name='ErrorResponse',
                 fields={
@@ -68,9 +67,8 @@ class MiriadaTtnViewSet(viewsets.ViewSet):
     """
     API для работы с ТТН из системы Мириада.
     """
-    permission_classes = [AllowAny]
 
-    @action(detail=False, methods=['get'], url_path='current')
+    @action(detail=False, methods=['get'], url_path='current', url_name='current')
     def get_current_ttn(self, request):
         """
         Получение списка текущих ТТН из системы Мириада, сохранение в БД и возврат.
@@ -78,45 +76,13 @@ class MiriadaTtnViewSet(viewsets.ViewSet):
         Returns:
             Response: Список ТТН с полями id, name, auto, date
         """
-        # Получаем данные из API Мириады
-        api_response = services.get_current_ttn_from_miriada()
-
-        # Сохраняем ТТН в базу данных
         try:
-            for ttn_data in api_response:
-
-                ttn_id = ttn_data.get('ttn_id')
-                if not ttn_id:
-                    logger.error(f"Отсутствует ID ТТН: {ttn_data}")
-                    continue
-
-                try:
-                    miriada_ttn, created = MiriadaTtn.objects.update_or_create(
-                        ttn_id=ttn_id,
-                        defaults={
-                            'name': ttn_data.get('name', ''),
-                            'auto': ttn_data.get('auto', ''),
-                            'date': ttn_data.get('date')
-                        }
-                    )
-
-                    logger.info(
-                        f"ТТН {'создана' if created else 'обновлена'}: ID={ttn_id}, name={ttn_data.get('name')}")
-
-                except Exception as e:
-                    logger.error(f"Ошибка сохранения ТТН ID={ttn_id}: {str(e)}")
-
+            services.sync_current_ttn_from_miriada()
         except Exception as e:
-            logger.error(f"Транзакционная ошибка при сохранении ТТН: {e}")
+            logger.error(f"Ошибка при синхронизации ТТН из Мириады: {e}")
             return Response(status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-        # Сериализуем и возвращаем сохраненные данные
-        # Последние 5 дней включая сегодня
-        start_date = datetime.today().date() - timedelta(days=5)
+        start_date = timezone.localdate() - timedelta(days=5)
         local_ttn = MiriadaTtn.objects.filter(date__gte=start_date)
-
-        if not local_ttn:
-            return Response(status=status.HTTP_404_NOT_FOUND)
-
         serializer = MiriadaTtnSerializer(local_ttn, many=True)
         return Response(serializer.data)

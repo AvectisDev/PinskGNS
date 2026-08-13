@@ -1,12 +1,20 @@
 import logging
-from opcua import Client, ua
+from opcua import ua
 from django.conf import settings
 from django.core.management.base import BaseCommand
 from django.db.models import Q
 from django.core.cache import cache
-from datetime import datetime
+from core.opc import create_opc_client, disconnect_opc
 from filling_station.models import Truck, Trailer, TrailerType
-from autogas.models import AutoGasBatch
+from autogas.services import (
+    ActiveBatchExistsError,
+    NoActiveBatchError,
+    complete_active_batch,
+    create_active_batch,
+    get_truck_capacity,
+    resolve_batch_type,
+    resolve_gas_type,
+)
 from .intellect import get_registration_number_list, INTELLECT_SERVER_LIST
 
 
@@ -34,21 +42,10 @@ class Command(BaseCommand):
         "response_batch_complete": "ns=4; s=Address Space.PLC_SU2.batch.response_batch_complete",
     }
 
-    GAS_TYPES = {
-        2: 'СПБТ',
-        3: 'ПБА',
-    }
-
-    BATCH_TYPES = {
-        1: 'l',
-        2: 'u',
-    }
-
-    DEFAULT_GAS_TYPE = 'Не выбран'
-
     def __init__(self):
         super().__init__()
-        self.client = Client(settings.OPC_SERVER_URL)
+        self.client = create_opc_client(settings.OPC_SERVER_URL)
+        self._opc_connected = False
         self._truck_type = None
         self._trailer_type = None
 
@@ -148,11 +145,21 @@ class Command(BaseCommand):
 
     def create_batch(self, batch_type_code, gas_type_code):
         """Создаёт новую партию"""
-        registration_numbers = self.get_transport_numbers()
+        batch_type = resolve_batch_type(batch_type_code)
+        if batch_type is None:
+            logger.error(f'Неизвестный тип партии: {batch_type_code}')
+            self.set_opc_value("stop_batch", True)
+            return
 
+        gas_type = resolve_gas_type(gas_type_code)
+        if gas_type is None:
+            logger.error(f'Неизвестный тип газа: {gas_type_code}')
+            self.set_opc_value("stop_batch", True)
+            return
+
+        registration_numbers = self.get_transport_numbers()
         if not registration_numbers:
-            logger.warning('Список номеров пуст')
-            self.set_opc_value("response_batch_create", True)
+            logger.warning('Список номеров пуст, партия не создана')
             return
         logger.debug(f'Список номеров: {registration_numbers}')
 
@@ -160,7 +167,7 @@ class Command(BaseCommand):
 
         if not truck:
             logger.error('Не найден подходящий грузовик')
-            self.set_opc_value("stop_batch", True)  # Останавливаем формирование партии
+            self.set_opc_value("stop_batch", True)
             return
 
         logger.debug(f'Грузовик: {truck.registration_number}-{truck.type.type}')
@@ -168,42 +175,37 @@ class Command(BaseCommand):
             logger.debug(f'Прицеп: {trailer.registration_number}-{trailer.type.type}')
 
         try:
-            AutoGasBatch.objects.create(
-                batch_type=self.BATCH_TYPES.get(batch_type_code),
+            create_active_batch(
+                batch_type=batch_type,
+                gas_type=gas_type,
                 truck=truck,
-                trailer=trailer if trailer else None,
-                is_active=True,
-                gas_type=self.GAS_TYPES.get(gas_type_code)
+                trailer=trailer,
             )
-
-            # Определяем показатель вместимости цистерны
-            if truck.type.type == "Цистерна":
-                capacity_value = truck.max_gas_volume
-            elif truck.type.type == "Седельный тягач" and trailer:
-                capacity_value = trailer.max_gas_volume
-            else:
-                capacity_value = 0.0
-                logger.warning(f'Не удалось определить объём ёмкости для {truck.registration_number}')
-
-            if capacity_value:
-                self.set_opc_value("truck_capacity", capacity_value)
-
-            self.set_opc_value("response_batch_create", True)
+        except ActiveBatchExistsError:
+            logger.error('Уже есть активная партия, новая не создана')
+            self.set_opc_value("stop_batch", True)
+            return
         except Exception as e:
             logger.error(f'Ошибка при создании партии: {e}', exc_info=True)
+            return
+
+        capacity_value = get_truck_capacity(truck, trailer)
+        if capacity_value:
+            self.set_opc_value("truck_capacity", capacity_value)
+        elif capacity_value is None:
+            logger.warning(
+                f'Не удалось определить объём ёмкости для {truck.registration_number}'
+            )
+
+        self.set_opc_value("response_batch_create", True)
 
     def complete_batch(self, batch_data):
         """Завершает текущую активную партию"""
         try:
-            AutoGasBatch.objects.filter(is_active=True).update(
-                gas_amount=batch_data.get('gas_amount'),
-                scale_empty_weight=batch_data.get('truck_empty_weight'),
-                scale_full_weight=batch_data.get('truck_full_weight'),
-                weight_gas_amount=batch_data.get('weight_gas_amount'),
-                is_active=False,
-                completed_at=datetime.now(),
-            )
+            complete_active_batch(batch_data)
             self.set_opc_value("response_batch_complete", True)
+        except NoActiveBatchError:
+            logger.error('Нет активной партии для завершения')
         except Exception as e:
             logger.error(f'Ошибка при завершении партии: {e}', exc_info=True)
 
@@ -211,6 +213,7 @@ class Command(BaseCommand):
         """Обрабатывает текущую активную партию"""
         try:
             self.client.connect()
+            self._opc_connected = True
 
             # Получаем все значения OPC
             opc_values = {key: self.get_opc_value(key) for key in self.OPC_NODE_PATHS.keys()}
@@ -250,4 +253,6 @@ class Command(BaseCommand):
         except Exception as error:
             logger.error(f'Ошибка в основном цикле: {error}', exc_info=True)
         finally:
-            self.client.disconnect()
+            if self._opc_connected:
+                disconnect_opc(self.client)
+                self._opc_connected = False

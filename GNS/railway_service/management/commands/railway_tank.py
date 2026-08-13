@@ -3,11 +3,12 @@ import time
 from decimal import Decimal
 from django.core.cache import cache
 from django.core.files.base import ContentFile
-from opcua import Client, ua
+from opcua import ua
 from django.core.exceptions import MultipleObjectsReturned
 from django.core.management.base import BaseCommand
 from django.conf import settings
 from datetime import datetime
+from core.opc import create_opc_client, disconnect_opc
 from railway_service.models import RailwayBatch, RailwayTank, RailwayTankHistory
 from .intellect import get_registration_number_list, INTELLECT_SERVER_LIST, get_plate_image
 
@@ -24,7 +25,8 @@ class Command(BaseCommand):
 
     def __init__(self):
         super().__init__()
-        self.client = Client(settings.OPC_SERVER_URL)
+        self.client = create_opc_client(settings.OPC_SERVER_URL)
+        self._opc_connected = False
 
 
     def get_opc_value(self, node_key):
@@ -193,6 +195,7 @@ class Command(BaseCommand):
     def handle(self, *args, **kwargs):
         try:
             self.client.connect()
+            self._opc_connected = True
 
             tank_weight = self.get_opc_value("tank_weight")
             camera_worked = self.get_opc_value("camera_worked")
@@ -241,4 +244,6 @@ class Command(BaseCommand):
         except Exception as error:
             logger.error(f'No connection to OPC server: {error}')
         finally:
-            self.client.disconnect()
+            if self._opc_connected:
+                disconnect_opc(self.client)
+                self._opc_connected = False

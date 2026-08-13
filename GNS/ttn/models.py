@@ -1,6 +1,5 @@
 from django.db import models
 from django.urls import reverse
-from django.db.models import Q, Sum
 from django.conf import settings
 from filling_station.models import BalloonsBatch
 from autogas.models import AutoGasBatch
@@ -79,7 +78,7 @@ class BalloonTtn(models.Model):
         related_name='balloons_ttn_unloading',
         limit_choices_to={'batch_type': 'u'}
     )
-    date = models.DateTimeField(auto_now=True, verbose_name="Дата формирования накладной")
+    date = models.DateTimeField(auto_now_add=True, verbose_name="Дата формирования накладной")
 
     def __str__(self):
         return self.number
@@ -145,7 +144,7 @@ class RailwayTtn(models.Model):
     total_gas_amount_by_scales = models.FloatField(null=True, blank=True, verbose_name="Количество газа по весам")
     total_gas_amount_by_ttn = models.FloatField(null=True, blank=True, verbose_name="Количество газа по ТТН")
     gas_type = models.CharField(max_length=10, choices=settings.GAS_TYPE_CHOICES, default='СПБТ', verbose_name="Тип газа")
-    date = models.DateTimeField(auto_now=True, verbose_name="Дата формирования накладной")
+    date = models.DateTimeField(auto_now_add=True, verbose_name="Дата формирования накладной")
 
     def __str__(self):
         return self.number
@@ -165,11 +164,11 @@ class RailwayTtn(models.Model):
         return reverse('ttn:railway_ttn_delete', args=[self.pk])
 
     def update_gas_amounts(self):
-        """Обновляет суммы газа по связанным цистернам"""
-        tanks = self.railway_tank_list.all()
-        self.total_gas_amount_by_scales = tanks.aggregate(total=Sum('gas_weight'))['total'] or 0
-        self.total_gas_amount_by_ttn = tanks.aggregate(total=Sum('netto_weight_ttn'))['total'] or 0
-        self.save()
+        """Обновляет суммы газа по последней истории каждой цистерны."""
+        from ttn.services import apply_railway_tank_totals
+
+        apply_railway_tank_totals(self)
+        self.save(update_fields=['total_gas_amount_by_scales', 'total_gas_amount_by_ttn'])
 
 
 class AutoTtn(models.Model):
@@ -214,7 +213,7 @@ class AutoTtn(models.Model):
     total_gas_amount = models.FloatField(null=True, blank=True, verbose_name="Количество газа")
     source_gas_amount = models.CharField(max_length=20, null=True, blank=True, verbose_name="Источник веса для ТТН")
     gas_type = models.CharField(max_length=10, choices=settings.GAS_TYPE_CHOICES, default='СПБТ', verbose_name="Тип газа")
-    date = models.DateTimeField(auto_now=True, verbose_name="Дата формирования накладной")
+    date = models.DateTimeField(auto_now_add=True, verbose_name="Дата формирования накладной")
 
     def __str__(self):
         return self.number

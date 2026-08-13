@@ -12,12 +12,12 @@ class AutoGasBatch(models.Model):
     completed_at = models.DateTimeField(null=True, blank=True, verbose_name="Дата и время окончания")
     truck = models.ForeignKey(
         Truck,
-        on_delete=models.DO_NOTHING,
+        on_delete=models.PROTECT,
         verbose_name="Автомобиль"
     )
     trailer = models.ForeignKey(
         Trailer,
-        on_delete=models.DO_NOTHING,
+        on_delete=models.PROTECT,
         null=True,
         blank=True,
         verbose_name="Прицеп"
@@ -30,7 +30,7 @@ class AutoGasBatch(models.Model):
     is_active = models.BooleanField(default=False, verbose_name="В работе")
     user = models.ForeignKey(
         User,
-        on_delete=models.DO_NOTHING,
+        on_delete=models.PROTECT,
         default=1,
         verbose_name="Пользователь"
     )
@@ -42,6 +42,13 @@ class AutoGasBatch(models.Model):
         verbose_name = "Автоколонка"
         verbose_name_plural = "Автоколонка"
         ordering = ['-is_active', '-begin_at']
+        constraints = [
+            models.UniqueConstraint(
+                fields=['is_active'],
+                condition=Q(is_active=True),
+                name='uniq_one_active_autogas_batch',
+            ),
+        ]
 
     def get_absolute_url(self):
         return reverse('autogas:auto_gas_batch_detail', args=[self.pk])
@@ -56,17 +63,29 @@ class AutoGasBatch(models.Model):
     def get_period_stats(cls, start_date=None, end_date=None):
         queryset = cls.objects.filter(
             begin_at__date__gte=start_date,
-            begin_at__date__lte=end_date
+            begin_at__date__lte=end_date,
         )
 
-        return queryset.aggregate(
+        stats = queryset.aggregate(
             loading_batches=Count('id', filter=Q(batch_type='l')),
             unloading_batches=Count('id', filter=Q(batch_type='u')),
-            total_gas_loading_by_weight=Sum('weight_gas_amount', filter=Q(batch_type='l')),
-            total_gas_loading_by_flowmeter=Sum('gas_amount', filter=Q(batch_type='l')),
-            total_gas_unloading_by_weight=Sum('weight_gas_amount', filter=Q(batch_type='u')),
-            total_gas_unloading_by_flowmeter = Sum('gas_amount', filter=Q(batch_type='u')),
+            total_gas_loading_by_weight=Sum(
+                'weight_gas_amount', filter=Q(batch_type='l')
+            ),
+            total_gas_loading_by_flowmeter=Sum(
+                'gas_amount', filter=Q(batch_type='l')
+            ),
+            total_gas_unloading_by_weight=Sum(
+                'weight_gas_amount', filter=Q(batch_type='u')
+            ),
+            total_gas_unloading_by_flowmeter=Sum(
+                'gas_amount', filter=Q(batch_type='u')
+            ),
         )
+        return {
+            key: value or 0
+            for key, value in stats.items()
+        }
 
 
 WEIGHT_SOURCE_CHOICES = [

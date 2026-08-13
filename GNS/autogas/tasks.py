@@ -4,7 +4,7 @@ from .management.commands.auto_gas_batch import Command as AutoGasBatchHandleCom
 
 logger = logging.getLogger('autogas')
 
-@shared_task
+@shared_task(expires=9)
 def auto_gas_processing():
     command = AutoGasBatchHandleCommand()
     command.handle()

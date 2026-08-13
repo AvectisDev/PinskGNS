@@ -11,37 +11,47 @@ from ttn.models import FilePath, RailwayTtn, AutoTtn, EmailRecipient
 logger = logging.getLogger('celery')
 
 
+def _get_latest_by_number(queryset, ttn_number):
+    matches = list(queryset.filter(number=ttn_number).order_by('-id')[:2])
+    if not matches:
+        return None
+    if len(matches) > 1:
+        logger.warning(
+            f'Найдено несколько ТТН с номером {ttn_number}, используется id={matches[0].id}'
+        )
+    return matches[0]
+
+
 class Command(BaseCommand):
     help = 'Generate 1C file'
-    today = timezone.now().strftime('%d.%m.%y')
-    day_for_search = timezone.now()
 
     def handle(self, ttn_number=None, *args, **kwargs):
-        filename = f'ГНС{self.today}.txt'
+        now = timezone.now()
+        today = now.strftime('%d.%m.%y')
+        filename = f'ГНС{today}.txt'
         file_path = FilePath.objects.first()
         path = file_path.path if file_path and file_path.path else None
 
         content_1 = self.generate_railway_list(ttn_number=ttn_number)
         content_2 = self.generate_loading_auto_gas_list(ttn_number=ttn_number)
         content_3 = self.generate_unloading_auto_gas_list(ttn_number=ttn_number)
-        content_4 = self.generate_balloon_loading_list()
-        content_5 = self.generate_balloon_unloading_list()
+        content_4 = self.generate_balloon_loading_list(now)
+        content_5 = self.generate_balloon_unloading_list(now)
 
         content = '\n'.join([content_1, content_2, content_3, content_4, content_5])
 
-        if path:
-            full_path = os.path.join(path, filename)
-            with open(full_path, 'w', encoding='windows-1251') as file:
-                file.write(content)
-            
-            # Отправка почты
-            self.send_email_with_attachment(
-                file_path=full_path,
-                ttn_number=ttn_number
+        if not path:
+            logger.warning('Путь FilePath не задан, файл 1С не сохранён')
+            return
+
+        full_path = os.path.join(path, filename)
+        with open(full_path, 'w', encoding='windows-1251') as file:
+            file.write(content)
+
+        self.send_email_with_attachment(
+            file_path=full_path,
+            ttn_number=ttn_number,
         )
-        else:
-            # Логика для обмена по API
-            pass
 
     def get_recipient_list(self):
         """Получаем список активных email-адресов"""
@@ -76,18 +86,26 @@ class Command(BaseCommand):
         lines = ['ГНС-ТТН1']
         logger.info(f'Внутри функции generate_railway_list. Номер ТТН - {ttn_number}')
 
+        if not ttn_number:
+            return '\n'.join(lines)
+
         try:
-            ttn = RailwayTtn.objects.get(number=ttn_number)
+            ttn = _get_latest_by_number(
+                RailwayTtn.objects.select_related('shipper'),
+                ttn_number,
+            )
+            if ttn is None:
+                logger.error(f'ТТН {ttn_number} не найдена!')
+                return '\n'.join(lines)
+
             tanks = ttn.railway_tank_list.all()
 
             if not tanks.exists():
                 logger.error(f"Нет цистерн для ТТН {ttn_number}")
                 return '\n'.join(lines)
 
-            # Формируем строку с данными ТТН
             ttn_date = ttn.date.strftime('%d.%m.%y') if ttn.date else timezone.now().strftime('%d.%m.%y')
 
-            # Находим минимальную дату подачи (arrival_at) из истории по этой ж/д накладной
             entry_dates = []
             for t in tanks:
                 hist = t.tank_history.filter(railway_ttn=ttn.railway_ttn).order_by('arrival_at').first()
@@ -103,7 +121,6 @@ class Command(BaseCommand):
                 f'{ttn.shipper.name if ttn.shipper else ""};'
             )
 
-            # Добавляем данные по КАЖДОЙ цистерне этой ТТН (берём историю, связанную с номером ж/д накладной)
             for tank in tanks:
                 hist = tank.tank_history.filter(railway_ttn=ttn.railway_ttn).order_by('-arrival_at', '-departure_at').first()
                 netto_weight_ttn = hist.netto_weight_ttn if hist and hist.netto_weight_ttn is not None else 0
@@ -119,8 +136,6 @@ class Command(BaseCommand):
                     f'{""};'  # Пустая накладная возврата
                 )
 
-        except RailwayTtn.DoesNotExist:
-            logger.error(f'ТТН {ttn_number} не найдена!')
         except Exception as e:
             logger.error(f'Ошибка: {str(e)}')
 
@@ -134,8 +149,13 @@ class Command(BaseCommand):
             return '\n'.join(lines)
 
         try:
-            # Получаем конкретную ТТН по номеру
-            ttn = AutoTtn.objects.select_related('shipper', 'batch__truck').get(number=ttn_number)
+            ttn = _get_latest_by_number(
+                AutoTtn.objects.select_related('shipper', 'batch__truck'),
+                ttn_number,
+            )
+            if ttn is None:
+                logger.error(f"ТТН {ttn_number} не найдена")
+                return '\n'.join(lines)
 
             if not ttn.batch or ttn.batch.batch_type != 'l':
                 return '\n'.join(lines)
@@ -149,8 +169,6 @@ class Command(BaseCommand):
                 f'{batch.gas_amount or 0:.3f};'
                 f'{batch.truck.registration_number if batch.truck else ""};'
             )
-        except AutoTtn.DoesNotExist:
-            logger.error(f"ТТН {ttn_number} не найдена")
         except Exception as e:
             logger.error(f"Ошибка обработки ТТН {ttn_number}: {str(e)}")
 
@@ -164,8 +182,13 @@ class Command(BaseCommand):
             return '\n'.join(lines)
 
         try:
-            # Получаем конкретную ТТН по номеру
-            ttn = AutoTtn.objects.select_related('consignee', 'batch__truck').get(number=ttn_number)
+            ttn = _get_latest_by_number(
+                AutoTtn.objects.select_related('consignee', 'batch__truck'),
+                ttn_number,
+            )
+            if ttn is None:
+                logger.error(f"ТТН {ttn_number} не найдена")
+                return '\n'.join(lines)
 
             if not ttn.batch or ttn.batch.batch_type != 'u':
                 return '\n'.join(lines)
@@ -179,103 +202,105 @@ class Command(BaseCommand):
                 f'{batch.gas_amount or 0:.3f};'
                 f'{batch.truck.registration_number if batch.truck else ""};'
             )
-        except AutoTtn.DoesNotExist:
-            logger.error(f"ТТН {ttn_number} не найдена")
         except Exception as e:
             logger.error(f"Ошибка обработки ТТН {ttn_number}: {str(e)}")
 
         return '\n'.join(lines)
 
-    def generate_balloon_loading_list(self):
-        batches = BalloonsBatch.objects.filter(batch_type='l', started_at__date=self.day_for_search.date())
+    def generate_balloon_loading_list(self, day_for_search):
+        batches = BalloonsBatch.objects.filter(
+            batch_type='l',
+            started_at__date=day_for_search.date(),
+        ).select_related('truck')
 
         lines = ['ГНС-ТТН4']
 
-        if batches:
-            for batch in batches:
-                try:
-                    ttn = batch.ttn_loading.first()
-                    if not ttn:
-                        continue
-
-                    lines.append(f'{ttn.number};'
-                                 f'{ttn.date.strftime("%d.%m.%y") if ttn.date else ""};'
-                                 f'{ttn.shipper.name if ttn.shipper else ""};'
-                                 f'{batch.truck.registration_number if batch.truck else ""};')
-
-                    lines.append(f';'
-                                 f'Баллоны 50 л;'
-                                 f'{(batch.amount_of_rfid or 0) + (batch.amount_of_50_liters or 0)};'
-                                 f'0;'
-                                 f'0;')
-                    lines.append(f';'
-                                 f'Баллоны 27 л;'
-                                 f'{batch.amount_of_27_liters or 0};'
-                                 f'0;'
-                                 f'0;')
-                    lines.append(f';'
-                                 f'Баллоны 12 л;'
-                                 f'{batch.amount_of_12_liters or 0};'
-                                 f'0;'
-                                 f'0;')
-                    lines.append(f';'
-                                 f'Баллоны 5 л;'
-                                 f'{batch.amount_of_5_liters or 0};'
-                                 f'0;'
-                                 f'0;')
-                except Exception as e:
-                    logger.error(f"Error processing loading batch {batch.id}: {str(e)}")
+        for batch in batches:
+            try:
+                ttn = batch.balloons_ttn_loading.select_related('shipper').first()
+                if not ttn:
                     continue
+
+                lines.append(f'{ttn.number};'
+                             f'{ttn.date.strftime("%d.%m.%y") if ttn.date else ""};'
+                             f'{ttn.shipper.name if ttn.shipper else ""};'
+                             f'{batch.truck.registration_number if batch.truck else ""};')
+
+                lines.append(f';'
+                             f'Баллоны 50 л;'
+                             f'{(batch.amount_of_rfid or 0) + (batch.amount_of_50_liters or 0)};'
+                             f'0;'
+                             f'0;')
+                lines.append(f';'
+                             f'Баллоны 27 л;'
+                             f'{batch.amount_of_27_liters or 0};'
+                             f'0;'
+                             f'0;')
+                lines.append(f';'
+                             f'Баллоны 12 л;'
+                             f'{batch.amount_of_12_liters or 0};'
+                             f'0;'
+                             f'0;')
+                lines.append(f';'
+                             f'Баллоны 5 л;'
+                             f'{batch.amount_of_5_liters or 0};'
+                             f'0;'
+                             f'0;')
+            except Exception as e:
+                logger.error(f"Error processing loading batch {batch.id}: {str(e)}")
+                continue
 
         return '\n'.join(lines)
 
-    def generate_balloon_unloading_list(self):
-        batches = BalloonsBatch.objects.filter(batch_type='u', started_at__date=self.day_for_search.date())
+    def generate_balloon_unloading_list(self, day_for_search):
+        batches = BalloonsBatch.objects.filter(
+            batch_type='u',
+            started_at__date=day_for_search.date(),
+        ).select_related('truck')
 
         lines = ['ГНС-ТТН5']
 
-        if batches:
-            for batch in batches:
-                try:
-                    ttn = batch.ttn_unloading.first()
-                    if not ttn:
-                        continue
-
-                    lines.append(f'{ttn.number};'
-                                 f'{ttn.date.strftime("%d.%m.%y") if ttn.date else ""};'
-                                 f'{ttn.shipper.name if ttn.shipper else ""};'
-                                 f'{batch.truck.registration_number if batch.truck else ""};')
-
-                    balloons = batch.balloon_list.all()
-                    total_gas_weight = 0
-                    total_balloon_weight = 0
-                    if balloons:
-                        for balloon in balloons:
-                            total_gas_weight += (balloon.brutto or 0) - (balloon.netto or 0)
-                            total_balloon_weight += (balloon.brutto or 0)
-
-                    lines.append(f'СПБТ;'
-                                 f'Баллоны 50 л;'
-                                 f'{(batch.amount_of_rfid or 0) + (batch.amount_of_50_liters or 0)};'
-                                 f'{total_gas_weight};'
-                                 f'{total_balloon_weight};')
-                    lines.append(f'СПБТ;'
-                                 f'Баллоны 27 л;'
-                                 f'{batch.amount_of_27_liters or 0};'
-                                 f'0;'
-                                 f'0;')
-                    lines.append(f'СПБТ;'
-                                 f'Баллоны 12 л;'
-                                 f'{batch.amount_of_12_liters or 0};'
-                                 f'0;'
-                                 f'0;')
-                    lines.append(f'СПБТ;'
-                                 f'Баллоны 5 л;'
-                                 f'{batch.amount_of_5_liters or 0};'
-                                 f'0;'
-                                 f'0;')
-                except Exception as e:
-                    logger.error(f"Error processing unloading batch {batch.id}: {str(e)}")
+        for batch in batches:
+            try:
+                ttn = batch.balloons_ttn_unloading.select_related('shipper').first()
+                if not ttn:
                     continue
+
+                lines.append(f'{ttn.number};'
+                             f'{ttn.date.strftime("%d.%m.%y") if ttn.date else ""};'
+                             f'{ttn.shipper.name if ttn.shipper else ""};'
+                             f'{batch.truck.registration_number if batch.truck else ""};')
+
+                balloons = batch.balloon_list.all()
+                total_gas_weight = 0
+                total_balloon_weight = 0
+                if balloons:
+                    for balloon in balloons:
+                        total_gas_weight += (balloon.brutto or 0) - (balloon.netto or 0)
+                        total_balloon_weight += (balloon.brutto or 0)
+
+                lines.append(f'СПБТ;'
+                             f'Баллоны 50 л;'
+                             f'{(batch.amount_of_rfid or 0) + (batch.amount_of_50_liters or 0)};'
+                             f'{total_gas_weight};'
+                             f'{total_balloon_weight};')
+                lines.append(f'СПБТ;'
+                             f'Баллоны 27 л;'
+                             f'{batch.amount_of_27_liters or 0};'
+                             f'0;'
+                             f'0;')
+                lines.append(f'СПБТ;'
+                             f'Баллоны 12 л;'
+                             f'{batch.amount_of_12_liters or 0};'
+                             f'0;'
+                             f'0;')
+                lines.append(f'СПБТ;'
+                             f'Баллоны 5 л;'
+                             f'{batch.amount_of_5_liters or 0};'
+                             f'0;'
+                             f'0;')
+            except Exception as e:
+                logger.error(f"Error processing unloading batch {batch.id}: {str(e)}")
+                continue
 
         return '\n'.join(lines)

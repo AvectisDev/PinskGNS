@@ -1,9 +1,9 @@
-from django.conf import settings
+from django.core.exceptions import ValidationError as DjangoValidationError
 from django.shortcuts import get_object_or_404
-from rest_framework import generics, status, viewsets, serializers
+from rest_framework import status, viewsets, serializers
 from rest_framework.response import Response
-from rest_framework.decorators import api_view, action
-from rest_framework.permissions import IsAuthenticated, AllowAny
+from rest_framework.decorators import action
+from rest_framework.permissions import AllowAny
 from drf_spectacular.utils import (
     extend_schema,
     extend_schema_view,
@@ -13,7 +13,12 @@ from drf_spectacular.utils import (
     OpenApiParameter
 )
 import logging
-from carousel.models import Carousel, CarouselSettings
+from carousel.models import CarouselSettings
+from carousel.services import (
+    CarouselPostNotFoundError,
+    UnsupportedCarouselRequestError,
+    process_carousel_data,
+)
 from .serializers import CarouselSerializer, CarouselSettingsSerializer
 
 
@@ -148,44 +153,38 @@ class CarouselViewSet(viewsets.ViewSet):
 
         if not request_type:
             logger.error("Тип запроса отсутствует в теле запроса")
-            return Response({"error": "Не указан тип запроса"}, status=status.HTTP_400_BAD_REQUEST)
+            return Response(
+                {"error": "Не указан тип запроса"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
         try:
+            carousel_post = process_carousel_data(request.data)
+            logger.debug(f"Данные по запросу {request_type} успешно сохранены")
             if request_type == '0x7a':
-                serializer = CarouselSerializer(data=request.data)
-                if serializer.is_valid():
-                    serializer.save()
-                    logger.debug("Данные по запросу 0x7a успешно сохранены")
-                    return Response(serializer.data, status=status.HTTP_201_CREATED)
-                else:
-                    logger.error(f"Ошибка валидации данных: {serializer.errors}")
-                    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-            elif request_type == '0x70':
-                carousel_post = Carousel.objects.filter(post_number=post_number).first()
-
-                if not carousel_post:
-                    logger.error(f"Пост {post_number} не найден в базе данных")
-                    return Response(
-                        {"error": f"Пост {post_number} не найден"},
-                        status=status.HTTP_404_NOT_FOUND
-                    )
-
-                carousel_post.is_empty = False
-                if 'full_weight' in request.data:
-                    carousel_post.full_weight = request.data['full_weight']
-                carousel_post.save()
-
-                logger.debug("Данные по запросу 0x70 успешно сохранены")
-                return Response(status=status.HTTP_200_OK)
-
-            else:
-                logger.warning(f"Получен неизвестный тип запроса: {request_type}")
                 return Response(
-                    {"error": f"Неизвестный тип запроса: {request_type}"},
-                    status=status.HTTP_400_BAD_REQUEST
+                    CarouselSerializer(carousel_post).data,
+                    status=status.HTTP_201_CREATED,
                 )
-
+            return Response(status=status.HTTP_200_OK)
+        except DjangoValidationError as error:
+            logger.error(f"Ошибка валидации данных: {error}")
+            error_data = getattr(error, 'message_dict', None) or {
+                'error': '; '.join(error.messages)
+            }
+            return Response(error_data, status=status.HTTP_400_BAD_REQUEST)
+        except CarouselPostNotFoundError as error:
+            logger.error(str(error))
+            return Response(
+                {"error": str(error)},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        except UnsupportedCarouselRequestError as error:
+            logger.warning(str(error))
+            return Response(
+                {"error": str(error)},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
         except Exception as error:
             logger.exception(f'Ошибка при обработке запроса: {error}')
             return Response(
