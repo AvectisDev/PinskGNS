@@ -11,15 +11,3 @@ class MiriadaTtnSerializer(serializers.ModelSerializer):
             'date',
             'ttn_id',
         ]
-
-
-class TtnListItemSerializer(serializers.Serializer):
-    id = serializers.IntegerField()
-    name = serializers.CharField()
-    auto = serializers.CharField()
-    date = serializers.DateTimeField(allow_null=True)
-
-
-class TtnListResponseSerializer(serializers.Serializer):
-    ttn_list = TtnListItemSerializer(many=True)
-

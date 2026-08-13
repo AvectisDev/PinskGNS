@@ -256,6 +256,7 @@ CELERY_BEAT_SCHEDULE = {
     'fetch_current_ttn_from_miriada': {
         'task': 'ttn.tasks.fetch_current_ttn_from_miriada',
         'schedule': crontab(hour=22, minute=0),
+        'options': {'expires': 3600},
     },
 }
 

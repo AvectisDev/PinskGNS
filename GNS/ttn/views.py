@@ -1,23 +1,45 @@
-from django.shortcuts import render, redirect
+from django.contrib.auth.decorators import login_required
+from django.shortcuts import redirect
+from django.http import HttpResponseRedirect
 from core.mixins import ModalDeleteMixin, PreserveListQueryMixin
-from django.urls import reverse_lazy, reverse
+from django.urls import reverse_lazy
 from django.views import generic
-from django.db.models import Q, Sum
 from django.contrib import messages
 from django.views.decorators.http import require_POST
-from .models import RailwayTank, BalloonTtn, RailwayTtn, AutoTtn
+from .models import BalloonTtn, RailwayTtn, AutoTtn
 from autogas.models import AutoGasBatchSettings
 from .forms import BalloonTtnForm, AutoTtnForm, RailwayTtnForm
+from .services import save_auto_ttn, save_balloon_ttn, save_railway_ttn
+
+
+BALLOON_TTN_RELATED = (
+    'shipper',
+    'consignee',
+    'carrier',
+    'city',
+    'loading_batch',
+    'unloading_batch',
+)
+RAILWAY_TTN_RELATED = ('shipper', 'consignee', 'carrier')
+AUTO_TTN_RELATED = (
+    'shipper',
+    'consignee',
+    'carrier',
+    'city',
+    'batch__truck',
+)
 
 
 # ТТН для баллонов
 class TTNView(generic.ListView):
     model = BalloonTtn
     paginate_by = 10
+    queryset = BalloonTtn.objects.select_related(*BALLOON_TTN_RELATED)
 
 
 class TTNDetailView(generic.DetailView):
     model = BalloonTtn
+    queryset = BalloonTtn.objects.select_related(*BALLOON_TTN_RELATED)
 
 
 class TTNCreateView(PreserveListQueryMixin, generic.CreateView):
@@ -29,15 +51,17 @@ class TTNCreateView(PreserveListQueryMixin, generic.CreateView):
         return self.object.get_absolute_url()
 
     def form_valid(self, form):
-        response = super().form_valid(form)
+        self.object = form.save(commit=False)
+        save_balloon_ttn(self.object)
         messages.success(self.request, f'ТТН {self.object.number} успешно создана')
-        return response
+        return HttpResponseRedirect(self.get_success_url())
 
 
 class TTNUpdateView(PreserveListQueryMixin, generic.UpdateView):
     model = BalloonTtn
     form_class = BalloonTtnForm
     template_name = 'ttn/_equipment_form.html'
+    queryset = BalloonTtn.objects.select_related(*BALLOON_TTN_RELATED)
 
     def get_success_url(self):
         return self.object.get_absolute_url()
@@ -48,9 +72,10 @@ class TTNUpdateView(PreserveListQueryMixin, generic.UpdateView):
         return super().post(request, *args, **kwargs)
 
     def form_valid(self, form):
-        response = super().form_valid(form)
+        self.object = form.save(commit=False)
+        save_balloon_ttn(self.object)
         messages.success(self.request, f'ТТН {self.object.number} успешно обновлена')
-        return response
+        return HttpResponseRedirect(self.get_success_url())
 
 
 class TTNDeleteView(ModalDeleteMixin, PreserveListQueryMixin, generic.DeleteView):
@@ -62,10 +87,16 @@ class TTNDeleteView(ModalDeleteMixin, PreserveListQueryMixin, generic.DeleteView
 class RailwayTtnView(generic.ListView):
     model = RailwayTtn
     paginate_by = 10
+    queryset = RailwayTtn.objects.select_related(*RAILWAY_TTN_RELATED)
 
 
 class RailwayTtnDetailView(generic.DetailView):
     model = RailwayTtn
+    queryset = (
+        RailwayTtn.objects
+        .select_related(*RAILWAY_TTN_RELATED)
+        .prefetch_related('railway_tank_list__tank_history')
+    )
 
 
 class RailwayTtnCreateView(PreserveListQueryMixin, generic.CreateView):
@@ -78,25 +109,16 @@ class RailwayTtnCreateView(PreserveListQueryMixin, generic.CreateView):
 
     def form_valid(self, form):
         self.object = form.save(commit=False)
-        railway_ttn_number = form.cleaned_data['railway_ttn']
-
-        # Находим все цистерны с этим номером ж/д накладной по истории и суммируем значения
-        tanks = RailwayTank.objects.filter(tank_history__railway_ttn=railway_ttn_number).distinct()
-        self.object.total_gas_amount_by_scales = tanks.aggregate(total=Sum('tank_history__gas_weight'))['total'] or 0
-        self.object.total_gas_amount_by_ttn = tanks.aggregate(total=Sum('tank_history__netto_weight_ttn'))['total'] or 0
-        self.object.save()
-
-        # Добавляем цистерны в ManyToMany связь
-        self.object.railway_tank_list.set(tanks)
-
+        save_railway_ttn(self.object, form.cleaned_data['railway_ttn'])
         messages.success(self.request, f'ТТН {self.object.number} успешно создана')
-        return super().form_valid(form)
+        return HttpResponseRedirect(self.get_success_url())
 
 
 class RailwayTtnUpdateView(PreserveListQueryMixin, generic.UpdateView):
     model = RailwayTtn
     form_class = RailwayTtnForm
     template_name = 'ttn/_equipment_form.html'
+    queryset = RailwayTtn.objects.select_related(*RAILWAY_TTN_RELATED)
 
     def get_success_url(self):
         return self.object.get_absolute_url()
@@ -107,20 +129,9 @@ class RailwayTtnUpdateView(PreserveListQueryMixin, generic.UpdateView):
         return super().post(request, *args, **kwargs)
 
     def form_valid(self, form):
-        new_railway_ttn = form.cleaned_data['railway_ttn']
-
         self.object = form.save(commit=False)
-
-        # Обновляем суммы по истории
-        tanks = RailwayTank.objects.filter(tank_history__railway_ttn=new_railway_ttn).distinct()
-        self.object.total_gas_amount_by_scales = tanks.aggregate(total=Sum('tank_history__gas_weight'))['total'] or 0
-        self.object.total_gas_amount_by_ttn = tanks.aggregate(total=Sum('tank_history__netto_weight_ttn'))['total'] or 0
-
-        # Обновляем ManyToMany связь
-        self.object.railway_tank_list.set(tanks)
-
-        self.object.save()
-        return super().form_valid(form)
+        save_railway_ttn(self.object, form.cleaned_data['railway_ttn'])
+        return HttpResponseRedirect(self.get_success_url())
 
 
 class RailwayTtnDeleteView(ModalDeleteMixin, PreserveListQueryMixin, generic.DeleteView):
@@ -129,10 +140,10 @@ class RailwayTtnDeleteView(ModalDeleteMixin, PreserveListQueryMixin, generic.Del
 
 
 # ТТН для автоцистерн
+@login_required
 @require_POST
-# @login_required
 def update_weight_source(request):
-    weight_source = request.POST.get('weight_source', 's')  # 'f' если чекбокс отмечен, иначе 's'
+    weight_source = request.POST.get('weight_source', 's')
     settings, _ = AutoGasBatchSettings.objects.get_or_create()
     settings.weight_source = weight_source
     settings.save()
@@ -142,6 +153,7 @@ def update_weight_source(request):
 class AutoTtnView(generic.ListView):
     model = AutoTtn
     paginate_by = 10
+    queryset = AutoTtn.objects.select_related(*AUTO_TTN_RELATED)
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -152,6 +164,7 @@ class AutoTtnView(generic.ListView):
 
 class AutoTtnDetailView(generic.DetailView):
     model = AutoTtn
+    queryset = AutoTtn.objects.select_related(*AUTO_TTN_RELATED)
 
 
 class AutoTtnCreateView(PreserveListQueryMixin, generic.CreateView):
@@ -160,38 +173,19 @@ class AutoTtnCreateView(PreserveListQueryMixin, generic.CreateView):
     template_name = 'ttn/_equipment_form.html'
 
     def form_valid(self, form):
-        response = super().form_valid(form)
-
-        self.update_ttn_values()
-
-        return response
+        self.object = form.save(commit=False)
+        save_auto_ttn(self.object)
+        return HttpResponseRedirect(self.get_success_url())
 
     def get_success_url(self):
         return self.object.get_absolute_url()
-
-    def update_ttn_values(self):
-        batch = self.object.batch
-        if batch:
-            settings = AutoGasBatchSettings.objects.first()
-
-            # Определяем источник данных и значение количества газа
-            if settings and settings.weight_source == 'f':
-                gas_amount = batch.gas_amount
-                source = 'Расходомер'
-            else:
-                gas_amount = batch.weight_gas_amount
-                source = 'Весы'
-
-            self.object.total_gas_amount = gas_amount
-            self.object.source_gas_amount = source
-            self.object.gas_type = batch.gas_type
-            self.object.save()
 
 
 class AutoTtnUpdateView(PreserveListQueryMixin, generic.UpdateView):
     model = AutoTtn
     form_class = AutoTtnForm
     template_name = 'ttn/_equipment_form.html'
+    queryset = AutoTtn.objects.select_related(*AUTO_TTN_RELATED)
 
     def get_success_url(self):
         return self.object.get_absolute_url()
@@ -202,24 +196,9 @@ class AutoTtnUpdateView(PreserveListQueryMixin, generic.UpdateView):
         return super().post(request, *args, **kwargs)
 
     def form_valid(self, form):
-        response = super().form_valid(form)
-        self.update_ttn_values()
-        return response
-
-    def update_ttn_values(self):
-        batch = self.object.batch
-        if batch:
-            settings = AutoGasBatchSettings.objects.first()
-
-            if settings and settings.weight_source == 'f':
-                self.object.total_gas_amount = batch.gas_amount
-                self.object.source_gas_amount = 'Расходомер'
-            else:
-                self.object.total_gas_amount = batch.weight_gas_amount
-                self.object.source_gas_amount = 'Весы'
-
-            self.object.gas_type = batch.gas_type
-            self.object.save()
+        self.object = form.save(commit=False)
+        save_auto_ttn(self.object)
+        return HttpResponseRedirect(self.get_success_url())
 
 
 class AutoTtnDeleteView(ModalDeleteMixin, PreserveListQueryMixin, generic.DeleteView):

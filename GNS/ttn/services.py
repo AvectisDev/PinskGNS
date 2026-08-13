@@ -5,9 +5,13 @@ import time
 from datetime import datetime
 from typing import Optional, Tuple, TYPE_CHECKING
 from django.conf import settings
+from django.db import transaction
+from django.db.models import QuerySet
+from railway_service.models import RailwayTank
 
 if TYPE_CHECKING:
     from filling_station.models import BalloonsBatch
+    from ttn.models import AutoTtn, BalloonTtn, RailwayTtn
 
 
 logger = logging.getLogger('filling_station')
@@ -46,19 +50,12 @@ def get_current_ttn_from_miriada() -> Optional[list]:
             )
             prepared = session.prepare_request(req)
 
-            logger.debug(
-                f"Подготовленный запрос:\n"
-                f"URL: {prepared.url}\n"
-                f"Headers: {prepared.headers}\n"
-                f"Body: {prepared.body}"
-            )
+            logger.debug(f"Запрос списка ТТН из Мириады: {prepared.url}")
 
             response = session.send(prepared, timeout=settings.MIRIADA_TIMEOUT)
             response.raise_for_status()
 
             result = response.json()
-
-            logger.warning(f"Данные по ТТН из Мириады: {type(result)}")
 
             # Обработка списка ТТН из Мириады
             processed_list = []
@@ -230,12 +227,7 @@ def close_ttn_in_miriada(
             )
             prepared = session.prepare_request(req)
 
-            logger.debug(
-                f"Подготовленный запрос на закрытие ТТН:\n"
-                f"URL: {prepared.url}\n"
-                f"Headers: {prepared.headers}\n"
-                f"Body: {prepared.body}"
-            )
+            logger.debug(f"Запрос закрытия ТТН {ttn_id} в Мириаде: {prepared.url}")
 
             response = session.send(prepared, timeout=settings.MIRIADA_TIMEOUT)
             if response.status_code == 200:
@@ -268,3 +260,91 @@ def close_ttn_in_miriada(
             time.sleep(settings.MIRIADA_RETRY_DELAY_SECONDS)
 
     return False, last_error
+
+
+def enqueue_1c_file(ttn_number: Optional[str]) -> None:
+    if not ttn_number:
+        return
+    from ttn.tasks import generate_1c_file
+
+    number = ttn_number
+    transaction.on_commit(lambda: generate_1c_file.delay(number))
+
+
+def get_latest_tank_history(tank: RailwayTank, railway_ttn_number: str):
+    return (
+        tank.tank_history
+        .filter(railway_ttn=railway_ttn_number)
+        .order_by('-arrival_at', '-departure_at')
+        .first()
+    )
+
+
+def collect_tanks_for_railway_ttn(
+    railway_ttn_number: Optional[str],
+) -> Tuple[QuerySet, float, float]:
+    if not railway_ttn_number:
+        return RailwayTank.objects.none(), 0.0, 0.0
+
+    tanks = RailwayTank.objects.filter(
+        tank_history__railway_ttn=railway_ttn_number,
+    ).distinct()
+    scale_total = 0.0
+    ttn_total = 0.0
+    for tank in tanks:
+        hist = get_latest_tank_history(tank, railway_ttn_number)
+        if hist:
+            scale_total += float(hist.gas_weight or 0)
+            ttn_total += float(hist.netto_weight_ttn or 0)
+    return tanks, scale_total, ttn_total
+
+
+def apply_railway_tank_totals(
+    ttn: 'RailwayTtn',
+    railway_ttn_number: Optional[str] = None,
+) -> QuerySet:
+    number = railway_ttn_number if railway_ttn_number is not None else ttn.railway_ttn
+    tanks, scale_total, ttn_total = collect_tanks_for_railway_ttn(number)
+    ttn.total_gas_amount_by_scales = scale_total
+    ttn.total_gas_amount_by_ttn = ttn_total
+    return tanks
+
+
+@transaction.atomic
+def save_railway_ttn(
+    ttn: 'RailwayTtn',
+    railway_ttn_number: Optional[str] = None,
+) -> 'RailwayTtn':
+    number = railway_ttn_number if railway_ttn_number is not None else ttn.railway_ttn
+    ttn.railway_ttn = number
+    tanks = apply_railway_tank_totals(ttn, number)
+    ttn.save()
+    ttn.railway_tank_list.set(tanks)
+    enqueue_1c_file(ttn.number)
+    return ttn
+
+
+@transaction.atomic
+def save_auto_ttn(ttn: 'AutoTtn') -> 'AutoTtn':
+    from autogas.models import AutoGasBatchSettings
+
+    batch = ttn.batch
+    if batch:
+        batch_settings = AutoGasBatchSettings.objects.first()
+        if batch_settings and batch_settings.weight_source == 'f':
+            ttn.total_gas_amount = batch.gas_amount
+            ttn.source_gas_amount = 'Расходомер'
+        else:
+            ttn.total_gas_amount = batch.weight_gas_amount
+            ttn.source_gas_amount = 'Весы'
+        ttn.gas_type = batch.gas_type
+    ttn.save()
+    enqueue_1c_file(ttn.number)
+    return ttn
+
+
+@transaction.atomic
+def save_balloon_ttn(ttn: 'BalloonTtn') -> 'BalloonTtn':
+    ttn.save()
+    enqueue_1c_file(ttn.number)
+    return ttn
