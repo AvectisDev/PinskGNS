@@ -3,6 +3,7 @@ import requests
 import logging
 from datetime import datetime, timedelta
 from django.conf import settings
+from django.utils import timezone
 
 
 logger = logging.getLogger('kpp')
@@ -42,7 +43,7 @@ def get_intellect_data(data) -> list:
         response.raise_for_status()
 
         result = response.json()
-        if result['Status'] == "OK":
+        if result.get('Status') == "OK":
             item_list = result.get('Protocols', [])
             return item_list
         return []
@@ -54,14 +55,12 @@ def get_intellect_data(data) -> list:
 
 def get_start_time(delta_minutes: int) -> str:
     """
-    Функция определяет время, начиная с которого нужно запросить данные в базе данных "Интеллект".
-    delta_minutes: числовое значение количества минут, которые будут отниматься от текущего времени.
-    Дополнительно нужно отнять 3 часа, т.к. "Интеллект" выдаёт данные по часовому поясу UTC+0
-    return: string - для передачи в формате JSON объект времени конвертируется в строку под формат "Интеллект"
+    Время начала выборки протоколов для «Интеллекта».
+    «Интеллект» всегда работает в UTC+0, пояс в нём сменить нельзя.
+    Наше ПО — Europe/Minsk (UTC+3), поэтому от локального времени отнимаем 3 часа.
     """
-    start_date = datetime.now() - timedelta(hours=3, minutes=delta_minutes)
-    start_date_string = f'{start_date.strftime("%Y-%m-%dT%H:%M:%S")}.000'
-    return start_date_string
+    start_date = timezone.localtime() - timedelta(hours=3, minutes=delta_minutes)
+    return f'{start_date.strftime("%Y-%m-%dT%H:%M:%S")}.000'
 
 
 def separation_string_date(date_string: str = '') -> tuple:
@@ -122,6 +121,8 @@ def check_on_station(transport: dict) -> Optional[bool]:
             return True
         elif direction == '3':
             return False
+
+    return None
 
 
 def get_transport_type(registration_number: str) -> str:

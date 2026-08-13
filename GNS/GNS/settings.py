@@ -222,6 +222,8 @@ CRISPY_TEMPLATE_PACK = "bootstrap5"
 
 # Redis DB: 0 — Celery broker, 1 — Django cache
 CELERY_BROKER_URL = 'redis://localhost:6379/0'
+CELERY_TIMEZONE = 'Europe/Minsk'
+CELERY_ENABLE_UTC = True
 CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP = True
 CELERY_WORKER_HIJACK_ROOT_LOGGER = False
 CELERY_WORKER_PREFETCH_MULTIPLIER = 1
@@ -249,6 +251,7 @@ CELERY_BEAT_SCHEDULE = {
     'kpp_close_transport': {
         'task': 'transport.tasks.kpp_close_transport',
         'schedule': crontab(hour=18, minute=0),
+        'options': {'expires': 3600},
     },
     'fetch_current_ttn_from_miriada': {
         'task': 'ttn.tasks.fetch_current_ttn_from_miriada',
