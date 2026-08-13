@@ -70,14 +70,21 @@ class AutoGasBatchForm(forms.ModelForm):
     def clean(self):
         cleaned_data = super().clean()
 
-        # Проверка, что дата окончания не раньше даты начала
-        if self.instance.pk and cleaned_data.get('end_date'):
-            if cleaned_data['end_date'] < self.instance.begin_date:
-                raise forms.ValidationError(
-                    "Дата окончания не может быть раньше даты начала"
-                )
+        completed_at = cleaned_data.get('completed_at')
+        begin_at = self.instance.begin_at if self.instance.pk else None
+        if completed_at and begin_at and completed_at < begin_at:
+            self.add_error(
+                'completed_at',
+                'Дата окончания не может быть раньше даты начала',
+            )
 
-        # Проверка весовых показателей
+        if cleaned_data.get('is_active'):
+            active_qs = AutoGasBatch.objects.filter(is_active=True)
+            if self.instance.pk:
+                active_qs = active_qs.exclude(pk=self.instance.pk)
+            if active_qs.exists():
+                self.add_error('is_active', 'Уже есть активная партия')
+
         scale_empty = cleaned_data.get('scale_empty_weight')
         scale_full = cleaned_data.get('scale_full_weight')
         weight_gas = cleaned_data.get('weight_gas_amount')

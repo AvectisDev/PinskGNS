@@ -12,12 +12,12 @@ class AutoGasBatch(models.Model):
     completed_at = models.DateTimeField(null=True, blank=True, verbose_name="Дата и время окончания")
     truck = models.ForeignKey(
         Truck,
-        on_delete=models.DO_NOTHING,
+        on_delete=models.PROTECT,
         verbose_name="Автомобиль"
     )
     trailer = models.ForeignKey(
         Trailer,
-        on_delete=models.DO_NOTHING,
+        on_delete=models.PROTECT,
         null=True,
         blank=True,
         verbose_name="Прицеп"
@@ -30,7 +30,7 @@ class AutoGasBatch(models.Model):
     is_active = models.BooleanField(default=False, verbose_name="В работе")
     user = models.ForeignKey(
         User,
-        on_delete=models.DO_NOTHING,
+        on_delete=models.PROTECT,
         default=1,
         verbose_name="Пользователь"
     )
@@ -42,6 +42,13 @@ class AutoGasBatch(models.Model):
         verbose_name = "Автоколонка"
         verbose_name_plural = "Автоколонка"
         ordering = ['-is_active', '-begin_at']
+        constraints = [
+            models.UniqueConstraint(
+                fields=['is_active'],
+                condition=Q(is_active=True),
+                name='uniq_one_active_autogas_batch',
+            ),
+        ]
 
     def get_absolute_url(self):
         return reverse('autogas:auto_gas_batch_detail', args=[self.pk])

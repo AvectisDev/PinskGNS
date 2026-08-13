@@ -2,9 +2,10 @@ import logging
 from opcua import ua
 from django.conf import settings
 from django.core.management.base import BaseCommand
+from django.db import IntegrityError, transaction
 from django.db.models import Q
 from django.core.cache import cache
-from datetime import datetime
+from django.utils import timezone
 from core.opc import create_opc_client, disconnect_opc
 from filling_station.models import Truck, Trailer, TrailerType
 from autogas.models import AutoGasBatch
@@ -44,8 +45,6 @@ class Command(BaseCommand):
         1: 'l',
         2: 'u',
     }
-
-    DEFAULT_GAS_TYPE = 'Не выбран'
 
     def __init__(self):
         super().__init__()
@@ -150,11 +149,24 @@ class Command(BaseCommand):
 
     def create_batch(self, batch_type_code, gas_type_code):
         """Создаёт новую партию"""
-        registration_numbers = self.get_transport_numbers()
+        allowed_batch_types = {code for code, _ in settings.BATCH_TYPE_CHOICES}
+        allowed_gas_types = {code for code, _ in settings.GAS_TYPE_CHOICES}
 
+        batch_type = self.BATCH_TYPES.get(batch_type_code)
+        if batch_type not in allowed_batch_types:
+            logger.error(f'Неизвестный тип партии: {batch_type_code}')
+            self.set_opc_value("stop_batch", True)
+            return
+
+        gas_type = self.GAS_TYPES.get(gas_type_code)
+        if gas_type not in allowed_gas_types:
+            logger.error(f'Неизвестный тип газа: {gas_type_code}')
+            self.set_opc_value("stop_batch", True)
+            return
+
+        registration_numbers = self.get_transport_numbers()
         if not registration_numbers:
-            logger.warning('Список номеров пуст')
-            self.set_opc_value("response_batch_create", True)
+            logger.warning('Список номеров пуст, партия не создана')
             return
         logger.debug(f'Список номеров: {registration_numbers}')
 
@@ -162,49 +174,87 @@ class Command(BaseCommand):
 
         if not truck:
             logger.error('Не найден подходящий грузовик')
-            self.set_opc_value("stop_batch", True)  # Останавливаем формирование партии
+            self.set_opc_value("stop_batch", True)
             return
 
         logger.debug(f'Грузовик: {truck.registration_number}-{truck.type.type}')
         if trailer:
             logger.debug(f'Прицеп: {trailer.registration_number}-{trailer.type.type}')
 
+        already_active = False
         try:
-            AutoGasBatch.objects.create(
-                batch_type=self.BATCH_TYPES.get(batch_type_code),
-                truck=truck,
-                trailer=trailer if trailer else None,
-                is_active=True,
-                gas_type=self.GAS_TYPES.get(gas_type_code)
-            )
-
-            # Определяем показатель вместимости цистерны
-            if truck.type.type == "Цистерна":
-                capacity_value = truck.max_gas_volume
-            elif truck.type.type == "Седельный тягач" and trailer:
-                capacity_value = trailer.max_gas_volume
-            else:
-                capacity_value = 0.0
-                logger.warning(f'Не удалось определить объём ёмкости для {truck.registration_number}')
-
-            if capacity_value:
-                self.set_opc_value("truck_capacity", capacity_value)
-
-            self.set_opc_value("response_batch_create", True)
+            with transaction.atomic():
+                already_active = (
+                    AutoGasBatch.objects
+                    .select_for_update()
+                    .filter(is_active=True)
+                    .exists()
+                )
+                if not already_active:
+                    AutoGasBatch.objects.create(
+                        batch_type=batch_type,
+                        truck=truck,
+                        trailer=trailer,
+                        is_active=True,
+                        gas_type=gas_type,
+                    )
+        except IntegrityError:
+            logger.error('Уже есть активная партия, новая не создана')
+            self.set_opc_value("stop_batch", True)
+            return
         except Exception as e:
             logger.error(f'Ошибка при создании партии: {e}', exc_info=True)
+            return
+
+        if already_active:
+            logger.error('Уже есть активная партия, новая не создана')
+            self.set_opc_value("stop_batch", True)
+            return
+
+        if truck.type.type == "Цистерна":
+            capacity_value = truck.max_gas_volume
+        elif truck.type.type == "Седельный тягач" and trailer:
+            capacity_value = trailer.max_gas_volume
+        else:
+            capacity_value = 0.0
+            logger.warning(
+                f'Не удалось определить объём ёмкости для {truck.registration_number}'
+            )
+
+        if capacity_value:
+            self.set_opc_value("truck_capacity", capacity_value)
+
+        self.set_opc_value("response_batch_create", True)
 
     def complete_batch(self, batch_data):
         """Завершает текущую активную партию"""
         try:
-            AutoGasBatch.objects.filter(is_active=True).update(
-                gas_amount=batch_data.get('gas_amount'),
-                scale_empty_weight=batch_data.get('truck_empty_weight'),
-                scale_full_weight=batch_data.get('truck_full_weight'),
-                weight_gas_amount=batch_data.get('weight_gas_amount'),
-                is_active=False,
-                completed_at=datetime.now(),
-            )
+            with transaction.atomic():
+                batch = (
+                    AutoGasBatch.objects
+                    .select_for_update()
+                    .filter(is_active=True)
+                    .order_by('-begin_at', '-pk')
+                    .first()
+                )
+                if batch is None:
+                    logger.error('Нет активной партии для завершения')
+                    return
+
+                batch.gas_amount = batch_data.get('gas_amount')
+                batch.scale_empty_weight = batch_data.get('truck_empty_weight')
+                batch.scale_full_weight = batch_data.get('truck_full_weight')
+                batch.weight_gas_amount = batch_data.get('weight_gas_amount')
+                batch.is_active = False
+                batch.completed_at = timezone.now()
+                batch.save(update_fields=[
+                    'gas_amount',
+                    'scale_empty_weight',
+                    'scale_full_weight',
+                    'weight_gas_amount',
+                    'is_active',
+                    'completed_at',
+                ])
             self.set_opc_value("response_batch_complete", True)
         except Exception as e:
             logger.error(f'Ошибка при завершении партии: {e}', exc_info=True)

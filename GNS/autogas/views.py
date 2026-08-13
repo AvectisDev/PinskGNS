@@ -1,8 +1,7 @@
-from django.urls import reverse_lazy, reverse
+from django.urls import reverse_lazy
 from django.views import generic
 from .models import AutoGasBatch
 from .forms import AutoGasBatchForm
-from django.shortcuts import redirect
 from core.mixins import ModalDeleteMixin, PreserveListQueryMixin
 
 
@@ -12,11 +11,17 @@ class AutoGasBatchListView(generic.ListView):
     paginate_by = 10
     template_name = 'autogas/auto_batch_list.html'
 
+    def get_queryset(self):
+        return super().get_queryset().select_related('truck', 'trailer')
+
 
 class AutoGasBatchDetailView(generic.DetailView):
     model = AutoGasBatch
     context_object_name = 'batch'
     template_name = 'autogas/auto_batch_detail.html'
+
+    def get_queryset(self):
+        return super().get_queryset().select_related('truck', 'trailer')
 
 
 class AutoGasBatchUpdateView(PreserveListQueryMixin, generic.UpdateView):

@@ -15,7 +15,8 @@ from drf_spectacular.utils import (
     OpenApiTypes,
     OpenApiExample
 )
-from datetime import datetime, date
+from datetime import date
+from django.utils import timezone
 from autogas.models import AutoGasBatch
 from .serializers import AutoGasBatchSerializer
 
@@ -182,7 +183,12 @@ class AutoGasBatchView(viewsets.ViewSet):
                         response['unloading_batch']['СПБТ'] = response.get('unloading_batch', {}).get('СПБТ', {}) | r
 
         # Активная партия
-        active_batch = AutoGasBatch.objects.filter(is_active=True).first()
+        active_batch = (
+            AutoGasBatch.objects
+            .select_related('truck', 'trailer')
+            .filter(is_active=True)
+            .first()
+        )
         if active_batch:
             response['active_batch'] = {
                 'batch_type': 'Приёмка' if active_batch.batch_type == 'l' else 'Отгрузка',
@@ -200,26 +206,30 @@ class AutoGasBatchView(viewsets.ViewSet):
 
     def list(self, request):
         today = date.today()
-        batch = AutoGasBatch.objects.filter(is_active=True, begin_at__date=today)
-        serializer = AutoGasBatchSerializer(batch, many=True)
+        batches = AutoGasBatch.objects.filter(
+            is_active=True,
+            begin_at__date=today,
+        ).select_related('truck', 'trailer')
+        serializer = AutoGasBatchSerializer(batches, many=True)
         return Response(serializer.data)
 
     def create(self, request):
         serializer = AutoGasBatchSerializer(data=request.data)
         if serializer.is_valid():
             serializer.save()
-            return Response(serializer.data)
-        return Response(serializer.errors)
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     def partial_update(self, request, pk=None):
         batch = get_object_or_404(AutoGasBatch, id=pk)
-        if not request.data.get('is_active', True):
-            request.data['completed_at'] = datetime.now()
-        serializer = AutoGasBatchSerializer(batch, data=request.data, partial=True)
+        data = request.data.copy()
+        if not data.get('is_active', True):
+            data['completed_at'] = timezone.now()
+        serializer = AutoGasBatchSerializer(batch, data=data, partial=True)
         if serializer.is_valid():
             serializer.save()
             return Response(serializer.data)
-        return Response(serializer.errors)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 # Сигналы для сброса кеша при изменении данных
 @receiver(post_save, sender=AutoGasBatch)
