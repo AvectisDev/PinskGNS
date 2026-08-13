@@ -110,28 +110,39 @@ async def process_tag_event(
     command_session: ReaderSession,
     parsed_records: List[Dict],
 ) -> None:
-    tags: List[str] = []
+    raw_tags: List[str] = []
+    new_tags: List[str] = []
     for tag_data in parsed_records[1:]:
         nfc_tag = tag_data.get('nfc_tag') if isinstance(tag_data, dict) else None
         if not nfc_tag:
             continue
+        raw_tags.append(nfc_tag)
         if not is_balloon_nfc_tag(nfc_tag):
             logger.info(
                 f'{reader_obj.number} Метка {nfc_tag} не проходит фильтр UID (suffix={TAG_HEX_SUFFIX!r})'
             )
             continue
         if reader_obj.filter_duplicate_tag(nfc_tag):
-            tags.append(nfc_tag)
+            new_tags.append(nfc_tag)
 
-    if tags:
-        logger.info(f'{reader_obj.number} Получены метки из Notification Mode: {tags}')
+    if raw_tags:
+        logger.info(f'{reader_obj.number} Получены метки из Notification Mode: {raw_tags}')
 
-    for nfc_tag in tags:
+    any_success = False
+    for nfc_tag in new_tags:
         result = await process_balloon_data_sync(nfc_tag=nfc_tag, reader_number=reader_obj.number)
-        if result.get('filling_status'):
-            await command_session.send('SET_OUTPUT', b'\x01\x01\x81\x01\x00')  # зелёный
+        if result.get('status') == 'success':
+            any_success = True
         else:
-            await command_session.send('SET_OUTPUT', b'\x01\x01\x81\x0B\x00')  # мигание
+            logger.warning(
+                f'{reader_obj.number} Ошибка обработки метки {nfc_tag}: {result.get("message")}'
+            )
+
+    lamp_ok = any_success or (
+        not new_tags and any(is_balloon_nfc_tag(tag) for tag in raw_tags)
+    )
+    await command_session.indicate_tag_read(success=lamp_ok)
+
 
 
 async def process_input_event(reader_obj: Reader, parsed_records: List[Dict]) -> None:

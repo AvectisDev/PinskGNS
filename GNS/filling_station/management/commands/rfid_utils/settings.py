@@ -10,3 +10,9 @@ COMMANDS = {
 # Аутентификация
 USERNAME = "reader"
 PASSWORD = "rfid-device"
+
+
+def command_frame(name: str) -> bytes:
+    """Собирает байтовый кадр FEIG из hex-строки COMMANDS."""
+    return bytes.fromhex(COMMANDS[name].replace(' ', ''))
+

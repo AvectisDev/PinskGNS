@@ -450,53 +450,17 @@ class ReaderSession:
         """
         Последовательная отправка команды с корректным чтением полного кадра ответа.
         """
+        req = FeigProtocol.create_request(command_name, request_data)
+        return await self.send_raw(req, command_name)
+
+    async def send_raw(self, frame: bytes, command_name: str = 'raw') -> Dict:
+        """Отправляет готовый кадр FEIG (например команды лампы из settings.COMMANDS)."""
         if self.conn is None or self.writer is None:
             await self.connect()
 
         async with self.lock:
-            req = FeigProtocol.create_request(command_name, request_data)
-            logger.debug(f'{self.reader.number} Отправляем запрос: {req.hex()}, Команда {command_name}')
-            self.writer.write(req)
-            await self.writer.drain()
-
-            # читаем заголовок (5 байт): STX(1) + ALENGTH(2) + COM-ADR(1) + COMMAND(1)
-            try:
-                header = await asyncio.wait_for(self.conn.read(5), timeout=1.0)
-                if len(header) < 5 or header[0] != FeigProtocol.STX:
-                    return {'valid': False, 'error': 'Incomplete/invalid header'}
-
-                length = struct.unpack('>H', header[1:3])[0]  # ALENGTH
-                remaining = length - 5
-                body = b''
-                if remaining > 0:
-                    body = await asyncio.wait_for(self.conn.read(remaining), timeout=1.0)
-
-                response = header + body
-                logger.debug(f'{self.reader.number} Ответ ридера: {response.hex()}, Команда {command_name}')
-                return FeigProtocol.parse_response(response)
-
-            except asyncio.TimeoutError:
-                return {'valid': False, 'error': 'Timeout'}
-            except Exception as e:
-                return {'valid': False, 'error': str(e)}
-
-    async def send_event_ack(self, event_command: int, status: int = 0x00) -> Dict:
-        """
-        ACK для Notification Mode event.
-        В FEIG кадре COMMAND=event_command, DATA[0]=STATUS.
-        """
-        return await self.send_by_code(event_command, bytes([status]))
-
-    async def send_by_code(self, command_code: int, request_data: bytes = b'') -> Dict:
-        if self.conn is None or self.writer is None:
-            await self.connect()
-
-        async with self.lock:
-            req = FeigProtocol.create_request_by_code(command_code, request_data)
-            logger.debug(
-                f'{self.reader.number} Отправляем raw-запрос: {req.hex()}, Команда 0x{command_code:02X}'
-            )
-            self.writer.write(req)
+            logger.debug(f'{self.reader.number} Отправляем запрос: {frame.hex()}, Команда {command_name}')
+            self.writer.write(frame)
             await self.writer.drain()
 
             try:
@@ -511,9 +475,35 @@ class ReaderSession:
                     body = await asyncio.wait_for(self.conn.read(remaining), timeout=1.0)
 
                 response = header + body
-                logger.debug(f'{self.reader.number} Ответ ридера: {response.hex()}, Команда 0x{command_code:02X}')
+                logger.debug(f'{self.reader.number} Ответ ридера: {response.hex()}, Команда {command_name}')
                 return FeigProtocol.parse_response(response)
+
             except asyncio.TimeoutError:
                 return {'valid': False, 'error': 'Timeout'}
             except Exception as e:
+                self.conn = None
+                self.writer = None
                 return {'valid': False, 'error': str(e)}
+
+    async def indicate_tag_read(self, success: bool) -> Dict:
+        """Зелёная лампа: постоянное свечение при успехе, мигание при ошибке."""
+        from .settings import command_frame
+
+        name = 'read_complete' if success else 'read_complete_with_error'
+        result = await self.send_raw(command_frame(name), command_name=name)
+        if result.get('valid'):
+            logger.info(f'{self.reader.number} Лампа: {name}')
+        else:
+            logger.warning(f'{self.reader.number} Лампа {name} не принята: {result}')
+        return result
+
+    async def send_event_ack(self, event_command: int, status: int = 0x00) -> Dict:
+        """
+        ACK для Notification Mode event.
+        В FEIG кадре COMMAND=event_command, DATA[0]=STATUS.
+        """
+        return await self.send_by_code(event_command, bytes([status]))
+
+    async def send_by_code(self, command_code: int, request_data: bytes = b'') -> Dict:
+        req = FeigProtocol.create_request_by_code(command_code, request_data)
+        return await self.send_raw(req, command_name=f'0x{command_code:02X}')
