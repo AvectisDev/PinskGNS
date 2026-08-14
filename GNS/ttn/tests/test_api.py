@@ -11,9 +11,20 @@ class MiriadaTtnAPITests(APITestCase):
         self.user = User.objects.create_user(username='ttn_api', password='x')
         self.url = reverse('ttn_api:miriada-ttn-current')
 
-    def test_unauthenticated_returns_401(self):
+    @patch('ttn.api.views.services.sync_current_ttn_from_miriada')
+    def test_unauthenticated_returns_200(self, mock_sync):
         response = self.client.get(self.url)
-        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data, [])
+        mock_sync.assert_called_once()
+
+    @patch('ttn.api.views.services.sync_current_ttn_from_miriada')
+    def test_stale_bearer_token_still_returns_200(self, mock_sync):
+        self.client.credentials(HTTP_AUTHORIZATION='Bearer not.a.valid.token')
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data, [])
+        mock_sync.assert_called_once()
 
     @patch('ttn.api.views.services.sync_current_ttn_from_miriada')
     def test_empty_list_returns_200(self, mock_sync):

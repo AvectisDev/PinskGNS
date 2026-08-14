@@ -34,6 +34,7 @@ CSRF_TRUSTED_ORIGINS = [
     'http://localhost:8000',
     'http://127.0.0.1:8000',
     'http://10.10.12.253:8000',
+    'http://10.0.3.2:8000',
 ]
 
 # Application definition

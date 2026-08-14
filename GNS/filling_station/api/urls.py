@@ -1,9 +1,21 @@
 from django.urls import path, include
+from rest_framework.permissions import AllowAny
 from rest_framework.routers import DefaultRouter
-from . import balloons, transport
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
+from . import balloons, transport
 
 app_name = 'filling_station'
+
+
+class MobileTokenObtainPairView(TokenObtainPairView):
+    permission_classes = [AllowAny]
+    authentication_classes = []
+
+
+class MobileTokenRefreshView(TokenRefreshView):
+    permission_classes = [AllowAny]
+    authentication_classes = []
+
 
 balloons_router = DefaultRouter()
 balloons_router.register(r'balloons', balloons.BalloonViewSet, basename='balloons')
@@ -22,6 +34,6 @@ urlpatterns = [
     path('trucks', transport.TruckView.as_view()),
     path('trailers', transport.TrailerView.as_view()),
 
-    path('token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
-    path('token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
+    path('token/', MobileTokenObtainPairView.as_view(), name='token_obtain_pair'),
+    path('token/refresh/', MobileTokenRefreshView.as_view(), name='token_refresh'),
 ]

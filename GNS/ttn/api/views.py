@@ -5,6 +5,7 @@ from django.utils import timezone
 from rest_framework import viewsets, status, serializers
 from rest_framework.response import Response
 from rest_framework.decorators import action
+from rest_framework.permissions import AllowAny
 from drf_spectacular.utils import (
     extend_schema,
     extend_schema_view,
@@ -66,7 +67,11 @@ logger = logging.getLogger('filling_station')
 class MiriadaTtnViewSet(viewsets.ViewSet):
     """
     API для работы с ТТН из системы Мириада.
+    AllowAny: мобильное приложение запрашивает список до/без JWT.
+    Пустая authentication_classes: просроченный Bearer не должен давать 401.
     """
+    authentication_classes = []
+    permission_classes = [AllowAny]
 
     @action(detail=False, methods=['get'], url_path='current', url_name='current')
     def get_current_ttn(self, request):
@@ -80,7 +85,6 @@ class MiriadaTtnViewSet(viewsets.ViewSet):
             services.sync_current_ttn_from_miriada()
         except Exception as e:
             logger.error(f"Ошибка при синхронизации ТТН из Мириады: {e}")
-            return Response(status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
         start_date = timezone.localdate() - timedelta(days=5)
         local_ttn = MiriadaTtn.objects.filter(date__gte=start_date)
