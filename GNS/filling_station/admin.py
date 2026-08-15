@@ -144,6 +144,7 @@ class BalloonsBatchAdmin(admin.ModelAdmin):
         'reader_number',
         'amount_of_rfid',
         'amount_of_sensor',
+        'amount_of_ttn',
         'amount_of_5_liters',
         'amount_of_12_liters',
         'amount_of_27_liters',

@@ -550,6 +550,10 @@ class BalloonsBatch(models.Model):
     reader_number = models.IntegerField(null=True, blank=True, verbose_name="Номер считывателя")
     amount_of_rfid = models.IntegerField(default=0, verbose_name="Количество баллонов по rfid")
     amount_of_sensor = models.IntegerField(default=0, verbose_name="Количество баллонов по датчику")
+    amount_of_ttn = models.IntegerField(
+        default=0,
+        verbose_name="Количество баллонов по электронной ТТН",
+    )
     amount_of_5_liters = models.IntegerField(default=0, verbose_name="Количество 5л баллонов")
     amount_of_12_liters = models.IntegerField(default=0, verbose_name="Количество 12л баллонов")
     amount_of_27_liters = models.IntegerField(default=0, verbose_name="Количество 27л баллонов")
@@ -570,6 +574,10 @@ class BalloonsBatch(models.Model):
         blank=True,
         max_length=200,
         verbose_name="Текст ошибки при неудачном закрытии ТТН"
+    )
+    miriada_balloons_sent = models.BooleanField(
+        default=False,
+        verbose_name="Статусы баллонов отправлены в Мириаду",
     )
     ttn_id = models.IntegerField(verbose_name="ID ТТН")
     balloons_type = models.CharField(choices=settings.BALLOON_TYPE_CHOICES, default='e', verbose_name="Пустой/полный")

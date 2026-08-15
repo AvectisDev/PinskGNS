@@ -625,7 +625,7 @@ BalloonOperationResponse = inline_serializer(
     rfid_amount=extend_schema(
         tags=['Партии баллонов'],
         summary='Количество баллонов по RFID',
-        description='Получение количества баллонов в партии, зарегистрированных по RFID',
+        description='Количество баллонов в партии: RFID, оптический датчик и электронная ТТН',
         parameters=[
             OpenApiParameter(
                 name='id',
@@ -642,7 +642,7 @@ BalloonOperationResponse = inline_serializer(
     create=extend_schema(
         tags=['Партии баллонов'],
         summary='Создать новую партию',
-        description='Создание новой партии баллонов с привязкой к ТТН',
+        description='Создание новой партии баллонов с привязкой к ТТН и количеством баллонов по электронной ТТН',
         request=BalloonsBatchSerializer,
         responses={
             201: BalloonsBatchSerializer,
@@ -663,7 +663,7 @@ BalloonOperationResponse = inline_serializer(
     add_balloon=extend_schema(
         tags=['Партии баллонов'],
         summary='Добавить баллон в партию',
-        description='Добавление баллона в партию по NFC метке',
+        description='Добавление баллона в партию по NFC метке. Статус в Мириаду отправляется при закрытии партии.',
         request=inline_serializer(
             name='AddBalloonRequest',
             fields={
@@ -713,8 +713,9 @@ BalloonOperationResponse = inline_serializer(
         tags=['Партии баллонов'],
         summary='Завершить партию',
         description=(
-            'Сохраняет данные партии из мобильного приложения и закрывает ТТН в Мириаде. '
-            'Принимает тот же набор полей, что раньше отправлялся через PATCH при завершении. '
+            'Сохраняет данные партии, отправляет статусы всех баллонов в Мириаду '
+            'и закрывает ТТН. Завершение возможно, только если количество RFID '
+            'совпадает с количеством по электронной ТТН. '
             'Доступно для активных партий (первичное завершение и повтор после ошибки Мириады).'
         ),
         request=BalloonsBatchSerializer,
@@ -839,7 +840,7 @@ class BalloonsBatchViewSet(viewsets.ViewSet):
         if is_closing:
             success, error_payload, response_data = save_and_close_balloons_batch(batch, request.data)
             if not success:
-                if isinstance(error_payload, dict) and 'message' in error_payload:
+                if isinstance(error_payload, dict) and error_payload.get('miriada_close_failed'):
                     return Response(error_payload, status=status.HTTP_502_BAD_GATEWAY)
                 return Response(error_payload, status=status.HTTP_400_BAD_REQUEST)
             return Response(response_data)
@@ -869,7 +870,7 @@ class BalloonsBatchViewSet(viewsets.ViewSet):
 
         success, error_payload, response_data = save_and_close_balloons_batch(batch, request.data)
         if not success:
-            if isinstance(error_payload, dict) and 'message' in error_payload:
+            if isinstance(error_payload, dict) and error_payload.get('miriada_close_failed'):
                 return Response(error_payload, status=status.HTTP_502_BAD_GATEWAY)
             return Response(error_payload, status=status.HTTP_400_BAD_REQUEST)
         return Response(response_data)
@@ -893,8 +894,6 @@ class BalloonsBatchViewSet(viewsets.ViewSet):
         batch = get_object_or_404(BalloonsBatch, id=pk, batch_type=batch_type)
         result = add_balloon_to_batch_with_miriada(batch, nfc)
         if result['success']:
-            if result.get('miriada_error'):
-                return Response(result, status=status.HTTP_502_BAD_GATEWAY)
             return Response(result, status=status.HTTP_200_OK)
 
         return Response({'message': result.get('message')}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

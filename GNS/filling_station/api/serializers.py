@@ -91,6 +91,7 @@ class BalloonsBatchSerializer(serializers.ModelSerializer):
     ttn_name = serializers.SerializerMethodField()
     miriada_close_failed = serializers.BooleanField(read_only=True)
     miriada_error_message = serializers.CharField(read_only=True)
+    amount_of_ttn = serializers.IntegerField(min_value=1)
 
     class Meta:
         model = BalloonsBatch
@@ -104,6 +105,7 @@ class BalloonsBatchSerializer(serializers.ModelSerializer):
             'reader_number',
             'amount_of_rfid',
             'amount_of_sensor',
+            'amount_of_ttn',
             'amount_of_5_liters',
             'amount_of_12_liters',
             'amount_of_27_liters',
@@ -146,6 +148,7 @@ class ActiveBatchSerializer(serializers.ModelSerializer):
             'reader_number',
             'amount_of_rfid',
             'amount_of_sensor',
+            'amount_of_ttn',
             'amount_of_5_liters',
             'amount_of_12_liters',
             'amount_of_27_liters',
@@ -166,4 +169,4 @@ class ActiveBatchSerializer(serializers.ModelSerializer):
 class BalloonAmountSerializer(serializers.ModelSerializer):
     class Meta:
         model = BalloonsBatch
-        fields = ['id', 'amount_of_rfid', 'amount_of_sensor']
+        fields = ['id', 'amount_of_rfid', 'amount_of_sensor', 'amount_of_ttn']

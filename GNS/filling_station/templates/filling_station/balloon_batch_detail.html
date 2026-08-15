@@ -75,6 +75,9 @@
                         <dt class="col-sm-6">ТТН:</dt>
                         <dd class="col-sm-6">{{ batch.ttn_name|default:"Не указана" }}</dd>
 
+                        <dt class="col-sm-6">Баллонов по электронной ТТН:</dt>
+                        <dd class="col-sm-6">{{ batch.amount_of_ttn|default:"-" }}</dd>
+
                         <dt class="col-sm-6">Баллонов с RFID:</dt>
                         <dd class="col-sm-6">{{ batch.amount_of_rfid|default:"-" }}</dd>
 

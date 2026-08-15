@@ -167,7 +167,7 @@ class BalloonsBatchForm(forms.ModelForm):
 
     class Meta:
         model = BalloonsBatch
-        exclude = ['user', 'balloon_list']
+        exclude = ['user', 'balloon_list', 'miriada_balloons_sent']
         widgets = {
             'batch_type': forms.HiddenInput(),
             'completed_at': forms.DateTimeInput(format='%Y-%m-%dT%H:%M', attrs={
@@ -218,11 +218,11 @@ class BalloonsBatchForm(forms.ModelForm):
             }),
             'amount_of_ttn': forms.NumberInput(attrs={
                 'class': 'form-control',
-                'placeholder': 'Количество по ТТН'
+                'placeholder': 'Количество по электронной ТТН'
             })
         }
         labels = {
-            'amount_of_ttn': 'Количество баллонов по ТТН',
+            'amount_of_ttn': 'Количество баллонов по электронной ТТН',
             'ttn': 'Номер ТТН',
             'batch_type': 'Тип партии'
         }

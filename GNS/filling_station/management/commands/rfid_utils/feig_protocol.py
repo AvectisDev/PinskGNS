@@ -69,8 +69,7 @@ def process_balloon_data_sync(nfc_tag, reader_number):
         result = services.processing_request_with_nfc(nfc_tag=nfc_tag, reader_number=reader_number)
         if result:
             balloon, reader = result
-            # Отправка статуса в Мириаду
-            if reader.number in [3, 4, 6, 8]:
+            if services.should_send_balloon_status_immediately(reader.number):
                 services.send_status_to_miriada(reader=reader.number, nfc_tag=balloon.nfc_tag)
             return {
                 'status': 'success',
