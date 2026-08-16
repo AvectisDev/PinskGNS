@@ -17,7 +17,8 @@ logging.config.dictConfig(settings.LOGGING)
 logger = logging.getLogger('rfid')
 
 # Импорт моделей/протокола и ReaderSession
-from .models import Reader, FeigProtocol, ReaderSession
+from .models import FeigReaderDevice, ReaderSession, TAG_HEX_SUFFIX, is_balloon_nfc_tag
+from .feig_frames import FeigProtocol
 # Импорт моделей Django
 from filling_station.models import ReaderSettings
 # Импорт сервисов (синхронные)
@@ -25,27 +26,6 @@ from filling_station import services
 
 NOTIFICATION_LISTEN_HOST = os.getenv('RFID_NOTIFICATION_LISTEN_HOST', '0.0.0.0')
 NOTIFICATION_LISTEN_PORT = int(os.getenv('RFID_NOTIFICATION_LISTEN_PORT', '8002'))
-# UID баллонов в проекте — hex-строка, оканчивающаяся на этот суффикс (например ...1be0).
-TAG_HEX_SUFFIX = os.getenv('RFID_TAG_HEX_SUFFIX', 'e0').strip().lower()
-
-
-def is_balloon_nfc_tag(nfc_tag: str) -> bool:
-    """
-    True, если метка похожа на ожидаемый UID баллона: корректный hex и суффикс TAG_HEX_SUFFIX.
-    Иные значения (шум, чужие транспондеры) логируются и не идут в бизнес-логику.
-    """
-    if not nfc_tag or not isinstance(nfc_tag, str):
-        return False
-    tag = nfc_tag.strip().lower()
-    if not tag.endswith(TAG_HEX_SUFFIX):
-        return False
-    if len(tag) % 2 != 0:
-        return False
-    try:
-        bytes.fromhex(tag)
-    except ValueError:
-        return False
-    return True
 
 
 @sync_to_async
@@ -105,7 +85,7 @@ async def send_notification_ack(writer: asyncio.StreamWriter, command: int, stat
 
 
 async def process_tag_event(
-    reader_obj: Reader,
+    reader_obj: FeigReaderDevice,
     command_session: ReaderSession,
     parsed_records: List[Dict],
 ) -> None:
@@ -144,7 +124,7 @@ async def process_tag_event(
 
 
 
-async def process_input_event(reader_obj: Reader, parsed_records: List[Dict]) -> None:
+async def process_input_event(reader_obj: FeigReaderDevice, parsed_records: List[Dict]) -> None:
     """
     Input Event (0x2C): в Notification Mode ридер присылает уведомление при активации входа;
     при переходе IN1 с 1 на 0 событие не приходит — сравнивать с предыдущим состоянием не нужно.
@@ -174,7 +154,7 @@ async def process_input_event(reader_obj: Reader, parsed_records: List[Dict]) ->
 
 
 async def process_notification_payload(
-    reader_obj: Reader,
+    reader_obj: FeigReaderDevice,
     command_session: ReaderSession,
     payload: bytes,
 ) -> int:
@@ -202,7 +182,7 @@ async def process_notification_payload(
     return 0x80
 
 
-async def initialize_command_sessions(readers: List[Reader]) -> Dict[int, ReaderSession]:
+async def initialize_command_sessions(readers: List[FeigReaderDevice]) -> Dict[int, ReaderSession]:
     sessions: Dict[int, ReaderSession] = {}
     for reader in readers:
         sessions[reader.number] = ReaderSession(reader)
@@ -219,7 +199,7 @@ async def initialize_command_sessions(readers: List[Reader]) -> Dict[int, Reader
 async def handle_notification_connection(
     stream_reader: asyncio.StreamReader,
     stream_writer: asyncio.StreamWriter,
-    readers_by_ip: Dict[str, Reader],
+    readers_by_ip: Dict[str, FeigReaderDevice],
     sessions: Dict[int, ReaderSession],
 ):
     peer_ip = get_peer_ip(stream_writer)
@@ -276,7 +256,7 @@ async def handle_notification_connection(
             logger.info(f'Notification connection закрыт ({peer_ip})')
 
 
-async def load_readers_from_database() -> List[Reader]:
+async def load_readers_from_database() -> List[FeigReaderDevice]:
     """
     Загрузка конфигурации ридеров из БД
     """
@@ -289,7 +269,7 @@ async def load_readers_from_database() -> List[Reader]:
     try:
         reader_settings_list = await get_readers_from_db()
         for reader_settings in reader_settings_list:
-            reader = Reader(reader_settings)
+            reader = FeigReaderDevice(reader_settings)
             readers.append(reader)
             logger.info(f'Загружен ридер {reader}')
     except Exception as error:
@@ -309,7 +289,7 @@ async def main():
         logger.error('Не удалось загрузить конфигурацию ридеров. Завершение работы.')
         return
 
-    readers_by_ip: Dict[str, Reader] = {reader.ip: reader for reader in readers if reader.ip}
+    readers_by_ip: Dict[str, FeigReaderDevice] = {reader.ip: reader for reader in readers if reader.ip}
     sessions = await initialize_command_sessions(readers)
 
     async def _handler(reader_stream: asyncio.StreamReader, writer_stream: asyncio.StreamWriter):

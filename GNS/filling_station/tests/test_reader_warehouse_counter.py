@@ -24,15 +24,17 @@ class ReaderWarehouseCounterTests(TestCase):
         self.reader_6 = ReaderSettings.objects.create(number=6, ip='10.10.2.26', status='empty')
 
     def test_sensor_on_reader_6_adds_empty(self):
-        processing_request_without_nfc(6)
+        reader = processing_request_without_nfc(6)
+        self.assertIsInstance(reader, ReaderSettings)
+        self.assertEqual(reader.number, 6)
         self.counter.refresh_from_db()
         self.assertEqual(self.counter.total_empty, 1)
         daily = DailyReaderCounter.objects.get(number=self.reader_6)
         self.assertEqual(daily.amount_of_sensor, 1)
         self.assertEqual(daily.amount_of_rfid, 0)
 
-    @patch('filling_station.services.update_balloon_passport')
-    @patch('filling_station.services.add_balloon_to_reader_table')
+    @patch('filling_station.services.rfid.update_balloon_passport')
+    @patch('filling_station.services.rfid.add_balloon_to_reader_table')
     def test_rfid_on_reader_6_does_not_add_empty(self, _reader_table, _passport):
         processing_request_with_nfc('aabbccdde0', 6)
         self.counter.refresh_from_db()
@@ -41,16 +43,16 @@ class ReaderWarehouseCounterTests(TestCase):
         self.assertEqual(daily.amount_of_rfid, 1)
         self.assertEqual(daily.amount_of_sensor, 0)
 
-    @patch('filling_station.services.update_balloon_passport')
-    @patch('filling_station.services.add_balloon_to_reader_table')
+    @patch('filling_station.services.rfid.update_balloon_passport')
+    @patch('filling_station.services.rfid.add_balloon_to_reader_table')
     def test_reader_6_sensor_then_rfid_counts_empty_once(self, _reader_table, _passport):
         processing_request_without_nfc(6)
         processing_request_with_nfc('aabbccdde0', 6)
         self.counter.refresh_from_db()
         self.assertEqual(self.counter.total_empty, 1)
 
-    @patch('filling_station.services.update_balloon_passport')
-    @patch('filling_station.services.add_balloon_to_reader_table')
+    @patch('filling_station.services.rfid.update_balloon_passport')
+    @patch('filling_station.services.rfid.add_balloon_to_reader_table')
     def test_rfid_on_reader_1_adds_empty(self, _reader_table, _passport):
         processing_request_with_nfc('11223344e0', 1)
         self.counter.refresh_from_db()

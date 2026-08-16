@@ -1,6 +1,6 @@
 from django.test import SimpleTestCase
 
-from filling_station.management.commands.rfid_utils.models import FeigProtocol
+from filling_station.management.commands.rfid_utils.feig_frames import FeigProtocol
 from filling_station.management.commands.rfid_utils.settings import COMMANDS, command_frame
 
 

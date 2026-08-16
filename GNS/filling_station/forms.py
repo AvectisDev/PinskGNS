@@ -167,7 +167,13 @@ class BalloonsBatchForm(forms.ModelForm):
 
     class Meta:
         model = BalloonsBatch
-        exclude = ['user', 'balloon_list', 'miriada_balloons_sent']
+        exclude = [
+            'user',
+            'balloon_list',
+            'miriada_balloons_sent',
+            'miriada_close_failed',
+            'miriada_error_message',
+        ]
         widgets = {
             'batch_type': forms.HiddenInput(),
             'completed_at': forms.DateTimeInput(format='%Y-%m-%dT%H:%M', attrs={
@@ -212,10 +218,6 @@ class BalloonsBatchForm(forms.ModelForm):
             'is_active': forms.CheckboxInput(attrs={
                 'class': 'form-check-input'
             }),
-            'ttn': forms.TextInput(attrs={
-                'class': 'form-control',
-                'placeholder': 'Номер ТТН'
-            }),
             'amount_of_ttn': forms.NumberInput(attrs={
                 'class': 'form-control',
                 'placeholder': 'Количество по электронной ТТН'
@@ -223,6 +225,5 @@ class BalloonsBatchForm(forms.ModelForm):
         }
         labels = {
             'amount_of_ttn': 'Количество баллонов по электронной ТТН',
-            'ttn': 'Номер ТТН',
             'batch_type': 'Тип партии'
         }

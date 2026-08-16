@@ -8,6 +8,7 @@ from django.urls import reverse_lazy, reverse
 from django.views import generic
 from django.views.decorators.http import require_POST
 from django.contrib.auth.decorators import login_required
+from django.contrib.auth.mixins import LoginRequiredMixin
 from django.db.models import Q, Sum, Count, OuterRef, Subquery
 from ttn.models import MiriadaTtn
 from autogas.models import AutoGasBatch
@@ -25,7 +26,7 @@ from .services import save_and_close_balloons_batch
 from datetime import datetime, time, timedelta
 
 
-class BalloonListView(generic.ListView):
+class BalloonListView(LoginRequiredMixin, generic.ListView):
     model = Balloon
     paginate_by = 10
 
@@ -40,11 +41,11 @@ class BalloonListView(generic.ListView):
             return Balloon.objects.all()
 
 
-class BalloonDetailView(generic.DetailView):
+class BalloonDetailView(LoginRequiredMixin, generic.DetailView):
     model = Balloon
 
 
-class BalloonUpdateView(PreserveListQueryMixin, generic.UpdateView):
+class BalloonUpdateView(LoginRequiredMixin, PreserveListQueryMixin, generic.UpdateView):
     model = Balloon
     form_class = BalloonForm
     template_name = 'filling_station/_equipment_form.html'
@@ -58,11 +59,12 @@ class BalloonUpdateView(PreserveListQueryMixin, generic.UpdateView):
         return super().post(request, *args, **kwargs)
 
 
-class BalloonDeleteView(ModalDeleteMixin, PreserveListQueryMixin, generic.DeleteView):
+class BalloonDeleteView(LoginRequiredMixin, ModalDeleteMixin, PreserveListQueryMixin, generic.DeleteView):
     model = Balloon
     success_url = reverse_lazy("filling_station:balloon_list")
 
 
+@login_required
 def reader_info(request, reader_number=1):
     current_date = datetime.now().date()
 
@@ -138,7 +140,7 @@ class BalloonBatchTypeMixin:
 
 
 # Единые классы для работы с партиями баллонов
-class BalloonBatchListView(BalloonBatchTypeMixin, generic.ListView):
+class BalloonBatchListView(LoginRequiredMixin, BalloonBatchTypeMixin, generic.ListView):
     """Отображает список партий баллонов в зависимости от типа"""
     model = BalloonsBatch
     form_class = BalloonsBatchForm
@@ -158,7 +160,7 @@ class BalloonBatchListView(BalloonBatchTypeMixin, generic.ListView):
         return queryset.all()
 
 
-class BalloonBatchDetailView(BalloonBatchTypeMixin, generic.DetailView):
+class BalloonBatchDetailView(LoginRequiredMixin, BalloonBatchTypeMixin, generic.DetailView):
     """Отображает детальное представление партии баллонов"""
     model = BalloonsBatch
     context_object_name = 'batch'
@@ -177,7 +179,7 @@ class BalloonBatchDetailView(BalloonBatchTypeMixin, generic.DetailView):
         return queryset
 
 
-class BalloonBatchUpdateView(BalloonBatchTypeMixin, PreserveListQueryMixin, generic.UpdateView):
+class BalloonBatchUpdateView(LoginRequiredMixin, BalloonBatchTypeMixin, PreserveListQueryMixin, generic.UpdateView):
     """Универсальное редактирование партии баллонов"""
     model = BalloonsBatch
     form_class = BalloonsBatchForm
@@ -199,7 +201,7 @@ class BalloonBatchUpdateView(BalloonBatchTypeMixin, PreserveListQueryMixin, gene
         return super().post(request, *args, **kwargs)
 
 
-#@login_required
+@login_required
 @require_POST
 def balloon_batch_retry_close(request, pk):
     """Завершить партию: сохранить текущие данные и закрыть ТТН в Мириаде."""
@@ -223,7 +225,7 @@ def balloon_batch_retry_close(request, pk):
     return redirect_preserve_query(request, batch.get_absolute_url())
 
 
-class BalloonBatchDeleteView(BalloonBatchTypeMixin, ModalDeleteMixin, PreserveListQueryMixin, generic.DeleteView):
+class BalloonBatchDeleteView(LoginRequiredMixin, BalloonBatchTypeMixin, ModalDeleteMixin, PreserveListQueryMixin, generic.DeleteView):
     """Универсальное удаление партии баллонов"""
     model = BalloonsBatch
 
@@ -253,16 +255,16 @@ BalloonUnloadingBatchDeleteView = BalloonBatchDeleteView
 
 
 # Грузовики
-class TruckView(generic.ListView):
+class TruckView(LoginRequiredMixin, generic.ListView):
     model = Truck
     paginate_by = 10
 
 
-class TruckDetailView(generic.DetailView):
+class TruckDetailView(LoginRequiredMixin, generic.DetailView):
     model = Truck
 
 
-class TruckCreateView(PreserveListQueryMixin, generic.CreateView):
+class TruckCreateView(LoginRequiredMixin, PreserveListQueryMixin, generic.CreateView):
     model = Truck
     form_class = TruckForm
     template_name = 'filling_station/_equipment_form.html'
@@ -271,7 +273,7 @@ class TruckCreateView(PreserveListQueryMixin, generic.CreateView):
         return self.object.get_absolute_url()
 
 
-class TruckUpdateView(PreserveListQueryMixin, generic.UpdateView):
+class TruckUpdateView(LoginRequiredMixin, PreserveListQueryMixin, generic.UpdateView):
     model = Truck
     form_class = TruckForm
     template_name = 'filling_station/_equipment_form.html'
@@ -285,22 +287,22 @@ class TruckUpdateView(PreserveListQueryMixin, generic.UpdateView):
         return super().post(request, *args, **kwargs)
 
 
-class TruckDeleteView(ModalDeleteMixin, PreserveListQueryMixin, generic.DeleteView):
+class TruckDeleteView(LoginRequiredMixin, ModalDeleteMixin, PreserveListQueryMixin, generic.DeleteView):
     model = Truck
     success_url = reverse_lazy("filling_station:truck_list")
 
 
 # Прицепы
-class TrailerView(generic.ListView):
+class TrailerView(LoginRequiredMixin, generic.ListView):
     model = Trailer
     paginate_by = 10
 
 
-class TrailerDetailView(generic.DetailView):
+class TrailerDetailView(LoginRequiredMixin, generic.DetailView):
     model = Trailer
 
 
-class TrailerCreateView(PreserveListQueryMixin, generic.CreateView):
+class TrailerCreateView(LoginRequiredMixin, PreserveListQueryMixin, generic.CreateView):
     model = Trailer
     form_class = TrailerForm
     template_name = 'filling_station/_equipment_form.html'
@@ -309,7 +311,7 @@ class TrailerCreateView(PreserveListQueryMixin, generic.CreateView):
         return self.object.get_absolute_url()
 
 
-class TrailerUpdateView(PreserveListQueryMixin, generic.UpdateView):
+class TrailerUpdateView(LoginRequiredMixin, PreserveListQueryMixin, generic.UpdateView):
     model = Trailer
     form_class = TrailerForm
     template_name = 'filling_station/_equipment_form.html'
@@ -323,12 +325,13 @@ class TrailerUpdateView(PreserveListQueryMixin, generic.UpdateView):
         return super().post(request, *args, **kwargs)
 
 
-class TrailerDeleteView(ModalDeleteMixin, PreserveListQueryMixin, generic.DeleteView):
+class TrailerDeleteView(LoginRequiredMixin, ModalDeleteMixin, PreserveListQueryMixin, generic.DeleteView):
     model = Trailer
     success_url = reverse_lazy("filling_station:trailer_list")
 
 
 # Обработка данных для вкладки "Статистика"
+@login_required
 def statistic(request):
     current_date = datetime.now().date()
 
