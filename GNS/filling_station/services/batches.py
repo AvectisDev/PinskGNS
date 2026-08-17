@@ -1,11 +1,17 @@
 import logging
-from typing import Optional, Tuple
+from concurrent.futures import CancelledError, ThreadPoolExecutor, as_completed
+from typing import Any, Dict, Optional, Tuple
 
+from django.conf import settings
 from django.utils import timezone
 
 from filling_station.exceptions import MiriadaAPIError
 from filling_station.models import BalloonsBatch
-from filling_station.services.miriada import send_status_to_miriada
+from filling_station.services.miriada import (
+    _prepare_payload_for_miriada,
+    get_thread_miriada_session,
+    post_status_to_miriada,
+)
 
 logger = logging.getLogger('filling_station')
 
@@ -71,6 +77,10 @@ def send_batch_balloon_statuses_to_miriada(batch: BalloonsBatch) -> Tuple[bool, 
     """
     Отправляет в Мириаду статусы всех баллонов партии тем же методом,
     что раньше вызывался в момент сканирования на рамке.
+
+    HTTP идёт параллельно (лимит потоков MIRIADA_BATCH_SEND_WORKERS),
+    у каждого потока своя keep-alive сессия. Payload готовится заранее,
+    чтобы не ходить в ORM из воркеров.
     """
     if batch.miriada_balloons_sent:
         return True, None
@@ -83,14 +93,55 @@ def send_batch_balloon_statuses_to_miriada(batch: BalloonsBatch) -> Tuple[bool, 
         'truck', 'truck__type', 'trailer'
     ).get(pk=batch.pk)
     nfc_tags = list(prepared_batch.balloon_list.values_list('nfc_tag', flat=True))
+    if not nfc_tags:
+        batch.miriada_balloons_sent = True
+        batch.save(update_fields=['miriada_balloons_sent'])
+        return True, None
 
+    jobs = []
     for nfc_tag in nfc_tags:
         try:
-            send_status_to_miriada(reader=reader_number, nfc_tag=nfc_tag, batch=prepared_batch)
-        except MiriadaAPIError as exc:
-            error_msg = f'Ошибка отправки статуса баллона {nfc_tag} в Мириаду: {exc}'
+            url, payload, send_type = _prepare_payload_for_miriada(
+                reader_number, nfc_tag, batch=prepared_batch
+            )
+        except ValueError as exc:
+            error_msg = f"Ошибка подготовки данных для отправки: {exc}"
             logger.error(error_msg)
             return False, error_msg
+        jobs.append((nfc_tag, url, payload, send_type))
+
+    def _send_job(job: Tuple[str, str, Dict[str, Any], str]) -> str:
+        nfc_tag, url, payload, send_type = job
+        post_status_to_miriada(
+            url,
+            payload,
+            send_type,
+            session=get_thread_miriada_session(),
+        )
+        return nfc_tag
+
+    max_workers = max(1, min(settings.MIRIADA_BATCH_SEND_WORKERS, len(jobs)))
+    first_error: Optional[str] = None
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        future_to_tag = {
+            executor.submit(_send_job, job): job[0] for job in jobs
+        }
+        for future in as_completed(future_to_tag):
+            nfc_tag = future_to_tag[future]
+            try:
+                future.result()
+            except MiriadaAPIError as exc:
+                if first_error is None:
+                    first_error = f'Ошибка отправки статуса баллона {nfc_tag} в Мириаду: {exc}'
+                    logger.error(first_error)
+                    for pending in future_to_tag:
+                        if not pending.done():
+                            pending.cancel()
+            except CancelledError:
+                continue
+
+    if first_error:
+        return False, first_error
 
     batch.miriada_balloons_sent = True
     batch.save(update_fields=['miriada_balloons_sent'])

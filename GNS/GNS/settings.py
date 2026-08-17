@@ -415,6 +415,8 @@ MIRIADA_AUTH_PASSWORD = os.environ.get('MIRIADA_AUTH_PASSWORD')
 MIRIADA_REQUEST_RETRIES = 2
 MIRIADA_RETRY_DELAY_SECONDS = 1
 MIRIADA_TIMEOUT = 20
+# Параллельная отправка статусов баллонов при закрытии партии (один Session на поток).
+MIRIADA_BATCH_SEND_WORKERS = 8
 
 GAS_TYPE_CHOICES = [
     ('СПБТ', 'СПБТ'),
