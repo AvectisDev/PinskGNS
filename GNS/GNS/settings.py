@@ -414,7 +414,7 @@ MIRIADA_AUTH_PASSWORD = os.environ.get('MIRIADA_AUTH_PASSWORD')
 # Количество повторов неуспешного запроса к API Мириады (всего попыток = MIRIADA_REQUEST_RETRIES + 1)
 MIRIADA_REQUEST_RETRIES = 2
 MIRIADA_RETRY_DELAY_SECONDS = 1
-MIRIADA_TIMEOUT = 20
+MIRIADA_TIMEOUT = 30
 # Параллельная отправка статусов баллонов при закрытии партии (один Session на поток).
 MIRIADA_BATCH_SEND_WORKERS = 8
 

@@ -280,7 +280,8 @@ def post_status_to_miriada(
 
                 response = session.send(prepared, timeout=settings.MIRIADA_TIMEOUT)
                 if response.status_code == 200:
-                    logger.info(f"Статус по {send_type} успешно отправлен")
+                    nfc_tag = payload.get('nfctag')
+                    logger.info(f"Статус по {send_type} успешно отправлен, nfc={nfc_tag}")
                     return
                 error_msg = (
                     f"Ошибка при отправке {send_type}! "

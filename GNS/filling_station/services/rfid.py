@@ -178,7 +178,6 @@ def add_balloon_to_reader_table(balloon: Balloon, reader: ReaderSettings) -> Non
             brutto=balloon.brutto,
             filling_status=balloon.filling_status
         )
-        logger.debug(f"Баллон {balloon.nfc_tag} добавлен в таблицу считывателей для ридера {reader.number}")
     except Exception as error:
         logger.error(f"Ошибка добавления баллона с NFC {balloon.nfc_tag} в таблицу считывателей: {error}")
         raise

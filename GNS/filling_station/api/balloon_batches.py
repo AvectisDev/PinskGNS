@@ -13,6 +13,7 @@ from drf_spectacular.utils import (
     OpenApiParameter,
     OpenApiTypes,
 )
+import logging
 
 from filling_station.models import BalloonsBatch
 from filling_station.services import add_balloon_to_batch_by_nfc, save_and_close_balloons_batch
@@ -21,6 +22,15 @@ from .serializers import (
     BalloonAmountSerializer,
     BalloonsBatchSerializer,
 )
+
+logger = logging.getLogger('filling_station')
+
+
+def _api_user(request) -> str:
+    user = getattr(request, 'user', None)
+    if user is None or not getattr(user, 'is_authenticated', False):
+        return 'anonymous'
+    return f'{user.pk}:{user.get_username()}'
 
 
 BalloonOperationResponse = inline_serializer(
@@ -256,7 +266,17 @@ class BalloonsBatchViewSet(viewsets.ViewSet):
         serializer = BalloonsBatchSerializer(data=request.data)
         if serializer.is_valid():
             instance = serializer.save(batch_type=batch_type)
+            logger.info(
+                f"API create batch: user={_api_user(request)}, batch_id={instance.id}, "
+                f"batch_type={batch_type}, ttn_id={instance.ttn_id}, "
+                f"amount_of_ttn={instance.amount_of_ttn}, reader_number={instance.reader_number}, "
+                f"truck={instance.truck_id}"
+            )
             return Response(BalloonsBatchSerializer(instance).data, status=status.HTTP_201_CREATED)
+        logger.warning(
+            f"API create batch failed: user={_api_user(request)}, batch_type={batch_type}, "
+            f"errors={serializer.errors}, data={request.data}"
+        )
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     def partial_update(self, request, pk=None):
@@ -271,17 +291,35 @@ class BalloonsBatchViewSet(viewsets.ViewSet):
 
         is_closing = batch.is_active and not request.data.get('is_active', True)
         if is_closing:
+            logger.info(
+                f"API close batch: user={_api_user(request)}, batch_id={batch.id}, "
+                f"ttn_id={batch.ttn_id}, amount_of_rfid={batch.amount_of_rfid}, "
+                f"amount_of_ttn={batch.amount_of_ttn}, data={dict(request.data)}"
+            )
             success, error_payload, response_data = save_and_close_balloons_batch(batch, request.data)
             if not success:
+                logger.warning(
+                    f"API close batch failed: user={_api_user(request)}, batch_id={batch.id}, "
+                    f"error={error_payload}"
+                )
                 if isinstance(error_payload, dict) and error_payload.get('miriada_close_failed'):
                     return Response(error_payload, status=status.HTTP_502_BAD_GATEWAY)
                 return Response(error_payload, status=status.HTTP_400_BAD_REQUEST)
+            logger.info(f"API close batch ok: user={_api_user(request)}, batch_id={batch.id}")
             return Response(response_data)
 
         serializer = BalloonsBatchSerializer(batch, data=request.data, partial=True)
         if serializer.is_valid():
             serializer.save()
+            logger.info(
+                f"API update batch: user={_api_user(request)}, batch_id={batch.id}, "
+                f"data={dict(request.data)}"
+            )
             return Response(serializer.data)
+        logger.warning(
+            f"API update batch failed: user={_api_user(request)}, batch_id={batch.id}, "
+            f"errors={serializer.errors}"
+        )
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     @action(detail=True, methods=['post'], url_path='retry-close')
@@ -301,11 +339,21 @@ class BalloonsBatchViewSet(viewsets.ViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
+        logger.info(
+            f"API retry-close: user={_api_user(request)}, batch_id={batch.id}, "
+            f"ttn_id={batch.ttn_id}, amount_of_rfid={batch.amount_of_rfid}, "
+            f"amount_of_ttn={batch.amount_of_ttn}"
+        )
         success, error_payload, response_data = save_and_close_balloons_batch(batch, request.data)
         if not success:
+            logger.warning(
+                f"API retry-close failed: user={_api_user(request)}, batch_id={batch.id}, "
+                f"error={error_payload}"
+            )
             if isinstance(error_payload, dict) and error_payload.get('miriada_close_failed'):
                 return Response(error_payload, status=status.HTTP_502_BAD_GATEWAY)
             return Response(error_payload, status=status.HTTP_400_BAD_REQUEST)
+        logger.info(f"API retry-close ok: user={_api_user(request)}, batch_id={batch.id}")
         return Response(response_data)
 
     @action(detail=True, methods=['patch'], url_path='add-balloon')
@@ -327,8 +375,17 @@ class BalloonsBatchViewSet(viewsets.ViewSet):
         batch = get_object_or_404(BalloonsBatch, id=pk, batch_type=batch_type)
         result = add_balloon_to_batch_by_nfc(batch, nfc)
         if result['success']:
+            batch.refresh_from_db()
+            logger.info(
+                f"API add-balloon: user={_api_user(request)}, batch_id={batch.id}, "
+                f"nfc={nfc}, amount_of_rfid={batch.amount_of_rfid}"
+            )
             return Response(result, status=status.HTTP_200_OK)
 
+        logger.warning(
+            f"API add-balloon failed: user={_api_user(request)}, batch_id={batch.id}, "
+            f"nfc={nfc}, message={result.get('message')}"
+        )
         return Response({'message': result.get('message')}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
     @action(detail=True, methods=['patch'], url_path='remove-balloon')
@@ -350,8 +407,17 @@ class BalloonsBatchViewSet(viewsets.ViewSet):
         batch = get_object_or_404(BalloonsBatch, id=pk, batch_type=batch_type)
         result = batch.remove_balloon(nfc)
         if result['success']:
+            batch.refresh_from_db()
+            logger.info(
+                f"API remove-balloon: user={_api_user(request)}, batch_id={batch.id}, "
+                f"nfc={nfc}, amount_of_rfid={batch.amount_of_rfid}"
+            )
             return Response(result, status=status.HTTP_200_OK)
 
+        logger.warning(
+            f"API remove-balloon failed: user={_api_user(request)}, batch_id={batch.id}, "
+            f"nfc={nfc}, message={result.get('message')}"
+        )
         return Response({'message': result.get('message')}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 

@@ -622,17 +622,13 @@ class BalloonsBatch(models.Model):
         return MiriadaTtn.objects.filter(ttn_id=self.ttn_id).values_list('name', flat=True).first()
 
     def get_amount_without_rfid(self) -> int:
-        """
-        Возвращает общее количество баллонов без меток
-        """
-        amounts = [
-            self.amount_of_5_liters or 0,
-            self.amount_of_12_liters or 0,
-            self.amount_of_27_liters or 0,
-            self.amount_of_50_liters or 0
-        ]
-        total_amount = sum(amounts) if not self.amount_of_sensor else self.amount_of_sensor
-        return total_amount
+        """Количество баллонов без RFID: сумма полей объёмов (50л — баллоны без метки на приёмке)."""
+        return (
+            (self.amount_of_5_liters or 0)
+            + (self.amount_of_12_liters or 0)
+            + (self.amount_of_27_liters or 0)
+            + (self.amount_of_50_liters or 0)
+        )
 
     def add_balloon(self, nfc_tag: str = None) -> dict:
         """

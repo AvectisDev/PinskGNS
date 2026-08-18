@@ -179,6 +179,21 @@ def _parse_miriada_close_error(response_text: str) -> Optional[str]:
     return data.get('description') or data.get('title') or data.get('message')
 
 
+TTN_COUNT_MISMATCH_MESSAGE = 'Количество не соответствует указанному в ТТН'
+
+
+def _is_non_retryable_miriada_close_error(status_code: Optional[int], error_text: Optional[str]) -> bool:
+    """
+    Ответ Мириады про несовпадение количества с ТТН — валидный отказ, без повторов.
+    Клиентские 4xx (кроме 408/429) тоже не ретраим.
+    """
+    if error_text and TTN_COUNT_MISMATCH_MESSAGE in error_text:
+        return True
+    if status_code is not None and 400 <= status_code < 500 and status_code not in (408, 429):
+        return True
+    return False
+
+
 def _is_miriada_success_response(data: dict) -> bool:
     """Мириада может вернуть Result/result со значением Ok/ok."""
     for key, value in data.items():
@@ -216,6 +231,7 @@ def close_ttn_in_miriada(
     }
 
     for attempt in range(settings.MIRIADA_REQUEST_RETRIES + 1):
+        status_code: Optional[int] = None
         try:
             session = requests.Session()
             req = requests.Request(
@@ -230,6 +246,7 @@ def close_ttn_in_miriada(
             logger.debug(f"Запрос закрытия ТТН {ttn_id} в Мириаде: {prepared.url}")
 
             response = session.send(prepared, timeout=settings.MIRIADA_TIMEOUT)
+            status_code = response.status_code
             if response.status_code == 200:
                 result = response.json()
                 if isinstance(result, dict) and _is_miriada_success_response(result):
@@ -252,6 +269,9 @@ def close_ttn_in_miriada(
         except Exception as error:
             last_error = str(error)
             logger.error(f'Ошибка при закрытии ТТН {ttn_id} в Мириаде: {error}')
+
+        if _is_non_retryable_miriada_close_error(status_code, last_error):
+            return False, last_error
 
         if attempt < settings.MIRIADA_REQUEST_RETRIES:
             logger.warning(

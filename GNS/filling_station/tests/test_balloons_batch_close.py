@@ -220,3 +220,22 @@ class BalloonsBatchCloseTests(APITestCase):
         self.batch.refresh_from_db()
         self.assertTrue(self.batch.is_active)
         self.assertFalse(self.batch.miriada_balloons_sent)
+
+    def test_amount_without_rfid_is_sum_of_liter_fields(self):
+        self.batch.amount_of_sensor = 147
+        self.batch.amount_of_rfid = 147
+        self.batch.amount_of_5_liters = 1
+        self.batch.amount_of_12_liters = 2
+        self.batch.amount_of_27_liters = 3
+        self.batch.amount_of_50_liters = 4
+        self.batch.save()
+        self.assertEqual(self.batch.get_amount_without_rfid(), 10)
+
+    def test_api_add_balloon_logs_action(self):
+        url = reverse('filling_station_api:balloons-loading-add-balloon', args=[self.batch.id])
+        with self.assertLogs('filling_station', level='INFO') as logs:
+            response = self.client.patch(url, {'nfc': self.balloon.nfc_tag}, format='json')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertTrue(
+            any('API add-balloon' in line and self.balloon.nfc_tag in line for line in logs.output)
+        )
