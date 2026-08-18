@@ -258,6 +258,15 @@ class TruckView(generic.ListView):
     model = Truck
     paginate_by = 10
 
+    def get_queryset(self):
+        queryset = super().get_queryset().select_related('type')
+        query = self.request.GET.get('query', '').strip()
+        if query:
+            queryset = queryset.filter(
+                Q(registration_number__icontains=query) | Q(car_brand__icontains=query)
+            )
+        return queryset
+
 
 class TruckDetailView(generic.DetailView):
     model = Truck
@@ -295,6 +304,15 @@ class TruckDeleteView(ModalDeleteMixin, PreserveListQueryMixin, generic.DeleteVi
 class TrailerView(generic.ListView):
     model = Trailer
     paginate_by = 10
+
+    def get_queryset(self):
+        queryset = super().get_queryset().select_related('type', 'truck')
+        query = self.request.GET.get('query', '').strip()
+        if query:
+            queryset = queryset.filter(
+                Q(registration_number__icontains=query) | Q(trailer_brand__icontains=query)
+            )
+        return queryset
 
 
 class TrailerDetailView(generic.DetailView):
