@@ -7,7 +7,7 @@ from django.core.paginator import Paginator
 from django.urls import reverse_lazy, reverse
 from django.views import generic
 from django.views.decorators.http import require_POST
-from django.db.models import Q, Sum, Count, OuterRef, Subquery
+from django.db.models import Q, Sum, Count, OuterRef, Prefetch, Subquery
 from ttn.models import MiriadaTtn
 from autogas.models import AutoGasBatch
 from railway_service.models import RailwayBatch
@@ -169,6 +169,8 @@ class BalloonBatchDetailView(BalloonBatchTypeMixin, generic.DetailView):
         ).values('name')[:1]
         queryset = BalloonsBatch.objects.select_related(
             'truck', 'trailer', 'truck__type'
+        ).prefetch_related(
+            Prefetch('balloon_list', queryset=Balloon.objects.order_by('nfc_tag'))
         ).annotate(ttn_name=Subquery(ttn_name_sq))
         batch_type = self.get_batch_type()
         if batch_type:
