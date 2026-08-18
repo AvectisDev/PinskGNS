@@ -438,12 +438,16 @@ def get_active_balloon_batch(request):
         response.append({
             'reader_id': batch.reader_number,
             'truck_registration_number': batch.truck.registration_number,
-            'trailer_registration_number': batch.trailer.registration_number if batch.trailer else None
+            'trailer_registration_number': (
+                batch.trailer.registration_number if batch.trailer else ''
+            )
         })
     for batch in unloading_batches:
         response.append({
             'reader_id': batch.reader_number,
             'truck_registration_number': batch.truck.registration_number,
-            'trailer_registration_number': batch.trailer.registration_number if batch.trailer else None
+            'trailer_registration_number': (
+                batch.trailer.registration_number if batch.trailer else ''
+            )
         })
     return JsonResponse(response, safe=False)
