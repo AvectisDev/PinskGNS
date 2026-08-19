@@ -3,8 +3,10 @@ from ..models import (
     Balloon,
     Truck,
     Trailer,
-    BalloonsBatch
+    BalloonsBatch,
+    BatchStatus,
 )
+from filling_station.services.batches import pause_other_active_batches_on_reader
 
 
 class BalloonSerializer(serializers.ModelSerializer):
@@ -89,6 +91,14 @@ class TrailerSerializer(serializers.ModelSerializer):
 class BalloonsBatchSerializer(serializers.ModelSerializer):
     batch_type = serializers.CharField(read_only=True)
     ttn_name = serializers.SerializerMethodField()
+    status = serializers.ChoiceField(
+        choices=BatchStatus.choices,
+        default=BatchStatus.ACTIVE,
+        help_text=(
+            'active — в работе; paused — приостановлена; '
+            'completed — завершена; miriada_error — ошибка закрытия ТТН в Мириаде'
+        ),
+    )
     miriada_close_failed = serializers.BooleanField(read_only=True)
     miriada_error_message = serializers.CharField(read_only=True)
     amount_of_ttn = serializers.IntegerField(min_value=1)
@@ -111,7 +121,7 @@ class BalloonsBatchSerializer(serializers.ModelSerializer):
             'amount_of_27_liters',
             'amount_of_50_liters',
             'gas_amount',
-            'is_active',
+            'status',
             'miriada_close_failed',
             'miriada_error_message',
             'ttn_id',
@@ -121,6 +131,12 @@ class BalloonsBatchSerializer(serializers.ModelSerializer):
 
     def get_ttn_name(self, obj):
         return obj.get_ttn_name()
+
+    def create(self, validated_data):
+        instance = super().create(validated_data)
+        if instance.status == BatchStatus.ACTIVE:
+            pause_other_active_batches_on_reader(instance)
+        return instance
 
 
 # Кастомные сериализаторы для партий приёмки/отгрузки баллонов
@@ -154,7 +170,7 @@ class ActiveBatchSerializer(serializers.ModelSerializer):
             'amount_of_27_liters',
             'amount_of_50_liters',
             'gas_amount',
-            'is_active',
+            'status',
             'miriada_close_failed',
             'miriada_error_message',
             'ttn_id',

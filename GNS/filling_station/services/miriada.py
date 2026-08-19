@@ -9,7 +9,8 @@ from django.utils import timezone
 from requests.adapters import HTTPAdapter
 
 from filling_station.exceptions import MiriadaAPIError
-from filling_station.models import BalloonsBatch
+from filling_station.models import BalloonsBatch, BatchStatus
+from filling_station.services.transport import _format_registration_number
 
 logger = logging.getLogger('filling_station')
 
@@ -91,13 +92,6 @@ def get_balloon_data_from_miriada(nfc_tag: str) -> Optional[Dict[str, Any]]:
             raise MiriadaAPIError(error_msg) from e
 
 
-def _format_registration_number(reg_number: str) -> str:
-    """Форматирует регистрационный номер в формат "AM 7881-2"."""
-    if len(reg_number) >= 7:
-        return f"{reg_number[:2]} {reg_number[2:6]}-{reg_number[6]}"
-    return reg_number
-
-
 def _build_loading_payload(batch: BalloonsBatch) -> Dict[str, Any]:
     """Формирует payload /balloontocar из данных партии отгрузки."""
     if not batch.truck:
@@ -148,7 +142,7 @@ def _get_batch_data_for_loading(
             'truck', 'truck__type', 'trailer'
         ).filter(
             batch_type='u',
-            is_active=True,
+            status=BatchStatus.ACTIVE,
             started_at__date=timezone.localdate(),
             balloon_list__nfc_tag=nfc_tag,
         )
@@ -171,7 +165,7 @@ def _get_batch_data_for_unloading(
     if batch is None:
         queryset = BalloonsBatch.objects.select_related('truck', 'trailer').filter(
             batch_type='l',
-            is_active=True,
+            status=BatchStatus.ACTIVE,
             started_at__date=timezone.localdate(),
         )
         if reader is not None:

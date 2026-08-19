@@ -138,11 +138,11 @@ def sync_current_ttn_from_miriada() -> int:
 
 
 def _log_batch_balloons_on_ttn_close(ttn_id: int, batch: Optional['BalloonsBatch'] = None) -> None:
-    from filling_station.models import BalloonsBatch
+    from filling_station.models import BalloonsBatch, BatchStatus
 
     if batch is None:
         batch = (
-            BalloonsBatch.objects.filter(ttn_id=ttn_id, is_active=True)
+            BalloonsBatch.objects.filter(ttn_id=ttn_id, status=BatchStatus.ACTIVE)
             .prefetch_related('balloon_list')
             .first()
         )

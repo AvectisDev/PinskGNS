@@ -23,11 +23,14 @@
                 </h4>
 
                 <div>
-                    <span class="badge bg-{% if batch.is_active %}success{% else %}secondary{% endif %}">
-                        {% if batch.is_active %}Активна{% else %}Завершена{% endif %}
-                    </span>
-                    {% if batch.miriada_close_failed %}
-                        <span class="badge bg-danger ms-1">Ошибка закрытия в Мириаде</span>
+                    {% if batch.status == 'active' %}
+                        <span class="badge bg-success">В работе</span>
+                    {% elif batch.status == 'paused' %}
+                        <span class="badge bg-warning text-dark">Приостановлена</span>
+                    {% elif batch.status == 'miriada_error' %}
+                        <span class="badge bg-danger">Ошибка Мириады</span>
+                    {% else %}
+                        <span class="badge bg-secondary">Завершена</span>
                     {% endif %}
                 </div>
             </div>

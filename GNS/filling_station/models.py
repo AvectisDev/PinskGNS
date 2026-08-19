@@ -522,6 +522,13 @@ class Trailer(models.Model):
         return reverse('filling_station:trailer_delete', args=[self.pk])
 
 
+class BatchStatus(models.TextChoices):
+    ACTIVE = 'active', 'В работе'
+    PAUSED = 'paused', 'Приостановлена'
+    COMPLETED = 'completed', 'Завершена'
+    MIRIADA_ERROR = 'miriada_error', 'Завершена, ошибка Мириады'
+
+
 class BalloonsBatch(models.Model):
     """
     Партии баллонов. Содержит:
@@ -530,7 +537,7 @@ class BalloonsBatch(models.Model):
     - Статистику по количеству баллонов (по объёмам и RFID)
     - Список загруженных баллонов (ManyToMany)
     - Номер и количество по ТТН
-    - Статус активности партии
+    - Статус партии (active / paused / completed / miriada_error)
     """
     batch_type = models.CharField(choices=settings.BATCH_TYPE_CHOICES, default='l', verbose_name="Тип партии")
     started_at = models.DateTimeField(auto_now_add=True, verbose_name="Дата и время начала")
@@ -564,7 +571,13 @@ class BalloonsBatch(models.Model):
         blank=True,
         verbose_name="Список баллонов"
     )
-    is_active = models.BooleanField(default=False, verbose_name="В работе")
+    status = models.CharField(
+        max_length=20,
+        choices=BatchStatus.choices,
+        default=BatchStatus.PAUSED,
+        verbose_name="Статус партии",
+        db_index=True,
+    )
     miriada_close_failed = models.BooleanField(
         default=False,
         verbose_name="Ошибка закрытия ТТН в Мириаде",
@@ -612,7 +625,20 @@ class BalloonsBatch(models.Model):
         return reverse(f'filling_station:{self._batch_url_prefix()}_retry_close', args=[self.pk])
 
     def can_retry_miriada_close(self) -> bool:
-        return self.miriada_close_failed and bool(self.ttn_id)
+        return self.status == BatchStatus.MIRIADA_ERROR and bool(self.ttn_id)
+
+    def accepts_rfid(self) -> bool:
+        return self.status == BatchStatus.ACTIVE
+
+    def accepts_manual_edits(self) -> bool:
+        return self.status in (BatchStatus.ACTIVE, BatchStatus.PAUSED)
+
+    def save(self, *args, **kwargs):
+        if self.status == BatchStatus.MIRIADA_ERROR:
+            self.miriada_close_failed = True
+        elif self.status == BatchStatus.COMPLETED:
+            self.miriada_close_failed = False
+        super().save(*args, **kwargs)
 
     def get_ttn_name(self) -> Optional[str]:
         """Номер ТТН из Мириады по сохранённому ttn_id"""
@@ -646,8 +672,15 @@ class BalloonsBatch(models.Model):
             'message': 'ok'
         }
 
+        if not self.accepts_manual_edits():
+            result['message'] = 'Партия не принимает изменения в текущем статусе'
+            return result
+
         # Добавляем баллон, прошедший через оптический датчик
         if not nfc_tag:
+            if not self.accepts_rfid():
+                result['message'] = 'Оптический датчик учитывается только у активной партии'
+                return result
             self.amount_of_sensor = (self.amount_of_sensor or 0) + 1
             self.save()
             result['success'] = True
@@ -689,6 +722,10 @@ class BalloonsBatch(models.Model):
             'balloon_id': None,
             'message': 'ok'
         }
+
+        if not self.accepts_manual_edits():
+            result['message'] = 'Партия не принимает изменения в текущем статусе'
+            return result
 
         try:
             if not self.balloon_list.filter(nfc_tag=nfc_tag).exists():

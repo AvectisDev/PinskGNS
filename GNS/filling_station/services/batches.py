@@ -3,10 +3,11 @@ from concurrent.futures import CancelledError, ThreadPoolExecutor, as_completed
 from typing import Any, Dict, Optional, Tuple
 
 from django.conf import settings
+from django.db import transaction
 from django.utils import timezone
 
 from filling_station.exceptions import MiriadaAPIError
-from filling_station.models import BalloonsBatch
+from filling_station.models import BalloonsBatch, BatchStatus
 from filling_station.services.miriada import (
     _prepare_payload_for_miriada,
     get_thread_miriada_session,
@@ -18,6 +19,51 @@ logger = logging.getLogger('filling_station')
 MIRIADA_BATCH_STATUS_READERS = frozenset({3, 4, 6})
 MIRIADA_FILLING_READERS = frozenset({8})
 MIRIADA_BALLOON_STATUS_READERS = MIRIADA_BATCH_STATUS_READERS | MIRIADA_FILLING_READERS
+
+OPEN_BATCH_STATUSES = frozenset({
+    BatchStatus.ACTIVE,
+    BatchStatus.PAUSED,
+    BatchStatus.MIRIADA_ERROR,
+})
+
+
+def _today_batch_queryset(batch: BalloonsBatch):
+    return BalloonsBatch.objects.filter(
+        batch_type=batch.batch_type,
+        reader_number=batch.reader_number,
+        started_at__date=timezone.localdate(),
+    )
+
+
+def pause_other_active_batches_on_reader(batch: BalloonsBatch) -> int:
+    """Ставит на паузу другие активные партии на том же считывателе за сегодня."""
+    return (
+        _today_batch_queryset(batch)
+        .filter(status=BatchStatus.ACTIVE)
+        .exclude(pk=batch.pk)
+        .update(status=BatchStatus.PAUSED)
+    )
+
+
+@transaction.atomic
+def pause_balloons_batch(batch: BalloonsBatch) -> Tuple[bool, str]:
+    if batch.status != BatchStatus.ACTIVE:
+        return False, 'Партия не в работе'
+    batch.status = BatchStatus.PAUSED
+    batch.save(update_fields=['status'])
+    logger.info(f"Партия {batch.id} приостановлена")
+    return True, ''
+
+
+@transaction.atomic
+def resume_balloons_batch(batch: BalloonsBatch) -> Tuple[bool, str]:
+    if batch.status != BatchStatus.PAUSED:
+        return False, 'Партия не приостановлена'
+    pause_other_active_batches_on_reader(batch)
+    batch.status = BatchStatus.ACTIVE
+    batch.save(update_fields=['status'])
+    logger.info(f"Партия {batch.id} возобновлена")
+    return True, ''
 
 
 def should_defer_balloon_status_to_batch_close(reader_number: int) -> bool:
@@ -31,7 +77,7 @@ def should_defer_balloon_status_to_batch_close(reader_number: int) -> bool:
     return BalloonsBatch.objects.filter(
         reader_number=reader_number,
         started_at__date=timezone.localdate(),
-        is_active=True,
+        status=BatchStatus.ACTIVE,
     ).exists()
 
 
@@ -70,6 +116,18 @@ def _count_mismatch_payload(batch: BalloonsBatch) -> dict:
         'amount_of_sensor': batch.amount_of_sensor or 0,
         'id': batch.id,
     }
+
+
+def _mark_batch_close_failed(batch: BalloonsBatch, error_message: Optional[str]) -> None:
+    batch.status = BatchStatus.MIRIADA_ERROR
+    batch.completed_at = timezone.now()
+    batch.miriada_error_message = _truncate_batch_error_message(error_message)
+    batch.save(update_fields=[
+        'status',
+        'completed_at',
+        'miriada_close_failed',
+        'miriada_error_message',
+    ])
 
 
 def send_batch_balloon_statuses_to_miriada(batch: BalloonsBatch) -> Tuple[bool, Optional[str]]:
@@ -152,7 +210,7 @@ def send_batch_balloon_statuses_to_miriada(batch: BalloonsBatch) -> Tuple[bool, 
 
 def attempt_close_balloons_batch(batch: BalloonsBatch) -> Tuple[bool, Optional[str]]:
     """
-    Закрывает партию баллонов (устанавливает is_active=False, completed_at).
+    Закрывает партию баллонов.
 
     Сначала отправляет статусы всех баллонов партии в Мириаду, затем закрывает ТТН.
     """
@@ -164,10 +222,7 @@ def attempt_close_balloons_batch(batch: BalloonsBatch) -> Tuple[bool, Optional[s
 
     statuses_ok, statuses_error = send_batch_balloon_statuses_to_miriada(batch)
     if not statuses_ok:
-        error_message = _truncate_batch_error_message(statuses_error)
-        batch.miriada_close_failed = True
-        batch.miriada_error_message = error_message
-        batch.save(update_fields=['miriada_close_failed', 'miriada_error_message'])
+        _mark_batch_close_failed(batch, statuses_error)
         return False, statuses_error
 
     should_send = bool(batch.ttn_id)
@@ -187,12 +242,15 @@ def attempt_close_balloons_batch(batch: BalloonsBatch) -> Tuple[bool, Optional[s
                 f"{close_error}"
             )
 
-    batch.is_active = False
     batch.completed_at = timezone.now()
-    batch.miriada_close_failed = not success
-    batch.miriada_error_message = _truncate_batch_error_message(error_message) if not success else None
+    if success:
+        batch.status = BatchStatus.COMPLETED
+        batch.miriada_error_message = None
+    else:
+        batch.status = BatchStatus.MIRIADA_ERROR
+        batch.miriada_error_message = _truncate_batch_error_message(error_message)
     batch.save(update_fields=[
-        'is_active',
+        'status',
         'completed_at',
         'miriada_close_failed',
         'miriada_error_message',
@@ -249,7 +307,7 @@ def save_and_close_balloons_batch(batch: BalloonsBatch, data=None):
     if success:
         return True, None, BalloonsBatchSerializer(batch).data
 
-    if batch.is_active and not batch.miriada_close_failed:
+    if batch.status in (BatchStatus.ACTIVE, BatchStatus.PAUSED):
         return False, _count_mismatch_payload(batch), None
 
     return False, {
@@ -257,4 +315,5 @@ def save_and_close_balloons_batch(batch: BalloonsBatch, data=None):
         'miriada_close_failed': True,
         'miriada_error_message': batch.miriada_error_message,
         'id': batch.id,
+        'status': batch.status,
     }, None
