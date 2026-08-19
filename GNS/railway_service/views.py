@@ -5,7 +5,7 @@ from core.mixins import ModalDeleteMixin, PreserveListQueryMixin
 from .models import RailwayTank, RailwayBatch, RailwayTankHistory
 from .forms import RailwayTankForm, RailwayBatchForm, RailwayTankHistoryForm
 from django.db import transaction
-from django.db.models import Prefetch, Max
+from django.db.models import Prefetch, Max, Q
 
 
 # ж/д цистерны
@@ -14,7 +14,7 @@ class RailwayTankView(generic.ListView):
     paginate_by = 10
 
     def get_queryset(self):
-        return super().get_queryset().prefetch_related(
+        queryset = super().get_queryset().prefetch_related(
             Prefetch(
                 'tank_history',
                 queryset=RailwayTankHistory.objects.order_by('-arrival_at')
@@ -22,6 +22,10 @@ class RailwayTankView(generic.ListView):
         ).annotate(
             latest_arrival=Max('tank_history__arrival_at')
         ).order_by('-is_on_station', 'latest_arrival')
+        query = self.request.GET.get('query', '').strip()
+        if query:
+            queryset = queryset.filter(registration_number__icontains=query)
+        return queryset
 
 
 class RailwayTankDetailView(generic.DetailView):

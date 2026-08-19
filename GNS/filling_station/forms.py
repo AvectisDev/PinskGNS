@@ -25,12 +25,12 @@ class GetBalloonsAmount(forms.Form):
     start_date = forms.DateField(
         label="Начальная дата",
         widget=forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
-        initial=timezone.now().date()
+        initial=timezone.localdate()
     )
     end_date = forms.DateField(
         label="Конечная дата",
         widget=forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
-        initial=timezone.now().date()
+        initial=timezone.localdate()
     )
 
     def __init__(self, *args, **kwargs):
@@ -167,7 +167,13 @@ class BalloonsBatchForm(forms.ModelForm):
 
     class Meta:
         model = BalloonsBatch
-        exclude = ['user', 'balloon_list']
+        exclude = [
+            'user',
+            'balloon_list',
+            'miriada_balloons_sent',
+            'miriada_close_failed',
+            'miriada_error_message',
+        ]
         widgets = {
             'batch_type': forms.HiddenInput(),
             'completed_at': forms.DateTimeInput(format='%Y-%m-%dT%H:%M', attrs={
@@ -212,17 +218,12 @@ class BalloonsBatchForm(forms.ModelForm):
             'is_active': forms.CheckboxInput(attrs={
                 'class': 'form-check-input'
             }),
-            'ttn': forms.TextInput(attrs={
-                'class': 'form-control',
-                'placeholder': 'Номер ТТН'
-            }),
             'amount_of_ttn': forms.NumberInput(attrs={
                 'class': 'form-control',
-                'placeholder': 'Количество по ТТН'
+                'placeholder': 'Количество по электронной ТТН'
             })
         }
         labels = {
-            'amount_of_ttn': 'Количество баллонов по ТТН',
-            'ttn': 'Номер ТТН',
+            'amount_of_ttn': 'Количество баллонов по электронной ТТН',
             'batch_type': 'Тип партии'
         }

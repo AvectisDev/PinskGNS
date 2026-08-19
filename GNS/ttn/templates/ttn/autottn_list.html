@@ -9,13 +9,13 @@
         <h4 class="mb-0">ТТН на автоцистерны</h4>
         <div class="d-flex align-items-center">
             <!-- Форма для изменения источника веса -->
-            <form method="post" action="{% url 'ttn:update_weight_source' %}" class="me-3">
+            <form method="post" action="{% url 'ttn:update_weight_source' %}" id="weight-source-form" class="me-3">
                 {% csrf_token %}
+                <input type="hidden" name="weight_source" id="weight-source-value"
+                       value="{% if weight_source == 'f' %}f{% else %}s{% endif %}">
                 <div class="form-check form-switch">
                     <input class="form-check-input" type="checkbox" id="weightSourceSwitch"
-                           name="weight_source" value="f"
-                           {% if weight_source == 'f' %}checked{% endif %}
-                           onchange="this.form.submit()">
+                           {% if weight_source == 'f' %}checked{% endif %}>
                     <label class="form-check-label" for="weightSourceSwitch">
                         {% if weight_source == 'f' %}
                             <span class="text-success">Источник: Расходомер</span>
@@ -105,11 +105,21 @@
         </div>
     </div>
 </div>
+{% endblock %}
 
+{% block extra_scripts %}
 <script>
-// Автоматическая отправка формы при изменении переключателя
-document.getElementById('weightSourceSwitch').addEventListener('change', function() {
-    this.form.submit();
-});
+(function () {
+    const checkbox = document.getElementById('weightSourceSwitch');
+    const form = document.getElementById('weight-source-form');
+    const valueInput = document.getElementById('weight-source-value');
+    if (!checkbox || !form || !valueInput) {
+        return;
+    }
+    checkbox.addEventListener('change', function () {
+        valueInput.value = checkbox.checked ? 'f' : 's';
+        form.submit();
+    });
+})();
 </script>
 {% endblock %}

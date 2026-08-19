@@ -189,7 +189,7 @@ class DailyReaderCounter(models.Model):
     def add_rfid(cls, reader: ReaderSettings):
         obj, created = cls.objects.get_or_create(
             number=reader,
-            day=timezone.now().date(),
+            day=timezone.localdate(),
             defaults={'amount_of_rfid': 0, 'amount_of_sensor': 0}
         )
         # атомарный инкремент:
@@ -202,7 +202,7 @@ class DailyReaderCounter(models.Model):
     def add_sensor(cls, reader: ReaderSettings):
         obj, created = cls.objects.get_or_create(
             number=reader,
-            day=timezone.now().date(),
+            day=timezone.localdate(),
             defaults={'amount_of_rfid': 0, 'amount_of_sensor': 0}
         )
         cls.objects.filter(pk=obj.pk).update(
@@ -238,7 +238,7 @@ class DailyReaderCounter(models.Model):
         balloons_month/balloons_today - только баллоны, подсчитанные сенсором (amount_of_sensor)
         rfid_month/rfid_today - только баллоны, подсчитанные по RFID (amount_of_rfid)
         """
-        today = date.today()
+        today = timezone.localdate()
         first_day_of_month = today.replace(day=1)
 
         # Получаем агрегированные данные за месяц
@@ -550,6 +550,10 @@ class BalloonsBatch(models.Model):
     reader_number = models.IntegerField(null=True, blank=True, verbose_name="Номер считывателя")
     amount_of_rfid = models.IntegerField(default=0, verbose_name="Количество баллонов по rfid")
     amount_of_sensor = models.IntegerField(default=0, verbose_name="Количество баллонов по датчику")
+    amount_of_ttn = models.IntegerField(
+        default=0,
+        verbose_name="Количество баллонов по электронной ТТН",
+    )
     amount_of_5_liters = models.IntegerField(default=0, verbose_name="Количество 5л баллонов")
     amount_of_12_liters = models.IntegerField(default=0, verbose_name="Количество 12л баллонов")
     amount_of_27_liters = models.IntegerField(default=0, verbose_name="Количество 27л баллонов")
@@ -570,6 +574,10 @@ class BalloonsBatch(models.Model):
         blank=True,
         max_length=200,
         verbose_name="Текст ошибки при неудачном закрытии ТТН"
+    )
+    miriada_balloons_sent = models.BooleanField(
+        default=False,
+        verbose_name="Статусы баллонов отправлены в Мириаду",
     )
     ttn_id = models.IntegerField(verbose_name="ID ТТН")
     balloons_type = models.CharField(choices=settings.BALLOON_TYPE_CHOICES, default='e', verbose_name="Пустой/полный")
@@ -614,17 +622,13 @@ class BalloonsBatch(models.Model):
         return MiriadaTtn.objects.filter(ttn_id=self.ttn_id).values_list('name', flat=True).first()
 
     def get_amount_without_rfid(self) -> int:
-        """
-        Возвращает общее количество баллонов без меток
-        """
-        amounts = [
-            self.amount_of_5_liters or 0,
-            self.amount_of_12_liters or 0,
-            self.amount_of_27_liters or 0,
-            self.amount_of_50_liters or 0
-        ]
-        total_amount = sum(amounts) if not self.amount_of_sensor else self.amount_of_sensor
-        return total_amount
+        """Количество баллонов без RFID: сумма полей объёмов (50л — баллоны без метки на приёмке)."""
+        return (
+            (self.amount_of_5_liters or 0)
+            + (self.amount_of_12_liters or 0)
+            + (self.amount_of_27_liters or 0)
+            + (self.amount_of_50_liters or 0)
+        )
 
     def add_balloon(self, nfc_tag: str = None) -> dict:
         """
@@ -757,12 +761,8 @@ class BalloonsBatch(models.Model):
         """
         Собирает статистику по партиям за последние день и месяц
         """
-        now = timezone.now()
-        
-        # Начало сегодняшнего дня
+        now = timezone.localtime()
         today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
-        
-        # Начало месяца
         month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
 
         # Фильтруем по месяцу

@@ -3,8 +3,10 @@ from django.shortcuts import redirect
 from django.http import HttpResponseRedirect
 from core.mixins import ModalDeleteMixin, PreserveListQueryMixin
 from django.urls import reverse_lazy
+from django.utils.decorators import method_decorator
 from django.views import generic
 from django.contrib import messages
+from django.views.decorators.csrf import ensure_csrf_cookie
 from django.views.decorators.http import require_POST
 from .models import BalloonTtn, RailwayTtn, AutoTtn
 from autogas.models import AutoGasBatchSettings
@@ -143,13 +145,16 @@ class RailwayTtnDeleteView(ModalDeleteMixin, PreserveListQueryMixin, generic.Del
 @login_required
 @require_POST
 def update_weight_source(request):
-    weight_source = request.POST.get('weight_source', 's')
+    weight_source = request.POST.get('weight_source')
+    if weight_source not in ('f', 's'):
+        weight_source = 's'
     settings, _ = AutoGasBatchSettings.objects.get_or_create()
     settings.weight_source = weight_source
     settings.save()
     return redirect('ttn:auto_ttn_list')
 
 
+@method_decorator(ensure_csrf_cookie, name='dispatch')
 class AutoTtnView(generic.ListView):
     model = AutoTtn
     paginate_by = 10

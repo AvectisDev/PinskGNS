@@ -1,6 +1,6 @@
 from datetime import timedelta
 from decimal import Decimal
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 from django.test import TestCase
 from django.utils import timezone
@@ -9,6 +9,7 @@ from filling_station.models import BalloonsBatch
 from railway_service.models import RailwayTankHistory
 from ttn.models import AutoTtn, BalloonTtn, RailwayTtn
 from ttn.services import (
+    close_ttn_in_miriada,
     collect_tanks_for_railway_ttn,
     save_auto_ttn,
     save_balloon_ttn,
@@ -108,3 +109,34 @@ class SaveTtnEnqueueTests(TtnFixturesMixin, TestCase):
         mock_delay.assert_called_once_with('R-9')
         self.assertEqual(ttn.railway_tank_list.count(), 1)
         self.assertEqual(ttn.total_gas_amount_by_scales, 1.0)
+
+
+class CloseTtnInMiriadaTests(TestCase):
+    @patch('ttn.services.time.sleep')
+    @patch('ttn.services._log_batch_balloons_on_ttn_close')
+    @patch('ttn.services.requests.Session')
+    def test_count_mismatch_is_not_retried(self, mock_session_cls, _log_batch, mock_sleep):
+        session = mock_session_cls.return_value
+        response = MagicMock()
+        response.status_code = 403
+        response.reason = 'Forbidden'
+        response.text = '{"title": "Error", "description": "Количество не соответствует указанному в ТТН"}'
+        session.send.return_value = response
+
+        success, error = close_ttn_in_miriada(47900)
+        self.assertFalse(success)
+        self.assertEqual(error, 'Количество не соответствует указанному в ТТН')
+        self.assertEqual(session.send.call_count, 1)
+        mock_sleep.assert_not_called()
+
+    @patch('ttn.services.time.sleep')
+    @patch('ttn.services._log_batch_balloons_on_ttn_close')
+    @patch('ttn.services.requests.Session')
+    def test_timeout_is_retried(self, mock_session_cls, _log_batch, mock_sleep):
+        session = mock_session_cls.return_value
+        session.send.side_effect = Exception('timed out')
+
+        success, error = close_ttn_in_miriada(47900)
+        self.assertFalse(success)
+        self.assertEqual(session.send.call_count, 3)
+        self.assertEqual(mock_sleep.call_count, 2)
