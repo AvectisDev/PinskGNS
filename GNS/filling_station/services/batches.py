@@ -36,9 +36,8 @@ def should_defer_balloon_status_to_batch_close(reader_number: int) -> bool:
 
 
 def should_send_balloon_status_immediately(reader_number: int) -> bool:
-    if reader_number not in MIRIADA_BALLOON_STATUS_READERS:
-        return False
-    return not should_defer_balloon_status_to_batch_close(reader_number)
+    """На лету в Мириаду уходит только наполнение (ридер 8). Рамка 3/4/6 — при закрытии."""
+    return reader_number in MIRIADA_FILLING_READERS
 
 
 def add_balloon_to_batch_by_nfc(batch: BalloonsBatch, nfc_tag: str) -> dict:

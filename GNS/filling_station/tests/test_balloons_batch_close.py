@@ -111,10 +111,12 @@ class BalloonsBatchCloseTests(APITestCase):
         self.assertFalse(should_send_balloon_status_immediately(6))
         self.assertTrue(should_send_balloon_status_immediately(8))
 
-    def test_send_immediately_when_no_active_batch(self):
+    def test_send_immediately_only_for_filling_reader(self):
         self.batch.is_active = False
         self.batch.save(update_fields=['is_active'])
-        self.assertTrue(should_send_balloon_status_immediately(6))
+        self.assertFalse(should_send_balloon_status_immediately(6))
+        self.assertFalse(should_send_balloon_status_immediately(3))
+        self.assertTrue(should_send_balloon_status_immediately(8))
 
     @patch('ttn.services.close_ttn_in_miriada')
     @patch('filling_station.services.batches.post_status_to_miriada')

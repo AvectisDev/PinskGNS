@@ -5,6 +5,7 @@ from typing import Optional, Dict, Any, Tuple
 
 import requests
 from django.conf import settings
+from django.utils import timezone
 from requests.adapters import HTTPAdapter
 
 from filling_station.exceptions import MiriadaAPIError
@@ -148,6 +149,7 @@ def _get_batch_data_for_loading(
         ).filter(
             batch_type='u',
             is_active=True,
+            started_at__date=timezone.localdate(),
             balloon_list__nfc_tag=nfc_tag,
         )
         if reader is not None:
@@ -170,6 +172,7 @@ def _get_batch_data_for_unloading(
         queryset = BalloonsBatch.objects.select_related('truck', 'trailer').filter(
             batch_type='l',
             is_active=True,
+            started_at__date=timezone.localdate(),
         )
         if reader is not None:
             queryset = queryset.filter(reader_number=reader)
