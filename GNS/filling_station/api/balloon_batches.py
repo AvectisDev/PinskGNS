@@ -15,6 +15,7 @@ from drf_spectacular.utils import (
 import logging
 
 from filling_station.models import BalloonsBatch, BatchStatus
+from filling_station.api.batch_status import batch_status_to_api, is_api_close_request
 from filling_station.services import (
     add_balloon_to_batch_by_nfc,
     pause_balloons_batch,
@@ -49,10 +50,19 @@ BalloonOperationResponse = inline_serializer(
 )
 
 _BATCH_STATUS_DOC = (
-    'Статус партии: `active` — в работе (RFID принимает баллоны); '
-    '`paused` — приостановлена (ручное добавление/удаление доступно); '
-    '`completed` — завершена; `miriada_error` — ошибка закрытия ТТН в Мириаде.'
+    'Статус партии (числовой enum): '
+    '1=ACTIVE — в работе (RFID принимает баллоны); '
+    '2=PAUSED — приостановлена (ручное добавление/удаление доступно); '
+    '3=COMPLETED — завершена; '
+    '4=MIRIADA_ERROR — ошибка закрытия ТТН в Мириаде. '
+    '0=UNSPECIFIED не используется.'
 )
+
+
+def _api_error_payload(payload):
+    if isinstance(payload, dict) and 'status' in payload:
+        return {**payload, 'status': batch_status_to_api(payload['status'])}
+    return payload
 
 
 @extend_schema_view(
@@ -61,7 +71,7 @@ _BATCH_STATUS_DOC = (
         summary='Получить незавершённые партии',
         description=(
             'Список партий, которые ещё не завершены успешно: '
-            '`active`, `paused`, `miriada_error`. '
+            'status ∈ {1=ACTIVE, 2=PAUSED, 4=MIRIADA_ERROR}. '
             f'{_BATCH_STATUS_DOC}'
         ),
         parameters=[
@@ -82,8 +92,8 @@ _BATCH_STATUS_DOC = (
         tags=['Партии баллонов'],
         summary='Получить текущую активную партию',
         description=(
-            'Последняя партия со статусом `active` (принимает RFID). '
-            'Партии в `paused` или `miriada_error` не возвращаются.'
+            'Последняя партия со статусом 1=ACTIVE (принимает RFID). '
+            'Партии в 2=PAUSED или 4=MIRIADA_ERROR не возвращаются.'
         ),
         parameters=[
             OpenApiParameter(
@@ -121,9 +131,9 @@ _BATCH_STATUS_DOC = (
         summary='Создать новую партию',
         description=(
             'Создание партии с привязкой к ТТН. Обязательно поле `amount_of_ttn`. '
-            'По умолчанию `status`: `active`. При создании активной партии другие '
+            'По умолчанию `status`: 1 (ACTIVE). При создании активной партии другие '
             'активные партии на том же считывателе за сегодня автоматически '
-            'переводятся в `paused`.'
+            'переводятся в 2 (PAUSED).'
         ),
         request=BalloonsBatchSerializer,
         responses={
@@ -136,10 +146,10 @@ _BATCH_STATUS_DOC = (
         summary='Обновить или завершить партию',
         description=(
             'Частичное обновление полей партии (счётчики, транспорт, ТТН и т.д.).\n\n'
-            '**Завершение партии:** передайте `"status": "completed"`. '
+            '**Завершение партии:** передайте `"status": 3` (COMPLETED). '
             'Отправляются статусы баллонов в Мириаду и закрывается ТТН. '
-            'Доступно для статусов `active` и `paused`. '
-            'При ошибке Мириады партия переходит в `miriada_error` (ответ HTTP 502).\n\n'
+            'Доступно для статусов 1=ACTIVE и 2=PAUSED. '
+            'При ошибке Мириады партия переходит в 4=MIRIADA_ERROR (ответ HTTP 502).\n\n'
             'Устаревший способ (обратная совместимость): `"is_active": false`. '
             'Поле `is_active` удалено из модели — используйте `status`.'
         ),
@@ -156,7 +166,7 @@ _BATCH_STATUS_DOC = (
         summary='Добавить баллон в партию',
         description=(
             'Добавление баллона по NFC-метке. Статус в Мириаду отправляется при закрытии партии. '
-            'Доступно для статусов `active` и `paused`.'
+            'Доступно для статусов 1=ACTIVE и 2=PAUSED.'
         ),
         request=inline_serializer(
             name='AddBalloonRequest',
@@ -184,7 +194,7 @@ _BATCH_STATUS_DOC = (
         summary='Удалить баллон из партии',
         description=(
             'Удаление баллона по NFC-метке. '
-            'Доступно для статусов `active` и `paused`.'
+            'Доступно для статусов 1=ACTIVE и 2=PAUSED.'
         ),
         request=inline_serializer(
             name='RemoveBalloonRequest',
@@ -213,7 +223,7 @@ _BATCH_STATUS_DOC = (
             'Сохраняет данные партии, отправляет статусы баллонов в Мириаду '
             'и закрывает ТТН. Завершение возможно только если количество RFID '
             'совпадает с количеством по электронной ТТН. '
-            'Доступно для статусов `active`, `paused` и `miriada_error` '
+            'Доступно для статусов 1=ACTIVE, 2=PAUSED и 4=MIRIADA_ERROR '
             '(повтор после ошибки Мириады).'
         ),
         request=BalloonsBatchSerializer,
@@ -236,7 +246,7 @@ _BATCH_STATUS_DOC = (
         tags=['Партии баллонов'],
         summary='Приостановить партию',
         description=(
-            'Переводит партию из `active` в `paused`. '
+            'Переводит партию из 1=ACTIVE в 2=PAUSED. '
             'RFID и датчик перестают добавлять баллоны; '
             'ручное добавление и удаление остаётся доступным.'
         ),
@@ -258,9 +268,9 @@ _BATCH_STATUS_DOC = (
         tags=['Партии баллонов'],
         summary='Возобновить партию',
         description=(
-            'Переводит партию из `paused` в `active`. '
+            'Переводит партию из 2=PAUSED в 1=ACTIVE. '
             'Другие активные партии на том же считывателе за сегодня '
-            'автоматически переводятся в `paused`.'
+            'автоматически переводятся в 2=PAUSED.'
         ),
         parameters=[
             OpenApiParameter(
@@ -377,7 +387,7 @@ class BalloonsBatchViewSet(viewsets.ViewSet):
         is_closing = (
             batch.status in (BatchStatus.ACTIVE, BatchStatus.PAUSED)
             and (
-                request.data.get('status') == BatchStatus.COMPLETED
+                is_api_close_request(request.data)
                 or ('is_active' in request.data and not request.data.get('is_active', True))
             )
         )
@@ -393,6 +403,7 @@ class BalloonsBatchViewSet(viewsets.ViewSet):
                     f"API close batch failed: user={_api_user(request)}, batch_id={batch.id}, "
                     f"error={error_payload}"
                 )
+                error_payload = _api_error_payload(error_payload)
                 if isinstance(error_payload, dict) and error_payload.get('miriada_close_failed'):
                     return Response(error_payload, status=status.HTTP_502_BAD_GATEWAY)
                 return Response(error_payload, status=status.HTTP_400_BAD_REQUEST)
@@ -441,6 +452,7 @@ class BalloonsBatchViewSet(viewsets.ViewSet):
                 f"API retry-close failed: user={_api_user(request)}, batch_id={batch.id}, "
                 f"error={error_payload}"
             )
+            error_payload = _api_error_payload(error_payload)
             if isinstance(error_payload, dict) and error_payload.get('miriada_close_failed'):
                 return Response(error_payload, status=status.HTTP_502_BAD_GATEWAY)
             return Response(error_payload, status=status.HTTP_400_BAD_REQUEST)
@@ -561,10 +573,10 @@ class BalloonsBatchViewSet(viewsets.ViewSet):
 @extend_schema(
     tags=['Партии баллонов'],
     summary='Активные партии для SCADA',
-    description=(
-        'Список партий со статусом `active` за сегодня для приёмки и отгрузки. '
-        'Используется SCADA: номер считывателя и регистрационные номера транспорта.'
-    ),
+        description=(
+            'Список партий со статусом 1=ACTIVE за сегодня для приёмки и отгрузки. '
+            'Используется SCADA: номер считывателя и регистрационные номера транспорта.'
+        ),
     responses={200: OpenApiTypes.OBJECT},
 )
 @api_view(['GET'])

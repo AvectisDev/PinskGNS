@@ -7,6 +7,7 @@ from rest_framework.test import APITestCase
 
 from filling_station.exceptions import MiriadaAPIError
 from filling_station.models import Balloon, BalloonsBatch, BatchStatus, ReaderSettings, Truck, TruckType
+from filling_station.api.batch_status import STATUS_TO_API
 from filling_station.services import (
     add_balloon_to_batch_by_nfc,
     pause_balloons_batch,
@@ -58,7 +59,7 @@ class BalloonsBatchCloseTests(APITestCase):
                 'reader_number': 6,
                 'ttn_id': 14770,
                 'balloons_type': 'e',
-                'status': BatchStatus.ACTIVE,
+                'status': STATUS_TO_API[BatchStatus.ACTIVE],
             },
             format='json',
         )
@@ -75,13 +76,13 @@ class BalloonsBatchCloseTests(APITestCase):
                 'ttn_id': 14770,
                 'amount_of_ttn': 12,
                 'balloons_type': 'e',
-                'status': BatchStatus.ACTIVE,
+                'status': STATUS_TO_API[BatchStatus.ACTIVE],
             },
             format='json',
         )
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertEqual(response.data['amount_of_ttn'], 12)
-        self.assertEqual(response.data['status'], BatchStatus.ACTIVE)
+        self.assertEqual(response.data['status'], STATUS_TO_API[BatchStatus.ACTIVE])
 
     def test_create_pauses_previous_active_batch_on_same_reader(self):
         url = reverse('filling_station_api:balloons-loading-list')
@@ -93,7 +94,7 @@ class BalloonsBatchCloseTests(APITestCase):
                 'ttn_id': 14771,
                 'amount_of_ttn': 5,
                 'balloons_type': 'e',
-                'status': BatchStatus.ACTIVE,
+                'status': STATUS_TO_API[BatchStatus.ACTIVE],
             },
             format='json',
         )
@@ -230,7 +231,7 @@ class BalloonsBatchCloseTests(APITestCase):
 
     def test_http_close_returns_400_on_count_mismatch(self):
         url = reverse('filling_station_api:balloons-loading-detail', args=[self.batch.id])
-        response = self.client.patch(url, {'status': BatchStatus.COMPLETED}, format='json')
+        response = self.client.patch(url, {'status': STATUS_TO_API[BatchStatus.COMPLETED]}, format='json')
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertTrue(response.data['count_mismatch'])
         self.batch.refresh_from_db()
@@ -242,9 +243,10 @@ class BalloonsBatchCloseTests(APITestCase):
         mock_send.side_effect = MiriadaAPIError('miriada down')
         self.batch.add_balloon(self.balloon.nfc_tag)
         url = reverse('filling_station_api:balloons-loading-detail', args=[self.batch.id])
-        response = self.client.patch(url, {'status': BatchStatus.COMPLETED}, format='json')
+        response = self.client.patch(url, {'status': STATUS_TO_API[BatchStatus.COMPLETED]}, format='json')
         self.assertEqual(response.status_code, status.HTTP_502_BAD_GATEWAY)
         self.assertTrue(response.data['miriada_close_failed'])
+        self.assertEqual(response.data['status'], STATUS_TO_API[BatchStatus.MIRIADA_ERROR])
         mock_close.assert_not_called()
         self.batch.refresh_from_db()
         self.assertEqual(self.batch.status, BatchStatus.MIRIADA_ERROR)

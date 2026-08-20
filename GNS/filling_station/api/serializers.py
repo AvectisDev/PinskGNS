@@ -6,7 +6,28 @@ from ..models import (
     BalloonsBatch,
     BatchStatus,
 )
+from filling_station.api.batch_status import batch_status_from_api, batch_status_to_api
 from filling_station.services.batches import pause_other_active_batches_on_reader
+
+class BatchStatusApiField(serializers.Field):
+    """
+    API: числовой enum статуса партии.
+    0=UNSPECIFIED, 1=ACTIVE, 2=PAUSED, 3=COMPLETED, 4=MIRIADA_ERROR.
+    В БД по-прежнему хранится строка (active/paused/...).
+    """
+
+    default_error_messages = {
+        'invalid': 'Некорректный статус партии. Допустимо: 1=ACTIVE, 2=PAUSED, 3=COMPLETED, 4=MIRIADA_ERROR.',
+    }
+
+    def to_representation(self, value):
+        return batch_status_to_api(value)
+
+    def to_internal_value(self, data):
+        try:
+            return batch_status_from_api(data)
+        except ValueError:
+            self.fail('invalid')
 
 
 class BalloonSerializer(serializers.ModelSerializer):
@@ -91,12 +112,11 @@ class TrailerSerializer(serializers.ModelSerializer):
 class BalloonsBatchSerializer(serializers.ModelSerializer):
     batch_type = serializers.CharField(read_only=True)
     ttn_name = serializers.SerializerMethodField()
-    status = serializers.ChoiceField(
-        choices=BatchStatus.choices,
+    status = BatchStatusApiField(
         default=BatchStatus.ACTIVE,
         help_text=(
-            'active — в работе; paused — приостановлена; '
-            'completed — завершена; miriada_error — ошибка закрытия ТТН в Мириаде'
+            'Числовой enum: 1=ACTIVE, 2=PAUSED, 3=COMPLETED, 4=MIRIADA_ERROR '
+            '(0=UNSPECIFIED не используется в запросах)'
         ),
     )
     miriada_close_failed = serializers.BooleanField(read_only=True)
@@ -149,6 +169,7 @@ class BalloonsTruckSerializer(serializers.ModelSerializer):
 class ActiveBatchSerializer(serializers.ModelSerializer):
     truck = BalloonsTruckSerializer(read_only=True)
     ttn_name = serializers.SerializerMethodField()
+    status = BatchStatusApiField(read_only=True)
     miriada_close_failed = serializers.BooleanField(read_only=True)
     miriada_error_message = serializers.CharField(read_only=True)
 
