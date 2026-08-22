@@ -1,0 +1,19 @@
+---
+description: Redis cache, process state, keys, locks, and Celery Redis usage rules.
+globs:
+  - "**/*redis*.py"
+  - "**/*cache*.py"
+  - "**/settings*.py"
+  - "carousel/**/*.py"
+  - "filling_station/**/*.py"
+alwaysApply: false
+---
+
+# Redis
+
+- Treat Redis production state as a shared data contract.
+- Find all readers and writers before changing keys or value formats.
+- Define TTL, cleanup, missing-key, and recovery behavior explicitly.
+- Use atomic operations for concurrent updates.
+- Do not mix cache, Celery, and production-state assumptions.
+- Handle malformed data and Redis failures according to data criticality.

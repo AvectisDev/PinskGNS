@@ -1,0 +1,15 @@
+---
+description: Django architecture, ORM, models, services, views, and general Python backend rules.
+globs:
+  - "**/*.py"
+alwaysApply: false
+---
+
+# Django
+
+- Follow existing project patterns and make only required changes.
+- Use Django ORM; avoid raw SQL unless necessary.
+- Prevent N+1 queries with `select_related()`, `prefetch_related()`, or `annotate()`.
+- Keep HTTP logic in views, validation in serializers, business logic in services, and persistence in models.
+- Use transactions for related changes that must be atomic.
+- Add or update focused tests when behavior changes.

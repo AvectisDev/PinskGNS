@@ -141,7 +141,6 @@ venv.bak/
 
 # AI agents
 .continue/
-AGENTS.md
 .cursorignore
 
 

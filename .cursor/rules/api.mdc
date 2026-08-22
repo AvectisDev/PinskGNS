@@ -1,0 +1,19 @@
+---
+description: Django REST Framework API, serializer, permission, authentication, routing, and schema rules.
+globs:
+  - "**/api/**/*.py"
+  - "**/serializers.py"
+  - "**/views.py"
+  - "**/permissions.py"
+  - "**/urls.py"
+alwaysApply: false
+---
+
+# API
+
+- Use serializers for validation and permissions for access control.
+- Keep complex business logic outside views and serializers.
+- Preserve endpoint contracts and backward compatibility where possible.
+- Check query performance, pagination, filtering, and object-level access.
+- Update drf-spectacular schema when API behavior changes.
+- Test success, validation, authentication, and permission cases.
