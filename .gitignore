@@ -147,6 +147,11 @@ venv.bak/
 # Generated / auxiliary OpenAPI exports (not committed)
 openapi-pinskgns-core.yaml
 docs/openapi/*-core.yaml
+docs/openapi/*-core.json
+
+# Local Postman/Newman runs (env may contain credentials)
+postman/*environment*.json
+postman/*.postman_collection.json
 
 
 # Spyder project settings

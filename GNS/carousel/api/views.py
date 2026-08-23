@@ -20,6 +20,7 @@ from carousel.services import (
     process_carousel_data,
 )
 from .serializers import CarouselSerializer, CarouselSettingsSerializer
+from core.api.schema import ApiErrorSerializer
 
 
 logger = logging.getLogger('filling_station')
@@ -32,7 +33,7 @@ logger = logging.getLogger('filling_station')
         description='Получение настроек карусели наполнения баллонов',
         responses={
             200: CarouselSettingsSerializer,
-            404: OpenApiTypes.OBJECT
+            404: ApiErrorSerializer
         }
     ),
     partial_update=extend_schema(
@@ -42,8 +43,8 @@ logger = logging.getLogger('filling_station')
         request=CarouselSettingsSerializer,
         responses={
             200: CarouselSettingsSerializer,
-            400: OpenApiTypes.OBJECT,
-            404: OpenApiTypes.OBJECT
+            400: ApiErrorSerializer,
+            404: ApiErrorSerializer
         },
         parameters=[
             OpenApiParameter(
@@ -75,24 +76,9 @@ logger = logging.getLogger('filling_station')
         responses={
             200: OpenApiTypes.OBJECT,
             201: CarouselSerializer,
-            400: inline_serializer(
-                name='ErrorResponse',
-                fields={
-                    'error': serializers.CharField()
-                }
-            ),
-            404: inline_serializer(
-                name='ErrorResponse',
-                fields={
-                    'error': serializers.CharField()
-                }
-            ),
-            500: inline_serializer(
-                name='ErrorResponse',
-                fields={
-                    'error': serializers.CharField()
-                }
-            )
+            400: ApiErrorSerializer,
+            404: ApiErrorSerializer,
+            500: ApiErrorSerializer,
         },
         examples=[
             OpenApiExample(

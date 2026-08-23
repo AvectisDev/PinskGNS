@@ -52,8 +52,7 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                additionalProperties: {}
+                $ref: '#/components/schemas/ApiError'
           description: ''
     post:
       operationId: api_auto_gas_batch_create
@@ -89,8 +88,7 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                additionalProperties: {}
+                $ref: '#/components/schemas/ApiError'
           description: ''
   /api/auto-gas-batch/{id}/:
     patch:
@@ -132,15 +130,13 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                additionalProperties: {}
+                $ref: '#/components/schemas/ApiError'
           description: ''
         '404':
           content:
             application/json:
               schema:
-                type: object
-                additionalProperties: {}
+                $ref: '#/components/schemas/ApiError'
           description: ''
   /api/auto-gas-batch/statistic/:
     get:
@@ -283,8 +279,7 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                additionalProperties: {}
+                $ref: '#/components/schemas/ApiError'
               examples:
                 КонфликтNFCМетки:
                   value:
@@ -328,8 +323,7 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                additionalProperties: {}
+                $ref: '#/components/schemas/ApiError'
           description: ''
   /api/balloons-loading/{id}/:
     patch:
@@ -377,22 +371,19 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                additionalProperties: {}
+                $ref: '#/components/schemas/ApiError'
           description: ''
         '404':
           content:
             application/json:
               schema:
-                type: object
-                additionalProperties: {}
+                $ref: '#/components/schemas/ApiError'
           description: ''
         '502':
           content:
             application/json:
               schema:
-                type: object
-                additionalProperties: {}
+                $ref: '#/components/schemas/ApiError'
           description: ''
   /api/balloons-loading/{id}/add-balloon/:
     patch:
@@ -481,15 +472,13 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                additionalProperties: {}
+                $ref: '#/components/schemas/ApiError'
           description: ''
         '404':
           content:
             application/json:
               schema:
-                type: object
-                additionalProperties: {}
+                $ref: '#/components/schemas/ApiError'
           description: ''
   /api/balloons-loading/{id}/remove-balloon/:
     patch:
@@ -572,15 +561,13 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                additionalProperties: {}
+                $ref: '#/components/schemas/ApiError'
           description: ''
         '404':
           content:
             application/json:
               schema:
-                type: object
-                additionalProperties: {}
+                $ref: '#/components/schemas/ApiError'
           description: ''
   /api/balloons-loading/{id}/retry-close/:
     post:
@@ -627,22 +614,19 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                additionalProperties: {}
+                $ref: '#/components/schemas/ApiError'
           description: ''
         '404':
           content:
             application/json:
               schema:
-                type: object
-                additionalProperties: {}
+                $ref: '#/components/schemas/ApiError'
           description: ''
         '502':
           content:
             application/json:
               schema:
-                type: object
-                additionalProperties: {}
+                $ref: '#/components/schemas/ApiError'
           description: ''
   /api/balloons-loading/{id}/rfid-amount/:
     get:
@@ -675,8 +659,7 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                additionalProperties: {}
+                $ref: '#/components/schemas/ApiError'
           description: ''
   /api/balloons-loading/active/:
     get:
@@ -716,8 +699,7 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                additionalProperties: {}
+                $ref: '#/components/schemas/ApiError'
           description: ''
   /api/balloons-loading/last-active/:
     get:
@@ -752,8 +734,7 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                additionalProperties: {}
+                $ref: '#/components/schemas/ApiError'
           description: ''
   /api/balloons-unloading/:
     post:
@@ -792,8 +773,7 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                additionalProperties: {}
+                $ref: '#/components/schemas/ApiError'
           description: ''
   /api/balloons-unloading/{id}/:
     patch:
@@ -841,22 +821,19 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                additionalProperties: {}
+                $ref: '#/components/schemas/ApiError'
           description: ''
         '404':
           content:
             application/json:
               schema:
-                type: object
-                additionalProperties: {}
+                $ref: '#/components/schemas/ApiError'
           description: ''
         '502':
           content:
             application/json:
               schema:
-                type: object
-                additionalProperties: {}
+                $ref: '#/components/schemas/ApiError'
           description: ''
   /api/balloons-unloading/{id}/add-balloon/:
     patch:
@@ -945,15 +922,13 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                additionalProperties: {}
+                $ref: '#/components/schemas/ApiError'
           description: ''
         '404':
           content:
             application/json:
               schema:
-                type: object
-                additionalProperties: {}
+                $ref: '#/components/schemas/ApiError'
           description: ''
   /api/balloons-unloading/{id}/remove-balloon/:
     patch:
@@ -1036,15 +1011,13 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                additionalProperties: {}
+                $ref: '#/components/schemas/ApiError'
           description: ''
         '404':
           content:
             application/json:
               schema:
-                type: object
-                additionalProperties: {}
+                $ref: '#/components/schemas/ApiError'
           description: ''
   /api/balloons-unloading/{id}/retry-close/:
     post:
@@ -1091,22 +1064,19 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                additionalProperties: {}
+                $ref: '#/components/schemas/ApiError'
           description: ''
         '404':
           content:
             application/json:
               schema:
-                type: object
-                additionalProperties: {}
+                $ref: '#/components/schemas/ApiError'
           description: ''
         '502':
           content:
             application/json:
               schema:
-                type: object
-                additionalProperties: {}
+                $ref: '#/components/schemas/ApiError'
           description: ''
   /api/balloons-unloading/{id}/rfid-amount/:
     get:
@@ -1139,8 +1109,7 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                additionalProperties: {}
+                $ref: '#/components/schemas/ApiError'
           description: ''
   /api/balloons-unloading/active/:
     get:
@@ -1180,8 +1149,7 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                additionalProperties: {}
+                $ref: '#/components/schemas/ApiError'
           description: ''
   /api/balloons-unloading/last-active/:
     get:
@@ -1216,8 +1184,7 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                additionalProperties: {}
+                $ref: '#/components/schemas/ApiError'
           description: ''
   /api/balloons/{id}/:
     patch:
@@ -1286,8 +1253,7 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                additionalProperties: {}
+                $ref: '#/components/schemas/ApiError'
           description: ''
   /api/balloons/nfc/{nfc_tag}/:
     get:
@@ -1334,7 +1300,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: '#/components/schemas/ApiError'
           description: ''
   /api/balloons/serial-number/{serial_number}/:
     get:
@@ -1383,7 +1349,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: '#/components/schemas/ApiError'
           description: ''
   /api/balloons/statistic/:
     get:
@@ -1447,15 +1413,13 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                additionalProperties: {}
+                $ref: '#/components/schemas/ApiError'
           description: ''
         '404':
           content:
             application/json:
               schema:
-                type: object
-                additionalProperties: {}
+                $ref: '#/components/schemas/ApiError'
           description: ''
   /api/carousel/balloon-update/:
     post:
@@ -1518,19 +1482,19 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: '#/components/schemas/ApiError'
           description: ''
         '404':
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: '#/components/schemas/ApiError'
           description: ''
         '500':
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: '#/components/schemas/ApiError'
           description: ''
   /api/carousel/get-parameter/:
     get:
@@ -1556,8 +1520,7 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                additionalProperties: {}
+                $ref: '#/components/schemas/ApiError'
           description: ''
   /api/check-connection/:
     get:
@@ -1635,8 +1598,7 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                additionalProperties: {}
+                $ref: '#/components/schemas/ApiError'
           description: ''
     post:
       operationId: api_railway_batch_create
@@ -1671,8 +1633,7 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                additionalProperties: {}
+                $ref: '#/components/schemas/ApiError'
           description: ''
   /api/railway-batch/{id}/:
     patch:
@@ -1714,15 +1675,13 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                additionalProperties: {}
+                $ref: '#/components/schemas/ApiError'
           description: ''
         '404':
           content:
             application/json:
               schema:
-                type: object
-                additionalProperties: {}
+                $ref: '#/components/schemas/ApiError'
           description: ''
   /api/railway-batch/statistic/:
     get:
@@ -1849,7 +1808,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: '#/components/schemas/ApiError'
           description: ''
   /api/trailers:
     get:
@@ -1915,15 +1874,13 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                additionalProperties: {}
+                $ref: '#/components/schemas/ApiError'
           description: ''
         '400':
           content:
             application/json:
               schema:
-                type: object
-                additionalProperties: {}
+                $ref: '#/components/schemas/ApiError'
           description: ''
     post:
       operationId: api_trailers_create
@@ -1974,8 +1931,7 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                additionalProperties: {}
+                $ref: '#/components/schemas/ApiError'
           description: ''
     patch:
       operationId: api_trailers_partial_update
@@ -2018,15 +1974,13 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                additionalProperties: {}
+                $ref: '#/components/schemas/ApiError'
           description: ''
         '404':
           content:
             application/json:
               schema:
-                type: object
-                additionalProperties: {}
+                $ref: '#/components/schemas/ApiError'
           description: ''
   /api/trucks:
     get:
@@ -2094,15 +2048,13 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                additionalProperties: {}
+                $ref: '#/components/schemas/ApiError'
           description: ''
         '400':
           content:
             application/json:
               schema:
-                type: object
-                additionalProperties: {}
+                $ref: '#/components/schemas/ApiError'
           description: ''
     post:
       operationId: api_trucks_create
@@ -2152,8 +2104,7 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                additionalProperties: {}
+                $ref: '#/components/schemas/ApiError'
           description: ''
     patch:
       operationId: api_trucks_partial_update
@@ -2196,15 +2147,13 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                additionalProperties: {}
+                $ref: '#/components/schemas/ApiError'
           description: ''
         '404':
           content:
             application/json:
               schema:
-                type: object
-                additionalProperties: {}
+                $ref: '#/components/schemas/ApiError'
           description: ''
   /api/ttn/miriada/current/:
     get:
@@ -2241,7 +2190,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: '#/components/schemas/ApiError'
               examples:
                 ПримерОшибки:
                   value:
@@ -2370,6 +2319,27 @@ components:
       - truck
       - ttn_id
       - ttn_name
+    ApiError:
+      type: object
+      description: |-
+        Единый формат ошибок в OpenAPI.
+
+        Реальные ответы пока могут отличаться (`error` / `detail` / `errors`);
+        схема фиксирует целевой контракт для клиентов и агентов.
+      properties:
+        error:
+          type: string
+          description: Человекочитаемое сообщение об ошибке
+        detail:
+          type: string
+          description: Краткое описание (часто от DRF)
+        code:
+          type: string
+          description: Машиночитаемый код ошибки (если задан)
+        errors:
+          type: object
+          additionalProperties: {}
+          description: Ошибки валидации по полям
     AutoGasBatch:
       type: object
       properties:
@@ -3117,13 +3087,6 @@ components:
           description: Статус доступности API
       required:
       - status
-    ErrorResponse:
-      type: object
-      properties:
-        error:
-          type: string
-      required:
-      - error
     GasTypeEnum:
       enum:
       - СПБТ

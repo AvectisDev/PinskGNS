@@ -23,6 +23,7 @@ from filling_station.services import (
     save_and_close_balloons_batch,
 )
 from filling_station.services.batches import OPEN_BATCH_STATUSES
+from core.api.schema import ApiErrorSerializer
 from .serializers import (
     ActiveBatchSerializer,
     BalloonAmountSerializer,
@@ -85,7 +86,7 @@ def _api_error_payload(payload):
         ],
         responses={
             200: ActiveBatchSerializer(many=True),
-            400: OpenApiTypes.OBJECT,
+            400: ApiErrorSerializer,
         }
     ),
     last_active=extend_schema(
@@ -106,7 +107,7 @@ def _api_error_payload(payload):
         ],
         responses={
             200: BalloonsBatchSerializer,
-            404: OpenApiTypes.OBJECT
+            404: ApiErrorSerializer
         }
     ),
     rfid_amount=extend_schema(
@@ -123,7 +124,7 @@ def _api_error_payload(payload):
         ],
         responses={
             200: BalloonAmountSerializer,
-            404: OpenApiTypes.OBJECT
+            404: ApiErrorSerializer
         }
     ),
     create=extend_schema(
@@ -138,7 +139,7 @@ def _api_error_payload(payload):
         request=BalloonsBatchSerializer,
         responses={
             201: BalloonsBatchSerializer,
-            400: OpenApiTypes.OBJECT
+            400: ApiErrorSerializer
         }
     ),
     partial_update=extend_schema(
@@ -164,9 +165,9 @@ def _api_error_payload(payload):
         request=BalloonsBatchSerializer,
         responses={
             200: BalloonsBatchSerializer,
-            400: OpenApiTypes.OBJECT,
-            404: OpenApiTypes.OBJECT,
-            502: OpenApiTypes.OBJECT,
+            400: ApiErrorSerializer,
+            404: ApiErrorSerializer,
+            502: ApiErrorSerializer,
         }
     ),
     add_balloon=extend_schema(
@@ -245,9 +246,9 @@ def _api_error_payload(payload):
         ],
         responses={
             200: BalloonsBatchSerializer,
-            400: OpenApiTypes.OBJECT,
-            404: OpenApiTypes.OBJECT,
-            502: OpenApiTypes.OBJECT,
+            400: ApiErrorSerializer,
+            404: ApiErrorSerializer,
+            502: ApiErrorSerializer,
         }
     ),
     pause=extend_schema(
@@ -268,8 +269,8 @@ def _api_error_payload(payload):
         ],
         responses={
             200: BalloonsBatchSerializer,
-            400: OpenApiTypes.OBJECT,
-            404: OpenApiTypes.OBJECT,
+            400: ApiErrorSerializer,
+            404: ApiErrorSerializer,
         }
     ),
     resume=extend_schema(
@@ -290,8 +291,8 @@ def _api_error_payload(payload):
         ],
         responses={
             200: BalloonsBatchSerializer,
-            400: OpenApiTypes.OBJECT,
-            404: OpenApiTypes.OBJECT,
+            400: ApiErrorSerializer,
+            404: ApiErrorSerializer,
         }
     ),
 )

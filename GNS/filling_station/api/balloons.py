@@ -16,6 +16,7 @@ from drf_spectacular.utils import (
 )
 from filling_station.models import Balloon, BalloonsBatch, DailyReaderCounter, TotalReadersCounter, ReaderSettings
 from .serializers import BalloonSerializer
+from core.api.schema import ApiErrorSerializer
 
 
 logger = logging.getLogger('filling_station')
@@ -45,12 +46,7 @@ USER_STATUS_LIST = [
 
 
 # Схемы для Swagger
-ErrorResponseSerializer = inline_serializer(
-    name='ErrorResponse',
-    fields={
-        'error': serializers.CharField()
-    }
-)
+ErrorResponseSerializer = ApiErrorSerializer
 
 UpdateByReaderResponseSerializer = inline_serializer(
     name='UpdateByReaderResponse',
@@ -150,7 +146,7 @@ UpdateByReaderResponseSerializer = inline_serializer(
                     'errors': serializers.DictField()
                 }
             ),
-            409: OpenApiTypes.OBJECT
+            409: ApiErrorSerializer
         },
         examples=[
             OpenApiExample(
@@ -233,7 +229,7 @@ UpdateByReaderResponseSerializer = inline_serializer(
                     'errors': serializers.DictField()
                 }
             ),
-            404: OpenApiTypes.OBJECT
+            404: ApiErrorSerializer
         },
         examples=[
             OpenApiExample(
