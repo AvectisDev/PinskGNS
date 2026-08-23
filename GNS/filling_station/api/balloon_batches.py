@@ -153,6 +153,14 @@ def _api_error_payload(payload):
             'Устаревший способ (обратная совместимость): `"is_active": false`. '
             'Поле `is_active` удалено из модели — используйте `status`.'
         ),
+        parameters=[
+            OpenApiParameter(
+                name='id',
+                type=OpenApiTypes.INT,
+                location=OpenApiParameter.PATH,
+                description='ID партии',
+            ),
+        ],
         request=BalloonsBatchSerializer,
         responses={
             200: BalloonsBatchSerializer,

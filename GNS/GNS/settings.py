@@ -79,10 +79,28 @@ SPECTACULAR_SETTINGS = {
     'SERVE_INCLUDE_SCHEMA': False,
     'SCHEMA_PATH_PREFIX': r'/api/v[0-9]',
     'COMPONENT_SPLIT_REQUEST': True,
+    'SERVERS': [
+        {
+            'url': os.environ.get('API_BASE_URL', 'http://localhost:8000'),
+            'description': 'Default API server',
+        },
+    ],
     'AUTHENTICATION_WHITELIST': [
+        'rest_framework_simplejwt.authentication.JWTAuthentication',
         'rest_framework.authentication.SessionAuthentication',
         'rest_framework.authentication.BasicAuthentication',
     ],
+    'APPEND_COMPONENTS': {
+        'securitySchemes': {
+            'bearerAuth': {
+                'type': 'http',
+                'scheme': 'bearer',
+                'bearerFormat': 'JWT',
+                'description': 'JWT access token from POST /api/token/',
+            },
+        },
+    },
+    'SECURITY': [{'bearerAuth': []}],
     'SWAGGER_UI_SETTINGS': {
         'deepLinking': True,
         'persistAuthorization': True,

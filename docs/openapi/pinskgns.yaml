@@ -1,0 +1,4084 @@
+openapi: 3.0.3
+info:
+  title: Balloon Management API
+  version: 1.0.0
+  description: API for managing gas balloons, loading/unloading batches and integration
+    with Miriada system
+paths:
+  /api/app/apk/:
+    get:
+      operationId: api_app_apk_retrieve
+      tags:
+      - api
+      security:
+      - bearerAuth: []
+      - {}
+      responses:
+        '200':
+          description: No response body
+  /api/app/version/:
+    get:
+      operationId: api_app_version_retrieve
+      tags:
+      - api
+      security:
+      - bearerAuth: []
+      - {}
+      responses:
+        '200':
+          description: No response body
+  /api/auto-gas-batch/:
+    get:
+      operationId: api_auto_gas_batch_list
+      description: Получение списка активных партий автоцистерн за сегодня
+      summary: Получить активные партии
+      tags:
+      - Автоцистерны
+      security:
+      - jwtAuth: []
+      - basicAuth: []
+      - cookieAuth: []
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AutoGasBatch'
+          description: ''
+        '404':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+    post:
+      operationId: api_auto_gas_batch_create
+      description: Создание новой партии автоцистерн
+      summary: Создать новую партию
+      tags:
+      - Автоцистерны
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AutoGasBatchRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/AutoGasBatchRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/AutoGasBatchRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      - basicAuth: []
+      - cookieAuth: []
+      - bearerAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AutoGasBatch'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /api/auto-gas-batch/{id}/:
+    patch:
+      operationId: api_auto_gas_batch_partial_update
+      description: Частичное обновление данных партии автоцистерн
+      summary: Обновить партию
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+        required: true
+      tags:
+      - Автоцистерны
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedAutoGasBatchRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedAutoGasBatchRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedAutoGasBatchRequest'
+      security:
+      - jwtAuth: []
+      - basicAuth: []
+      - cookieAuth: []
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AutoGasBatch'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+        '404':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /api/auto-gas-batch/statistic/:
+    get:
+      operationId: api_auto_gas_batch_statistic_retrieve
+      description: Получение сводной статистики по партиям автоцистерн. Включает статистику
+        за последний месяц и за сегодня, а также информацию об активной партии.
+      summary: Получить статистику по автоцистернам
+      tags:
+      - Автоцистерны
+      security:
+      - jwtAuth: []
+      - basicAuth: []
+      - cookieAuth: []
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+              examples:
+                ПримерОтвета:
+                  value:
+                    loading_batch:
+                      ПБА:
+                        gas_type: ПБА
+                        batch_type: l
+                        last_month_loading_batches: 15
+                        last_month_loading_weight: 200000.5
+                        today_loading_batches: 2
+                        today_loading_weight: 30000.0
+                      СПБТ:
+                        gas_type: СПБТ
+                        batch_type: l
+                        last_month_loading_batches: 10
+                        last_month_loading_weight: 150000.25
+                        today_loading_batches: 1
+                        today_loading_weight: 15000.0
+                    unloading_batch:
+                      ПБА:
+                        gas_type: ПБА
+                        batch_type: u
+                        last_month_unloading_batches: 12
+                        last_month_unloading_weight: 180000.0
+                        today_unloading_batches: 1
+                        today_unloading_weight: 15000.0
+                    active_batch:
+                      batch_type: Приёмка
+                      gas_type: ПБА
+                      car_brand: МАЗ
+                      truck_number: AM12347
+                      trailer_number: AB12347
+                      truck_gas_capacity: 20000.0
+                      scale_empty_weight: 15000.0
+                      scale_full_weight: 35000.0
+                  summary: Пример ответа
+          description: ''
+  /api/balloon-status-options:
+    get:
+      operationId: api_balloon_status_options_retrieve
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      - basicAuth: []
+      - cookieAuth: []
+      - bearerAuth: []
+      responses:
+        '200':
+          description: No response body
+  /api/balloons/:
+    post:
+      operationId: api_balloons_create
+      description: Создание нового баллона с проверкой уникальности NFC метки
+      summary: Создать новый баллон
+      tags:
+      - Баллоны
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BalloonRequest'
+            examples:
+              ПримерЗапроса:
+                value:
+                  nfc_tag: 1234567890ABCDEF
+                  serial_number: B12345
+                  size: 50
+                  netto: 18.5
+                  brutto: 40.2
+                  status: На складе
+                summary: Пример запроса
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/BalloonRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/BalloonRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      - basicAuth: []
+      - cookieAuth: []
+      - bearerAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Balloon'
+              examples:
+                УспешныйОтвет:
+                  value:
+                    nfc_tag: 1234567890ABCDEF
+                    serial_number: B12345
+                    size: 50
+                    netto: 18.5
+                    brutto: 40.2
+                    status: На складе
+                    filling_status: true
+                  summary: Успешный ответ
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BalloonCreateError'
+              examples:
+                ОшибкаВалидации:
+                  value:
+                    errors:
+                      size:
+                      - Обязательное поле.
+                      netto:
+                      - Введите число.
+                  summary: Ошибка валидации
+          description: ''
+        '409':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+              examples:
+                КонфликтNFCМетки:
+                  value:
+                    detail: Баллон с такой NFC меткой уже существует
+                  summary: Конфликт NFC метки
+          description: ''
+  /api/balloons-loading/:
+    post:
+      operationId: api_balloons_loading_create
+      description: 'Создание партии с привязкой к ТТН. Обязательно поле `amount_of_ttn`.
+        По умолчанию `status`: 1 (ACTIVE). При создании активной партии другие активные
+        партии на том же считывателе за сегодня автоматически переводятся в 2 (PAUSED).'
+      summary: Создать новую партию
+      tags:
+      - Партии баллонов
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BalloonsBatchRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/BalloonsBatchRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/BalloonsBatchRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      - basicAuth: []
+      - cookieAuth: []
+      - bearerAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BalloonsBatch'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /api/balloons-loading/{id}/:
+    patch:
+      operationId: api_balloons_loading_partial_update
+      description: |-
+        Частичное обновление полей партии (счётчики, транспорт, ТТН и т.д.).
+
+        **Завершение партии:** передайте `"status": 3` (COMPLETED). Отправляются статусы баллонов в Мириаду и закрывается ТТН. Доступно для статусов 1=ACTIVE и 2=PAUSED. При ошибке Мириады партия переходит в 4=MIRIADA_ERROR (ответ HTTP 502).
+
+        Устаревший способ (обратная совместимость): `"is_active": false`. Поле `is_active` удалено из модели — используйте `status`.
+      summary: Обновить или завершить партию
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: ID партии
+        required: true
+      tags:
+      - Партии баллонов
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedBalloonsBatchRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedBalloonsBatchRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedBalloonsBatchRequest'
+      security:
+      - jwtAuth: []
+      - basicAuth: []
+      - cookieAuth: []
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BalloonsBatch'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+        '404':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+        '502':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /api/balloons-loading/{id}/add-balloon/:
+    patch:
+      operationId: api_balloons_loading_add_balloon_partial_update
+      description: Добавление баллона по NFC-метке. Статус в Мириаду отправляется
+        при закрытии партии. Доступно для статусов 1=ACTIVE и 2=PAUSED.
+      summary: Добавить баллон в партию
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: ID партии
+        required: true
+      tags:
+      - Партии баллонов
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedAddBalloonRequestRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedAddBalloonRequestRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedAddBalloonRequestRequest'
+      security:
+      - jwtAuth: []
+      - basicAuth: []
+      - cookieAuth: []
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BalloonOperationResponse'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BalloonOperationResponse'
+          description: ''
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BalloonOperationResponse'
+          description: ''
+        '409':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BalloonOperationResponse'
+          description: ''
+  /api/balloons-loading/{id}/pause/:
+    post:
+      operationId: api_balloons_loading_pause_create
+      description: Переводит партию из 1=ACTIVE в 2=PAUSED. RFID и датчик перестают
+        добавлять баллоны; ручное добавление и удаление остаётся доступным.
+      summary: Приостановить партию
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: ID партии
+        required: true
+      tags:
+      - Партии баллонов
+      security:
+      - jwtAuth: []
+      - basicAuth: []
+      - cookieAuth: []
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BalloonsBatch'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+        '404':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /api/balloons-loading/{id}/remove-balloon/:
+    patch:
+      operationId: api_balloons_loading_remove_balloon_partial_update
+      description: Удаление баллона по NFC-метке. Доступно для статусов 1=ACTIVE и
+        2=PAUSED.
+      summary: Удалить баллон из партии
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: ID партии
+        required: true
+      tags:
+      - Партии баллонов
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedRemoveBalloonRequestRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedRemoveBalloonRequestRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedRemoveBalloonRequestRequest'
+      security:
+      - jwtAuth: []
+      - basicAuth: []
+      - cookieAuth: []
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BalloonOperationResponse'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BalloonOperationResponse'
+          description: ''
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BalloonOperationResponse'
+          description: ''
+  /api/balloons-loading/{id}/resume/:
+    post:
+      operationId: api_balloons_loading_resume_create
+      description: Переводит партию из 2=PAUSED в 1=ACTIVE. Другие активные партии
+        на том же считывателе за сегодня автоматически переводятся в 2=PAUSED.
+      summary: Возобновить партию
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: ID партии
+        required: true
+      tags:
+      - Партии баллонов
+      security:
+      - jwtAuth: []
+      - basicAuth: []
+      - cookieAuth: []
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BalloonsBatch'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+        '404':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /api/balloons-loading/{id}/retry-close/:
+    post:
+      operationId: api_balloons_loading_retry_close_create
+      description: Сохраняет данные партии, отправляет статусы баллонов в Мириаду
+        и закрывает ТТН. Завершение возможно только если количество RFID совпадает
+        с количеством по электронной ТТН. Доступно для статусов 1=ACTIVE, 2=PAUSED
+        и 4=MIRIADA_ERROR (повтор после ошибки Мириады).
+      summary: Повторно завершить партию
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: ID партии
+        required: true
+      tags:
+      - Партии баллонов
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BalloonsBatchRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/BalloonsBatchRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/BalloonsBatchRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      - basicAuth: []
+      - cookieAuth: []
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BalloonsBatch'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+        '404':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+        '502':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /api/balloons-loading/{id}/rfid-amount/:
+    get:
+      operationId: api_balloons_loading_rfid_amount_retrieve
+      description: 'Количество баллонов в партии: RFID, оптический датчик и электронная
+        ТТН'
+      summary: Количество баллонов по RFID
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: ID партии
+        required: true
+      tags:
+      - Партии баллонов
+      security:
+      - jwtAuth: []
+      - basicAuth: []
+      - cookieAuth: []
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BalloonAmount'
+          description: ''
+        '404':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /api/balloons-loading/active/:
+    get:
+      operationId: api_balloons_loading_active_list
+      description: 'Список партий, которые ещё не завершены успешно: status ∈ {1=ACTIVE,
+        2=PAUSED, 4=MIRIADA_ERROR}. Статус партии (числовой enum): 1=ACTIVE — в работе
+        (RFID принимает баллоны); 2=PAUSED — приостановлена (ручное добавление/удаление
+        доступно); 3=COMPLETED — завершена; 4=MIRIADA_ERROR — ошибка закрытия ТТН
+        в Мириаде. 0=UNSPECIFIED не используется.'
+      summary: Получить незавершённые партии
+      parameters:
+      - in: query
+        name: batch_type
+        schema:
+          type: string
+          enum:
+          - l
+          - u
+        description: 'Тип партии: l (приёмка) или u (отгрузка)'
+      tags:
+      - Партии баллонов
+      security:
+      - jwtAuth: []
+      - basicAuth: []
+      - cookieAuth: []
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ActiveBatch'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /api/balloons-loading/last-active/:
+    get:
+      operationId: api_balloons_loading_last_active_retrieve
+      description: Последняя партия со статусом 1=ACTIVE (принимает RFID). Партии
+        в 2=PAUSED или 4=MIRIADA_ERROR не возвращаются.
+      summary: Получить текущую активную партию
+      parameters:
+      - in: query
+        name: batch_type
+        schema:
+          type: string
+          enum:
+          - l
+          - u
+        description: 'Тип партии: l (приёмка) или u (отгрузка)'
+      tags:
+      - Партии баллонов
+      security:
+      - jwtAuth: []
+      - basicAuth: []
+      - cookieAuth: []
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BalloonsBatch'
+          description: ''
+        '404':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /api/balloons-unloading/:
+    post:
+      operationId: api_balloons_unloading_create
+      description: 'Создание партии с привязкой к ТТН. Обязательно поле `amount_of_ttn`.
+        По умолчанию `status`: 1 (ACTIVE). При создании активной партии другие активные
+        партии на том же считывателе за сегодня автоматически переводятся в 2 (PAUSED).'
+      summary: Создать новую партию
+      tags:
+      - Партии баллонов
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BalloonsBatchRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/BalloonsBatchRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/BalloonsBatchRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      - basicAuth: []
+      - cookieAuth: []
+      - bearerAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BalloonsBatch'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /api/balloons-unloading/{id}/:
+    patch:
+      operationId: api_balloons_unloading_partial_update
+      description: |-
+        Частичное обновление полей партии (счётчики, транспорт, ТТН и т.д.).
+
+        **Завершение партии:** передайте `"status": 3` (COMPLETED). Отправляются статусы баллонов в Мириаду и закрывается ТТН. Доступно для статусов 1=ACTIVE и 2=PAUSED. При ошибке Мириады партия переходит в 4=MIRIADA_ERROR (ответ HTTP 502).
+
+        Устаревший способ (обратная совместимость): `"is_active": false`. Поле `is_active` удалено из модели — используйте `status`.
+      summary: Обновить или завершить партию
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: ID партии
+        required: true
+      tags:
+      - Партии баллонов
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedBalloonsBatchRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedBalloonsBatchRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedBalloonsBatchRequest'
+      security:
+      - jwtAuth: []
+      - basicAuth: []
+      - cookieAuth: []
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BalloonsBatch'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+        '404':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+        '502':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /api/balloons-unloading/{id}/add-balloon/:
+    patch:
+      operationId: api_balloons_unloading_add_balloon_partial_update
+      description: Добавление баллона по NFC-метке. Статус в Мириаду отправляется
+        при закрытии партии. Доступно для статусов 1=ACTIVE и 2=PAUSED.
+      summary: Добавить баллон в партию
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: ID партии
+        required: true
+      tags:
+      - Партии баллонов
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedAddBalloonRequestRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedAddBalloonRequestRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedAddBalloonRequestRequest'
+      security:
+      - jwtAuth: []
+      - basicAuth: []
+      - cookieAuth: []
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BalloonOperationResponse'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BalloonOperationResponse'
+          description: ''
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BalloonOperationResponse'
+          description: ''
+        '409':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BalloonOperationResponse'
+          description: ''
+  /api/balloons-unloading/{id}/pause/:
+    post:
+      operationId: api_balloons_unloading_pause_create
+      description: Переводит партию из 1=ACTIVE в 2=PAUSED. RFID и датчик перестают
+        добавлять баллоны; ручное добавление и удаление остаётся доступным.
+      summary: Приостановить партию
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: ID партии
+        required: true
+      tags:
+      - Партии баллонов
+      security:
+      - jwtAuth: []
+      - basicAuth: []
+      - cookieAuth: []
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BalloonsBatch'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+        '404':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /api/balloons-unloading/{id}/remove-balloon/:
+    patch:
+      operationId: api_balloons_unloading_remove_balloon_partial_update
+      description: Удаление баллона по NFC-метке. Доступно для статусов 1=ACTIVE и
+        2=PAUSED.
+      summary: Удалить баллон из партии
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: ID партии
+        required: true
+      tags:
+      - Партии баллонов
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedRemoveBalloonRequestRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedRemoveBalloonRequestRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedRemoveBalloonRequestRequest'
+      security:
+      - jwtAuth: []
+      - basicAuth: []
+      - cookieAuth: []
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BalloonOperationResponse'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BalloonOperationResponse'
+          description: ''
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BalloonOperationResponse'
+          description: ''
+  /api/balloons-unloading/{id}/resume/:
+    post:
+      operationId: api_balloons_unloading_resume_create
+      description: Переводит партию из 2=PAUSED в 1=ACTIVE. Другие активные партии
+        на том же считывателе за сегодня автоматически переводятся в 2=PAUSED.
+      summary: Возобновить партию
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: ID партии
+        required: true
+      tags:
+      - Партии баллонов
+      security:
+      - jwtAuth: []
+      - basicAuth: []
+      - cookieAuth: []
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BalloonsBatch'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+        '404':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /api/balloons-unloading/{id}/retry-close/:
+    post:
+      operationId: api_balloons_unloading_retry_close_create
+      description: Сохраняет данные партии, отправляет статусы баллонов в Мириаду
+        и закрывает ТТН. Завершение возможно только если количество RFID совпадает
+        с количеством по электронной ТТН. Доступно для статусов 1=ACTIVE, 2=PAUSED
+        и 4=MIRIADA_ERROR (повтор после ошибки Мириады).
+      summary: Повторно завершить партию
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: ID партии
+        required: true
+      tags:
+      - Партии баллонов
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BalloonsBatchRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/BalloonsBatchRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/BalloonsBatchRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      - basicAuth: []
+      - cookieAuth: []
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BalloonsBatch'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+        '404':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+        '502':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /api/balloons-unloading/{id}/rfid-amount/:
+    get:
+      operationId: api_balloons_unloading_rfid_amount_retrieve
+      description: 'Количество баллонов в партии: RFID, оптический датчик и электронная
+        ТТН'
+      summary: Количество баллонов по RFID
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: ID партии
+        required: true
+      tags:
+      - Партии баллонов
+      security:
+      - jwtAuth: []
+      - basicAuth: []
+      - cookieAuth: []
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BalloonAmount'
+          description: ''
+        '404':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /api/balloons-unloading/active/:
+    get:
+      operationId: api_balloons_unloading_active_list
+      description: 'Список партий, которые ещё не завершены успешно: status ∈ {1=ACTIVE,
+        2=PAUSED, 4=MIRIADA_ERROR}. Статус партии (числовой enum): 1=ACTIVE — в работе
+        (RFID принимает баллоны); 2=PAUSED — приостановлена (ручное добавление/удаление
+        доступно); 3=COMPLETED — завершена; 4=MIRIADA_ERROR — ошибка закрытия ТТН
+        в Мириаде. 0=UNSPECIFIED не используется.'
+      summary: Получить незавершённые партии
+      parameters:
+      - in: query
+        name: batch_type
+        schema:
+          type: string
+          enum:
+          - l
+          - u
+        description: 'Тип партии: l (приёмка) или u (отгрузка)'
+      tags:
+      - Партии баллонов
+      security:
+      - jwtAuth: []
+      - basicAuth: []
+      - cookieAuth: []
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ActiveBatch'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /api/balloons-unloading/last-active/:
+    get:
+      operationId: api_balloons_unloading_last_active_retrieve
+      description: Последняя партия со статусом 1=ACTIVE (принимает RFID). Партии
+        в 2=PAUSED или 4=MIRIADA_ERROR не возвращаются.
+      summary: Получить текущую активную партию
+      parameters:
+      - in: query
+        name: batch_type
+        schema:
+          type: string
+          enum:
+          - l
+          - u
+        description: 'Тип партии: l (приёмка) или u (отгрузка)'
+      tags:
+      - Партии баллонов
+      security:
+      - jwtAuth: []
+      - basicAuth: []
+      - cookieAuth: []
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BalloonsBatch'
+          description: ''
+        '404':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /api/balloons/{id}/:
+    patch:
+      operationId: api_balloons_partial_update
+      description: Обновление отдельных полей баллона по его NFC метке
+      summary: Частичное обновление баллона
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+        description: NFC метка баллона (первичный ключ)
+        required: true
+        examples:
+          ПримерNFCМетки:
+            value: 1234567890ABCDEF
+            summary: Пример NFC метки
+      tags:
+      - Баллоны
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedBalloonRequest'
+            examples:
+              ПримерЗапросаНаОбновление:
+                value:
+                  status: В ремонте
+                  filling_status: false
+                  wall_thickness: 5.2
+                summary: Пример запроса на обновление
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedBalloonRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedBalloonRequest'
+      security:
+      - jwtAuth: []
+      - basicAuth: []
+      - cookieAuth: []
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Balloon'
+              examples:
+                УспешныйОтвет:
+                  value:
+                    nfc_tag: 1234567890ABCDEF
+                    serial_number: B12345
+                    status: В ремонте
+                    filling_status: false
+                    wall_thickness: 5.2
+                  summary: Успешный ответ
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BalloonUpdateError'
+          description: ''
+        '404':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /api/balloons/nfc/{nfc_tag}/:
+    get:
+      operationId: api_balloons_nfc_retrieve
+      description: Получение информации о баллоне по его NFC метке
+      summary: Получить баллон по NFC метке
+      parameters:
+      - in: path
+        name: nfc_tag
+        schema:
+          type: string
+        description: NFC метка баллона
+        required: true
+        examples:
+          ПримерNFCМетки:
+            value: 1234567890ABCDEF
+            summary: Пример NFC метки
+      tags:
+      - Баллоны
+      security:
+      - jwtAuth: []
+      - basicAuth: []
+      - cookieAuth: []
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Balloon'
+              examples:
+                ПримерУспешногоОтвета:
+                  value:
+                    nfc_tag: 1234567890ABCDEF
+                    serial_number: B12345
+                    size: 50
+                    netto: 18.5
+                    brutto: 40.2
+                    status: На складе
+                    filling_status: true
+                  summary: Пример успешного ответа
+          description: ''
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+  /api/balloons/serial-number/{serial_number}/:
+    get:
+      operationId: api_balloons_serial_number_list
+      description: Поиск всех баллонов с указанным серийным номером
+      summary: Получить баллоны по серийному номеру
+      parameters:
+      - in: path
+        name: serial_number
+        schema:
+          type: string
+        description: Серийный номер баллона
+        required: true
+        examples:
+          ПримерСерийногоНомера:
+            value: B12345
+            summary: Пример серийного номера
+      tags:
+      - Баллоны
+      security:
+      - jwtAuth: []
+      - basicAuth: []
+      - cookieAuth: []
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Balloon'
+              examples:
+                ПримерОтветаСНесколькимиБаллонами:
+                  value:
+                  - - nfc_tag: 1234567890ABCDEF
+                      serial_number: B12345
+                      size: 50
+                      netto: 18.5
+                      brutto: 40.2
+                      status: На складе
+                      filling_status: true
+                  summary: Пример ответа с несколькими баллонами
+          description: ''
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+  /api/balloons/statistic/:
+    get:
+      operationId: api_balloons_statistic_retrieve
+      description: Получение статистики по ГНС
+      summary: Получение статистики по ГНС
+      tags:
+      - Баллоны
+      security:
+      - jwtAuth: []
+      - basicAuth: []
+      - cookieAuth: []
+      - bearerAuth: []
+      responses:
+        '200':
+          description: No response body
+  /api/carousel/{id}/:
+    patch:
+      operationId: api_carousel_partial_update
+      description: Частичное обновление настроек карусели
+      summary: Обновить параметры карусели
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+        required: true
+      - in: path
+        name: pk
+        schema:
+          type: integer
+        description: ID карусели
+        required: true
+      tags:
+      - Карусель
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedCarouselSettingsRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedCarouselSettingsRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedCarouselSettingsRequest'
+      security:
+      - jwtAuth: []
+      - basicAuth: []
+      - cookieAuth: []
+      - bearerAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CarouselSettings'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+        '404':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /api/carousel/balloon-update/:
+    post:
+      operationId: api_carousel_balloon_update_create
+      description: 'Получение данных от постов наполнения карусели. Поддерживает два
+        типа запросов: 0x7a (данные о баллоне) и 0x70 (обновление веса).'
+      summary: Обновить данные от карусели
+      tags:
+      - Карусель
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CarouselUpdateRequestRequest'
+            examples:
+              ЗапросТипа0x7a:
+                value:
+                  request_type: '0x7a'
+                  post_number: 1
+                  nfc_tag: 1234567890ABCDEF
+                  serial_number: B12345
+                  size: 50
+                  netto: 18.5
+                  brutto: 40.2
+                summary: Запрос типа 0x7a
+              ЗапросТипа0x70:
+                value:
+                  request_type: '0x70'
+                  post_number: 1
+                  full_weight: 40200.0
+                summary: Запрос типа 0x70
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/CarouselUpdateRequestRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/CarouselUpdateRequestRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      - basicAuth: []
+      - cookieAuth: []
+      - bearerAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Carousel'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+  /api/carousel/get-parameter/:
+    get:
+      operationId: api_carousel_get_parameter_retrieve
+      description: Получение настроек карусели наполнения баллонов
+      summary: Получить параметры карусели
+      tags:
+      - Карусель
+      security:
+      - jwtAuth: []
+      - basicAuth: []
+      - cookieAuth: []
+      - bearerAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CarouselSettings'
+          description: ''
+        '404':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /api/check-connection/:
+    get:
+      operationId: api_check_connection_retrieve
+      description: Публичный health-check. Не требует аутентификации.
+      summary: Проверка доступности API
+      tags:
+      - Health
+      security:
+      - bearerAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CheckConnectionResponse'
+          description: ''
+  /api/get-active-balloon-batch:
+    get:
+      operationId: api_get_active_balloon_batch_retrieve
+      description: 'Список партий со статусом 1=ACTIVE за сегодня для приёмки и отгрузки.
+        Используется SCADA: номер считывателя и регистрационные номера транспорта.'
+      summary: Активные партии для SCADA
+      tags:
+      - Партии баллонов
+      security:
+      - jwtAuth: []
+      - basicAuth: []
+      - cookieAuth: []
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /api/loading-balloon-reader-list:
+    get:
+      operationId: api_loading_balloon_reader_list_retrieve
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      - basicAuth: []
+      - cookieAuth: []
+      - bearerAuth: []
+      responses:
+        '200':
+          description: No response body
+  /api/railway-batch/:
+    get:
+      operationId: api_railway_batch_list
+      description: Получение данных активной железнодорожной партии
+      summary: Получить активную партию
+      tags:
+      - Железнодорожные партии
+      security:
+      - jwtAuth: []
+      - basicAuth: []
+      - cookieAuth: []
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/RailwayBatch'
+          description: ''
+        '404':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+    post:
+      operationId: api_railway_batch_create
+      description: Создание новой железнодорожной партии
+      summary: Создать новую партию
+      tags:
+      - Железнодорожные партии
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RailwayBatchRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/RailwayBatchRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/RailwayBatchRequest'
+      security:
+      - jwtAuth: []
+      - basicAuth: []
+      - cookieAuth: []
+      - bearerAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RailwayBatch'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /api/railway-batch/{id}/:
+    patch:
+      operationId: api_railway_batch_partial_update
+      description: Частичное обновление данных железнодорожной партии
+      summary: Обновить партию
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+        required: true
+      tags:
+      - Железнодорожные партии
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedRailwayBatchRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedRailwayBatchRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedRailwayBatchRequest'
+      security:
+      - jwtAuth: []
+      - basicAuth: []
+      - cookieAuth: []
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RailwayBatch'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+        '404':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /api/railway-batch/statistic/:
+    get:
+      operationId: api_railway_batch_statistic_retrieve
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      - basicAuth: []
+      - cookieAuth: []
+      - bearerAuth: []
+      responses:
+        '200':
+          description: No response body
+  /api/token/:
+    post:
+      operationId: api_token_create
+      description: |-
+        Takes a set of user credentials and returns an access and refresh JSON web
+        token pair to prove the authentication of those credentials.
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TokenObtainPairRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/TokenObtainPairRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/TokenObtainPairRequest'
+        required: true
+      security:
+      - bearerAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenObtainPair'
+          description: ''
+  /api/token/refresh/:
+    post:
+      operationId: api_token_refresh_create
+      description: |-
+        Takes a refresh type JSON web token and returns an access type JSON web
+        token if the refresh token is valid.
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TokenRefreshRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/TokenRefreshRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/TokenRefreshRequest'
+        required: true
+      security:
+      - bearerAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenRefresh'
+          description: ''
+  /api/total-readers-counter/manual-values:
+    post:
+      operationId: api_total_readers_counter_manual_values_create
+      description: Записывает переданные значения в таблицу `TotalReadersCounter`
+        (singleton `pk=1`). Можно передать только `empty`, только `full` или оба поля.
+      summary: Ручной ввод итоговых счетчиков (пустые/полные)
+      tags:
+      - Свод по складу
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ManualTotalReadersCounterRequestRequest'
+            examples:
+              ПримерЗапроса(обаПоля):
+                value:
+                  empty: 25
+                  full: 7
+                summary: Пример запроса (оба поля)
+              ПримерЗапроса(толькоEmpty):
+                value:
+                  empty: 10
+                summary: Пример запроса (только empty)
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ManualTotalReadersCounterRequestRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ManualTotalReadersCounterRequestRequest'
+      security:
+      - jwtAuth: []
+      - basicAuth: []
+      - cookieAuth: []
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ManualTotalReadersCounterResponse'
+              examples:
+                ПримерУспешногоОтвета:
+                  value:
+                    total_empty: 25
+                    total_full: 7
+                    changed_at: '2026-01-28T10:15:30Z'
+                  summary: Пример успешного ответа
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+  /api/trailers:
+    get:
+      operationId: api_trailers_list
+      description: |-
+        Получение списка прицепов с возможностью фильтрации:
+                - По наличию на станции (on_station)
+                - По регистрационному номеру (registration_number)
+      summary: Получить список прицепов
+      parameters:
+      - in: query
+        name: on_station
+        schema:
+          type: boolean
+        description: Фильтр по наличию на станции (true/false)
+        examples:
+          ТолькоНаСтанции:
+            value: true
+            summary: Только на станции
+          ТолькоВнеСтанции:
+            value: false
+            summary: Только вне станции
+      - in: query
+        name: registration_number
+        schema:
+          type: string
+        description: 'Поиск по регистрационному номеру (например: ПТ987ХВ)'
+      tags:
+      - Прицепы
+      security:
+      - jwtAuth: []
+      - basicAuth: []
+      - cookieAuth: []
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Trailer'
+              examples:
+                ПримерУспешногоОтвета:
+                  value:
+                  - - id: 1
+                      truck: 1
+                      trailer_brand: МАЗ
+                      registration_number: A1234B7
+                      type: Цистерна
+                      capacity_cylinders: 40
+                      max_weight_of_transported_cylinders: 1200.5
+                      max_mass_of_transported_gas: 1000.0
+                      max_gas_volume: 1500.0
+                      empty_weight: 5000.0
+                      full_weight: 15000.0
+                      is_on_station: true
+                      entry_at: '2023-05-15T08:45:00'
+                      departure_at: null
+                  summary: Пример успешного ответа
+          description: ''
+        '404':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+    post:
+      operationId: api_trailers_create
+      description: Создание новой записи о прицепе в системе
+      summary: Добавить новый прицеп
+      tags:
+      - Прицепы
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TrailerRequest'
+            examples:
+              ПримерЗапроса:
+                value:
+                  truck: 1
+                  trailer_brand: МАЗ
+                  registration_number: A1234B7
+                  type: 2
+                  capacity_cylinders: 35
+                  max_weight_of_transported_cylinders: 1100.0
+                  max_mass_of_transported_gas: 900.0
+                  max_gas_volume: 1400.0
+                  empty_weight: 4800.0
+                  full_weight: 14500.0
+                  is_on_station: false
+                summary: Пример запроса
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/TrailerRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/TrailerRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      - basicAuth: []
+      - cookieAuth: []
+      - bearerAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Trailer'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+    patch:
+      operationId: api_trailers_partial_update
+      description: Частичное обновление информации о прицепе
+      summary: Обновить данные прицепа
+      tags:
+      - Прицепы
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedTrailerRequest'
+            examples:
+              ПримерЗапросаНаОбновление:
+                value:
+                  id: 1
+                  is_on_station: false
+                  entry_at: '2023-05-16T10:15:00'
+                  departure_at: '2023-05-16T17:00:00'
+                summary: Пример запроса на обновление
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedTrailerRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedTrailerRequest'
+      security:
+      - jwtAuth: []
+      - basicAuth: []
+      - cookieAuth: []
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Trailer'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+        '404':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /api/trucks:
+    get:
+      operationId: api_trucks_list
+      description: |-
+        Получение списка грузовиков с возможностью фильтрации:
+                - По наличию на станции (on_station)
+                - По регистрационному номеру (registration_number)
+      summary: Получить список грузовиков
+      parameters:
+      - in: query
+        name: on_station
+        schema:
+          type: boolean
+        description: Фильтр по наличию на станции (true/false)
+        examples:
+          ТолькоНаСтанции:
+            value: true
+            summary: Только на станции
+          ТолькоВнеСтанции:
+            value: false
+            summary: Только вне станции
+      - in: query
+        name: registration_number
+        schema:
+          type: string
+        description: 'Поиск по регистрационному номеру (например: АX12347)'
+      tags:
+      - Грузовики
+      security:
+      - jwtAuth: []
+      - basicAuth: []
+      - cookieAuth: []
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Truck'
+              examples:
+                ПримерУспешногоОтвета:
+                  value:
+                  - - id: 1
+                      car_brand: МАЗ
+                      registration_number: АX12347
+                      type: Седельный тягач
+                      capacity_cylinders: 60
+                      max_weight_of_transported_cylinders: 1500.5
+                      max_mass_of_transported_gas: 1200.0
+                      max_gas_volume: 2000.0
+                      empty_weight: 7500.0
+                      full_weight: 20000.0
+                      is_on_station: true
+                      entry_at: '2023-05-15T08:30:00'
+                      departure_at: null
+                      trailer:
+                        id: 1
+                        registration_number: A1234B7
+                  summary: Пример успешного ответа
+          description: ''
+        '404':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+    post:
+      operationId: api_trucks_create
+      description: Создание новой записи о грузовике в системе
+      summary: Добавить новый грузовик
+      tags:
+      - Грузовики
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TruckRequest'
+            examples:
+              ПримерЗапроса:
+                value:
+                  car_brand: MAN
+                  registration_number: АX12347
+                  type: 1
+                  capacity_cylinders: 50
+                  max_weight_of_transported_cylinders: 1400.0
+                  max_mass_of_transported_gas: 1100.0
+                  max_gas_volume: 1800.0
+                  empty_weight: 8000.0
+                  full_weight: 21000.0
+                  is_on_station: false
+                summary: Пример запроса
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/TruckRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/TruckRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      - basicAuth: []
+      - cookieAuth: []
+      - bearerAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Truck'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+    patch:
+      operationId: api_trucks_partial_update
+      description: Частичное обновление информации о грузовике
+      summary: Обновить данные грузовика
+      tags:
+      - Грузовики
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedTruckRequest'
+            examples:
+              ПримерЗапросаНаОбновление:
+                value:
+                  id: 1
+                  is_on_station: false
+                  entry_at: '2023-05-16T10:00:00'
+                  departure_at: '2023-05-16T16:30:00'
+                summary: Пример запроса на обновление
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedTruckRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedTruckRequest'
+      security:
+      - jwtAuth: []
+      - basicAuth: []
+      - cookieAuth: []
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Truck'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+        '404':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /api/ttn/miriada/current/:
+    get:
+      operationId: api_ttn_miriada_current_list
+      description: Получение списка текущих ТТН из системы Мириада
+      summary: Получить список текущих ТТН
+      tags:
+      - ТТН из Мириады
+      security:
+      - bearerAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/MiriadaTtn'
+              examples:
+                ПримерУспешногоОтвета:
+                  value:
+                  - - ttn_id: 14769
+                      name: ТТН №0324344
+                      auto: AM 9621-1
+                      date: '2025-12-18'
+                    - ttn_id: 14796
+                      name: '0324576'
+                      auto: АН 5514-1
+                      date: '2025-12-18'
+                  summary: Пример успешного ответа
+          description: ''
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                ПримерОшибки:
+                  value:
+                    error: Не удалось получить список ТТН из Мириады
+                  summary: Пример ошибки
+          description: ''
+  /api/unloading-balloon-reader-list:
+    get:
+      operationId: api_unloading_balloon_reader_list_retrieve
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      - basicAuth: []
+      - cookieAuth: []
+      - bearerAuth: []
+      responses:
+        '200':
+          description: No response body
+components:
+  schemas:
+    ActiveBatch:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        batch_type:
+          allOf:
+          - $ref: '#/components/schemas/BatchTypeEnum'
+          title: Тип партии
+        started_at:
+          type: string
+          format: date-time
+          readOnly: true
+          title: Дата и время начала
+        completed_at:
+          type: string
+          format: date-time
+          nullable: true
+          title: Дата и время окончания
+        truck:
+          allOf:
+          - $ref: '#/components/schemas/BalloonsTruck'
+          readOnly: true
+        trailer:
+          type: integer
+          nullable: true
+          title: Прицеп
+        reader_number:
+          type: integer
+          maximum: 2147483647
+          minimum: -2147483648
+          nullable: true
+          title: Номер считывателя
+        amount_of_rfid:
+          type: integer
+          maximum: 2147483647
+          minimum: -2147483648
+          title: Количество баллонов по rfid
+        amount_of_sensor:
+          type: integer
+          maximum: 2147483647
+          minimum: -2147483648
+          title: Количество баллонов по датчику
+        amount_of_ttn:
+          type: integer
+          maximum: 2147483647
+          minimum: -2147483648
+          title: Количество баллонов по электронной ТТН
+        amount_of_5_liters:
+          type: integer
+          maximum: 2147483647
+          minimum: -2147483648
+          title: Количество 5л баллонов
+        amount_of_12_liters:
+          type: integer
+          maximum: 2147483647
+          minimum: -2147483648
+          title: Количество 12л баллонов
+        amount_of_27_liters:
+          type: integer
+          maximum: 2147483647
+          minimum: -2147483648
+          title: Количество 27л баллонов
+        amount_of_50_liters:
+          type: integer
+          maximum: 2147483647
+          minimum: -2147483648
+          title: Количество 50л баллонов
+        gas_amount:
+          type: number
+          format: double
+          nullable: true
+          title: Количество принятого газа
+        status:
+          allOf:
+          - $ref: '#/components/schemas/StatusEnum'
+          description: 'Числовой enum: 1=ACTIVE, 2=PAUSED, 3=COMPLETED, 4=MIRIADA_ERROR
+            (0=UNSPECIFIED не используется в запросах)'
+          readOnly: true
+        miriada_close_failed:
+          type: boolean
+          readOnly: true
+        miriada_error_message:
+          type: string
+          readOnly: true
+        ttn_id:
+          type: integer
+          maximum: 2147483647
+          minimum: -2147483648
+          title: ID ТТН
+        ttn_name:
+          type: string
+          readOnly: true
+        balloons_type:
+          allOf:
+          - $ref: '#/components/schemas/BalloonsTypeEnum'
+          title: Пустой/полный
+      required:
+      - id
+      - miriada_close_failed
+      - miriada_error_message
+      - started_at
+      - status
+      - truck
+      - ttn_id
+      - ttn_name
+    AutoGasBatch:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        batch_type:
+          allOf:
+          - $ref: '#/components/schemas/BatchTypeEnum'
+          title: Тип партии
+        begin_at:
+          type: string
+          format: date-time
+          readOnly: true
+          title: Дата и время начала
+        completed_at:
+          type: string
+          format: date-time
+          nullable: true
+          title: Дата и время окончания
+        truck:
+          type: integer
+          title: Автомобиль
+        trailer:
+          type: integer
+          nullable: true
+          title: Прицеп
+        gas_amount:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,10}(?:\.\d{0,2})?$
+          nullable: true
+          title: Количество газа (массомер)
+        gas_type:
+          allOf:
+          - $ref: '#/components/schemas/GasTypeEnum'
+          title: Тип газа
+        scale_empty_weight:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,10}(?:\.\d{0,2})?$
+          nullable: true
+          title: Вес пустого т/с (весы)
+        scale_full_weight:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,10}(?:\.\d{0,2})?$
+          nullable: true
+          title: Вес полного т/с (весы)
+        weight_gas_amount:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,10}(?:\.\d{0,2})?$
+          nullable: true
+          title: Количество газа (весы)
+        is_active:
+          type: boolean
+          title: В работе
+      required:
+      - begin_at
+      - id
+      - truck
+    AutoGasBatchRequest:
+      type: object
+      properties:
+        batch_type:
+          allOf:
+          - $ref: '#/components/schemas/BatchTypeEnum'
+          title: Тип партии
+        completed_at:
+          type: string
+          format: date-time
+          nullable: true
+          title: Дата и время окончания
+        truck:
+          type: integer
+          title: Автомобиль
+        trailer:
+          type: integer
+          nullable: true
+          title: Прицеп
+        gas_amount:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,10}(?:\.\d{0,2})?$
+          nullable: true
+          title: Количество газа (массомер)
+        gas_type:
+          allOf:
+          - $ref: '#/components/schemas/GasTypeEnum'
+          title: Тип газа
+        scale_empty_weight:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,10}(?:\.\d{0,2})?$
+          nullable: true
+          title: Вес пустого т/с (весы)
+        scale_full_weight:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,10}(?:\.\d{0,2})?$
+          nullable: true
+          title: Вес полного т/с (весы)
+        weight_gas_amount:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,10}(?:\.\d{0,2})?$
+          nullable: true
+          title: Количество газа (весы)
+        is_active:
+          type: boolean
+          title: В работе
+      required:
+      - truck
+    Balloon:
+      type: object
+      properties:
+        nfc_tag:
+          type: string
+          title: Номер метки
+          maxLength: 30
+        serial_number:
+          type: string
+          nullable: true
+          title: Серийный номер
+          maxLength: 30
+        creation_date:
+          type: string
+          format: date
+          nullable: true
+          title: Дата производства
+        size:
+          allOf:
+          - $ref: '#/components/schemas/SizeEnum'
+          title: Объём
+          minimum: -2147483648
+          maximum: 2147483647
+        netto:
+          type: number
+          format: double
+          nullable: true
+          title: Вес пустого баллона
+        brutto:
+          type: number
+          format: double
+          nullable: true
+          title: Вес наполненного баллона
+        current_examination_date:
+          type: string
+          format: date
+          nullable: true
+          title: Дата освидетельствования
+        next_examination_date:
+          type: string
+          format: date
+          nullable: true
+          title: Дата следующего освидетельствования
+        status:
+          type: string
+          nullable: true
+          title: Статус
+          maxLength: 100
+        manufacturer:
+          type: string
+          nullable: true
+          title: Производитель
+          maxLength: 30
+        wall_thickness:
+          type: number
+          format: double
+          nullable: true
+          title: Толщина стенок
+        filling_status:
+          type: boolean
+          title: Готов к наполнению
+        update_passport_required:
+          type: boolean
+          title: Требуется обновление паспорта
+      required:
+      - nfc_tag
+    BalloonAmount:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        amount_of_rfid:
+          type: integer
+          maximum: 2147483647
+          minimum: -2147483648
+          title: Количество баллонов по rfid
+        amount_of_sensor:
+          type: integer
+          maximum: 2147483647
+          minimum: -2147483648
+          title: Количество баллонов по датчику
+        amount_of_ttn:
+          type: integer
+          maximum: 2147483647
+          minimum: -2147483648
+          title: Количество баллонов по электронной ТТН
+      required:
+      - id
+    BalloonCreateError:
+      type: object
+      properties:
+        errors:
+          type: object
+          additionalProperties: {}
+      required:
+      - errors
+    BalloonOperationResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        balloon_id:
+          type: string
+          nullable: true
+        new_count:
+          type: integer
+        error:
+          type: string
+      required:
+      - balloon_id
+      - error
+      - new_count
+      - success
+    BalloonRequest:
+      type: object
+      properties:
+        nfc_tag:
+          type: string
+          minLength: 1
+          title: Номер метки
+          maxLength: 30
+        serial_number:
+          type: string
+          nullable: true
+          title: Серийный номер
+          maxLength: 30
+        creation_date:
+          type: string
+          format: date
+          nullable: true
+          title: Дата производства
+        size:
+          allOf:
+          - $ref: '#/components/schemas/SizeEnum'
+          title: Объём
+          minimum: -2147483648
+          maximum: 2147483647
+        netto:
+          type: number
+          format: double
+          nullable: true
+          title: Вес пустого баллона
+        brutto:
+          type: number
+          format: double
+          nullable: true
+          title: Вес наполненного баллона
+        current_examination_date:
+          type: string
+          format: date
+          nullable: true
+          title: Дата освидетельствования
+        next_examination_date:
+          type: string
+          format: date
+          nullable: true
+          title: Дата следующего освидетельствования
+        status:
+          type: string
+          nullable: true
+          title: Статус
+          maxLength: 100
+        manufacturer:
+          type: string
+          nullable: true
+          title: Производитель
+          maxLength: 30
+        wall_thickness:
+          type: number
+          format: double
+          nullable: true
+          title: Толщина стенок
+        filling_status:
+          type: boolean
+          title: Готов к наполнению
+        update_passport_required:
+          type: boolean
+          title: Требуется обновление паспорта
+      required:
+      - nfc_tag
+    BalloonUpdateError:
+      type: object
+      properties:
+        errors:
+          type: object
+          additionalProperties: {}
+      required:
+      - errors
+    BalloonsBatch:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        batch_type:
+          type: string
+          readOnly: true
+        started_at:
+          type: string
+          format: date-time
+          readOnly: true
+          title: Дата и время начала
+        completed_at:
+          type: string
+          format: date-time
+          nullable: true
+          title: Дата и время окончания
+        truck:
+          type: integer
+          title: Автомобиль
+        trailer:
+          type: integer
+          nullable: true
+          title: Прицеп
+        reader_number:
+          type: integer
+          maximum: 2147483647
+          minimum: -2147483648
+          nullable: true
+          title: Номер считывателя
+        amount_of_rfid:
+          type: integer
+          maximum: 2147483647
+          minimum: -2147483648
+          title: Количество баллонов по rfid
+        amount_of_sensor:
+          type: integer
+          maximum: 2147483647
+          minimum: -2147483648
+          title: Количество баллонов по датчику
+        amount_of_ttn:
+          type: integer
+          minimum: 1
+        amount_of_5_liters:
+          type: integer
+          maximum: 2147483647
+          minimum: -2147483648
+          title: Количество 5л баллонов
+        amount_of_12_liters:
+          type: integer
+          maximum: 2147483647
+          minimum: -2147483648
+          title: Количество 12л баллонов
+        amount_of_27_liters:
+          type: integer
+          maximum: 2147483647
+          minimum: -2147483648
+          title: Количество 27л баллонов
+        amount_of_50_liters:
+          type: integer
+          maximum: 2147483647
+          minimum: -2147483648
+          title: Количество 50л баллонов
+        gas_amount:
+          type: number
+          format: double
+          nullable: true
+          title: Количество принятого газа
+        status:
+          allOf:
+          - $ref: '#/components/schemas/StatusEnum'
+          description: 'Числовой enum: 1=ACTIVE, 2=PAUSED, 3=COMPLETED, 4=MIRIADA_ERROR
+            (0=UNSPECIFIED не используется в запросах)'
+          default: 1
+        miriada_close_failed:
+          type: boolean
+          readOnly: true
+        miriada_error_message:
+          type: string
+          readOnly: true
+        ttn_id:
+          type: integer
+          maximum: 2147483647
+          minimum: -2147483648
+          title: ID ТТН
+        ttn_name:
+          type: string
+          readOnly: true
+        balloons_type:
+          allOf:
+          - $ref: '#/components/schemas/BalloonsTypeEnum'
+          title: Пустой/полный
+      required:
+      - amount_of_ttn
+      - batch_type
+      - id
+      - miriada_close_failed
+      - miriada_error_message
+      - started_at
+      - truck
+      - ttn_id
+      - ttn_name
+    BalloonsBatchRequest:
+      type: object
+      properties:
+        completed_at:
+          type: string
+          format: date-time
+          nullable: true
+          title: Дата и время окончания
+        truck:
+          type: integer
+          title: Автомобиль
+        trailer:
+          type: integer
+          nullable: true
+          title: Прицеп
+        reader_number:
+          type: integer
+          maximum: 2147483647
+          minimum: -2147483648
+          nullable: true
+          title: Номер считывателя
+        amount_of_rfid:
+          type: integer
+          maximum: 2147483647
+          minimum: -2147483648
+          title: Количество баллонов по rfid
+        amount_of_sensor:
+          type: integer
+          maximum: 2147483647
+          minimum: -2147483648
+          title: Количество баллонов по датчику
+        amount_of_ttn:
+          type: integer
+          minimum: 1
+        amount_of_5_liters:
+          type: integer
+          maximum: 2147483647
+          minimum: -2147483648
+          title: Количество 5л баллонов
+        amount_of_12_liters:
+          type: integer
+          maximum: 2147483647
+          minimum: -2147483648
+          title: Количество 12л баллонов
+        amount_of_27_liters:
+          type: integer
+          maximum: 2147483647
+          minimum: -2147483648
+          title: Количество 27л баллонов
+        amount_of_50_liters:
+          type: integer
+          maximum: 2147483647
+          minimum: -2147483648
+          title: Количество 50л баллонов
+        gas_amount:
+          type: number
+          format: double
+          nullable: true
+          title: Количество принятого газа
+        status:
+          allOf:
+          - $ref: '#/components/schemas/StatusEnum'
+          description: 'Числовой enum: 1=ACTIVE, 2=PAUSED, 3=COMPLETED, 4=MIRIADA_ERROR
+            (0=UNSPECIFIED не используется в запросах)'
+          default: 1
+        ttn_id:
+          type: integer
+          maximum: 2147483647
+          minimum: -2147483648
+          title: ID ТТН
+        balloons_type:
+          allOf:
+          - $ref: '#/components/schemas/BalloonsTypeEnum'
+          title: Пустой/полный
+      required:
+      - amount_of_ttn
+      - truck
+      - ttn_id
+    BalloonsTruck:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        car_brand:
+          type: string
+          nullable: true
+          title: Марка авто
+          maxLength: 20
+        registration_number:
+          type: string
+          title: Регистрационный знак
+          maxLength: 10
+      required:
+      - id
+      - registration_number
+    BalloonsTypeEnum:
+      enum:
+      - e
+      - f
+      type: string
+      description: |-
+        * `e` - Пустой
+        * `f` - Полный
+    BatchTypeEnum:
+      enum:
+      - l
+      - u
+      type: string
+      description: |-
+        * `l` - Приёмка
+        * `u` - Отгрузка
+    Carousel:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        carousel_number:
+          type: integer
+          maximum: 2147483647
+          minimum: -2147483648
+          title: Номер карусели наполнения
+        is_empty:
+          type: boolean
+          title: Принят запрос на наполнение баллона
+        post_number:
+          type: integer
+          maximum: 2147483647
+          minimum: -2147483648
+          title: Номер поста наполнения
+        empty_weight:
+          type: number
+          format: double
+          nullable: true
+          title: Вес пустого баллона на посту
+        full_weight:
+          type: number
+          format: double
+          nullable: true
+          title: Вес полного баллона на посту
+        nfc_tag:
+          type: string
+          nullable: true
+          title: Номер метки
+          maxLength: 30
+        serial_number:
+          type: string
+          nullable: true
+          title: Серийный номер
+          maxLength: 30
+        size:
+          allOf:
+          - $ref: '#/components/schemas/SizeEnum'
+          title: Объём
+          minimum: -2147483648
+          maximum: 2147483647
+        netto:
+          type: number
+          format: double
+          nullable: true
+          title: Вес пустого баллона
+        brutto:
+          type: number
+          format: double
+          nullable: true
+          title: Вес наполненного баллона
+        filling_status:
+          type: boolean
+          title: Готов к наполнению
+        change_at:
+          type: string
+          format: date-time
+          readOnly: true
+          title: Дата и время изменений
+      required:
+      - change_at
+      - id
+      - post_number
+    CarouselSettings:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        read_only:
+          type: boolean
+          title: Только чтение с постов наполнения
+        use_weight_management:
+          type: boolean
+          title: Использовать коррекцию веса
+        use_common_correction:
+          type: boolean
+          title: Использовать общее значение коррекции веса
+        weight_correction_value:
+          type: number
+          format: double
+          title: Значение корректировки веса
+        min_balloon_weight:
+          type: number
+          format: double
+          title: Минимальный вес баллона
+        max_balloon_weight:
+          type: number
+          format: double
+          title: Максимальный вес баллона
+        max_passport_weight_diff:
+          type: number
+          format: double
+          title: Максимальная разница в паспортных весах баллона
+        post_1_correction:
+          type: number
+          format: double
+          title: Корректор для 1 поста
+        post_2_correction:
+          type: number
+          format: double
+          title: Корректор для 2 поста
+        post_3_correction:
+          type: number
+          format: double
+          title: Корректор для 3 поста
+        post_4_correction:
+          type: number
+          format: double
+          title: Корректор для 4 поста
+        post_5_correction:
+          type: number
+          format: double
+          title: Корректор для 5 поста
+        post_6_correction:
+          type: number
+          format: double
+          title: Корректор для 6 поста
+        post_7_correction:
+          type: number
+          format: double
+          title: Корректор для 7 поста
+        post_8_correction:
+          type: number
+          format: double
+          title: Корректор для 8 поста
+        post_9_correction:
+          type: number
+          format: double
+          title: Корректор для 9 поста
+        post_10_correction:
+          type: number
+          format: double
+          title: Корректор для 10 поста
+        post_11_correction:
+          type: number
+          format: double
+          title: Корректор для 11 поста
+        post_12_correction:
+          type: number
+          format: double
+          title: Корректор для 12 поста
+        post_13_correction:
+          type: number
+          format: double
+          title: Корректор для 13 поста
+        post_14_correction:
+          type: number
+          format: double
+          title: Корректор для 14 поста
+        post_15_correction:
+          type: number
+          format: double
+          title: Корректор для 15 поста
+        post_16_correction:
+          type: number
+          format: double
+          title: Корректор для 16 поста
+        post_17_correction:
+          type: number
+          format: double
+          title: Корректор для 17 поста
+        post_18_correction:
+          type: number
+          format: double
+          title: Корректор для 18 поста
+        post_19_correction:
+          type: number
+          format: double
+          title: Корректор для 19 поста
+        post_20_correction:
+          type: number
+          format: double
+          title: Корректор для 20 поста
+        user:
+          type: integer
+          nullable: true
+          title: Пользователь
+      required:
+      - id
+    CarouselUpdateRequestRequest:
+      type: object
+      properties:
+        request_type:
+          type: string
+          minLength: 1
+          description: 'Тип запроса: 0x7a или 0x70'
+        post_number:
+          type: integer
+          description: Номер поста наполнения
+        nfc_tag:
+          type: string
+          minLength: 1
+          description: NFC метка баллона
+        serial_number:
+          type: string
+          minLength: 1
+          description: Серийный номер баллона
+        size:
+          type: integer
+          description: Объем баллона
+        netto:
+          type: number
+          format: double
+          description: Вес пустого баллона
+        brutto:
+          type: number
+          format: double
+          description: Вес наполненного баллона
+        full_weight:
+          type: number
+          format: double
+          description: Полный вес (для типа 0x70)
+      required:
+      - post_number
+      - request_type
+    CheckConnectionResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          description: Статус доступности API
+      required:
+      - status
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+      required:
+      - error
+    GasTypeEnum:
+      enum:
+      - СПБТ
+      - ПБА
+      type: string
+      description: |-
+        * `СПБТ` - СПБТ
+        * `ПБА` - ПБА
+    ManualTotalReadersCounterRequestRequest:
+      type: object
+      properties:
+        empty:
+          type: integer
+          minimum: 0
+          description: Ручное значение для количества пустых баллонов (total_empty)
+        full:
+          type: integer
+          minimum: 0
+          description: Ручное значение для количества полных баллонов (total_full)
+    ManualTotalReadersCounterResponse:
+      type: object
+      properties:
+        total_empty:
+          type: integer
+        total_full:
+          type: integer
+        changed_at:
+          type: string
+          format: date-time
+      required:
+      - changed_at
+      - total_empty
+      - total_full
+    MiriadaTtn:
+      type: object
+      properties:
+        name:
+          type: string
+          title: Номер ТТН
+          maxLength: 100
+        auto:
+          type: string
+          title: Номер автомобиля
+          maxLength: 50
+        date:
+          type: string
+          format: date
+          nullable: true
+          title: Дата ТТН
+        ttn_id:
+          type: integer
+          maximum: 2147483647
+          minimum: -2147483648
+          title: ID ТТН в Мириаде
+      required:
+      - auto
+      - name
+      - ttn_id
+    PatchedAddBalloonRequestRequest:
+      type: object
+      properties:
+        nfc:
+          type: string
+          minLength: 1
+    PatchedAutoGasBatchRequest:
+      type: object
+      properties:
+        batch_type:
+          allOf:
+          - $ref: '#/components/schemas/BatchTypeEnum'
+          title: Тип партии
+        completed_at:
+          type: string
+          format: date-time
+          nullable: true
+          title: Дата и время окончания
+        truck:
+          type: integer
+          title: Автомобиль
+        trailer:
+          type: integer
+          nullable: true
+          title: Прицеп
+        gas_amount:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,10}(?:\.\d{0,2})?$
+          nullable: true
+          title: Количество газа (массомер)
+        gas_type:
+          allOf:
+          - $ref: '#/components/schemas/GasTypeEnum'
+          title: Тип газа
+        scale_empty_weight:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,10}(?:\.\d{0,2})?$
+          nullable: true
+          title: Вес пустого т/с (весы)
+        scale_full_weight:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,10}(?:\.\d{0,2})?$
+          nullable: true
+          title: Вес полного т/с (весы)
+        weight_gas_amount:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,10}(?:\.\d{0,2})?$
+          nullable: true
+          title: Количество газа (весы)
+        is_active:
+          type: boolean
+          title: В работе
+    PatchedBalloonRequest:
+      type: object
+      properties:
+        nfc_tag:
+          type: string
+          minLength: 1
+          title: Номер метки
+          maxLength: 30
+        serial_number:
+          type: string
+          nullable: true
+          title: Серийный номер
+          maxLength: 30
+        creation_date:
+          type: string
+          format: date
+          nullable: true
+          title: Дата производства
+        size:
+          allOf:
+          - $ref: '#/components/schemas/SizeEnum'
+          title: Объём
+          minimum: -2147483648
+          maximum: 2147483647
+        netto:
+          type: number
+          format: double
+          nullable: true
+          title: Вес пустого баллона
+        brutto:
+          type: number
+          format: double
+          nullable: true
+          title: Вес наполненного баллона
+        current_examination_date:
+          type: string
+          format: date
+          nullable: true
+          title: Дата освидетельствования
+        next_examination_date:
+          type: string
+          format: date
+          nullable: true
+          title: Дата следующего освидетельствования
+        status:
+          type: string
+          nullable: true
+          title: Статус
+          maxLength: 100
+        manufacturer:
+          type: string
+          nullable: true
+          title: Производитель
+          maxLength: 30
+        wall_thickness:
+          type: number
+          format: double
+          nullable: true
+          title: Толщина стенок
+        filling_status:
+          type: boolean
+          title: Готов к наполнению
+        update_passport_required:
+          type: boolean
+          title: Требуется обновление паспорта
+    PatchedBalloonsBatchRequest:
+      type: object
+      properties:
+        completed_at:
+          type: string
+          format: date-time
+          nullable: true
+          title: Дата и время окончания
+        truck:
+          type: integer
+          title: Автомобиль
+        trailer:
+          type: integer
+          nullable: true
+          title: Прицеп
+        reader_number:
+          type: integer
+          maximum: 2147483647
+          minimum: -2147483648
+          nullable: true
+          title: Номер считывателя
+        amount_of_rfid:
+          type: integer
+          maximum: 2147483647
+          minimum: -2147483648
+          title: Количество баллонов по rfid
+        amount_of_sensor:
+          type: integer
+          maximum: 2147483647
+          minimum: -2147483648
+          title: Количество баллонов по датчику
+        amount_of_ttn:
+          type: integer
+          minimum: 1
+        amount_of_5_liters:
+          type: integer
+          maximum: 2147483647
+          minimum: -2147483648
+          title: Количество 5л баллонов
+        amount_of_12_liters:
+          type: integer
+          maximum: 2147483647
+          minimum: -2147483648
+          title: Количество 12л баллонов
+        amount_of_27_liters:
+          type: integer
+          maximum: 2147483647
+          minimum: -2147483648
+          title: Количество 27л баллонов
+        amount_of_50_liters:
+          type: integer
+          maximum: 2147483647
+          minimum: -2147483648
+          title: Количество 50л баллонов
+        gas_amount:
+          type: number
+          format: double
+          nullable: true
+          title: Количество принятого газа
+        status:
+          allOf:
+          - $ref: '#/components/schemas/StatusEnum'
+          description: 'Числовой enum: 1=ACTIVE, 2=PAUSED, 3=COMPLETED, 4=MIRIADA_ERROR
+            (0=UNSPECIFIED не используется в запросах)'
+          default: 1
+        ttn_id:
+          type: integer
+          maximum: 2147483647
+          minimum: -2147483648
+          title: ID ТТН
+        balloons_type:
+          allOf:
+          - $ref: '#/components/schemas/BalloonsTypeEnum'
+          title: Пустой/полный
+    PatchedCarouselSettingsRequest:
+      type: object
+      properties:
+        read_only:
+          type: boolean
+          title: Только чтение с постов наполнения
+        use_weight_management:
+          type: boolean
+          title: Использовать коррекцию веса
+        use_common_correction:
+          type: boolean
+          title: Использовать общее значение коррекции веса
+        weight_correction_value:
+          type: number
+          format: double
+          title: Значение корректировки веса
+        min_balloon_weight:
+          type: number
+          format: double
+          title: Минимальный вес баллона
+        max_balloon_weight:
+          type: number
+          format: double
+          title: Максимальный вес баллона
+        max_passport_weight_diff:
+          type: number
+          format: double
+          title: Максимальная разница в паспортных весах баллона
+        post_1_correction:
+          type: number
+          format: double
+          title: Корректор для 1 поста
+        post_2_correction:
+          type: number
+          format: double
+          title: Корректор для 2 поста
+        post_3_correction:
+          type: number
+          format: double
+          title: Корректор для 3 поста
+        post_4_correction:
+          type: number
+          format: double
+          title: Корректор для 4 поста
+        post_5_correction:
+          type: number
+          format: double
+          title: Корректор для 5 поста
+        post_6_correction:
+          type: number
+          format: double
+          title: Корректор для 6 поста
+        post_7_correction:
+          type: number
+          format: double
+          title: Корректор для 7 поста
+        post_8_correction:
+          type: number
+          format: double
+          title: Корректор для 8 поста
+        post_9_correction:
+          type: number
+          format: double
+          title: Корректор для 9 поста
+        post_10_correction:
+          type: number
+          format: double
+          title: Корректор для 10 поста
+        post_11_correction:
+          type: number
+          format: double
+          title: Корректор для 11 поста
+        post_12_correction:
+          type: number
+          format: double
+          title: Корректор для 12 поста
+        post_13_correction:
+          type: number
+          format: double
+          title: Корректор для 13 поста
+        post_14_correction:
+          type: number
+          format: double
+          title: Корректор для 14 поста
+        post_15_correction:
+          type: number
+          format: double
+          title: Корректор для 15 поста
+        post_16_correction:
+          type: number
+          format: double
+          title: Корректор для 16 поста
+        post_17_correction:
+          type: number
+          format: double
+          title: Корректор для 17 поста
+        post_18_correction:
+          type: number
+          format: double
+          title: Корректор для 18 поста
+        post_19_correction:
+          type: number
+          format: double
+          title: Корректор для 19 поста
+        post_20_correction:
+          type: number
+          format: double
+          title: Корректор для 20 поста
+        user:
+          type: integer
+          nullable: true
+          title: Пользователь
+    PatchedRailwayBatchRequest:
+      type: object
+      properties:
+        end_date:
+          type: string
+          format: date-time
+          nullable: true
+          title: Дата окончания приёмки
+        gas_amount_spbt:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,10}(?:\.\d{0,2})?$
+          nullable: true
+          title: Количество принятого СПБТ газа
+        gas_amount_pba:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,10}(?:\.\d{0,2})?$
+          nullable: true
+          title: Количество принятого ПБА газа
+        railway_tank_list:
+          type: array
+          items:
+            type: integer
+            title: Список жд цистерн
+          title: Список жд цистерн
+        is_active:
+          type: boolean
+          title: В работе
+    PatchedRemoveBalloonRequestRequest:
+      type: object
+      properties:
+        nfc:
+          type: string
+          minLength: 1
+    PatchedTrailerRequest:
+      type: object
+      properties:
+        truck:
+          type: integer
+          title: Автомобиль
+        trailer_brand:
+          type: string
+          nullable: true
+          title: Марка прицепа
+          maxLength: 20
+        registration_number:
+          type: string
+          minLength: 1
+          title: Регистрационный знак
+          maxLength: 10
+        capacity_cylinders:
+          type: integer
+          maximum: 2147483647
+          minimum: -2147483648
+          nullable: true
+          title: Максимальная вместимость баллонов
+        max_weight_of_transported_cylinders:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,8}(?:\.\d{0,2})?$
+          nullable: true
+          title: Максимальная масса перевозимых баллонов
+        max_mass_of_transported_gas:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,8}(?:\.\d{0,2})?$
+          nullable: true
+          title: Максимальная масса перевозимого газа
+        max_gas_volume:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,8}(?:\.\d{0,2})?$
+          nullable: true
+          title: Максимальный объём перевозимого газа
+        empty_weight:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,8}(?:\.\d{0,2})?$
+          nullable: true
+          title: Вес пустого т/с (по техпаспорту)
+        full_weight:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,8}(?:\.\d{0,2})?$
+          nullable: true
+          title: Вес полного т/с (по техпаспорту)
+        is_on_station:
+          type: boolean
+          title: Находится на станции
+        entry_at:
+          type: string
+          format: date-time
+          nullable: true
+          title: Дата и время въезда
+        departure_at:
+          type: string
+          format: date-time
+          nullable: true
+          title: Дата и время выезда
+    PatchedTruckRequest:
+      type: object
+      properties:
+        car_brand:
+          type: string
+          nullable: true
+          title: Марка авто
+          maxLength: 20
+        registration_number:
+          type: string
+          minLength: 1
+          title: Регистрационный знак
+          maxLength: 10
+        capacity_cylinders:
+          type: integer
+          maximum: 2147483647
+          minimum: -2147483648
+          nullable: true
+          title: Максимальная вместимость баллонов
+        max_weight_of_transported_cylinders:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,8}(?:\.\d{0,2})?$
+          nullable: true
+          title: Максимальная масса перевозимых баллонов
+        max_mass_of_transported_gas:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,8}(?:\.\d{0,2})?$
+          nullable: true
+          title: Максимальная масса перевозимого газа
+        max_gas_volume:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,8}(?:\.\d{0,2})?$
+          nullable: true
+          title: Максимальный объём перевозимого газа
+        empty_weight:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,8}(?:\.\d{0,2})?$
+          nullable: true
+          title: Вес пустого т/с (по техпаспорту)
+        full_weight:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,8}(?:\.\d{0,2})?$
+          nullable: true
+          title: Вес полного т/с (по техпаспорту)
+        is_on_station:
+          type: boolean
+          title: Находится на станции
+        entry_at:
+          type: string
+          format: date-time
+          nullable: true
+          title: Дата и время въезда
+        departure_at:
+          type: string
+          format: date-time
+          nullable: true
+          title: Дата и время выезда
+    RailwayBatch:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        begin_date:
+          type: string
+          format: date-time
+          readOnly: true
+          title: Дата начала приёмки
+        end_date:
+          type: string
+          format: date-time
+          nullable: true
+          title: Дата окончания приёмки
+        gas_amount_spbt:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,10}(?:\.\d{0,2})?$
+          nullable: true
+          title: Количество принятого СПБТ газа
+        gas_amount_pba:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,10}(?:\.\d{0,2})?$
+          nullable: true
+          title: Количество принятого ПБА газа
+        railway_tank_list:
+          type: array
+          items:
+            type: integer
+            title: Список жд цистерн
+          title: Список жд цистерн
+        is_active:
+          type: boolean
+          title: В работе
+      required:
+      - begin_date
+      - id
+    RailwayBatchRequest:
+      type: object
+      properties:
+        end_date:
+          type: string
+          format: date-time
+          nullable: true
+          title: Дата окончания приёмки
+        gas_amount_spbt:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,10}(?:\.\d{0,2})?$
+          nullable: true
+          title: Количество принятого СПБТ газа
+        gas_amount_pba:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,10}(?:\.\d{0,2})?$
+          nullable: true
+          title: Количество принятого ПБА газа
+        railway_tank_list:
+          type: array
+          items:
+            type: integer
+            title: Список жд цистерн
+          title: Список жд цистерн
+        is_active:
+          type: boolean
+          title: В работе
+    SizeEnum:
+      enum:
+      - 5
+      - 12
+      - 27
+      - 50
+      type: integer
+      description: |-
+        * `5` - 5
+        * `12` - 12
+        * `27` - 27
+        * `50` - 50
+    StatusEnum:
+      type: integer
+      enum:
+      - 1
+      - 2
+      - 3
+      - 4
+    TokenObtainPair:
+      type: object
+      properties:
+        access:
+          type: string
+          readOnly: true
+        refresh:
+          type: string
+          readOnly: true
+      required:
+      - access
+      - refresh
+    TokenObtainPairRequest:
+      type: object
+      properties:
+        username:
+          type: string
+          writeOnly: true
+          minLength: 1
+        password:
+          type: string
+          writeOnly: true
+          minLength: 1
+      required:
+      - password
+      - username
+    TokenRefresh:
+      type: object
+      properties:
+        access:
+          type: string
+          readOnly: true
+      required:
+      - access
+    TokenRefreshRequest:
+      type: object
+      properties:
+        refresh:
+          type: string
+          writeOnly: true
+          minLength: 1
+      required:
+      - refresh
+    Trailer:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        truck:
+          type: integer
+          title: Автомобиль
+        trailer_brand:
+          type: string
+          nullable: true
+          title: Марка прицепа
+          maxLength: 20
+        registration_number:
+          type: string
+          title: Регистрационный знак
+          maxLength: 10
+        type:
+          type: string
+          readOnly: true
+        capacity_cylinders:
+          type: integer
+          maximum: 2147483647
+          minimum: -2147483648
+          nullable: true
+          title: Максимальная вместимость баллонов
+        max_weight_of_transported_cylinders:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,8}(?:\.\d{0,2})?$
+          nullable: true
+          title: Максимальная масса перевозимых баллонов
+        max_mass_of_transported_gas:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,8}(?:\.\d{0,2})?$
+          nullable: true
+          title: Максимальная масса перевозимого газа
+        max_gas_volume:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,8}(?:\.\d{0,2})?$
+          nullable: true
+          title: Максимальный объём перевозимого газа
+        empty_weight:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,8}(?:\.\d{0,2})?$
+          nullable: true
+          title: Вес пустого т/с (по техпаспорту)
+        full_weight:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,8}(?:\.\d{0,2})?$
+          nullable: true
+          title: Вес полного т/с (по техпаспорту)
+        is_on_station:
+          type: boolean
+          title: Находится на станции
+        entry_at:
+          type: string
+          format: date-time
+          nullable: true
+          title: Дата и время въезда
+        departure_at:
+          type: string
+          format: date-time
+          nullable: true
+          title: Дата и время выезда
+      required:
+      - id
+      - registration_number
+      - type
+    TrailerRequest:
+      type: object
+      properties:
+        truck:
+          type: integer
+          title: Автомобиль
+        trailer_brand:
+          type: string
+          nullable: true
+          title: Марка прицепа
+          maxLength: 20
+        registration_number:
+          type: string
+          minLength: 1
+          title: Регистрационный знак
+          maxLength: 10
+        capacity_cylinders:
+          type: integer
+          maximum: 2147483647
+          minimum: -2147483648
+          nullable: true
+          title: Максимальная вместимость баллонов
+        max_weight_of_transported_cylinders:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,8}(?:\.\d{0,2})?$
+          nullable: true
+          title: Максимальная масса перевозимых баллонов
+        max_mass_of_transported_gas:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,8}(?:\.\d{0,2})?$
+          nullable: true
+          title: Максимальная масса перевозимого газа
+        max_gas_volume:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,8}(?:\.\d{0,2})?$
+          nullable: true
+          title: Максимальный объём перевозимого газа
+        empty_weight:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,8}(?:\.\d{0,2})?$
+          nullable: true
+          title: Вес пустого т/с (по техпаспорту)
+        full_weight:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,8}(?:\.\d{0,2})?$
+          nullable: true
+          title: Вес полного т/с (по техпаспорту)
+        is_on_station:
+          type: boolean
+          title: Находится на станции
+        entry_at:
+          type: string
+          format: date-time
+          nullable: true
+          title: Дата и время въезда
+        departure_at:
+          type: string
+          format: date-time
+          nullable: true
+          title: Дата и время выезда
+      required:
+      - registration_number
+    Truck:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        car_brand:
+          type: string
+          nullable: true
+          title: Марка авто
+          maxLength: 20
+        registration_number:
+          type: string
+          title: Регистрационный знак
+          maxLength: 10
+        type:
+          type: string
+          readOnly: true
+        capacity_cylinders:
+          type: integer
+          maximum: 2147483647
+          minimum: -2147483648
+          nullable: true
+          title: Максимальная вместимость баллонов
+        max_weight_of_transported_cylinders:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,8}(?:\.\d{0,2})?$
+          nullable: true
+          title: Максимальная масса перевозимых баллонов
+        max_mass_of_transported_gas:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,8}(?:\.\d{0,2})?$
+          nullable: true
+          title: Максимальная масса перевозимого газа
+        max_gas_volume:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,8}(?:\.\d{0,2})?$
+          nullable: true
+          title: Максимальный объём перевозимого газа
+        empty_weight:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,8}(?:\.\d{0,2})?$
+          nullable: true
+          title: Вес пустого т/с (по техпаспорту)
+        full_weight:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,8}(?:\.\d{0,2})?$
+          nullable: true
+          title: Вес полного т/с (по техпаспорту)
+        is_on_station:
+          type: boolean
+          title: Находится на станции
+        entry_at:
+          type: string
+          format: date-time
+          nullable: true
+          title: Дата и время въезда
+        departure_at:
+          type: string
+          format: date-time
+          nullable: true
+          title: Дата и время выезда
+        trailer:
+          type: string
+          readOnly: true
+      required:
+      - id
+      - registration_number
+      - trailer
+      - type
+    TruckRequest:
+      type: object
+      properties:
+        car_brand:
+          type: string
+          nullable: true
+          title: Марка авто
+          maxLength: 20
+        registration_number:
+          type: string
+          minLength: 1
+          title: Регистрационный знак
+          maxLength: 10
+        capacity_cylinders:
+          type: integer
+          maximum: 2147483647
+          minimum: -2147483648
+          nullable: true
+          title: Максимальная вместимость баллонов
+        max_weight_of_transported_cylinders:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,8}(?:\.\d{0,2})?$
+          nullable: true
+          title: Максимальная масса перевозимых баллонов
+        max_mass_of_transported_gas:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,8}(?:\.\d{0,2})?$
+          nullable: true
+          title: Максимальная масса перевозимого газа
+        max_gas_volume:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,8}(?:\.\d{0,2})?$
+          nullable: true
+          title: Максимальный объём перевозимого газа
+        empty_weight:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,8}(?:\.\d{0,2})?$
+          nullable: true
+          title: Вес пустого т/с (по техпаспорту)
+        full_weight:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,8}(?:\.\d{0,2})?$
+          nullable: true
+          title: Вес полного т/с (по техпаспорту)
+        is_on_station:
+          type: boolean
+          title: Находится на станции
+        entry_at:
+          type: string
+          format: date-time
+          nullable: true
+          title: Дата и время въезда
+        departure_at:
+          type: string
+          format: date-time
+          nullable: true
+          title: Дата и время выезда
+      required:
+      - registration_number
+  securitySchemes:
+    basicAuth:
+      type: http
+      scheme: basic
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT access token from POST /api/token/
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: sessionid
+    jwtAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+servers:
+- url: http://localhost:8000
+  description: Default API server

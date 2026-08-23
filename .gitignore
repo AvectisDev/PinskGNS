@@ -142,6 +142,11 @@ venv.bak/
 # AI agents
 .continue/
 .cursorignore
+.cursor/mcp.json
+
+# Generated / auxiliary OpenAPI exports (not committed)
+openapi-pinskgns-core.yaml
+docs/openapi/*-core.yaml
 
 
 # Spyder project settings

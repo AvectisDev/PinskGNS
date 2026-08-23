@@ -1,3 +1,4 @@
+from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 from ..models import (
     Balloon,
@@ -9,6 +10,14 @@ from ..models import (
 from filling_station.api.batch_status import batch_status_from_api, batch_status_to_api
 from filling_station.services.batches import pause_other_active_batches_on_reader
 
+@extend_schema_field({
+    'type': 'integer',
+    'enum': [1, 2, 3, 4],
+    'description': (
+        'Числовой enum: 1=ACTIVE, 2=PAUSED, 3=COMPLETED, 4=MIRIADA_ERROR '
+        '(0=UNSPECIFIED не используется в запросах)'
+    ),
+})
 class BatchStatusApiField(serializers.Field):
     """
     API: числовой enum статуса партии.

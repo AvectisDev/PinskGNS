@@ -18,6 +18,24 @@
 9. По адресу `http://localhost:8000` будет доступна главная страница с архивом баллонов.
 10. По адресу `http://localhost:8000/api/swagger` будет доступно описание API для проекта.
 
+## OpenAPI
+
+Спецификация API генерируется из Django-кода (`drf-spectacular`) и хранится в репозитории:
+
+- `docs/openapi/pinskgns.yaml` — полная OpenAPI 3.0 схема
+
+После изменений в API перегенерируйте файл из каталога `GNS`:
+
+```bash
+python manage.py spectacular --file ../docs/openapi/pinskgns.yaml
+```
+
+Тот же JSON/YAML доступен на работающем сервере:
+
+- `http://localhost:8000/api/schema/` — схема
+- `http://localhost:8000/api/swagger/` — Swagger UI
+- `http://localhost:8000/api/redoc/` — ReDoc
+
 ## Redis
 
 Redis используется в проекте для следующих целей:
