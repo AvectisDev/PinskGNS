@@ -6,11 +6,12 @@ from django.test import TestCase
 from django.utils import timezone
 
 from filling_station.models import BalloonsBatch
-from railway_service.models import RailwayTankHistory
+from railway_service.models import RailwayTank, RailwayTankHistory
 from ttn.models import AutoTtn, BalloonTtn, RailwayTtn
 from ttn.services import (
     close_ttn_in_miriada,
     collect_tanks_for_railway_ttn,
+    get_railway_ttn_gas_totals,
     save_auto_ttn,
     save_balloon_ttn,
     save_railway_ttn,
@@ -35,10 +36,36 @@ class RailwayTankTotalsTests(TtnFixturesMixin, TestCase):
             arrival_at=timezone.now(),
         )
 
-        tanks, scale_total, ttn_total = collect_tanks_for_railway_ttn('RW-1')
+        tanks, scale_total, ttn_total, scales_incomplete, ttn_incomplete = collect_tanks_for_railway_ttn('RW-1')
         self.assertEqual(tanks.count(), 1)
         self.assertEqual(scale_total, 5.0)
         self.assertEqual(ttn_total, 8.0)
+        self.assertFalse(scales_incomplete)
+        self.assertFalse(ttn_incomplete)
+
+    def test_marks_scales_incomplete_when_gas_weight_missing(self):
+        RailwayTankHistory.objects.create(
+            tank=self.tank,
+            railway_ttn='RW-3',
+            gas_weight=Decimal('10'),
+            netto_weight_ttn=Decimal('20'),
+            arrival_at=timezone.now(),
+        )
+        tank2 = RailwayTank.objects.create(registration_number=6002)
+        RailwayTankHistory.objects.create(
+            tank=tank2,
+            railway_ttn='RW-3',
+            empty_weight=Decimal('22.96'),
+            netto_weight_ttn=Decimal('8'),
+            arrival_at=timezone.now(),
+        )
+
+        totals = get_railway_ttn_gas_totals('RW-3')
+
+        self.assertEqual(totals['scales']['amount'], Decimal('10'))
+        self.assertTrue(totals['scales']['incomplete'])
+        self.assertEqual(totals['ttn']['amount'], Decimal('28'))
+        self.assertFalse(totals['ttn']['incomplete'])
 
     def test_update_gas_amounts_uses_latest_history(self):
         RailwayTankHistory.objects.create(

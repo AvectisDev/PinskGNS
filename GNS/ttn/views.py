@@ -11,7 +11,7 @@ from django.views.decorators.http import require_POST
 from .models import BalloonTtn, RailwayTtn, AutoTtn
 from autogas.models import AutoGasBatchSettings
 from .forms import BalloonTtnForm, AutoTtnForm, RailwayTtnForm
-from .services import save_auto_ttn, save_balloon_ttn, save_railway_ttn
+from .services import save_auto_ttn, save_balloon_ttn, save_railway_ttn, get_railway_ttn_gas_totals, get_railway_ttn_tank_rows
 
 
 BALLOON_TTN_RELATED = (
@@ -99,6 +99,12 @@ class RailwayTtnDetailView(generic.DetailView):
         .select_related(*RAILWAY_TTN_RELATED)
         .prefetch_related('railway_tank_list__tank_history')
     )
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['gas_totals'] = get_railway_ttn_gas_totals(self.object.railway_ttn)
+        context['tank_rows'] = get_railway_ttn_tank_rows(self.object.railway_ttn)
+        return context
 
 
 class RailwayTtnCreateView(PreserveListQueryMixin, generic.CreateView):

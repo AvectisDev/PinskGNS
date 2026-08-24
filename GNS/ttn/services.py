@@ -302,21 +302,63 @@ def get_latest_tank_history(tank: RailwayTank, railway_ttn_number: str):
 
 def collect_tanks_for_railway_ttn(
     railway_ttn_number: Optional[str],
-) -> Tuple[QuerySet, float, float]:
+) -> Tuple[QuerySet, float, float, bool, bool]:
     if not railway_ttn_number:
-        return RailwayTank.objects.none(), 0.0, 0.0
+        return RailwayTank.objects.none(), 0.0, 0.0, False, False
 
     tanks = RailwayTank.objects.filter(
         tank_history__railway_ttn=railway_ttn_number,
     ).distinct()
     scale_total = 0.0
     ttn_total = 0.0
+    scales_incomplete = False
+    ttn_incomplete = False
     for tank in tanks:
         hist = get_latest_tank_history(tank, railway_ttn_number)
-        if hist:
-            scale_total += float(hist.gas_weight or 0)
-            ttn_total += float(hist.netto_weight_ttn or 0)
-    return tanks, scale_total, ttn_total
+        if hist is None:
+            scales_incomplete = True
+            ttn_incomplete = True
+            continue
+        if hist.gas_weight is None:
+            scales_incomplete = True
+        else:
+            scale_total += float(hist.gas_weight)
+        if hist.netto_weight_ttn is None:
+            ttn_incomplete = True
+        else:
+            ttn_total += float(hist.netto_weight_ttn)
+    return tanks, scale_total, ttn_total, scales_incomplete, ttn_incomplete
+
+
+def get_railway_ttn_gas_totals(railway_ttn_number: Optional[str]) -> dict:
+    from decimal import Decimal
+
+    _, scale_total, ttn_total, scales_incomplete, ttn_incomplete = collect_tanks_for_railway_ttn(
+        railway_ttn_number,
+    )
+    has_tanks = bool(railway_ttn_number)
+    return {
+        'scales': {
+            'amount': Decimal(str(scale_total)),
+            'incomplete': scales_incomplete,
+            'has_tanks': has_tanks,
+        },
+        'ttn': {
+            'amount': Decimal(str(ttn_total)),
+            'incomplete': ttn_incomplete,
+            'has_tanks': has_tanks,
+        },
+    }
+
+
+def get_railway_ttn_tank_rows(railway_ttn_number: Optional[str]):
+    if not railway_ttn_number:
+        return []
+    tanks, _, _, _, _ = collect_tanks_for_railway_ttn(railway_ttn_number)
+    return [
+        (tank, get_latest_tank_history(tank, railway_ttn_number))
+        for tank in tanks
+    ]
 
 
 def apply_railway_tank_totals(
@@ -324,7 +366,7 @@ def apply_railway_tank_totals(
     railway_ttn_number: Optional[str] = None,
 ) -> QuerySet:
     number = railway_ttn_number if railway_ttn_number is not None else ttn.railway_ttn
-    tanks, scale_total, ttn_total = collect_tanks_for_railway_ttn(number)
+    tanks, scale_total, ttn_total, _, _ = collect_tanks_for_railway_ttn(number)
     ttn.total_gas_amount_by_scales = scale_total
     ttn.total_gas_amount_by_ttn = ttn_total
     return tanks
