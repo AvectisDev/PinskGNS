@@ -42,15 +42,24 @@
                     </dl>
                 </div>
                 <div class="col-md-6">
-                    <dl class="row">
-                        <dt class="col-sm-8">Минимальный вес баллона:</dt>
-                        <dd class="col-sm-4">{{ carousel_settings.min_balloon_weight|floatformat:2 }} кг</dd>
+                    <dl class="row g-2">
+                        <dt class="col-sm-6">Минимальный вес баллона:</dt>
+                        <dd class="col-sm-6">
+                            от {{ carousel_settings.min_balloon_weight_from|floatformat:2 }}
+                            до {{ carousel_settings.min_balloon_weight_to|floatformat:2 }} кг
+                        </dd>
 
-                        <dt class="col-sm-8">Максимальный вес баллона:</dt>
-                        <dd class="col-sm-4">{{ carousel_settings.max_balloon_weight|floatformat:2 }} кг</dd>
+                        <dt class="col-sm-6">Максимальный вес баллона:</dt>
+                        <dd class="col-sm-6">
+                            от {{ carousel_settings.max_balloon_weight_from|floatformat:2 }}
+                            до {{ carousel_settings.max_balloon_weight_to|floatformat:2 }} кг
+                        </dd>
 
-                        <dt class="col-sm-8">Максимальная разница паспортных весов:</dt>
-                        <dd class="col-sm-4">{{ carousel_settings.max_passport_weight_diff|floatformat:2 }} кг</dd>
+                        <dt class="col-sm-6">Разница паспортных весов:</dt>
+                        <dd class="col-sm-6">
+                            от {{ carousel_settings.passport_weight_diff_from|floatformat:2 }}
+                            до {{ carousel_settings.passport_weight_diff_to|floatformat:2 }} кг
+                        </dd>
                     </dl>
                 </div>
             </div>

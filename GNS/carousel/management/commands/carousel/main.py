@@ -13,6 +13,7 @@ django.setup()
 
 from django.core.exceptions import ValidationError
 
+from carousel.validation import is_value_in_range
 from carousel.services import (
     CarouselPostNotFoundError,
     UnsupportedCarouselRequestError,
@@ -57,9 +58,12 @@ class PostSettings:
     available: bool
     read_only: bool
     weight_correction: float | None
-    min_balloon_weight: float | None
-    max_balloon_weight: float | None
-    max_passport_weight_diff: float | None
+    min_balloon_weight_from: float | None
+    min_balloon_weight_to: float | None
+    max_balloon_weight_from: float | None
+    max_balloon_weight_to: float | None
+    passport_weight_diff_from: float | None
+    passport_weight_diff_to: float | None
 
 
 def record_post_error(
@@ -208,9 +212,12 @@ def check_settings(post_number: int) -> PostSettings:
             available=False,
             read_only=True,
             weight_correction=0.0,
-            min_balloon_weight=None,
-            max_balloon_weight=None,
-            max_passport_weight_diff=None,
+            min_balloon_weight_from=None,
+            min_balloon_weight_to=None,
+            max_balloon_weight_from=None,
+            max_balloon_weight_to=None,
+            passport_weight_diff_from=None,
+            passport_weight_diff_to=None,
         )
 
     weight_correction = 0.0
@@ -226,11 +233,12 @@ def check_settings(post_number: int) -> PostSettings:
         available=True,
         read_only=bool(post_settings.get('read_only')),
         weight_correction=weight_correction,
-        min_balloon_weight=post_settings.get('min_balloon_weight'),
-        max_balloon_weight=post_settings.get('max_balloon_weight'),
-        max_passport_weight_diff=post_settings.get(
-            'max_passport_weight_diff'
-        ),
+        min_balloon_weight_from=post_settings.get('min_balloon_weight_from'),
+        min_balloon_weight_to=post_settings.get('min_balloon_weight_to'),
+        max_balloon_weight_from=post_settings.get('max_balloon_weight_from'),
+        max_balloon_weight_to=post_settings.get('max_balloon_weight_to'),
+        passport_weight_diff_from=post_settings.get('passport_weight_diff_from'),
+        passport_weight_diff_to=post_settings.get('passport_weight_diff_to'),
     )
 
 
@@ -358,43 +366,67 @@ def request_processing(request_type: str, post_number: int, weight: int) -> tupl
             elif not post_settings.read_only:
                 weight_is_valid = True
 
-                if (
-                    post_settings.min_balloon_weight is not None
-                    and netto < post_settings.min_balloon_weight
-                ) or (
-                    post_settings.max_balloon_weight is not None
-                    and brutto > post_settings.max_balloon_weight
+                if not is_value_in_range(
+                    netto,
+                    post_settings.min_balloon_weight_from,
+                    post_settings.min_balloon_weight_to,
                 ):
                     weight_is_valid = False
                     record_post_error(
                         post_number,
                         request_type,
                         'weight_out_of_range',
-                        f'Паспортные веса вне диапазона: '
-                        f'netto={netto}, brutto={brutto}',
+                        'Паспортный вес netto вне диапазона: '
+                        f'netto={netto}, '
+                        f'от={post_settings.min_balloon_weight_from}, '
+                        f'до={post_settings.min_balloon_weight_to}',
                         metric_name='weight_rejections',
                     )
 
-                max_passport_diff = (
-                    post_settings.max_passport_weight_diff
-                )
-                if max_passport_diff is None:
+                if not is_value_in_range(
+                    brutto,
+                    post_settings.max_balloon_weight_from,
+                    post_settings.max_balloon_weight_to,
+                ):
+                    weight_is_valid = False
+                    record_post_error(
+                        post_number,
+                        request_type,
+                        'weight_out_of_range',
+                        'Паспортный вес brutto вне диапазона: '
+                        f'brutto={brutto}, '
+                        f'от={post_settings.max_balloon_weight_from}, '
+                        f'до={post_settings.max_balloon_weight_to}',
+                        metric_name='weight_rejections',
+                    )
+
+                passport_diff = abs(brutto - netto)
+                if (
+                    post_settings.passport_weight_diff_from is None
+                    or post_settings.passport_weight_diff_to is None
+                ):
                     weight_is_valid = False
                     record_post_error(
                         post_number,
                         request_type,
                         'invalid_settings',
-                        'Не задан max_passport_weight_diff',
+                        'Не задан диапазон разницы паспортных весов',
                         metric_name='settings_errors',
                     )
-                elif abs(brutto - netto) > max_passport_diff:
+                elif not is_value_in_range(
+                    passport_diff,
+                    post_settings.passport_weight_diff_from,
+                    post_settings.passport_weight_diff_to,
+                ):
                     weight_is_valid = False
                     record_post_error(
                         post_number,
                         request_type,
                         'passport_weight_diff',
-                        f'Разница brutto/netto {abs(brutto - netto)} '
-                        f'превышает {max_passport_diff}',
+                        'Разница brutto/netto вне диапазона: '
+                        f'diff={passport_diff}, '
+                        f'от={post_settings.passport_weight_diff_from}, '
+                        f'до={post_settings.passport_weight_diff_to}',
                         metric_name='weight_rejections',
                     )
 

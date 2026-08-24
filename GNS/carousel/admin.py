@@ -29,9 +29,12 @@ class CarouselSettingsAdmin(admin.ModelAdmin):
         'use_weight_management',
         'use_common_correction',
         'weight_correction_value',
-        'min_balloon_weight',
-        'max_balloon_weight',
-        'max_passport_weight_diff',
+        'min_balloon_weight_from',
+        'min_balloon_weight_to',
+        'max_balloon_weight_from',
+        'max_balloon_weight_to',
+        'passport_weight_diff_from',
+        'passport_weight_diff_to',
     ]
     exclude = ['user']
 
