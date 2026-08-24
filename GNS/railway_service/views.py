@@ -127,17 +127,38 @@ class RailwayTankDeleteView(ModalDeleteMixin, PreserveListQueryMixin, generic.De
 
 
 # Партии приёмки газа в ж/д цистернах
+def _railway_batch_queryset():
+    tank_history = Prefetch(
+        'tank_history',
+        queryset=RailwayTankHistory.objects.order_by('-arrival_at'),
+    )
+    return RailwayBatch.objects.prefetch_related(
+        Prefetch(
+            'railway_tank_list',
+            queryset=RailwayTank.objects.prefetch_related(tank_history),
+        )
+    )
+
+
 class RailwayBatchListView(generic.ListView):
     model = RailwayBatch
     paginate_by = 10
     template_name = 'railway_service/railway_batch_list.html'
 
+    def get_queryset(self):
+        return _railway_batch_queryset()
+
 
 class RailwayBatchDetailView(generic.DetailView):
     model = RailwayBatch
-    queryset = RailwayBatch.objects.prefetch_related('railway_tank_list')
+    queryset = _railway_batch_queryset()
     context_object_name = 'batch'
     template_name = 'railway_service/railway_batch_detail.html'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['gas_totals'] = self.object.get_gas_totals()
+        return context
 
 
 class RailwayBatchUpdateView(PreserveListQueryMixin, generic.UpdateView):

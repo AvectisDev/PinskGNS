@@ -27,6 +27,7 @@
                     </thead>
                     <tbody>
                     {% for batch in page_obj.object_list %}
+                    {% with totals=batch.get_gas_totals %}
                     <tr>
                         <td>
                             <a href="{% url_with_query batch.get_absolute_url %}" class="custom-link fw-bold">
@@ -42,8 +43,12 @@
                             {% endif %}
                         </td>
                         <td>{{ batch.railway_tank_list.count }}</td>
-                        <td>{{ batch.gas_amount_spbt|float_format|default:"-" }} т</td>
-                        <td>{{ batch.gas_amount_pba|float_format|default:"-" }} т</td>
+                        <td {% if totals.spbt.incomplete %}class="text-danger"{% endif %}>
+                            {% if totals.spbt.has_tanks %}{{ totals.spbt.amount|float_format }} т{% else %}- т{% endif %}
+                        </td>
+                        <td {% if totals.pba.incomplete %}class="text-danger"{% endif %}>
+                            {% if totals.pba.has_tanks %}{{ totals.pba.amount|float_format }} т{% else %}- т{% endif %}
+                        </td>
                         <td>
                             {% if batch.is_active %}
                             <span class="badge bg-success">Активна</span>
@@ -60,6 +65,7 @@
                             </div>
                         </td>
                     </tr>
+                    {% endwith %}
                     {% empty %}
                     <tr>
                         <td colspan="8" class="text-center py-4 text-muted">Нет данных о партиях</td>

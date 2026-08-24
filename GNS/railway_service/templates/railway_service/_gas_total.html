@@ -1,0 +1,11 @@
+{% load custom_filters %}
+{% if total.has_tanks %}
+    <span {% if total.incomplete %}class="text-danger"{% endif %}>
+        {{ total.amount|float_format }} т
+    </span>
+    {% if total.incomplete %}
+        <small class="text-danger d-block">Данные получены не со всех цистерн, требуется уточнение</small>
+    {% endif %}
+{% else %}
+    - т
+{% endif %}

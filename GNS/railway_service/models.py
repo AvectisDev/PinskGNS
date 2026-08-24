@@ -1,3 +1,5 @@
+from decimal import Decimal
+
 from django.db import models
 from django.contrib.auth.models import User
 from django.urls import reverse
@@ -100,6 +102,31 @@ class RailwayBatch(models.Model):
 
     def get_delete_url(self):
         return reverse('railway_service:railway_batch_delete', args=[self.pk])
+
+    def get_gas_totals(self) -> dict:
+        """Суммы газа по последней истории цистерн партии.
+
+        Если у части цистерн нет веса газа, сумма считается по имеющимся
+        данным и помечается как неполная.
+        """
+        empty = {'amount': Decimal('0'), 'incomplete': False, 'has_tanks': False}
+        totals = {
+            'spbt': dict(empty),
+            'pba': dict(empty),
+        }
+        key_by_type = {'СПБТ': 'spbt', 'ПБА': 'pba'}
+
+        for tank in self.railway_tank_list.all():
+            last = next(iter(tank.tank_history.all()), None)
+            gas_type = last.gas_type if last and last.gas_type else 'СПБТ'
+            bucket = totals[key_by_type.get(gas_type, 'spbt')]
+            bucket['has_tanks'] = True
+            if last is None or last.gas_weight is None:
+                bucket['incomplete'] = True
+                continue
+            bucket['amount'] += last.gas_weight
+
+        return totals
 
     @classmethod
     def get_period_stats(cls, start_date, end_date):

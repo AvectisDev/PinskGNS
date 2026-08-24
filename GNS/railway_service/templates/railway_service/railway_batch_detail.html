@@ -33,11 +33,19 @@
                             {% endif %}
                         </dd>
 
+                        {% if gas_totals.spbt.has_tanks %}
                         <dt class="col-sm-6">СПБТ газа:</dt>
-                        <dd class="col-sm-6">{{ batch.gas_amount_spbt|float_format|default:"-" }} т</dd>
+                        <dd class="col-sm-6">
+                            {% include 'railway_service/_gas_total.html' with total=gas_totals.spbt %}
+                        </dd>
+                        {% endif %}
 
+                        {% if gas_totals.pba.has_tanks %}
                         <dt class="col-sm-6">ПБА газа:</dt>
-                        <dd class="col-sm-6">{{ batch.gas_amount_pba|float_format|default:"-" }} т</dd>
+                        <dd class="col-sm-6">
+                            {% include 'railway_service/_gas_total.html' with total=gas_totals.pba %}
+                        </dd>
+                        {% endif %}
 
                         <dt class="col-sm-6">Кол-во цистерн:</dt>
                         <dd class="col-sm-6">{{ batch.railway_tank_list.count }}</dd>
