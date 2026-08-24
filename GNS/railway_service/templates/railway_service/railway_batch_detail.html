@@ -32,6 +32,12 @@
                                 <span class="text-muted">Не завершена</span>
                             {% endif %}
                         </dd>
+                    </dl>
+                </div>
+                <div class="col-md-6">
+                    <dl class="row">
+                        <dt class="col-sm-6">Количество цистерн:</dt>
+                        <dd class="col-sm-6">{{ batch.railway_tank_list.count }}</dd>
 
                         {% if gas_totals.spbt.has_tanks %}
                         <dt class="col-sm-6">СПБТ газа:</dt>
@@ -46,9 +52,6 @@
                             {% include 'railway_service/_gas_total.html' with total=gas_totals.pba %}
                         </dd>
                         {% endif %}
-
-                        <dt class="col-sm-6">Кол-во цистерн:</dt>
-                        <dd class="col-sm-6">{{ batch.railway_tank_list.count }}</dd>
                     </dl>
                 </div>
             </div>
@@ -81,7 +84,7 @@
                                         {% if tank.is_on_station %}
                                             <span class="badge bg-success">На станции</span>
                                         {% else %}
-                                            <span class="badge bg-warning text-dark">Отгружена</span>
+                                            <span class="badge bg-secondary">Отгружена</span>
                                         {% endif %}
                                     </td>
                                 </tr>

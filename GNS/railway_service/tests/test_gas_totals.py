@@ -5,7 +5,7 @@ from django.test import TestCase
 from django.urls import reverse
 from django.utils import timezone
 
-from railway_service.models import RailwayTankHistory
+from railway_service.models import RailwayBatch, RailwayTankHistory
 
 from .helpers import RailwayFixturesMixin
 
@@ -72,6 +72,61 @@ class GetGasTotalsTests(RailwayFixturesMixin, TestCase):
         batch = self.make_batch(tanks=[tank])
 
         self.assertEqual(batch.get_gas_totals()['spbt']['amount'], Decimal('3'))
+
+
+class GetPeriodStatsTests(RailwayFixturesMixin, TestCase):
+    def test_sums_gas_from_tank_histories_in_period(self):
+        complete = self.make_tank(
+            5001,
+            gas_type='СПБТ',
+            gas_weight=Decimal('32.02'),
+            arrival_at=timezone.now(),
+        )
+        incomplete = self.make_tank(
+            5002,
+            gas_type='СПБТ',
+            empty_weight=Decimal('22.96'),
+            arrival_at=timezone.now(),
+        )
+        self.make_batch(tanks=[complete, incomplete])
+
+        today = timezone.localdate()
+        stats = RailwayBatch.get_period_stats(today, today)
+
+        self.assertEqual(stats['total_batches'], 1)
+        self.assertEqual(stats['total_tanks'], 2)
+        self.assertEqual(stats['total_gas_spbt'], Decimal('32.02'))
+        self.assertEqual(stats['total_gas_pba'], Decimal('0'))
+        self.assertEqual(stats['total_gas_in_all_tanks'], Decimal('32.02'))
+        self.assertTrue(stats['has_spbt'])
+        self.assertFalse(stats['has_pba'])
+        self.assertTrue(stats['spbt_incomplete'])
+        self.assertFalse(stats['pba_incomplete'])
+
+    def test_statistic_page_shows_partial_railway_sum(self):
+        complete = self.make_tank(
+            5003,
+            gas_type='СПБТ',
+            gas_weight=Decimal('36.76'),
+            arrival_at=timezone.now(),
+        )
+        missing = self.make_tank(
+            5004,
+            gas_type='СПБТ',
+            empty_weight=Decimal('37.80'),
+            arrival_at=timezone.now(),
+        )
+        self.make_batch(tanks=[complete, missing])
+
+        response = self.client.get(reverse('filling_station:statistic'))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, '36.76')
+        self.assertContains(response, 'text-danger')
+        self.assertContains(response, 'data-bs-toggle="tooltip"')
+        self.assertContains(response, 'data-bs-title="Данные получены не со всех цистерн, требуется уточнение"')
+        self.assertContains(response, 'Газ ПБА')
+        self.assertContains(response, '0,00')
 
 
 class RailwayBatchDetailViewTests(RailwayFixturesMixin, TestCase):
