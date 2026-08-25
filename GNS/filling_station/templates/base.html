@@ -5,9 +5,9 @@
 <head>
     <meta charset="UTF-8">
     <title>{% block title %} Газонаполнительная станция {% endblock %}</title>
-    <link rel="shortcut icon" type="image/ico" href='/static/filling_station/media/Gas.ico'/>
-    <link rel="stylesheet" href="/static/filling_station/bootstrap/css/bootstrap.min.css">
-    <link rel="stylesheet" href="/static/filling_station/bootstrap/icons/font/bootstrap-icons.css">
+    <link rel="shortcut icon" type="image/ico" href="{% static 'filling_station/media/Gas.ico' %}">
+    <link rel="stylesheet" href="{% static 'filling_station/bootstrap/css/bootstrap.min.css' %}">
+    <link rel="stylesheet" href="{% static 'filling_station/bootstrap/icons/font/bootstrap-icons.css' %}">
     <link rel="stylesheet" href="{% static 'filling_station/css/tables.css' %}">
     <link rel="stylesheet" href="{% static 'filling_station/css/menu.css' %}">
 </head>
@@ -149,14 +149,24 @@
 </div>
 
 <div class="main-content">
+    {% if messages %}
+        <div class="px-3 pt-3">
+            {% for message in messages %}
+                <div class="alert alert-{% if message.tags == 'error' %}danger{% elif message.tags %}{{ message.tags }}{% else %}info{% endif %} alert-dismissible fade show" role="alert">
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            {% endfor %}
+        </div>
+    {% endif %}
     {% block content %}
     {% endblock content %}
 </div>
 
 {% include 'core/_delete_modal.html' %}
 
-<script src="/static/filling_station/bootstrap/jquery-3.5.1.slim.min.js"></script>
-<script type="text/javascript" src="/static/filling_station/bootstrap/js/bootstrap.bundle.min.js"></script>
+<script src="{% static 'filling_station/bootstrap/jquery-3.5.1.slim.min.js' %}"></script>
+<script type="text/javascript" src="{% static 'filling_station/bootstrap/js/bootstrap.bundle.min.js' %}"></script>
 <script>
     (function () {
         const modalEl = document.getElementById('deleteConfirmModal');
