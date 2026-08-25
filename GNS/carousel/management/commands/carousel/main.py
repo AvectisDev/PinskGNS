@@ -42,6 +42,8 @@ RFID_READER_NUMBER = int(
 BALLOON_QUEUE_KEY = get_reader_balloon_queue_key(RFID_READER_NUMBER)
 
 REQUEST_CACHE_SECONDS = 2.0
+COM_RECONNECT_DELAY_SECONDS = 60
+FATAL_RESTART_DELAY_SECONDS = 300
 
 
 @dataclass(frozen=True)
@@ -473,7 +475,11 @@ def request_processing(request_type: str, post_number: int, weight: int) -> tupl
     return response_required, full_weight, process_data_to_server
 
 
-def serial_exchange():
+def serial_exchange(
+    *,
+    announce_start: bool = True,
+    on_connected=None,
+) -> None:
     """
     Функция обработки данных с поста наполнения баллонов. Каждый пост отправляет 8 байт данных, после чего ждёт ответ.
     В зависимости от типа запроса в ответе должен быть либо вес баллона, либо ответ не нужен.
@@ -481,10 +487,13 @@ def serial_exchange():
     """
     ser = None
     try:
-        logger.info(f"Запуск программы обработки УНБ...")
+        if announce_start:
+            logger.info("Запуск программы обработки УНБ...")
         # Создаем объект Serial для работы с COM-портом
         ser = serial.Serial(PORT, BAUD_RATE, timeout=1)
         logger.info(f"Соединение установлено на порту {PORT}.")
+        if on_connected is not None:
+            on_connected()
 
         while True:
             data = ser.read(8)
@@ -574,26 +583,56 @@ def serial_exchange():
                     metric_name='frame_errors',
                 )
 
-    except serial.SerialException as error:
-        logger.error(f"Ошибка: {error}. Проверьте правильность указанного порта.")
-    except Exception as error:
-        logger.error(f"Общая ошибка: {error}.")
     finally:
-        if ser:
-            # Закрываем соединение только если оно было открыто
+        if ser and ser.is_open:
             ser.close()
             logger.debug("Соединение закрыто")
 
 
 def main():
+    last_serial_error: str | None = None
+    repeat_count = 0
+
+    def mark_connected() -> None:
+        nonlocal last_serial_error, repeat_count
+        last_serial_error = None
+        repeat_count = 0
+
     while True:
         try:
-            serial_exchange()
-        except Exception as error:
-            logger.error(
-                f"Ошибка в serial_exchange: {error}. Перезапуск через 5 минут..."
+            serial_exchange(
+                announce_start=last_serial_error is None,
+                on_connected=mark_connected,
             )
-            time.sleep(300)
+        except serial.SerialException as error:
+            error_text = str(error)
+            if error_text != last_serial_error:
+                logger.error(
+                    "Ошибка: %s. Проверьте правильность указанного порта. "
+                    "Повторное подключение через %s с.",
+                    error,
+                    COM_RECONNECT_DELAY_SECONDS,
+                )
+                last_serial_error = error_text
+                repeat_count = 1
+            else:
+                repeat_count += 1
+                logger.debug(
+                    "Повтор ошибки COM-порта (раз подряд: %s). "
+                    "Повторное подключение через %s с.",
+                    repeat_count,
+                    COM_RECONNECT_DELAY_SECONDS,
+                )
+            time.sleep(COM_RECONNECT_DELAY_SECONDS)
+        except Exception as error:
+            last_serial_error = None
+            repeat_count = 0
+            logger.error(
+                "Ошибка в serial_exchange: %s. Перезапуск через %s с...",
+                error,
+                FATAL_RESTART_DELAY_SECONDS,
+            )
+            time.sleep(FATAL_RESTART_DELAY_SECONDS)
 
 
 if __name__ == '__main__':
