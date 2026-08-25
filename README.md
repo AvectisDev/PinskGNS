@@ -63,6 +63,10 @@ uv sync
 uv sync --group dev
 ```
 
+### Production на Windows Server
+
+Nginx в Docker (статика/media + reverse proxy) и запуск Daphne/Celery через NSSM на `.venv` после `uv sync` — см. [deploy/README.md](deploy/README.md).
+
 ## OpenAPI
 
 Спецификация API генерируется из Django-кода (`drf-spectacular`) и хранится в репозитории:

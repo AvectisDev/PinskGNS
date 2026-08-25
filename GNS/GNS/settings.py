@@ -25,14 +25,17 @@ SESSION_COOKIE_HTTPONLY = True
 ALLOWED_HOSTS = [
     'localhost',
     '127.0.0.1',
+    'gns-gas',
     '10.10.12.253',
-    '10.0.3.2'
+    '10.0.3.2',
 ]
 
 # Доверенные источники для CSRF
 CSRF_TRUSTED_ORIGINS = [
     'http://localhost:8000',
     'http://127.0.0.1:8000',
+    'http://gns-gas',
+    'http://gns-gas:8000',
     'http://10.10.12.253:8000',
     'http://10.0.3.2:8000',
 ]
