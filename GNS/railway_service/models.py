@@ -1,8 +1,10 @@
+from decimal import Decimal
+
 from django.db import models
 from django.contrib.auth.models import User
 from django.urls import reverse
 from django.conf import settings
-from django.db.models import Count, Sum
+from django.db.models import Count, Prefetch
 
 
 class RailwayTank(models.Model):
@@ -101,25 +103,80 @@ class RailwayBatch(models.Model):
     def get_delete_url(self):
         return reverse('railway_service:railway_batch_delete', args=[self.pk])
 
+    def get_gas_totals(self) -> dict:
+        """Суммы газа по последней истории цистерн партии.
+
+        Если у части цистерн нет веса газа, сумма считается по имеющимся
+        данным и помечается как неполная.
+        """
+        empty = {'amount': Decimal('0'), 'incomplete': False, 'has_tanks': False}
+        totals = {
+            'spbt': dict(empty),
+            'pba': dict(empty),
+        }
+        key_by_type = {'СПБТ': 'spbt', 'ПБА': 'pba'}
+
+        for tank in self.railway_tank_list.all():
+            last = next(iter(tank.tank_history.all()), None)
+            gas_type = last.gas_type if last and last.gas_type else 'СПБТ'
+            bucket = totals[key_by_type.get(gas_type, 'spbt')]
+            bucket['has_tanks'] = True
+            if last is None or last.gas_weight is None:
+                bucket['incomplete'] = True
+                continue
+            bucket['amount'] += last.gas_weight
+
+        return totals
+
     @classmethod
     def get_period_stats(cls, start_date, end_date):
+        tank_history = Prefetch(
+            'tank_history',
+            queryset=RailwayTankHistory.objects.order_by('-arrival_at'),
+        )
         queryset = cls.objects.filter(
             begin_date__date__gte=start_date,
             begin_date__date__lte=end_date,
+        ).prefetch_related(
+            Prefetch(
+                'railway_tank_list',
+                queryset=RailwayTank.objects.prefetch_related(tank_history),
+            )
         )
 
-        stats = queryset.aggregate(
+        aggregate_stats = queryset.aggregate(
             total_batches=Count('id'),
             total_tanks=Count('railway_tank_list', distinct=True),
-            total_gas_spbt=Sum('gas_amount_spbt'),
-            total_gas_pba=Sum('gas_amount_pba'),
         )
-        total_gas_spbt = stats['total_gas_spbt'] or 0
-        total_gas_pba = stats['total_gas_pba'] or 0
+
+        total_gas_spbt = Decimal('0')
+        total_gas_pba = Decimal('0')
+        spbt_incomplete = False
+        pba_incomplete = False
+        has_spbt = False
+        has_pba = False
+
+        for batch in queryset:
+            totals = batch.get_gas_totals()
+            if totals['spbt']['has_tanks']:
+                has_spbt = True
+                total_gas_spbt += totals['spbt']['amount']
+                if totals['spbt']['incomplete']:
+                    spbt_incomplete = True
+            if totals['pba']['has_tanks']:
+                has_pba = True
+                total_gas_pba += totals['pba']['amount']
+                if totals['pba']['incomplete']:
+                    pba_incomplete = True
+
         return {
-            'total_batches': stats['total_batches'] or 0,
-            'total_tanks': stats['total_tanks'] or 0,
+            'total_batches': aggregate_stats['total_batches'] or 0,
+            'total_tanks': aggregate_stats['total_tanks'] or 0,
             'total_gas_spbt': total_gas_spbt,
             'total_gas_pba': total_gas_pba,
             'total_gas_in_all_tanks': total_gas_spbt + total_gas_pba,
+            'spbt_incomplete': spbt_incomplete,
+            'pba_incomplete': pba_incomplete,
+            'has_spbt': has_spbt,
+            'has_pba': has_pba,
         }

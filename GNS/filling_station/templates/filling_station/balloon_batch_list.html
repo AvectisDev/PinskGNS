@@ -55,10 +55,12 @@
                             <td>{{ batch.get_amount_without_rfid|default:"-" }}</td>
                             <td>{{ batch.ttn_name|default:"-" }}</td>
                             <td>
-                                {% if batch.miriada_close_failed %}
+                                {% if batch.status == 'active' %}
+                                    <span class="badge bg-success">В работе</span>
+                                {% elif batch.status == 'paused' %}
+                                    <span class="badge bg-warning text-dark">Приостановлена</span>
+                                {% elif batch.status == 'miriada_error' %}
                                     <span class="badge bg-danger">Ошибка Мириады</span>
-                                {% elif batch.is_active %}
-                                    <span class="badge bg-success">Активна</span>
                                 {% else %}
                                     <span class="badge bg-secondary">Завершена</span>
                                 {% endif %}

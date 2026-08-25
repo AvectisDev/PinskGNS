@@ -173,6 +173,7 @@ class BalloonsBatchForm(forms.ModelForm):
             'miriada_balloons_sent',
             'miriada_close_failed',
             'miriada_error_message',
+            'status',
         ]
         widgets = {
             'batch_type': forms.HiddenInput(),
@@ -214,9 +215,6 @@ class BalloonsBatchForm(forms.ModelForm):
                 'class': 'form-control',
                 'placeholder': 'Количество газа',
                 'step': '0.01'
-            }),
-            'is_active': forms.CheckboxInput(attrs={
-                'class': 'form-check-input'
             }),
             'amount_of_ttn': forms.NumberInput(attrs={
                 'class': 'form-control',

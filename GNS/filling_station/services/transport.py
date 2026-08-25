@@ -1,22 +1,49 @@
 import logging
+import re
 from typing import Optional, Tuple
 
 from filling_station.models import Truck, Trailer
 
 logger = logging.getLogger('filling_station')
 
+_BELARUS_PLATE_PATTERN = re.compile(
+    r'^([A-Za-zА-Яа-яЁё]{2})(\d{4})(\d)$',
+)
+
+
+def compact_registration_number(reg_number: str) -> str:
+    """Убирает пробелы и дефисы, оставляет буквы и цифры."""
+    if not reg_number:
+        return ''
+    return re.sub(r'[\s\-]+', '', reg_number.strip())
+
 
 def normalize_registration_number(reg_number: str) -> str:
     """
-    Преобразует номер машины из формата "AM 7881-2" в формат "AM78812" (убирает пробелы и дефис).
-    Args:
-        reg_number (str): Номер машины в формате "AM 7881-2"
-    Returns:
-        str: Номер машины в формате "AM78812"
+    Преобразует номер машины в компактный формат «AM78812» (без пробелов и дефисов).
+    «AM 7881-2», «AM7881-2» и «AM78812» дают один результат.
+    """
+    return compact_registration_number(reg_number)
+
+
+def _format_registration_number(reg_number: str) -> str:
+    """
+    Формат номера для API Мириады: «АС 5512-1».
+    Эквивалентные входные формы: «АС5512-1», «АС55121», «АС 5512-1», «AP71081».
     """
     if not reg_number:
-        return ''
-    return reg_number.replace(' ', '').replace('-', '')
+        return reg_number
+
+    compact = compact_registration_number(reg_number)
+    match = _BELARUS_PLATE_PATTERN.match(compact)
+    if match:
+        letters, digits, region = match.groups()
+        return f'{letters.upper()} {digits}-{region}'
+
+    if len(compact) >= 7:
+        return f'{compact[:2].upper()} {compact[2:6]}-{compact[6]}'
+
+    return reg_number.strip()
 
 
 def find_transport_by_registration_number(reg_number: str) -> Tuple[Optional[Truck], Optional[Trailer]]:

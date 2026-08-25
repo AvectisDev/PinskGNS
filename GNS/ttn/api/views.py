@@ -15,6 +15,7 @@ from drf_spectacular.utils import (
 from ttn import services
 from ttn.models import MiriadaTtn
 from ttn.api.serializers import MiriadaTtnSerializer
+from core.api.schema import ApiErrorSerializer
 
 
 logger = logging.getLogger('filling_station')
@@ -27,12 +28,7 @@ logger = logging.getLogger('filling_station')
         description='Получение списка текущих ТТН из системы Мириада',
         responses={
             200: MiriadaTtnSerializer(many=True),
-            500: inline_serializer(
-                name='ErrorResponse',
-                fields={
-                    'error': serializers.CharField()
-                }
-            )
+            500: ApiErrorSerializer,
         },
         examples=[
             OpenApiExample(

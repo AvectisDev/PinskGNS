@@ -10,6 +10,7 @@ from filling_station.models import (
     Balloon,
     Reader,
     BalloonsBatch,
+    BatchStatus,
     ReaderSettings,
     DailyReaderCounter,
     TotalReadersCounter,
@@ -124,7 +125,7 @@ def get_active_batch_for_reader(reader: ReaderSettings) -> Optional[BalloonsBatc
         batch_type=reader.function,
         started_at__date=timezone.localdate(),
         reader_number=reader.number,
-        is_active=True,
+        status=BatchStatus.ACTIVE,
     ).first()
 
 

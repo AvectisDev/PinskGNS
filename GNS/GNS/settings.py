@@ -25,16 +25,22 @@ SESSION_COOKIE_HTTPONLY = True
 ALLOWED_HOSTS = [
     'localhost',
     '127.0.0.1',
+    'gns-gas',
     '10.10.12.253',
-    '10.0.3.2'
+    '10.0.3.2',
 ]
 
 # Доверенные источники для CSRF
 CSRF_TRUSTED_ORIGINS = [
     'http://localhost:8000',
     'http://127.0.0.1:8000',
+    'http://gns-gas',
+    'http://gns-gas:8000',
+    'http://gns-gas:8080',
     'http://10.10.12.253:8000',
+    'http://10.10.12.253:8080',
     'http://10.0.3.2:8000',
+    'http://10.0.3.2:8080',
 ]
 
 # Application definition
@@ -79,10 +85,28 @@ SPECTACULAR_SETTINGS = {
     'SERVE_INCLUDE_SCHEMA': False,
     'SCHEMA_PATH_PREFIX': r'/api/v[0-9]',
     'COMPONENT_SPLIT_REQUEST': True,
+    'SERVERS': [
+        {
+            'url': os.environ.get('API_BASE_URL', 'http://localhost:8000'),
+            'description': 'Default API server',
+        },
+    ],
     'AUTHENTICATION_WHITELIST': [
+        'rest_framework_simplejwt.authentication.JWTAuthentication',
         'rest_framework.authentication.SessionAuthentication',
         'rest_framework.authentication.BasicAuthentication',
     ],
+    'APPEND_COMPONENTS': {
+        'securitySchemes': {
+            'bearerAuth': {
+                'type': 'http',
+                'scheme': 'bearer',
+                'bearerFormat': 'JWT',
+                'description': 'JWT access token from POST /api/token/',
+            },
+        },
+    },
+    'SECURITY': [{'bearerAuth': []}],
     'SWAGGER_UI_SETTINGS': {
         'deepLinking': True,
         'persistAuthorization': True,

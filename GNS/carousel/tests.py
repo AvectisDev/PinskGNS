@@ -9,6 +9,16 @@ from .services import (
     UnsupportedCarouselRequestError,
     process_carousel_data,
 )
+from .validation import is_value_in_range
+
+
+class RangeValidationTests(SimpleTestCase):
+    def test_value_inside_range(self):
+        self.assertTrue(is_value_in_range(18.0, 17.0, 19.0))
+
+    def test_value_outside_range(self):
+        self.assertFalse(is_value_in_range(16.0, 17.0, 19.0))
+        self.assertFalse(is_value_in_range(20.0, 17.0, 19.0))
 
 
 class CarouselRequestProcessingTests(SimpleTestCase):
@@ -75,9 +85,12 @@ class CarouselRequestProcessingTests(SimpleTestCase):
             available=True,
             read_only=True,
             weight_correction=0.0,
-            min_balloon_weight=17.0,
-            max_balloon_weight=47.0,
-            max_passport_weight_diff=22.0,
+            min_balloon_weight_from=17.0,
+            min_balloon_weight_to=19.0,
+            max_balloon_weight_from=35.0,
+            max_balloon_weight_to=47.0,
+            passport_weight_diff_from=0.0,
+            passport_weight_diff_to=22.0,
         )
 
         response_required, full_weight, data = (
@@ -107,9 +120,12 @@ class CarouselRequestProcessingTests(SimpleTestCase):
             available=True,
             read_only=False,
             weight_correction=0.2,
-            min_balloon_weight=17.0,
-            max_balloon_weight=47.0,
-            max_passport_weight_diff=22.0,
+            min_balloon_weight_from=17.0,
+            min_balloon_weight_to=19.0,
+            max_balloon_weight_from=35.0,
+            max_balloon_weight_to=47.0,
+            passport_weight_diff_from=0.0,
+            passport_weight_diff_to=22.0,
         )
 
         response_required, full_weight, _ = (
@@ -137,9 +153,12 @@ class CarouselRequestProcessingTests(SimpleTestCase):
             available=False,
             read_only=True,
             weight_correction=0.0,
-            min_balloon_weight=None,
-            max_balloon_weight=None,
-            max_passport_weight_diff=None,
+            min_balloon_weight_from=None,
+            min_balloon_weight_to=None,
+            max_balloon_weight_from=None,
+            max_balloon_weight_to=None,
+            passport_weight_diff_from=None,
+            passport_weight_diff_to=None,
         )
 
         response_required, full_weight, _ = (

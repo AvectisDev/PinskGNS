@@ -1,0 +1,9 @@
+<strong
+    {% if incomplete %}
+    class="text-danger"
+    data-bs-toggle="tooltip"
+    data-bs-title="Данные получены не со всех цистерн, требуется уточнение"
+    {% endif %}
+>
+    {{ amount|floatformat:2 }} т
+</strong>

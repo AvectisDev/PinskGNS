@@ -5,6 +5,7 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from ..models import Truck, Trailer
+from core.api.schema import ApiErrorSerializer
 from .serializers import TruckSerializer, TrailerSerializer
 
 
@@ -43,8 +44,8 @@ from .serializers import TruckSerializer, TrailerSerializer
         ],
         responses={
             200: TruckSerializer(many=True),
-            404: OpenApiTypes.OBJECT,
-            400: OpenApiTypes.OBJECT
+            404: ApiErrorSerializer,
+            400: ApiErrorSerializer
         },
         examples=[
             OpenApiExample(
@@ -79,7 +80,7 @@ from .serializers import TruckSerializer, TrailerSerializer
         request=TruckSerializer,
         responses={
             201: TruckSerializer,
-            400: OpenApiTypes.OBJECT
+            400: ApiErrorSerializer
         },
         examples=[
             OpenApiExample(
@@ -107,8 +108,8 @@ from .serializers import TruckSerializer, TrailerSerializer
         request=TruckSerializer,
         responses={
             200: TruckSerializer,
-            400: OpenApiTypes.OBJECT,
-            404: OpenApiTypes.OBJECT
+            400: ApiErrorSerializer,
+            404: ApiErrorSerializer
         },
         examples=[
             OpenApiExample(
@@ -216,8 +217,8 @@ class TruckView(APIView):
         ],
         responses={
             200: TrailerSerializer(many=True),
-            404: OpenApiTypes.OBJECT,
-            400: OpenApiTypes.OBJECT
+            404: ApiErrorSerializer,
+            400: ApiErrorSerializer
         },
         examples=[
             OpenApiExample(
@@ -249,7 +250,7 @@ class TruckView(APIView):
         request=TrailerSerializer,
         responses={
             201: TrailerSerializer,
-            400: OpenApiTypes.OBJECT
+            400: ApiErrorSerializer
         },
         examples=[
             OpenApiExample(
@@ -278,8 +279,8 @@ class TruckView(APIView):
         request=TrailerSerializer,
         responses={
             200: TrailerSerializer,
-            400: OpenApiTypes.OBJECT,
-            404: OpenApiTypes.OBJECT
+            400: ApiErrorSerializer,
+            404: ApiErrorSerializer
         },
         examples=[
             OpenApiExample(

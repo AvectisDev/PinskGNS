@@ -19,6 +19,7 @@ from drf_spectacular.utils import (
 from datetime import datetime, date
 from railway_service.models import RailwayTank, RailwayBatch, RailwayTankHistory
 from .serializers import RailwayBatchSerializer
+from core.api.schema import ApiErrorSerializer
 
 
 @extend_schema_view(
@@ -60,7 +61,7 @@ from .serializers import RailwayBatchSerializer
         description='Получение данных активной железнодорожной партии',
         responses={
             200: RailwayBatchSerializer,
-            404: OpenApiTypes.OBJECT
+            404: ApiErrorSerializer
         }
     ),
     create=extend_schema(
@@ -70,7 +71,7 @@ from .serializers import RailwayBatchSerializer
         request=RailwayBatchSerializer,
         responses={
             201: RailwayBatchSerializer,
-            400: OpenApiTypes.OBJECT
+            400: ApiErrorSerializer
         }
     ),
     partial_update=extend_schema(
@@ -80,8 +81,8 @@ from .serializers import RailwayBatchSerializer
         request=RailwayBatchSerializer,
         responses={
             200: RailwayBatchSerializer,
-            400: OpenApiTypes.OBJECT,
-            404: OpenApiTypes.OBJECT
+            400: ApiErrorSerializer,
+            404: ApiErrorSerializer
         }
     )
 )

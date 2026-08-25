@@ -13,6 +13,7 @@ django.setup()
 
 from django.core.exceptions import ValidationError
 
+from carousel.validation import is_value_in_range
 from carousel.services import (
     CarouselPostNotFoundError,
     UnsupportedCarouselRequestError,
@@ -41,6 +42,8 @@ RFID_READER_NUMBER = int(
 BALLOON_QUEUE_KEY = get_reader_balloon_queue_key(RFID_READER_NUMBER)
 
 REQUEST_CACHE_SECONDS = 2.0
+COM_RECONNECT_DELAY_SECONDS = 60
+FATAL_RESTART_DELAY_SECONDS = 300
 
 
 @dataclass(frozen=True)
@@ -57,9 +60,12 @@ class PostSettings:
     available: bool
     read_only: bool
     weight_correction: float | None
-    min_balloon_weight: float | None
-    max_balloon_weight: float | None
-    max_passport_weight_diff: float | None
+    min_balloon_weight_from: float | None
+    min_balloon_weight_to: float | None
+    max_balloon_weight_from: float | None
+    max_balloon_weight_to: float | None
+    passport_weight_diff_from: float | None
+    passport_weight_diff_to: float | None
 
 
 def record_post_error(
@@ -208,9 +214,12 @@ def check_settings(post_number: int) -> PostSettings:
             available=False,
             read_only=True,
             weight_correction=0.0,
-            min_balloon_weight=None,
-            max_balloon_weight=None,
-            max_passport_weight_diff=None,
+            min_balloon_weight_from=None,
+            min_balloon_weight_to=None,
+            max_balloon_weight_from=None,
+            max_balloon_weight_to=None,
+            passport_weight_diff_from=None,
+            passport_weight_diff_to=None,
         )
 
     weight_correction = 0.0
@@ -226,11 +235,12 @@ def check_settings(post_number: int) -> PostSettings:
         available=True,
         read_only=bool(post_settings.get('read_only')),
         weight_correction=weight_correction,
-        min_balloon_weight=post_settings.get('min_balloon_weight'),
-        max_balloon_weight=post_settings.get('max_balloon_weight'),
-        max_passport_weight_diff=post_settings.get(
-            'max_passport_weight_diff'
-        ),
+        min_balloon_weight_from=post_settings.get('min_balloon_weight_from'),
+        min_balloon_weight_to=post_settings.get('min_balloon_weight_to'),
+        max_balloon_weight_from=post_settings.get('max_balloon_weight_from'),
+        max_balloon_weight_to=post_settings.get('max_balloon_weight_to'),
+        passport_weight_diff_from=post_settings.get('passport_weight_diff_from'),
+        passport_weight_diff_to=post_settings.get('passport_weight_diff_to'),
     )
 
 
@@ -358,43 +368,67 @@ def request_processing(request_type: str, post_number: int, weight: int) -> tupl
             elif not post_settings.read_only:
                 weight_is_valid = True
 
-                if (
-                    post_settings.min_balloon_weight is not None
-                    and netto < post_settings.min_balloon_weight
-                ) or (
-                    post_settings.max_balloon_weight is not None
-                    and brutto > post_settings.max_balloon_weight
+                if not is_value_in_range(
+                    netto,
+                    post_settings.min_balloon_weight_from,
+                    post_settings.min_balloon_weight_to,
                 ):
                     weight_is_valid = False
                     record_post_error(
                         post_number,
                         request_type,
                         'weight_out_of_range',
-                        f'Паспортные веса вне диапазона: '
-                        f'netto={netto}, brutto={brutto}',
+                        'Паспортный вес netto вне диапазона: '
+                        f'netto={netto}, '
+                        f'от={post_settings.min_balloon_weight_from}, '
+                        f'до={post_settings.min_balloon_weight_to}',
                         metric_name='weight_rejections',
                     )
 
-                max_passport_diff = (
-                    post_settings.max_passport_weight_diff
-                )
-                if max_passport_diff is None:
+                if not is_value_in_range(
+                    brutto,
+                    post_settings.max_balloon_weight_from,
+                    post_settings.max_balloon_weight_to,
+                ):
+                    weight_is_valid = False
+                    record_post_error(
+                        post_number,
+                        request_type,
+                        'weight_out_of_range',
+                        'Паспортный вес brutto вне диапазона: '
+                        f'brutto={brutto}, '
+                        f'от={post_settings.max_balloon_weight_from}, '
+                        f'до={post_settings.max_balloon_weight_to}',
+                        metric_name='weight_rejections',
+                    )
+
+                passport_diff = abs(brutto - netto)
+                if (
+                    post_settings.passport_weight_diff_from is None
+                    or post_settings.passport_weight_diff_to is None
+                ):
                     weight_is_valid = False
                     record_post_error(
                         post_number,
                         request_type,
                         'invalid_settings',
-                        'Не задан max_passport_weight_diff',
+                        'Не задан диапазон разницы паспортных весов',
                         metric_name='settings_errors',
                     )
-                elif abs(brutto - netto) > max_passport_diff:
+                elif not is_value_in_range(
+                    passport_diff,
+                    post_settings.passport_weight_diff_from,
+                    post_settings.passport_weight_diff_to,
+                ):
                     weight_is_valid = False
                     record_post_error(
                         post_number,
                         request_type,
                         'passport_weight_diff',
-                        f'Разница brutto/netto {abs(brutto - netto)} '
-                        f'превышает {max_passport_diff}',
+                        'Разница brutto/netto вне диапазона: '
+                        f'diff={passport_diff}, '
+                        f'от={post_settings.passport_weight_diff_from}, '
+                        f'до={post_settings.passport_weight_diff_to}',
                         metric_name='weight_rejections',
                     )
 
@@ -441,7 +475,11 @@ def request_processing(request_type: str, post_number: int, weight: int) -> tupl
     return response_required, full_weight, process_data_to_server
 
 
-def serial_exchange():
+def serial_exchange(
+    *,
+    announce_start: bool = True,
+    on_connected=None,
+) -> None:
     """
     Функция обработки данных с поста наполнения баллонов. Каждый пост отправляет 8 байт данных, после чего ждёт ответ.
     В зависимости от типа запроса в ответе должен быть либо вес баллона, либо ответ не нужен.
@@ -449,10 +487,13 @@ def serial_exchange():
     """
     ser = None
     try:
-        logger.info(f"Запуск программы обработки УНБ...")
+        if announce_start:
+            logger.info("Запуск программы обработки УНБ...")
         # Создаем объект Serial для работы с COM-портом
         ser = serial.Serial(PORT, BAUD_RATE, timeout=1)
         logger.info(f"Соединение установлено на порту {PORT}.")
+        if on_connected is not None:
+            on_connected()
 
         while True:
             data = ser.read(8)
@@ -542,26 +583,56 @@ def serial_exchange():
                     metric_name='frame_errors',
                 )
 
-    except serial.SerialException as error:
-        logger.error(f"Ошибка: {error}. Проверьте правильность указанного порта.")
-    except Exception as error:
-        logger.error(f"Общая ошибка: {error}.")
     finally:
-        if ser:
-            # Закрываем соединение только если оно было открыто
+        if ser and ser.is_open:
             ser.close()
             logger.debug("Соединение закрыто")
 
 
 def main():
+    last_serial_error: str | None = None
+    repeat_count = 0
+
+    def mark_connected() -> None:
+        nonlocal last_serial_error, repeat_count
+        last_serial_error = None
+        repeat_count = 0
+
     while True:
         try:
-            serial_exchange()
-        except Exception as error:
-            logger.error(
-                f"Ошибка в serial_exchange: {error}. Перезапуск через 5 минут..."
+            serial_exchange(
+                announce_start=last_serial_error is None,
+                on_connected=mark_connected,
             )
-            time.sleep(300)
+        except serial.SerialException as error:
+            error_text = str(error)
+            if error_text != last_serial_error:
+                logger.error(
+                    "Ошибка: %s. Проверьте правильность указанного порта. "
+                    "Повторное подключение через %s с.",
+                    error,
+                    COM_RECONNECT_DELAY_SECONDS,
+                )
+                last_serial_error = error_text
+                repeat_count = 1
+            else:
+                repeat_count += 1
+                logger.debug(
+                    "Повтор ошибки COM-порта (раз подряд: %s). "
+                    "Повторное подключение через %s с.",
+                    repeat_count,
+                    COM_RECONNECT_DELAY_SECONDS,
+                )
+            time.sleep(COM_RECONNECT_DELAY_SECONDS)
+        except Exception as error:
+            last_serial_error = None
+            repeat_count = 0
+            logger.error(
+                "Ошибка в serial_exchange: %s. Перезапуск через %s с...",
+                error,
+                FATAL_RESTART_DELAY_SECONDS,
+            )
+            time.sleep(FATAL_RESTART_DELAY_SECONDS)
 
 
 if __name__ == '__main__':

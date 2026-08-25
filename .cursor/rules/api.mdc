@@ -1,0 +1,248 @@
+---
+description: Django REST Framework API, serializer, permission, authentication, routing, and schema rules.
+globs:
+  - "**/api/**/*.py"
+  - "**/serializers.py"
+  - "**/views.py"
+  - "**/permissions.py"
+  - "**/urls.py"
+alwaysApply: false
+---
+
+# Django REST Framework Rules
+
+## Serializer Validation Is Mandatory
+
+Always call `is_valid()` before accessing `validated_data` or calling `save()`:
+
+```python
+# CORRECT
+serializer = PostSerializer(data=request.data)
+serializer.is_valid(raise_exception=True)
+post = serializer.save(author=request.user)
+```
+
+## Use ModelSerializer for Model-Backed APIs
+
+```python
+# CORRECT - auto-generates fields, validators, create/update
+class PostSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Post
+        fields = ['id', 'title', 'content', 'author', 'created_at']
+        read_only_fields = ['id', 'author', 'created_at']
+```
+
+Use plain `Serializer` only for non-model data (search results, aggregations, external API responses).
+
+## Always Specify fields in Meta
+
+Never use `fields = '__all__'` in production. It exposes all model fields including sensitive ones:
+
+```python
+# WRONG - exposes everything
+class UserSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = '__all__'  # Includes password hash, is_superuser, etc.
+
+# CORRECT - explicit fields
+class UserSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = ['id', 'username', 'email', 'date_joined']
+```
+
+## Optimize Querysets for Serializers
+
+Every serializer that accesses related objects needs an optimized queryset:
+
+```python
+class PostSerializer(serializers.ModelSerializer):
+    author = UserSerializer(read_only=True)
+    tags = TagSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = Post
+        fields = ['id', 'title', 'author', 'tags']
+
+class PostViewSet(viewsets.ModelViewSet):
+    serializer_class = PostSerializer
+
+    def get_queryset(self):
+        return Post.objects.select_related('author').prefetch_related('tags')
+```
+
+## Writable Nested Serializers Need Explicit create/update
+
+DRF does not auto-handle writable nested data:
+
+```python
+class PostSerializer(serializers.ModelSerializer):
+    tags = TagSerializer(many=True)
+
+    def create(self, validated_data):
+        tags_data = validated_data.pop('tags')
+        post = Post.objects.create(**validated_data)
+        for tag_data in tags_data:
+            tag, _ = Tag.objects.get_or_create(**tag_data)
+            post.tags.add(tag)
+        return post
+
+    def update(self, instance, validated_data):
+        tags_data = validated_data.pop('tags', None)
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        instance.save()
+        if tags_data is not None:
+            instance.tags.clear()
+            for tag_data in tags_data:
+                tag, _ = Tag.objects.get_or_create(**tag_data)
+                instance.tags.add(tag)
+        return instance
+
+    class Meta:
+        model = Post
+        fields = ['title', 'content', 'tags']
+```
+
+## Use the Most Specific View Class
+
+| Need | Use | Not |
+|------|-----|-----|
+| Full CRUD | `ModelViewSet` | manual `ViewSet` |
+| Read-only list + detail | `ReadOnlyModelViewSet` | `ModelViewSet` |
+| List + create | `ListCreateAPIView` | `ModelViewSet` |
+| Single custom endpoint | `APIView` | `ViewSet` |
+
+```python
+# CORRECT - read-only, use ReadOnlyModelViewSet
+class CategoryViewSet(viewsets.ReadOnlyModelViewSet):
+    queryset = Category.objects.all()
+    serializer_class = CategorySerializer
+
+# WRONG - full CRUD when only reads needed
+class CategoryViewSet(viewsets.ModelViewSet):
+    queryset = Category.objects.all()
+    serializer_class = CategorySerializer
+```
+
+## Permissions: Always Pair Authentication with Authorization
+
+```python
+# WRONG - authenticates but doesn't authorize
+class PostViewSet(viewsets.ModelViewSet):
+    authentication_classes = [TokenAuthentication]
+    # Missing permission_classes - any token holder can do anything
+
+# CORRECT
+class PostViewSet(viewsets.ModelViewSet):
+    authentication_classes = [TokenAuthentication]
+    permission_classes = [IsAuthenticated, IsAuthorOrReadOnly]
+```
+
+Object-level permissions need `has_object_permission`:
+
+```python
+class IsAuthorOrReadOnly(permissions.BasePermission):
+    def has_object_permission(self, request, view, obj):
+        if request.method in permissions.SAFE_METHODS:
+            return True
+        return obj.author == request.user
+```
+
+## Pagination Is Required on List Endpoints
+
+Set it globally:
+```python
+REST_FRAMEWORK = {
+    'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
+    'PAGE_SIZE': 20,
+}
+```
+
+Both `DEFAULT_PAGINATION_CLASS` and `PAGE_SIZE` must be set. One without the other does not work.
+
+## Use Filter Backends for Filtering
+
+```python
+from django_filters.rest_framework import DjangoFilterBackend
+from rest_framework import filters
+
+class PostViewSet(viewsets.ModelViewSet):
+    queryset = Post.objects.all()
+    serializer_class = PostSerializer
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
+
+    filterset_fields = ['status', 'author']           # ?status=published&author=1
+    search_fields = ['title', 'content']              # ?search=django
+    ordering_fields = ['created_at', 'title']         # ?ordering=-created_at
+    ordering = ['-created_at']                        # Default ordering
+```
+
+Do NOT manually parse `request.query_params` for filtering -- use filter backends.
+
+## Use perform_create for Setting Request-Dependent Fields
+
+```python
+class PostViewSet(viewsets.ModelViewSet):
+    serializer_class = PostSerializer
+    permission_classes = [IsAuthenticated]
+
+    def perform_create(self, serializer):
+        serializer.save(author=self.request.user)
+```
+
+## Use Different Serializers per Action
+
+```python
+class PostViewSet(viewsets.ModelViewSet):
+    queryset = Post.objects.all()
+
+    def get_serializer_class(self):
+        if self.action == 'list':
+            return PostListSerializer    # Fewer fields, no nested
+        if self.action == 'create':
+            return PostCreateSerializer  # Write fields only
+        return PostDetailSerializer      # Full detail with nested
+```
+
+## Custom Actions Use @action
+
+```python
+from rest_framework.decorators import action
+
+class PostViewSet(viewsets.ModelViewSet):
+    @action(detail=True, methods=['post'], permission_classes=[IsAuthenticated])
+    def publish(self, request, pk=None):
+        post = self.get_object()
+        post.publish()
+        return Response({'status': 'published'})
+
+    @action(detail=False, methods=['get'])
+    def recent(self, request):
+        recent = self.get_queryset().order_by('-created_at')[:10]
+        page = self.paginate_queryset(recent)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+        serializer = self.get_serializer(recent, many=True)
+        return Response(serializer.data)
+```
+
+## Router Registration
+
+```python
+from rest_framework.routers import DefaultRouter
+
+router = DefaultRouter()
+router.register(r'posts', PostViewSet)
+router.register(r'categories', CategoryViewSet)
+
+# basename required when no queryset attribute
+router.register(r'my-posts', UserPostViewSet, basename='user-post')
+
+urlpatterns = [
+    path('api/', include(router.urls)),
+]
+```

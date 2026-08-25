@@ -11,7 +11,7 @@ from django.db.models import Q, Sum, Count, OuterRef, Prefetch, Subquery
 from ttn.models import MiriadaTtn
 from autogas.models import AutoGasBatch
 from railway_service.models import RailwayBatch
-from .models import Balloon, Truck, Trailer, BalloonsBatch, Reader, ReaderSettings, DailyReaderCounter
+from .models import Balloon, Truck, Trailer, BalloonsBatch, BatchStatus, Reader, ReaderSettings, DailyReaderCounter
 from .admin import BalloonResources
 from .forms import (
     GetBalloonsAmount,
@@ -209,7 +209,7 @@ def balloon_batch_retry_close(request, pk):
     batch = get_object_or_404(BalloonsBatch, pk=pk, batch_type=batch_type)
 
     # Разрешаем повтор, только если есть флаг ошибки Мириады
-    if not batch.miriada_close_failed:
+    if batch.status != BatchStatus.MIRIADA_ERROR:
         messages.error(request, 'Партия не содержит ошибок.')
         return redirect_preserve_query(request, batch.get_absolute_url())
 
