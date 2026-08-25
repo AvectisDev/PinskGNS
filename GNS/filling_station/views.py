@@ -24,6 +24,9 @@ from .services import save_and_close_balloons_batch
 from datetime import datetime, time, timedelta
 
 
+BALLOON_STATUS_HISTORY_PAGE_SIZE = 10
+
+
 class BalloonListView(generic.ListView):
     model = Balloon
     paginate_by = 10
@@ -41,6 +44,41 @@ class BalloonListView(generic.ListView):
 
 class BalloonDetailView(generic.DetailView):
     model = Balloon
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        events_qs = (
+            self.object.events
+            .select_related('user')
+            .order_by('-pgh_created_at', '-pgh_id')
+        )
+        total = events_qs.count()
+        context['status_history'] = events_qs[:BALLOON_STATUS_HISTORY_PAGE_SIZE]
+        context['status_history_total'] = total
+        context['status_history_has_more'] = total > BALLOON_STATUS_HISTORY_PAGE_SIZE
+        context['status_history_page_size'] = BALLOON_STATUS_HISTORY_PAGE_SIZE
+        return context
+
+
+def balloon_status_history(request, pk):
+    """Partial HTML: следующая порция строк истории статусов баллона."""
+    balloon = get_object_or_404(Balloon, pk=pk)
+    try:
+        offset = int(request.GET.get('offset', 0))
+    except (TypeError, ValueError):
+        offset = 0
+    offset = max(offset, 0)
+
+    events = (
+        balloon.events
+        .select_related('user')
+        .order_by('-pgh_created_at', '-pgh_id')[offset:offset + BALLOON_STATUS_HISTORY_PAGE_SIZE]
+    )
+    return render(
+        request,
+        'filling_station/_balloon_status_history_rows.html',
+        {'events': events},
+    )
 
 
 class BalloonUpdateView(PreserveListQueryMixin, generic.UpdateView):

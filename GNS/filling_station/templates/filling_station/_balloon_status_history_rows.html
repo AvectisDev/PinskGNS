@@ -1,0 +1,16 @@
+{% for event in events %}
+<tr>
+    <td>{{ event.pgh_created_at|date:"d.m.Y H:i:s" }}</td>
+    <td>{{ event.status|default:"-" }}</td>
+    <td>
+        {% if event.pgh_label == 'insert' %}
+            Создание
+        {% elif event.pgh_label == 'update' %}
+            Изменение
+        {% else %}
+            {{ event.pgh_label|default:"-" }}
+        {% endif %}
+    </td>
+    <td>{{ event.user|default:"-" }}</td>
+</tr>
+{% endfor %}

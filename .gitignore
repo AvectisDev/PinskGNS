@@ -141,8 +141,8 @@ venv.bak/
 
 # AI agents
 .continue/
+.cursor/
 .cursorignore
-.cursor/mcp.json
 
 # Generated / auxiliary OpenAPI exports (not committed)
 openapi-pinskgns-core.yaml
