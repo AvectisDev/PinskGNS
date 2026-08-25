@@ -2,21 +2,66 @@
 
 ## Установка и запуск проекта
 
-Запускаем проект на своей машине: 
+Зависимости проекта управляются через **[uv](https://docs.astral.sh/uv/)** (`pyproject.toml` + `uv.lock`). Требуется **Python 3.12**.
 
-1. Клонируем репозиторий `git clone https://github.com/AvectisDev/PinskGNS.git`
-2. Переходим в папку с проектом `cd GNS` (здесь и далее приводятся команды в терминале на машине под windows)
-3. Устанавливаем виртуальное окружение `python -m venv env`
-4. Запускаем виртуальное окружение `source env/Scripts/activate` (на Linux/Mac: `source env/bin/activate`)
-5. Обновляем pip `python -m pip install --upgrade pip`
-6. Устанавливаем в виртуальном окружении зависимости для проекта `python -m pip install --no-cache-dir -r requirements.txt`
-7. Делаем миграции для создания базы данных `python manage.py makemigrations && python manage.py migrate`
+Здесь и далее команды приведены для Windows; отличия для Linux/Mac указаны отдельно.
+
+1. Клонируем репозиторий:
+   ```bash
+   git clone https://github.com/AvectisDev/PinskGNS.git
+   cd PinskGNS
+   ```
+2. Устанавливаем uv (если ещё не установлен):
+   ```bash
+   # Windows (PowerShell)
+   powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
+
+   # Linux/Mac
+   curl -LsSf https://astral.sh/uv/install.sh | sh
+   ```
+3. Создаём виртуальное окружение и устанавливаем зависимости из lock-файла:
+   ```bash
+   uv sync
+   ```
+   Для разработки (включая `django-debug-toolbar`):
+   ```bash
+   uv sync --group dev
+   ```
+4. Активируем окружение:
+   ```bash
+   # Windows
+   .venv\Scripts\activate
+
+   # Linux/Mac
+   source .venv/bin/activate
+   ```
+   Альтернатива без активации: выполнять команды через `uv run` из корня репозитория (например `uv run --directory GNS python manage.py migrate`).
+5. Создаём файл `GNS/.env` с переменными окружения (`SECRET_KEY`, `DEBUG`, параметры БД и т.д.).
+6. Переходим в каталог Django-проекта и применяем миграции:
+   ```bash
+   cd GNS
+   python manage.py migrate
+   ```
+7. Собираем статические файлы (нужно для раздачи статики через Daphne):
+   ```bash
+   python manage.py collectstatic --noinput
+   ```
 8. Запускаем локальный сервер через **Daphne** (ASGI сервер):
    ```bash
    daphne GNS.asgi:application --bind 0.0.0.0 -p 8000 --application-close-timeout 10
    ```
 9. По адресу `http://localhost:8000` будет доступна главная страница с архивом баллонов.
 10. По адресу `http://localhost:8000/api/swagger` будет доступно описание API для проекта.
+
+### Обновление зависимостей
+
+После изменений в `pyproject.toml` или получения обновлённого `uv.lock`:
+
+```bash
+uv sync
+# или с dev-зависимостями:
+uv sync --group dev
+```
 
 ## OpenAPI
 
