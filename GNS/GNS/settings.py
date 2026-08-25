@@ -36,8 +36,11 @@ CSRF_TRUSTED_ORIGINS = [
     'http://127.0.0.1:8000',
     'http://gns-gas',
     'http://gns-gas:8000',
+    'http://gns-gas:8080',
     'http://10.10.12.253:8000',
+    'http://10.10.12.253:8080',
     'http://10.0.3.2:8000',
+    'http://10.0.3.2:8080',
 ]
 
 # Application definition
