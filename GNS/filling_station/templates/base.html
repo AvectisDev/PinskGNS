@@ -152,7 +152,7 @@
     {% if messages %}
         <div class="px-3 pt-3">
             {% for message in messages %}
-                <div class="alert alert-{% if message.tags == 'error' %}danger{% elif message.tags %}{{ message.tags }}{% else %}info{% endif %} alert-dismissible fade show" role="alert">
+                <div class="alert alert-{% if message.tags == 'error' %}danger{% elif message.tags %}{{ message.tags }}{% else %}info{% endif %} alert-dismissible fade show js-auto-dismiss-alert" role="alert">
                     {{ message }}
                     <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
                 </div>
@@ -168,6 +168,15 @@
 <script src="{% static 'filling_station/bootstrap/jquery-3.5.1.slim.min.js' %}"></script>
 <script type="text/javascript" src="{% static 'filling_station/bootstrap/js/bootstrap.bundle.min.js' %}"></script>
 <script>
+    (function () {
+        document.querySelectorAll('.js-auto-dismiss-alert').forEach(function (el) {
+            setTimeout(function () {
+                const alert = bootstrap.Alert.getOrCreateInstance(el);
+                alert.close();
+            }, 5000);
+        });
+    })();
+
     (function () {
         const modalEl = document.getElementById('deleteConfirmModal');
         if (!modalEl) return;

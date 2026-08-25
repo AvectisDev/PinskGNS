@@ -362,7 +362,7 @@ class Truck(models.Model):
     registration_number = models.CharField(unique=True, max_length=10, verbose_name="Регистрационный знак")
     type = models.ForeignKey(
         TruckType,
-        on_delete=models.DO_NOTHING,
+        on_delete=models.PROTECT,
         verbose_name="Тип",
         default=1
     )
@@ -447,7 +447,7 @@ class Trailer(models.Model):
     """
     truck = models.ForeignKey(
         Truck,
-        on_delete=models.DO_NOTHING,
+        on_delete=models.PROTECT,
         verbose_name="Автомобиль",
         related_name='trailer',
         default=1
@@ -456,7 +456,7 @@ class Trailer(models.Model):
     registration_number = models.CharField(unique=True, max_length=10, verbose_name="Регистрационный знак")
     type = models.ForeignKey(
         TrailerType,
-        on_delete=models.DO_NOTHING,
+        on_delete=models.PROTECT,
         verbose_name="Тип",
         default=1
     )
@@ -544,12 +544,12 @@ class BalloonsBatch(models.Model):
     completed_at = models.DateTimeField(null=True, blank=True, verbose_name="Дата и время окончания")
     truck = models.ForeignKey(
         Truck,
-        on_delete=models.DO_NOTHING,
+        on_delete=models.PROTECT,
         verbose_name="Автомобиль"
     )
     trailer = models.ForeignKey(
         Trailer,
-        on_delete=models.DO_NOTHING,
+        on_delete=models.PROTECT,
         null=True,
         blank=True,
         verbose_name="Прицеп"
@@ -596,7 +596,8 @@ class BalloonsBatch(models.Model):
     balloons_type = models.CharField(choices=settings.BALLOON_TYPE_CHOICES, default='e', verbose_name="Пустой/полный")
     user = models.ForeignKey(
         User,
-        on_delete=models.DO_NOTHING,
+        on_delete=models.SET_NULL,
+        null=True,
         default=1,
         verbose_name="Пользователь"
     )
