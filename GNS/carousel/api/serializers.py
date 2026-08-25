@@ -1,11 +1,5 @@
 from rest_framework import serializers
-from ..models import Carousel, CarouselSettings
-
-
-class CarouselSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Carousel
-        fields = '__all__'
+from ..models import CarouselSettings
 
 
 class CarouselSettingsSerializer(serializers.ModelSerializer):

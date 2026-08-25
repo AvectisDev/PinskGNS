@@ -1421,81 +1421,6 @@ paths:
               schema:
                 $ref: '#/components/schemas/ApiError'
           description: ''
-  /api/carousel/balloon-update/:
-    post:
-      operationId: api_carousel_balloon_update_create
-      description: 'Получение данных от постов наполнения карусели. Поддерживает два
-        типа запросов: 0x7a (данные о баллоне) и 0x70 (обновление веса).'
-      summary: Обновить данные от карусели
-      tags:
-      - Карусель
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/CarouselUpdateRequestRequest'
-            examples:
-              ЗапросТипа0x7a:
-                value:
-                  request_type: '0x7a'
-                  post_number: 1
-                  nfc_tag: 1234567890ABCDEF
-                  serial_number: B12345
-                  size: 50
-                  netto: 18.5
-                  brutto: 40.2
-                summary: Запрос типа 0x7a
-              ЗапросТипа0x70:
-                value:
-                  request_type: '0x70'
-                  post_number: 1
-                  full_weight: 40200.0
-                summary: Запрос типа 0x70
-          application/x-www-form-urlencoded:
-            schema:
-              $ref: '#/components/schemas/CarouselUpdateRequestRequest'
-          multipart/form-data:
-            schema:
-              $ref: '#/components/schemas/CarouselUpdateRequestRequest'
-        required: true
-      security:
-      - jwtAuth: []
-      - basicAuth: []
-      - cookieAuth: []
-      - bearerAuth: []
-      - {}
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                type: object
-                additionalProperties: {}
-          description: ''
-        '201':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Carousel'
-          description: ''
-        '400':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiError'
-          description: ''
-        '404':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiError'
-          description: ''
-        '500':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiError'
-          description: ''
   /api/carousel/get-parameter/:
     get:
       operationId: api_carousel_get_parameter_retrieve
@@ -2859,73 +2784,6 @@ components:
       description: |-
         * `l` - Приёмка
         * `u` - Отгрузка
-    Carousel:
-      type: object
-      properties:
-        id:
-          type: integer
-          readOnly: true
-        carousel_number:
-          type: integer
-          maximum: 2147483647
-          minimum: -2147483648
-          title: Номер карусели наполнения
-        is_empty:
-          type: boolean
-          title: Принят запрос на наполнение баллона
-        post_number:
-          type: integer
-          maximum: 2147483647
-          minimum: -2147483648
-          title: Номер поста наполнения
-        empty_weight:
-          type: number
-          format: double
-          nullable: true
-          title: Вес пустого баллона на посту
-        full_weight:
-          type: number
-          format: double
-          nullable: true
-          title: Вес полного баллона на посту
-        nfc_tag:
-          type: string
-          nullable: true
-          title: Номер метки
-          maxLength: 30
-        serial_number:
-          type: string
-          nullable: true
-          title: Серийный номер
-          maxLength: 30
-        size:
-          allOf:
-          - $ref: '#/components/schemas/SizeEnum'
-          title: Объём
-          minimum: -2147483648
-          maximum: 2147483647
-        netto:
-          type: number
-          format: double
-          nullable: true
-          title: Вес пустого баллона
-        brutto:
-          type: number
-          format: double
-          nullable: true
-          title: Вес наполненного баллона
-        filling_status:
-          type: boolean
-          title: Готов к наполнению
-        change_at:
-          type: string
-          format: date-time
-          readOnly: true
-          title: Дата и время изменений
-      required:
-      - change_at
-      - id
-      - post_number
     CarouselSettings:
       type: object
       properties:
@@ -2945,18 +2803,30 @@ components:
           type: number
           format: double
           title: Значение корректировки веса
-        min_balloon_weight:
+        min_balloon_weight_from:
           type: number
           format: double
-          title: Минимальный вес баллона
-        max_balloon_weight:
+          title: Минимальный вес баллона (от)
+        min_balloon_weight_to:
           type: number
           format: double
-          title: Максимальный вес баллона
-        max_passport_weight_diff:
+          title: Минимальный вес баллона (до)
+        max_balloon_weight_from:
           type: number
           format: double
-          title: Максимальная разница в паспортных весах баллона
+          title: Максимальный вес баллона (от)
+        max_balloon_weight_to:
+          type: number
+          format: double
+          title: Максимальный вес баллона (до)
+        passport_weight_diff_from:
+          type: number
+          format: double
+          title: Разница паспортных весов (от)
+        passport_weight_diff_to:
+          type: number
+          format: double
+          title: Разница паспортных весов (до)
         post_1_correction:
           type: number
           format: double
@@ -3043,42 +2913,6 @@ components:
           title: Пользователь
       required:
       - id
-    CarouselUpdateRequestRequest:
-      type: object
-      properties:
-        request_type:
-          type: string
-          minLength: 1
-          description: 'Тип запроса: 0x7a или 0x70'
-        post_number:
-          type: integer
-          description: Номер поста наполнения
-        nfc_tag:
-          type: string
-          minLength: 1
-          description: NFC метка баллона
-        serial_number:
-          type: string
-          minLength: 1
-          description: Серийный номер баллона
-        size:
-          type: integer
-          description: Объем баллона
-        netto:
-          type: number
-          format: double
-          description: Вес пустого баллона
-        brutto:
-          type: number
-          format: double
-          description: Вес наполненного баллона
-        full_weight:
-          type: number
-          format: double
-          description: Полный вес (для типа 0x70)
-      required:
-      - post_number
-      - request_type
     CheckConnectionResponse:
       type: object
       properties:
@@ -3356,18 +3190,30 @@ components:
           type: number
           format: double
           title: Значение корректировки веса
-        min_balloon_weight:
+        min_balloon_weight_from:
           type: number
           format: double
-          title: Минимальный вес баллона
-        max_balloon_weight:
+          title: Минимальный вес баллона (от)
+        min_balloon_weight_to:
           type: number
           format: double
-          title: Максимальный вес баллона
-        max_passport_weight_diff:
+          title: Минимальный вес баллона (до)
+        max_balloon_weight_from:
           type: number
           format: double
-          title: Максимальная разница в паспортных весах баллона
+          title: Максимальный вес баллона (от)
+        max_balloon_weight_to:
+          type: number
+          format: double
+          title: Максимальный вес баллона (до)
+        passport_weight_diff_from:
+          type: number
+          format: double
+          title: Разница паспортных весов (от)
+        passport_weight_diff_to:
+          type: number
+          format: double
+          title: Разница паспортных весов (до)
         post_1_correction:
           type: number
           format: double
