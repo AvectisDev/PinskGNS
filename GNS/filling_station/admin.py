@@ -1,3 +1,5 @@
+"""Регистрация моделей filling_station в Django Admin."""
+
 from django.contrib import admin
 from import_export import resources
 from .models import (
@@ -14,7 +16,11 @@ from .models import (
 
 
 class BalloonResources(resources.ModelResource):
+    """Ресурс import-export для выгрузки и загрузки паспортов баллонов."""
+
     class Meta:
+        """Поля модели Balloon, участвующие в импорте и экспорте."""
+
         model = Balloon
         fields = [
             'nfc_tag',
@@ -29,6 +35,8 @@ class BalloonResources(resources.ModelResource):
 
 @admin.register(Balloon)
 class BalloonAdmin(admin.ModelAdmin):
+    """Админка паспортов баллонов: список, поиск по NFC и серийному номеру."""
+
     list_display = [
         'nfc_tag',
         'serial_number',
@@ -56,6 +64,8 @@ class BalloonAdmin(admin.ModelAdmin):
 
 @admin.register(ReaderSettings)
 class ReaderSettingsAdmin(admin.ModelAdmin):
+    """Админка настроек RFID-считывателей станции."""
+
     list_display = [
         'number',
         'status',
@@ -73,6 +83,8 @@ class ReaderSettingsAdmin(admin.ModelAdmin):
 
 @admin.register(Truck)
 class TruckAdmin(admin.ModelAdmin):
+    """Админка грузовиков, используемых на ГНС."""
+
     list_display = [
         'id',
         'car_brand',
@@ -98,11 +110,15 @@ class TruckAdmin(admin.ModelAdmin):
 
 @admin.register(TruckType)
 class TruckTypeAdmin(admin.ModelAdmin):
+    """Админка справочника типов грузовиков."""
+
     list_display = ['id', 'type']
 
 
 @admin.register(Trailer)
 class TrailerAdmin(admin.ModelAdmin):
+    """Админка прицепов, используемых на ГНС."""
+
     list_display = [
         'id',
         'truck',
@@ -129,11 +145,15 @@ class TrailerAdmin(admin.ModelAdmin):
 
 @admin.register(TrailerType)
 class TrailerTypeAdmin(admin.ModelAdmin):
+    """Админка справочника типов прицепов."""
+
     list_display = ['id', 'type']
 
 
 @admin.register(BalloonsBatch)
 class BalloonsBatchAdmin(admin.ModelAdmin):
+    """Админка партий приёмки и отгрузки баллонов."""
+
     list_display = [
         'id',
         'batch_type',
@@ -160,18 +180,40 @@ class BalloonsBatchAdmin(admin.ModelAdmin):
 
     @admin.display(description='Номер ТТН')
     def display_ttn_name(self, obj):
+        """
+        Возвращает номер связанной ТТН для колонки списка.
+
+        Args:
+            obj (BalloonsBatch): Экземпляр партии.
+
+        Returns:
+            str: Номер ТТН или «—», если номер отсутствует.
+        """
         return obj.get_ttn_name() or '—'
 
 
 @admin.register(TotalReadersCounter)
 class TotalsReaderCounterAdmin(admin.ModelAdmin):
+    """Админка суммарных счётчиков считывателей (одна запись на станцию)."""
+
     list_display = ['total_empty', 'total_full', 'changed_at']
 
     def has_add_permission(self, request):
+        """
+        Разрешает создание записи только если счётчик ещё не существует.
+
+        Args:
+            request: HTTP-запрос админки.
+
+        Returns:
+            bool: ``True``, если записей ещё нет.
+        """
         return not TotalReadersCounter.objects.exists()
 
 
 @admin.register(DailyReaderCounter)
 class DailyReaderCounterAdmin(admin.ModelAdmin):
+    """Админка суточных счётчиков RFID и датчиков по считывателям."""
+
     list_display = ['number', 'day', 'amount_of_rfid', 'amount_of_sensor', 'change_at']
     list_filter = ['number', 'day', 'change_at']

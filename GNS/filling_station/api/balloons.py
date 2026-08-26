@@ -1,3 +1,7 @@
+"""API баллонов: CRUD по NFC, статистика ГНС, списки ридеров и ручные счётчики."""
+
+"""API баллонов: CRUD по NFC, статистика ГНС, списки ридеров, ручные счётчики."""
+
 import logging
 from collections import defaultdict
 from django.http import JsonResponse
@@ -265,6 +269,7 @@ class BalloonViewSet(viewsets.ViewSet):
     permission_classes = [IsAuthenticated]
 
     def __init__(self, *args, **kwargs):
+        """Инициализирует ViewSet и локальный логгер."""
         super().__init__(*args, **kwargs)
         self.logger = logging.getLogger(__name__)
 
@@ -452,23 +457,52 @@ class BalloonViewSet(viewsets.ViewSet):
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def get_balloon_status_options(request):
+    """
+    Возвращает список допустимых пользовательских статусов баллона.
+
+    Args:
+        request: HTTP-запрос DRF.
+
+    Returns:
+        Response: список строк USER_STATUS_LIST.
+    """
     return Response(USER_STATUS_LIST)
 
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def get_loading_balloon_reader_list(request):
+    """
+    Возвращает номера считывателей с функцией приёмки (l).
+
+    Args:
+        request: HTTP-запрос DRF.
+
+    Returns:
+        Response: список номеров ридеров.
+    """
     loading_readers = ReaderSettings.objects.filter(function='l').values_list('number', flat=True)
     return Response(list(loading_readers))
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def get_unloading_balloon_reader_list(request):
+    """
+    Возвращает номера считывателей с функцией отгрузки (u).
+
+    Args:
+        request: HTTP-запрос DRF.
+
+    Returns:
+        Response: список номеров ридеров.
+    """
     unloading_readers = ReaderSettings.objects.filter(function='u').values_list('number', flat=True)
     return Response(list(unloading_readers))
 
 # --- TotalReadersCounter (ручной ввод) ---
 class ManualTotalReadersCounterRequestSerializer(serializers.Serializer):
+    """Тело запроса ручного ввода счётчиков пустых/полных баллонов."""
+
     empty = serializers.IntegerField(
         required=False,
         min_value=0,
@@ -481,8 +515,9 @@ class ManualTotalReadersCounterRequestSerializer(serializers.Serializer):
     )
 
 
-
 class ManualTotalReadersCounterResponseSerializer(serializers.Serializer):
+    """Ответ после записи ручных значений TotalReadersCounter."""
+
     total_empty = serializers.IntegerField()
     total_full = serializers.IntegerField()
     changed_at = serializers.DateTimeField()
@@ -522,7 +557,13 @@ class ManualTotalReadersCounterResponseSerializer(serializers.Serializer):
 @permission_classes([IsAuthenticated])
 def set_total_readers_counter_manual_values(request):
     """
-    Запись ручных значений `TotalReadersCounter` через API.
+    Записывает ручные значения TotalReadersCounter через API.
+
+    Args:
+        request: HTTP-запрос с полями empty и/или full.
+
+    Returns:
+        Response: текущие total_empty/total_full/changed_at или 400 при ошибке.
     """
     # Валидируем через DRF поля (включая min_value)
     req_serializer = ManualTotalReadersCounterRequestSerializer(data=request.data)

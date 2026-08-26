@@ -1,3 +1,5 @@
+"""Формы Django для работы с баллонами, транспортом и партиями на ГНС."""
+
 from django import forms
 from django.utils import timezone
 from django.conf import settings
@@ -22,6 +24,8 @@ USER_STATUS_LIST = [
 
 
 class GetBalloonsAmount(forms.Form):
+    """Форма выбора периода для подсчёта количества баллонов в статистике."""
+
     start_date = forms.DateField(
         label="Начальная дата",
         widget=forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
@@ -34,6 +38,7 @@ class GetBalloonsAmount(forms.Form):
     )
 
     def __init__(self, *args, **kwargs):
+        """Инициализирует форму и настраивает горизонтальный layout crispy-forms."""
         super().__init__(*args, **kwargs)
         self.helper = FormHelper()
         self.helper.form_class = 'form-horizontal'
@@ -43,8 +48,10 @@ class GetBalloonsAmount(forms.Form):
 
 
 class BalloonForm(forms.ModelForm):
+    """ModelForm паспорта баллона для создания и редактирования в веб-интерфейсе."""
 
     def __init__(self, *args, **kwargs):
+        """Инициализирует форму паспорта и кнопки сохранения/отмены через crispy-forms."""
         super().__init__(*args, **kwargs)
         self.helper = FormHelper()
         self.helper.form_class = 'form-horizontal'
@@ -55,6 +62,8 @@ class BalloonForm(forms.ModelForm):
         self.helper.form_method = 'POST'
 
     class Meta:
+        """Конфигурация модели, исключённых полей и виджетов формы баллона."""
+
         model = Balloon
         exclude = ['user', 'change_date']
         widgets = {
@@ -77,7 +86,10 @@ class BalloonForm(forms.ModelForm):
 
 
 class TruckForm(forms.ModelForm):
+    """ModelForm грузовика для создания и редактирования в разделе транспорта ГНС."""
+
     def __init__(self, *args, **kwargs):
+        """Инициализирует форму грузовика и кнопки сохранения/отмены через crispy-forms."""
         super().__init__(*args, **kwargs)
         self.helper = FormHelper()
         self.helper.form_class = 'form-horizontal'
@@ -88,6 +100,8 @@ class TruckForm(forms.ModelForm):
         self.helper.form_method = 'POST'
 
     class Meta:
+        """Конфигурация полей и виджетов формы грузовика."""
+
         model = Truck
         fields = '__all__'
         widgets = {
@@ -113,7 +127,10 @@ class TruckForm(forms.ModelForm):
 
 
 class TrailerForm(forms.ModelForm):
+    """ModelForm прицепа для создания и редактирования в разделе транспорта ГНС."""
+
     def __init__(self, *args, **kwargs):
+        """Инициализирует форму прицепа и кнопки сохранения/отмены через crispy-forms."""
         super().__init__(*args, **kwargs)
         self.helper = FormHelper()
         self.helper.form_class = 'form-horizontal'
@@ -124,6 +141,8 @@ class TrailerForm(forms.ModelForm):
         self.helper.form_method = 'POST'
 
     class Meta:
+        """Конфигурация полей и виджетов формы прицепа."""
+
         model = Trailer
         fields = '__all__'
         widgets = {
@@ -150,7 +169,14 @@ class TrailerForm(forms.ModelForm):
 
 
 class BalloonsBatchForm(forms.ModelForm):
+    """ModelForm партии баллонов (приёмка/отгрузка) для редактирования в веб-интерфейсе."""
+
     def __init__(self, *args, **kwargs):
+        """
+        Инициализирует форму партии, crispy-forms и подписи пустых значений.
+
+        Скрывает поле ``batch_type`` и настраивает empty_label для транспорта.
+        """
         super().__init__(*args, **kwargs)
         self.helper = FormHelper()
         self.helper.form_class = 'form-horizontal'
@@ -166,6 +192,8 @@ class BalloonsBatchForm(forms.ModelForm):
         self.fields['batch_type'].widget = forms.HiddenInput()
 
     class Meta:
+        """Конфигурация исключённых полей, виджетов и подписей формы партии."""
+
         model = BalloonsBatch
         exclude = [
             'user',

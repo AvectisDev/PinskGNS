@@ -1,3 +1,5 @@
+"""Сборка и разбор кадров протокола FEIG (Advanced Protocol Frame)."""
+
 import struct
 import binascii
 from typing import List, Dict
@@ -6,7 +8,8 @@ logger = logging.getLogger('rfid')
 
 
 class FeigProtocol:
-    """Класс для работы с протоколом FEIG"""
+    """Кодирование запросов и парсинг ответов/событий FEIG."""
+
     # Команды протокола
     FEIG_COMMANDS = {
         'GET_INPUT': 0x74,           # чтение состояния входов
@@ -54,7 +57,13 @@ class FeigProtocol:
     @staticmethod
     def crc16(data: bytes) -> int:
         """
-        CRC-16 для FEIG (LSB-first, полином 0x8408)
+        CRC-16 для FEIG (LSB-first, полином 0x8408).
+
+        Args:
+            data (bytes): Байты кадра без поля CRC.
+
+        Returns:
+            int: Значение CRC-16 (0..0xFFFF).
         """
         crc = 0xFFFF
         for byte in data:
@@ -69,7 +78,18 @@ class FeigProtocol:
 
     @classmethod
     def get_command(cls, name: str) -> int:
-        """Возвращает числовой код команды по имени или ошибку."""
+        """
+        Возвращает числовой код команды по имени.
+
+        Args:
+            name (str): Ключ из ``FEIG_COMMANDS``.
+
+        Returns:
+            int: Код команды FEIG.
+
+        Raises:
+            ValueError: Если имя команды неизвестно.
+        """
         try:
             return cls.FEIG_COMMANDS[name]
         except KeyError:
@@ -78,9 +98,17 @@ class FeigProtocol:
     @classmethod
     def create_request(cls, command_name: str, request_data: bytes = b'') -> bytes:
         """
-        Создание запроса согласно протоколу FEIG
-        Advanced frame: STX + ALENGTH(2) + COM-ADR(1) + COMMAND(1) + DATA + CRC16(LSB,MSB)
-        ALENGTH и CRC16 кодируются в MSB/LSB (big-endian для длины; CRC упаковываем little-endian).
+        Создаёт Advanced Protocol Frame запрос по имени команды.
+
+        Формат: STX + ALENGTH(2) + COM-ADR(1) + COMMAND(1) + DATA + CRC16(LSB,MSB).
+        ALENGTH — big-endian; CRC — little-endian.
+
+        Args:
+            command_name (str): Имя команды из ``FEIG_COMMANDS``.
+            request_data (bytes): Поле DATA (по умолчанию пустое).
+
+        Returns:
+            bytes: Готовый кадр для отправки на ридер.
         """
         com_adr = 0xFF  # при TCP/IP обычно используется широковещательный адрес шины
         command = cls.get_command(command_name)
@@ -99,8 +127,16 @@ class FeigProtocol:
     @classmethod
     def create_request_by_code(cls, command_code: int, request_data: bytes = b'') -> bytes:
         """
-        Создание запроса по числовому коду команды.
+        Создаёт запрос по числовому коду команды.
+
         Используется для ACK Notification Mode events (0x2A/0x2B/0x2C).
+
+        Args:
+            command_code (int): Код команды FEIG.
+            request_data (bytes): Поле DATA (для ACK обычно 1 байт статуса).
+
+        Returns:
+            bytes: Готовый кадр для отправки на ридер.
         """
         com_adr = 0xFF
         length = 1 + 2 + 1 + 1 + len(request_data) + 2
@@ -116,7 +152,16 @@ class FeigProtocol:
 
     @classmethod
     def parse_response(cls, response: bytes) -> Dict:
-        """Парсинг ответа от ридера с проверкой длины и CRC."""
+        """
+        Разбирает ответ ридера с проверкой длины и CRC.
+
+        Args:
+            response (bytes): Полный кадр ответа.
+
+        Returns:
+            dict: При успехе — ``com_adr``, ``response_data``, ``valid=True``;
+                при ошибке — ``error``, ``valid=False``.
+        """
         if not response or response[0] != cls.STX:
             return {'error': 'Invalid STX byte', 'valid': False}
 
@@ -141,7 +186,16 @@ class FeigProtocol:
     @classmethod
     def parse_buffer_data(cls, response_data: bytes) -> List[Dict]:
         """
-        Парсинг данных из буфера (команды 0x2B, 0x31) и входов (0x74)
+        Парсит payload ответа/события: буфер (0x2B, 0x31), входы (0x74), Notification (0x2A/0x2C).
+
+        Первый элемент списка всегда содержит ``command`` и ``status``;
+        последующие — разобранные записи (метки, состояния входов и т.д.).
+
+        Args:
+            response_data (bytes): Поле DATA кадра без заголовка STX/ALENGTH/CRC.
+
+        Returns:
+            list[dict]: Список записей; пустой список при слишком коротком payload.
         """
         tags = []
         

@@ -1,3 +1,5 @@
+"""Готовые hex-кадры команд FEIG (лампа, буфер, входы) и учётные данные ридера."""
+
 # Команды, посылаемые на считыватель
 COMMANDS = {
     'read_complete':            '02 000D FF 72 01 01 81 01 00 19 236B',  # зажигаем зелёную лампу на считывателе на 2.5 сек
@@ -13,6 +15,16 @@ PASSWORD = "rfid-device"
 
 
 def command_frame(name: str) -> bytes:
-    """Собирает байтовый кадр FEIG из hex-строки COMMANDS."""
-    return bytes.fromhex(COMMANDS[name].replace(' ', ''))
+    """
+    Собирает байтовый кадр FEIG из hex-строки ``COMMANDS``.
 
+    Args:
+        name (str): Ключ в ``COMMANDS``.
+
+    Returns:
+        bytes: Готовый кадр для отправки.
+
+    Raises:
+        KeyError: Если имя команды неизвестно.
+    """
+    return bytes.fromhex(COMMANDS[name].replace(' ', ''))

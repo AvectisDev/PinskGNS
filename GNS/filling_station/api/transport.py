@@ -1,3 +1,5 @@
+"""API грузовиков и прицепов на станции: список, создание, частичное обновление."""
+
 from django.shortcuts import get_object_or_404
 from drf_spectacular.utils import extend_schema, OpenApiParameter, OpenApiExample, OpenApiTypes, extend_schema_view
 from rest_framework import generics, status, viewsets
@@ -138,6 +140,15 @@ class TruckView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
+        """
+        Возвращает список грузовиков или один по регистрационному номеру.
+
+        Args:
+            request: HTTP-запрос с опциональными query-параметрами.
+
+        Returns:
+            Response: список/объект TruckSerializer или 404.
+        """
         on_station = request.query_params.get('on_station')
         registration_number = request.query_params.get('registration_number')
 
@@ -160,6 +171,15 @@ class TruckView(APIView):
         return Response(serializer.data)
 
     def post(self, request):
+        """
+        Создаёт новую запись грузовика.
+
+        Args:
+            request: HTTP-запрос с телом TruckSerializer.
+
+        Returns:
+            Response: 201 с данными или 400 при ошибке валидации.
+        """
         serializer = TruckSerializer(data=request.data)
         if serializer.is_valid():
             serializer.save()
@@ -167,6 +187,15 @@ class TruckView(APIView):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     def patch(self, request):
+        """
+        Частично обновляет грузовик по полю id в теле запроса.
+
+        Args:
+            request: HTTP-запрос с id и обновляемыми полями.
+
+        Returns:
+            Response: обновлённые данные или 400/404.
+        """
         truck_id = request.data.get('id')
         if not truck_id:
             return Response(
@@ -309,6 +338,15 @@ class TrailerView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
+        """
+        Возвращает список прицепов или один по регистрационному номеру.
+
+        Args:
+            request: HTTP-запрос с опциональными query-параметрами.
+
+        Returns:
+            Response: список/объект TrailerSerializer или 404.
+        """
         on_station = request.query_params.get('on_station')
         registration_number = request.query_params.get('registration_number')
 
@@ -331,6 +369,15 @@ class TrailerView(APIView):
         return Response(serializer.data)
 
     def post(self, request):
+        """
+        Создаёт новую запись прицепа.
+
+        Args:
+            request: HTTP-запрос с телом TrailerSerializer.
+
+        Returns:
+            Response: 201 с данными или 400 при ошибке валидации.
+        """
         serializer = TrailerSerializer(data=request.data)
         if serializer.is_valid():
             serializer.save()
@@ -338,6 +385,15 @@ class TrailerView(APIView):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     def patch(self, request):
+        """
+        Частично обновляет прицеп по полю id в теле запроса.
+
+        Args:
+            request: HTTP-запрос с id и обновляемыми полями.
+
+        Returns:
+            Response: обновлённые данные или 400/404.
+        """
         trailer_id = request.data.get('id')
         if not trailer_id:
             return Response(

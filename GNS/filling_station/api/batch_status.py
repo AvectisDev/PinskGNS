@@ -13,10 +13,31 @@ STATUS_FROM_API = {api: db for db, api in STATUS_TO_API.items()}
 
 
 def batch_status_to_api(status: str | None) -> int:
+    """
+    Преобразует строковый статус БД в числовой enum API.
+
+    Args:
+        status (str | None): статус партии в БД.
+
+    Returns:
+        int: 1–4 или 0 (UNSPECIFIED) при неизвестном значении.
+    """
     return STATUS_TO_API.get(status, 0)
 
 
 def batch_status_from_api(value) -> str:
+    """
+    Преобразует числовой enum API в строковый статус БД.
+
+    Args:
+        value: значение из запроса (int или строка с числом).
+
+    Returns:
+        str: статус BatchStatus.
+
+    Raises:
+        ValueError: если значение не является допустимым enum 1–4.
+    """
     try:
         api_value = int(value)
     except (TypeError, ValueError) as exc:
@@ -27,7 +48,15 @@ def batch_status_from_api(value) -> str:
 
 
 def is_api_close_request(data: dict) -> bool:
-    """True, если в теле PATCH передан status=3 (COMPLETED)."""
+    """
+    Проверяет, запрошено ли завершение партии через status=3 (COMPLETED).
+
+    Args:
+        data (dict): тело PATCH-запроса.
+
+    Returns:
+        bool: True, если в теле передан status=COMPLETED.
+    """
     if 'status' not in data:
         return False
     try:

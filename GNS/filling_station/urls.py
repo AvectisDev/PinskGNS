@@ -1,3 +1,5 @@
+"""URL-маршруты веб-интерфейса filling_station: баллоны, партии, транспорт, статистика."""
+
 from django.urls import path
 from . import views
 

@@ -1,3 +1,8 @@
+"""
+Notification Mode сервер RFID: приём TCP-событий от ридеров FEIG
+и обработка меток/входов через сервисы filling_station.
+"""
+
 import os
 import asyncio
 import logging
@@ -33,6 +38,13 @@ def process_balloon_data_sync(nfc_tag, reader_number):
     """
     Прямой вызов сервисов (синхронных) в отдельном потоке через asgiref.sync_to_async,
     чтобы не блокировать event-loop.
+
+    Args:
+        nfc_tag: Hex UID метки или ``None`` для сценария «без NFC».
+        reader_number: Номер ридера.
+
+    Returns:
+        dict: Результат с ключами ``status`` / ``message`` (и опционально ``filling_status``).
     """
     if nfc_tag is None:
         reader = services.processing_request_without_nfc(reader_number)
@@ -61,6 +73,19 @@ def process_balloon_data_sync(nfc_tag, reader_number):
 
 
 async def read_frame(reader_stream: asyncio.StreamReader) -> bytes:
+    """
+    Читает один полный кадр FEIG из потока (по ALENGTH).
+
+    Args:
+        reader_stream: Асинхронный поток от ридера.
+
+    Returns:
+        bytes: Полный кадр включая STX, длину, тело и CRC.
+
+    Raises:
+        ValueError: Неверный STX или длина кадра.
+        asyncio.IncompleteReadError: Соединение закрыто до конца кадра.
+    """
     header = await reader_stream.readexactly(3)
     if header[0] != FeigProtocol.STX:
         raise ValueError(f'Invalid STX byte: 0x{header[0]:02X}')
@@ -72,6 +97,15 @@ async def read_frame(reader_stream: asyncio.StreamReader) -> bytes:
 
 
 def get_peer_ip(writer: asyncio.StreamWriter) -> str:
+    """
+    Извлекает IP удалённой стороны TCP-соединения.
+
+    Args:
+        writer: Writer уведомляющего соединения.
+
+    Returns:
+        str: IP-адрес или ``'unknown'``.
+    """
     peer = writer.get_extra_info('peername')
     if isinstance(peer, tuple) and peer:
         return str(peer[0])
@@ -79,6 +113,14 @@ def get_peer_ip(writer: asyncio.StreamWriter) -> str:
 
 
 async def send_notification_ack(writer: asyncio.StreamWriter, command: int, status: int = 0x00):
+    """
+    Отправляет ACK на Notification Mode событие.
+
+    Args:
+        writer: Writer активного notification-соединения.
+        command (int): Код события (0x2A/0x2B/0x2C).
+        status (int): Байт статуса ACK (по умолчанию 0x00 OK).
+    """
     ack = FeigProtocol.create_request_by_code(command, bytes([status]))
     writer.write(ack)
     await writer.drain()
@@ -89,6 +131,14 @@ async def process_tag_event(
     command_session: ReaderSession,
     parsed_records: List[Dict],
 ) -> None:
+    """
+    Обрабатывает Tag Read Event (0x2B): фильтр UID, дедупликация, бизнес-логика, лампа.
+
+    Args:
+        reader_obj: Runtime-состояние ридера.
+        command_session: Управляющая TCP-сессия для индикации лампы.
+        parsed_records: Результат ``parse_buffer_data`` (статус + записи меток).
+    """
     raw_tags: List[str] = []
     new_tags: List[str] = []
     for tag_data in parsed_records[1:]:
@@ -126,9 +176,14 @@ async def process_tag_event(
 
 async def process_input_event(reader_obj: FeigReaderDevice, parsed_records: List[Dict]) -> None:
     """
-    Input Event (0x2C): в Notification Mode ридер присылает уведомление при активации входа;
-    при переходе IN1 с 1 на 0 событие не приходит — сравнивать с предыдущим состоянием не нужно.
-    Все оптические датчики на IN1: при IN1=1 в текущем состоянии записи — выполняем сценарий «без NFC».
+    Обрабатывает Input Event (0x2C) в Notification Mode.
+
+    При активации IN1 выполняется сценарий «без NFC» (оптический датчик).
+    При переходе IN1 с 1 на 0 событие от ридера не приходит.
+
+    Args:
+        reader_obj: Runtime-состояние ридера.
+        parsed_records: Результат ``parse_buffer_data`` (статус + записи входов).
     """
     for event_data in parsed_records[1:]:
         if not isinstance(event_data, dict):
@@ -158,6 +213,17 @@ async def process_notification_payload(
     command_session: ReaderSession,
     payload: bytes,
 ) -> int:
+    """
+    Маршрутизирует payload Notification Mode по коду события.
+
+    Args:
+        reader_obj: Runtime-состояние ридера.
+        command_session: Управляющая сессия ридера.
+        payload (bytes): ``response_data`` кадра события.
+
+    Returns:
+        int: Код статуса для ACK (0x00 OK, 0x80 unknown, 0x81 length error).
+    """
     logger.debug(f'{reader_obj.number} Event payload: {payload.hex()}')
     parsed = FeigProtocol.parse_buffer_data(payload)
     if not parsed:
@@ -183,6 +249,15 @@ async def process_notification_payload(
 
 
 async def initialize_command_sessions(readers: List[FeigReaderDevice]) -> Dict[int, ReaderSession]:
+    """
+    Открывает управляющие TCP-сессии ко всем ридерам.
+
+    Args:
+        readers: Список runtime-ридеров.
+
+    Returns:
+        dict[int, ReaderSession]: Сессии по номеру ридера (в т.ч. с ошибкой connect).
+    """
     sessions: Dict[int, ReaderSession] = {}
     for reader in readers:
         sessions[reader.number] = ReaderSession(reader)
@@ -202,6 +277,15 @@ async def handle_notification_connection(
     readers_by_ip: Dict[str, FeigReaderDevice],
     sessions: Dict[int, ReaderSession],
 ):
+    """
+    Обрабатывает одно входящее Notification Mode TCP-соединение до закрытия.
+
+    Args:
+        stream_reader: Поток чтения от ридера.
+        stream_writer: Поток записи (ACK).
+        readers_by_ip: Карта IP → runtime-ридер.
+        sessions: Управляющие сессии по номеру ридера.
+    """
     peer_ip = get_peer_ip(stream_writer)
     reader_obj = readers_by_ip.get(peer_ip)
 
@@ -258,12 +342,16 @@ async def handle_notification_connection(
 
 async def load_readers_from_database() -> List[FeigReaderDevice]:
     """
-    Загрузка конфигурации ридеров из БД
+    Загружает конфигурацию ридеров из ``ReaderSettings``.
+
+    Returns:
+        list[FeigReaderDevice]: Список runtime-ридеров (пустой при ошибке БД).
     """
     readers = []
 
     @sync_to_async
     def get_readers_from_db():
+        """Читает все записи ``ReaderSettings`` в синхронном контексте Django ORM."""
         return list(ReaderSettings.objects.all())
 
     try:
@@ -280,8 +368,10 @@ async def load_readers_from_database() -> List[FeigReaderDevice]:
 
 async def main():
     """
-    Точка входа Notification Mode:
-    сервер слушает TCP-порт и принимает события от ридеров.
+    Точка входа Notification Mode: TCP-listener событий от ридеров FEIG.
+
+    Загружает ридеры из БД, открывает управляющие сессии и слушает
+    ``NOTIFICATION_LISTEN_HOST``:``NOTIFICATION_LISTEN_PORT``.
     """
     logger.info('Запуск Notification Mode сервера RFID...')
     readers = await load_readers_from_database()
@@ -293,6 +383,7 @@ async def main():
     sessions = await initialize_command_sessions(readers)
 
     async def _handler(reader_stream: asyncio.StreamReader, writer_stream: asyncio.StreamWriter):
+        """Обёртка ``asyncio.start_server``: делегирует в ``handle_notification_connection``."""
         await handle_notification_connection(
             stream_reader=reader_stream,
             stream_writer=writer_stream,

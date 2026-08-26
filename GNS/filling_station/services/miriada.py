@@ -1,3 +1,5 @@
+"""Клиент API Мириады: паспорт баллона и отправка статусов по NFC."""
+
 import logging
 import threading
 import time
@@ -18,7 +20,12 @@ _thread_local = threading.local()
 
 
 def get_thread_miriada_session() -> requests.Session:
-    """HTTP-сессия текущего потока: keep-alive без шаринга Session между потоками."""
+    """
+    HTTP-сессия текущего потока: keep-alive без шаринга Session между потоками.
+
+    Returns:
+        requests.Session: потокобезопасная сессия с HTTPAdapter.
+    """
     session = getattr(_thread_local, 'session', None)
     if session is None:
         session = requests.Session()
@@ -33,6 +40,15 @@ def get_balloon_data_from_miriada(nfc_tag: str) -> Optional[Dict[str, Any]]:
     """
     Получает данные баллона по NFC-метке из API Мириады.
     При неуспешном запросе выполняется до 2 повторных попыток.
+
+    Args:
+        nfc_tag (str): NFC-метка баллона.
+
+    Returns:
+        dict | None: обработанные поля паспорта или None при пустой метке.
+
+    Raises:
+        MiriadaAPIError: при ошибке ответа API или сети после исчерпания попыток.
     """
     if not nfc_tag:
         logger.warning("Пустая NFC метка при запросе данных из Мириады")
@@ -93,7 +109,18 @@ def get_balloon_data_from_miriada(nfc_tag: str) -> Optional[Dict[str, Any]]:
 
 
 def _build_loading_payload(batch: BalloonsBatch) -> Dict[str, Any]:
-    """Формирует payload /balloontocar из данных партии отгрузки."""
+    """
+    Формирует payload /balloontocar из данных партии отгрузки.
+
+    Args:
+        batch (BalloonsBatch): партия отгрузки с грузовиком и ТТН.
+
+    Returns:
+        dict: поля fulness, number_auto, type_car и опционально id_ttn.
+
+    Raises:
+        ValueError: если у партии нет грузовика или типа транспорта.
+    """
     if not batch.truck:
         raise ValueError(f"У партии {batch.id} отсутствует информация о грузовике")
 
@@ -115,7 +142,18 @@ def _build_loading_payload(batch: BalloonsBatch) -> Dict[str, Any]:
 
 
 def _build_unloading_payload(batch: BalloonsBatch) -> Dict[str, Any]:
-    """Формирует payload /balloontosklad из данных партии приёмки."""
+    """
+    Формирует payload /balloontosklad из данных партии приёмки.
+
+    Args:
+        batch (BalloonsBatch): партия приёмки с balloons_type и ТТН.
+
+    Returns:
+        dict: поля fulness и опционально id_ttn.
+
+    Raises:
+        ValueError: при неизвестном balloons_type.
+    """
     if batch.balloons_type == 'e':
         fulness = 0
     elif batch.balloons_type == 'f':
@@ -136,7 +174,20 @@ def _get_batch_data_for_loading(
     batch: Optional[BalloonsBatch] = None,
     reader: Optional[int] = None,
 ) -> Dict[str, Any]:
-    """Получает данные партии для отправки статуса загрузки в /balloontocar."""
+    """
+    Получает данные партии для отправки статуса загрузки в /balloontocar.
+
+    Args:
+        nfc_tag (str): NFC-метка баллона (для поиска партии, если batch не передан).
+        batch (BalloonsBatch | None): готовая партия отгрузки или None.
+        reader (int | None): номер считывателя для фильтрации.
+
+    Returns:
+        dict: payload для /balloontocar.
+
+    Raises:
+        ValueError: если активная партия отгрузки не найдена или тип партии неверный.
+    """
     if batch is None:
         queryset = BalloonsBatch.objects.select_related(
             'truck', 'truck__type', 'trailer'
@@ -161,7 +212,19 @@ def _get_batch_data_for_unloading(
     batch: Optional[BalloonsBatch] = None,
     reader: Optional[int] = None,
 ) -> Dict[str, Any]:
-    """Получает данные партии для отправки статуса разгрузки в /balloontosklad."""
+    """
+    Получает данные партии для отправки статуса разгрузки в /balloontosklad.
+
+    Args:
+        batch (BalloonsBatch | None): готовая партия приёмки или None.
+        reader (int | None): номер считывателя для поиска активной партии.
+
+    Returns:
+        dict: payload для /balloontosklad.
+
+    Raises:
+        ValueError: если активная партия приёмки не найдена или тип партии неверный.
+    """
     if batch is None:
         queryset = BalloonsBatch.objects.select_related('truck', 'trailer').filter(
             batch_type='l',
@@ -180,7 +243,12 @@ def _get_batch_data_for_unloading(
 
 
 def _get_send_urls() -> Dict[str, str]:
-    """Возвращает словарь URL для отправки статусов в Мириаду."""
+    """
+    Возвращает словарь URL для отправки статусов в Мириаду.
+
+    Returns:
+        dict[str, str]: ключи filling / registering_in_warehouse / loading_into_truck.
+    """
     return {
         'filling': f'{settings.MIRIADA_API_POST_URL}/fillingballoon',
         'registering_in_warehouse': f'{settings.MIRIADA_API_POST_URL}/balloontosklad',
@@ -193,7 +261,20 @@ def _prepare_payload_for_miriada(
     nfc_tag: str,
     batch: Optional[BalloonsBatch] = None,
 ) -> Tuple[str, Dict[str, Any], str]:
-    """Подготавливает payload для отправки в Мириаду в зависимости от номера считывателя."""
+    """
+    Подготавливает payload для отправки в Мириаду в зависимости от номера считывателя.
+
+    Args:
+        reader (int): номер RFID-считывателя (2/3/4/6/8).
+        nfc_tag (str): NFC-метка баллона.
+        batch (BalloonsBatch | None): партия для построения payload (опционально).
+
+    Returns:
+        tuple[str, dict, str]: URL, payload и тип отправки.
+
+    Raises:
+        ValueError: при неизвестном ридере, типе отправки или ошибке данных партии.
+    """
     send_urls = _get_send_urls()
 
     payload = {
@@ -230,6 +311,15 @@ def send_status_to_miriada(
     """
     Отправляет статусы баллонов по NFC-метке в Мириаду.
     При неуспешном запросе выполняется до 2 повторных попыток.
+
+    Args:
+        reader (int): номер RFID-считывателя.
+        nfc_tag (str): NFC-метка баллона.
+        batch (BalloonsBatch | None): партия для payload (опционально).
+        session (requests.Session | None): HTTP-сессия или None (создаётся внутри).
+
+    Raises:
+        MiriadaAPIError: при ошибке подготовки данных или HTTP-запроса.
     """
     try:
         url, payload, send_type = _prepare_payload_for_miriada(reader, nfc_tag, batch=batch)
@@ -247,7 +337,18 @@ def post_status_to_miriada(
     send_type: str,
     session: Optional[requests.Session] = None,
 ) -> None:
-    """POST статуса в Мириаду. Сессия переиспользуется между попытками и вызовами."""
+    """
+    POST статуса в Мириаду. Сессия переиспользуется между попытками и вызовами.
+
+    Args:
+        url (str): endpoint Мириады.
+        payload (dict): JSON-тело запроса.
+        send_type (str): тип операции (для логов).
+        session (requests.Session | None): HTTP-сессия или None.
+
+    Raises:
+        MiriadaAPIError: при неуспешном ответе или сетевой ошибке после ретраев.
+    """
     headers = {
         'Accept': 'application/json',
         'Content-Type': 'application/json'

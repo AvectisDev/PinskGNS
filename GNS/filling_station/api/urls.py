@@ -1,3 +1,5 @@
+"""URL-маршруты REST API filling_station: баллоны, партии, транспорт и JWT для мобильного клиента."""
+
 from django.urls import include, path
 from rest_framework.routers import DefaultRouter
 

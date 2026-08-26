@@ -1,3 +1,5 @@
+"""Сервис жизненного цикла партий баллонов: пауза, закрытие, отправка в Мириаду."""
+
 import logging
 from concurrent.futures import CancelledError, ThreadPoolExecutor, as_completed
 from typing import Any, Dict, Optional, Tuple
@@ -28,6 +30,15 @@ OPEN_BATCH_STATUSES = frozenset({
 
 
 def _today_batch_queryset(batch: BalloonsBatch):
+    """
+    Возвращает queryset партий того же типа и считывателя за сегодня.
+
+    Args:
+        batch (BalloonsBatch): эталонная партия (тип, считыватель).
+
+    Returns:
+        QuerySet: партии BalloonsBatch за текущую локальную дату.
+    """
     return BalloonsBatch.objects.filter(
         batch_type=batch.batch_type,
         reader_number=batch.reader_number,
@@ -36,7 +47,15 @@ def _today_batch_queryset(batch: BalloonsBatch):
 
 
 def pause_other_active_batches_on_reader(batch: BalloonsBatch) -> int:
-    """Ставит на паузу другие активные партии на том же считывателе за сегодня."""
+    """
+    Ставит на паузу другие активные партии на том же считывателе за сегодня.
+
+    Args:
+        batch (BalloonsBatch): партия, которую оставляют активной.
+
+    Returns:
+        int: число обновлённых записей.
+    """
     return (
         _today_batch_queryset(batch)
         .filter(status=BatchStatus.ACTIVE)
@@ -47,6 +66,15 @@ def pause_other_active_batches_on_reader(batch: BalloonsBatch) -> int:
 
 @transaction.atomic
 def pause_balloons_batch(batch: BalloonsBatch) -> Tuple[bool, str]:
+    """
+    Переводит партию из ACTIVE в PAUSED.
+
+    Args:
+        batch (BalloonsBatch): партия для приостановки.
+
+    Returns:
+        tuple[bool, str]: успех и текст ошибки (пустая строка при успехе).
+    """
     if batch.status != BatchStatus.ACTIVE:
         return False, 'Партия не в работе'
     batch.status = BatchStatus.PAUSED
@@ -57,6 +85,15 @@ def pause_balloons_batch(batch: BalloonsBatch) -> Tuple[bool, str]:
 
 @transaction.atomic
 def resume_balloons_batch(batch: BalloonsBatch) -> Tuple[bool, str]:
+    """
+    Возобновляет приостановленную партию и ставит на паузу другие активные на ридере.
+
+    Args:
+        batch (BalloonsBatch): партия для возобновления.
+
+    Returns:
+        tuple[bool, str]: успех и текст ошибки (пустая строка при успехе).
+    """
     if batch.status != BatchStatus.PAUSED:
         return False, 'Партия не приостановлена'
     pause_other_active_batches_on_reader(batch)
@@ -71,6 +108,12 @@ def should_defer_balloon_status_to_batch_close(reader_number: int) -> bool:
     Статусы баллонов рамки приёмки/отгрузки (3/4/6) отправляются в Мириаду
     только при закрытии активной партии, а не в момент сканирования.
     Наполнение (ридер 8) по-прежнему уходит сразу.
+
+    Args:
+        reader_number (int): номер RFID-считывателя.
+
+    Returns:
+        bool: True, если отправку статуса нужно отложить до закрытия партии.
     """
     if reader_number not in MIRIADA_BATCH_STATUS_READERS:
         return False
@@ -82,7 +125,15 @@ def should_defer_balloon_status_to_batch_close(reader_number: int) -> bool:
 
 
 def should_send_balloon_status_immediately(reader_number: int) -> bool:
-    """На лету в Мириаду уходит только наполнение (ридер 8). Рамка 3/4/6 — при закрытии."""
+    """
+    На лету в Мириаду уходит только наполнение (ридер 8). Рамка 3/4/6 — при закрытии.
+
+    Args:
+        reader_number (int): номер RFID-считывателя.
+
+    Returns:
+        bool: True, если статус нужно отправить сразу после сканирования.
+    """
     return reader_number in MIRIADA_FILLING_READERS
 
 
@@ -90,11 +141,27 @@ def add_balloon_to_batch_by_nfc(batch: BalloonsBatch, nfc_tag: str) -> dict:
     """
     Добавляет баллон в партию локально.
     Отправка статуса в Мириаду выполняется при закрытии партии.
+
+    Args:
+        batch (BalloonsBatch): целевая партия.
+        nfc_tag (str): NFC-метка баллона.
+
+    Returns:
+        dict: результат ``batch.add_balloon`` (success, message и связанные поля).
     """
     return batch.add_balloon(nfc_tag)
 
 
 def _truncate_batch_error_message(error_message: Optional[str]) -> Optional[str]:
+    """
+    Обрезает текст ошибки Мириады до max_length поля модели.
+
+    Args:
+        error_message (str | None): исходное сообщение об ошибке.
+
+    Returns:
+        str | None: обрезанное сообщение или исходное значение.
+    """
     if not error_message:
         return error_message
     max_len = BalloonsBatch._meta.get_field('miriada_error_message').max_length
@@ -104,6 +171,15 @@ def _truncate_batch_error_message(error_message: Optional[str]) -> Optional[str]
 
 
 def _count_mismatch_payload(batch: BalloonsBatch) -> dict:
+    """
+    Формирует payload ответа при расхождении RFID и электронной ТТН.
+
+    Args:
+        batch (BalloonsBatch): партия со счётчиками.
+
+    Returns:
+        dict: сообщение и числовые поля для API-ответа.
+    """
     message = (
         f'Количество отсканированных RFID ({batch.amount_of_rfid or 0}) '
         f'не совпадает с количеством по электронной ТТН ({batch.amount_of_ttn or 0})'
@@ -119,6 +195,13 @@ def _count_mismatch_payload(batch: BalloonsBatch) -> dict:
 
 
 def _mark_batch_close_failed(batch: BalloonsBatch, error_message: Optional[str]) -> None:
+    """
+    Помечает партию статусом MIRIADA_ERROR после неудачного закрытия.
+
+    Args:
+        batch (BalloonsBatch): закрываемая партия.
+        error_message (str | None): текст ошибки для сохранения.
+    """
     batch.status = BatchStatus.MIRIADA_ERROR
     batch.completed_at = timezone.now()
     batch.miriada_error_message = _truncate_batch_error_message(error_message)
@@ -138,6 +221,12 @@ def send_batch_balloon_statuses_to_miriada(batch: BalloonsBatch) -> Tuple[bool, 
     HTTP идёт параллельно (лимит потоков MIRIADA_BATCH_SEND_WORKERS),
     у каждого потока своя keep-alive сессия. Payload готовится заранее,
     чтобы не ходить в ORM из воркеров.
+
+    Args:
+        batch (BalloonsBatch): партия, статусы баллонов которой отправляются.
+
+    Returns:
+        tuple[bool, str | None]: успех и текст первой ошибки (или None).
     """
     if batch.miriada_balloons_sent:
         return True, None
@@ -168,6 +257,15 @@ def send_batch_balloon_statuses_to_miriada(batch: BalloonsBatch) -> Tuple[bool, 
         jobs.append((nfc_tag, url, payload, send_type))
 
     def _send_job(job: Tuple[str, str, Dict[str, Any], str]) -> str:
+        """
+        Отправляет один подготовленный статус баллона в Мириаду.
+
+        Args:
+            job: кортеж (nfc_tag, url, payload, send_type).
+
+        Returns:
+            str: NFC-метка успешно отправленного баллона.
+        """
         nfc_tag, url, payload, send_type = job
         post_status_to_miriada(
             url,
@@ -213,6 +311,12 @@ def attempt_close_balloons_batch(batch: BalloonsBatch) -> Tuple[bool, Optional[s
     Закрывает партию баллонов.
 
     Сначала отправляет статусы всех баллонов партии в Мириаду, затем закрывает ТТН.
+
+    Args:
+        batch (BalloonsBatch): партия для закрытия.
+
+    Returns:
+        tuple[bool, str | None]: успех и текст ошибки (или None при успехе).
     """
     from ttn.services import close_ttn_in_miriada
 
@@ -282,6 +386,13 @@ def save_and_close_balloons_batch(batch: BalloonsBatch, data=None):
     """
     Сохраняет данные партии, отправляет статусы баллонов в Мириаду и закрывает ТТН.
     Пустое тело запроса допустимо: берутся текущие данные партии из БД.
+
+    Args:
+        batch (BalloonsBatch): партия для сохранения и закрытия.
+        data: частичные поля партии из запроса (или None).
+
+    Returns:
+        tuple: (успех, ошибка/payload, сериализованные данные или None).
     """
     from filling_station.api.serializers import BalloonsBatchSerializer
 

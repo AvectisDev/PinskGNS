@@ -1,3 +1,5 @@
+"""Runtime-модели RFID: устройство FEIG, TCP-сессия и фильтр UID баллона."""
+
 import asyncio
 import os
 from collections import deque
@@ -16,6 +18,12 @@ def is_balloon_nfc_tag(nfc_tag: str) -> bool:
     """
     True, если метка похожа на ожидаемый UID баллона: корректный hex и суффикс TAG_HEX_SUFFIX.
     Иные значения (шум, чужие транспондеры) логируются и не идут в бизнес-логику.
+
+    Args:
+        nfc_tag (str): Hex-строка UID метки.
+
+    Returns:
+        bool: ``True``, если метка проходит фильтр.
     """
     if not nfc_tag or not isinstance(nfc_tag, str):
         return False
@@ -35,6 +43,12 @@ class FeigReaderDevice:
     """Runtime-состояние RFID-считывателя FEIG (не Django-модель)."""
 
     def __init__(self, reader_settings):
+        """
+        Инициализирует runtime-ридер из записи ``ReaderSettings``.
+
+        Args:
+            reader_settings: Объект настроек ридера из БД.
+        """
         self.number = reader_settings.number
         self.ip = reader_settings.ip
         self.port = reader_settings.port
@@ -45,12 +59,23 @@ class FeigReaderDevice:
         self.previous_nfc_tags = deque(maxlen=5)
 
     def __str__(self):
+        """
+        Краткое строковое представление ридера.
+
+        Returns:
+            str: Номер, адрес и статус.
+        """
         return f"Reader {self.number}: {self.ip}:{self.port} - {self.status}"
 
     def filter_duplicate_tag(self, nfc_tag: str) -> bool:
         """
         Кэширует 5 последних считанных меток.
-        Возвращает True если метка новая (ещё не была в последних 5).
+
+        Args:
+            nfc_tag (str): Hex UID метки.
+
+        Returns:
+            bool: ``True``, если метка новая (ещё не была в последних 5).
         """
         if nfc_tag in self.previous_nfc_tags:
             return False
@@ -61,21 +86,31 @@ class FeigReaderDevice:
 class ReaderSession:
     """
     Постоянная TCP-сессия к ридеру FEIG.
+
     Обеспечивает последовательную отправку команд и точное чтение ответа по длине (ALENGTH).
     """
+
     def __init__(self, reader: FeigReaderDevice):
+        """
+        Создаёт сессию без немедленного подключения.
+
+        Args:
+            reader: Runtime-ридер, к которому открывается TCP.
+        """
         self.reader = reader
         self.conn = None
         self.writer = None
         self.lock = None
 
     async def connect(self):
+        """Открывает TCP-соединение к ``reader.ip:reader.port``, если ещё не открыто."""
         if self.conn is None or self.writer is None:
             self.conn, self.writer = await asyncio.open_connection(self.reader.ip, self.reader.port)
             self.lock = asyncio.Lock()
             logger.info(f'{self.reader} TCP connected')
 
     async def close(self):
+        """Закрывает TCP-соединение и сбрасывает состояние сессии."""
         if self.writer:
             try:
                 self.writer.close()
@@ -87,12 +122,30 @@ class ReaderSession:
                 logger.info(f'{self.reader} TCP closed')
 
     async def send(self, command_name: str, request_data: bytes = b'') -> Dict:
-        """Последовательная отправка команды с корректным чтением полного кадра ответа."""
+        """
+        Последовательная отправка команды с корректным чтением полного кадра ответа.
+
+        Args:
+            command_name (str): Имя команды FEIG.
+            request_data (bytes): Поле DATA запроса.
+
+        Returns:
+            dict: Результат ``FeigProtocol.parse_response``.
+        """
         req = FeigProtocol.create_request(command_name, request_data)
         return await self.send_raw(req, command_name)
 
     async def send_raw(self, frame: bytes, command_name: str = 'raw') -> Dict:
-        """Отправляет готовый кадр FEIG (например команды лампы из settings.COMMANDS)."""
+        """
+        Отправляет готовый кадр FEIG (например команды лампы из settings.COMMANDS).
+
+        Args:
+            frame (bytes): Полный кадр запроса.
+            command_name (str): Имя для логов.
+
+        Returns:
+            dict: Разобранный ответ или ``valid=False`` при ошибке/таймауте.
+        """
         if self.conn is None or self.writer is None:
             await self.connect()
 
@@ -124,7 +177,15 @@ class ReaderSession:
                 return {'valid': False, 'error': str(e)}
 
     async def indicate_tag_read(self, success: bool) -> Dict:
-        """Зелёная лампа: постоянное свечение при успехе, мигание при ошибке."""
+        """
+        Зелёная лампа: постоянное свечение при успехе, мигание при ошибке.
+
+        Args:
+            success (bool): Успешная обработка метки.
+
+        Returns:
+            dict: Ответ ридера на команду SET_OUTPUT.
+        """
         from .settings import command_frame
 
         name = 'read_complete' if success else 'read_complete_with_error'
@@ -136,9 +197,28 @@ class ReaderSession:
         return result
 
     async def send_event_ack(self, event_command: int, status: int = 0x00) -> Dict:
-        """ACK для Notification Mode event. COMMAND=event_command, DATA[0]=STATUS."""
+        """
+        ACK для Notification Mode event. COMMAND=event_command, DATA[0]=STATUS.
+
+        Args:
+            event_command (int): Код события.
+            status (int): Байт статуса ACK.
+
+        Returns:
+            dict: Ответ ридера.
+        """
         return await self.send_by_code(event_command, bytes([status]))
 
     async def send_by_code(self, command_code: int, request_data: bytes = b'') -> Dict:
+        """
+        Отправляет команду по числовому коду.
+
+        Args:
+            command_code (int): Код команды FEIG.
+            request_data (bytes): Поле DATA.
+
+        Returns:
+            dict: Результат ``send_raw``.
+        """
         req = FeigProtocol.create_request_by_code(command_code, request_data)
         return await self.send_raw(req, command_name=f'0x{command_code:02X}')
