@@ -1,6 +1,7 @@
 from django.core.exceptions import ValidationError
 from django.test import SimpleTestCase, TestCase
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
+import socket
 
 from .models import Carousel
 from .management.commands.carousel import main as carousel_main
@@ -19,6 +20,55 @@ class RangeValidationTests(SimpleTestCase):
     def test_value_outside_range(self):
         self.assertFalse(is_value_in_range(16.0, 17.0, 19.0))
         self.assertFalse(is_value_in_range(20.0, 17.0, 19.0))
+
+
+class TcpFrameAssemblyTests(SimpleTestCase):
+    def test_recv_exact_assembles_fragments(self):
+        frame = bytes.fromhex('7A141036B0000D53')
+        sock = MagicMock()
+        sock.recv.side_effect = [frame[:3], frame[3:5], frame[5:]]
+
+        result = carousel_main.recv_exact(sock, 8)
+
+        self.assertEqual(result, frame)
+        self.assertEqual(sock.recv.call_count, 3)
+
+    def test_recv_exact_raises_when_connection_closed(self):
+        sock = MagicMock()
+        sock.recv.side_effect = [b'\x7A\x14', b'']
+
+        with self.assertRaises(ConnectionError):
+            carousel_main.recv_exact(sock, 8)
+
+    @patch('carousel.management.commands.carousel.main.socket.create_connection')
+    def test_tcp_transport_assembles_fragments_across_timeout(
+        self,
+        create_connection,
+    ):
+        frame = bytes.fromhex('7A141036B0000D53')
+        sock = MagicMock()
+        sock.recv.side_effect = [
+            frame[:2],
+            socket.timeout,
+            frame[2:],
+        ]
+        create_connection.return_value = sock
+
+        transport = carousel_main.TcpTransport('127.0.0.1', 4001, 1.0)
+
+        self.assertEqual(transport.read_frame(8), b'')
+        self.assertEqual(transport.read_frame(8), frame)
+
+    @patch('carousel.management.commands.carousel.main.socket.create_connection')
+    def test_tcp_transport_write_uses_sendall(self, create_connection):
+        sock = MagicMock()
+        create_connection.return_value = sock
+        transport = carousel_main.TcpTransport('127.0.0.1', 4001, 1.0)
+
+        payload = bytes.fromhex('5A14FFA410FF7D88')
+        transport.write(payload)
+
+        sock.sendall.assert_called_once_with(payload)
 
 
 class CarouselRequestProcessingTests(SimpleTestCase):
