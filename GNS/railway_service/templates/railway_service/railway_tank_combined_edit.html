@@ -21,9 +21,12 @@
             <h6 class="mt-2 mb-3">Последняя историческая запись</h6>
             {% crispy history_form %}
 
-            <div class="d-flex gap-2 mt-3">
-              <button type="submit" name="save" class="btn btn-success">Сохранить</button>
-              <button type="submit" name="cancel" class="btn btn-secondary">Отмена</button>
+            <div class="mb-3 row mt-3">
+              <div class="col-lg-5"></div>
+              <div class="col-lg-auto d-flex gap-2">
+                <button type="submit" name="save" class="btn btn-success">Сохранить</button>
+                <button type="submit" name="cancel" class="btn btn-secondary" formnovalidate>Отмена</button>
+              </div>
             </div>
           </form>
         </div>

@@ -1,3 +1,8 @@
+"""Модели газонаполнительной станции: баллоны, RFID-считыватели, транспорт и партии.
+
+Описывают учёт баллонов, показания считывателей, складские счётчики и операции приёмки/отгрузки.
+"""
+
 from collections import defaultdict
 from django.db import models
 from django.utils import timezone
@@ -44,23 +49,34 @@ class Balloon(models.Model):
     )
 
     def __str__(self):
+        """Возвращает номер NFC-метки баллона."""
         return self.nfc_tag
 
     class Meta:
+        """Метаданные модели баллона."""
         verbose_name = "Баллон"
         verbose_name_plural = "Баллоны"
         ordering = ['-change_date']
 
     def get_absolute_url(self):
+        """URL страницы просмотра баллона."""
         return reverse('filling_station:balloon_detail', args=[self.pk])
 
     def get_update_url(self):
+        """URL страницы редактирования баллона."""
         return reverse('filling_station:balloon_update', args=[self.pk])
 
     def get_delete_url(self):
+        """URL страницы удаления баллона."""
         return reverse('filling_station:balloon_delete', args=[self.pk])
 
     def clean(self):
+        """
+        Проверяет согласованность весов баллона.
+
+        Raises:
+            ValidationError: Если brutto меньше netto.
+        """
         if self.brutto and self.netto and self.brutto < self.netto:
             raise ValidationError("Вес наполненного баллона должен быть больше веса пустого баллона.")
 
@@ -84,12 +100,15 @@ class ReaderSettings(models.Model):
     need_cache = models.BooleanField(default=False, verbose_name="Добавлять в кеш")
 
     def __int__(self):
+        """Возвращает номер считывателя."""
         return self.number
 
     def __str__(self):
+        """Возвращает статус считывателя."""
         return self.status
 
     class Meta:
+        """Метаданные модели настроек считывателей."""
         verbose_name = "Настройки считывателей"
         verbose_name_plural = "Настройки считывателей"
         ordering = ['number']
@@ -114,12 +133,15 @@ class Reader(models.Model):
     change_date = models.DateTimeField(auto_now=True, verbose_name="Дата изменений")
 
     def __int__(self):
+        """Возвращает первичный ключ записи считывания."""
         return self.pk
 
     def __str__(self):
+        """Возвращает номер связанного считывателя."""
         return str(self.number)
 
     class Meta:
+        """Метаданные модели событий считывания."""
         verbose_name = "Считыватель"
         verbose_name_plural = "Считыватели"
         ordering = ['-change_date']
@@ -129,6 +151,13 @@ class Reader(models.Model):
         """
         Получает статистику по всем считывателям за указанный период.
         Источник — DailyReaderCounter (те же счётчики, что и в RFID-таблицах).
+
+        Args:
+            start_date: Начало периода (включительно).
+            end_date: Конец периода (включительно).
+
+        Returns:
+            Список словарей с номером, статусом и суммами RFID/сенсор/всего по каждому считывателю.
         """
         period_stats = (
             DailyReaderCounter.objects.filter(
@@ -161,7 +190,7 @@ class Reader(models.Model):
 
 class DailyReaderCounter(models.Model):
     """
-    Ежедневные счетчики по конкретному ридеру
+    Ежедневные счётчики проходов по конкретному RFID-считывателю.
     """
     number = models.ForeignKey(
         ReaderSettings,
@@ -175,9 +204,11 @@ class DailyReaderCounter(models.Model):
     change_at = models.DateTimeField(auto_now=True, verbose_name="Дата последнего изменения")
 
     def __str__(self):
+        """Краткое описание счётчика по номеру считывателя."""
         return f'Количество баллонов на ридере {self.number}'
 
     class Meta:
+        """Метаданные ежедневных счётчиков считывателей."""
         verbose_name = "Счетчики по ридерам за день"
         verbose_name_plural = "Счетчики по ридерам за день"
         ordering = ['-day']
@@ -187,6 +218,12 @@ class DailyReaderCounter(models.Model):
 
     @classmethod
     def add_rfid(cls, reader: ReaderSettings):
+        """
+        Атомарно увеличивает счётчик RFID-проходов за текущий день.
+
+        Args:
+            reader: Настройки считывателя, для которого ведётся учёт.
+        """
         obj, created = cls.objects.get_or_create(
             number=reader,
             day=timezone.localdate(),
@@ -200,6 +237,12 @@ class DailyReaderCounter(models.Model):
 
     @classmethod
     def add_sensor(cls, reader: ReaderSettings):
+        """
+        Атомарно увеличивает счётчик проходов по оптическому датчику за текущий день.
+
+        Args:
+            reader: Настройки считывателя, для которого ведётся учёт.
+        """
         obj, created = cls.objects.get_or_create(
             number=reader,
             day=timezone.localdate(),
@@ -214,7 +257,14 @@ class DailyReaderCounter(models.Model):
     def get_reader_period_stats(cls, reader: ReaderSettings, start_date: date, end_date: date) -> dict:
         """
         Получение статистики по конкретному ридеру за указанный период.
-        Возвращает словарь с количеством баллонов по RFID и по сенсору.
+
+        Args:
+            reader: Считыватель, по которому агрегируются данные.
+            start_date: Начало периода (включительно).
+            end_date: Конец периода (включительно).
+
+        Returns:
+            Словарь с ключами ``total_rfid`` и ``total_sensor``.
         """
         stats = cls.objects.filter(
             number=reader,
@@ -234,9 +284,11 @@ class DailyReaderCounter(models.Model):
     def get_common_stats_for_gns(cls) -> list:
         """
         Получение статистики по ридерам за месяц и сегодня.
-        Возвращает список словарей с данными по каждому ридеру.
-        balloons_month/balloons_today - только баллоны, подсчитанные сенсором (amount_of_sensor)
-        rfid_month/rfid_today - только баллоны, подсчитанные по RFID (amount_of_rfid)
+        balloons_month/balloons_today — только баллоны, подсчитанные сенсором (amount_of_sensor);
+        rfid_month/rfid_today — только баллоны, подсчитанные по RFID (amount_of_rfid).
+
+        Returns:
+            Список словарей с данными по каждому считывателю.
         """
         today = timezone.localdate()
         first_day_of_month = today.replace(day=1)
@@ -287,32 +339,44 @@ class TotalReadersCounter(models.Model):
     changed_at = models.DateTimeField(auto_now=True, verbose_name='Дата последнего изменения')
 
     class Meta:
+        """Метаданные сводного складского счётчика."""
         verbose_name = "Свод по складу"
         verbose_name_plural = "Свод по складу"
         ordering = ['-changed_at']
 
     def __str__(self):
+        """Краткое представление числа пустых и полных баллонов."""
         return f'Свод (E={self.total_empty}, F={self.total_full})'
 
     @classmethod
     def add_full_balloon(cls):
+        """Увеличивает счётчик полных баллонов на складе на единицу."""
         cls.objects.filter(pk=1).update(total_full=F('total_full') + 1, changed_at=timezone.now())
 
     @classmethod
     def add_empty_balloon(cls):
+        """Увеличивает счётчик пустых баллонов на складе на единицу."""
         cls.objects.filter(pk=1).update(total_empty=F('total_empty') + 1, changed_at=timezone.now())
 
     @classmethod
     def sub_full_balloon(cls):
+        """Уменьшает счётчик полных баллонов на единицу, если он больше нуля."""
         cls.objects.filter(pk=1, total_full__gt=0).update(total_full=F('total_full') - 1, changed_at=timezone.now())
 
     @classmethod
     def sub_empty_balloon(cls):
+        """Уменьшает счётчик пустых баллонов на единицу, если он больше нуля."""
         cls.objects.filter(pk=1, total_empty__gt=0).update(total_empty=F('total_empty') - 1, changed_at=timezone.now())
 
     @classmethod
     def insert_manual_values(cls, empty: int = None, full: int = None):
-        """Ввод значений со SCADA системы"""
+        """
+        Записывает ручные значения со SCADA (или оставляет текущие поля без изменений).
+
+        Args:
+            empty: Новое число пустых баллонов; ``None`` — не менять.
+            full: Новое число полных баллонов; ``None`` — не менять.
+        """
         cls.objects.filter(pk=1).update(
             total_empty=empty if empty is not None else F('total_empty'),
             total_full=full if full is not None else F('total_full'),
@@ -323,7 +387,9 @@ class TotalReadersCounter(models.Model):
     def get_balloons_stats(cls):
         """
         Получение статистики полных и пустых баллонов на станции.
-        Возвращает словарь с количеством полных и пустых баллонов.
+
+        Returns:
+            Словарь с ключами ``filled`` и ``empty``; при отсутствии записи — нули.
         """
         counter = cls.objects.filter(pk=1).first()
         if counter:
@@ -342,9 +408,11 @@ class TruckType(models.Model):
     type = models.CharField(max_length=100, verbose_name="Тип грузовика")
 
     def __str__(self):
+        """Возвращает название типа грузовика."""
         return self.type
 
     class Meta:
+        """Метаданные справочника типов грузовиков."""
         verbose_name = "Тип грузовика"
         verbose_name_plural = "Типы грузовиков"
 
@@ -362,7 +430,7 @@ class Truck(models.Model):
     registration_number = models.CharField(unique=True, max_length=10, verbose_name="Регистрационный знак")
     type = models.ForeignKey(
         TruckType,
-        on_delete=models.DO_NOTHING,
+        on_delete=models.PROTECT,
         verbose_name="Тип",
         default=1
     )
@@ -407,20 +475,25 @@ class Truck(models.Model):
     departure_at = models.DateTimeField(null=True, blank=True, verbose_name="Дата и время выезда")
 
     def __str__(self):
+        """Возвращает регистрационный знак грузовика."""
         return self.registration_number
 
     class Meta:
+        """Метаданные модели грузовика."""
         verbose_name = "Грузовик"
         verbose_name_plural = "Грузовики"
         ordering = ['-is_on_station', '-entry_at']
 
     def get_absolute_url(self):
+        """URL страницы просмотра грузовика."""
         return reverse('filling_station:truck_detail', args=[self.pk])
 
     def get_update_url(self):
+        """URL страницы редактирования грузовика."""
         return reverse('filling_station:truck_update', args=[self.pk])
 
     def get_delete_url(self):
+        """URL страницы удаления грузовика."""
         return reverse('filling_station:truck_delete', args=[self.pk])
 
 
@@ -429,9 +502,11 @@ class TrailerType(models.Model):
     type = models.CharField(max_length=100, verbose_name="Тип прицепа")
 
     def __str__(self):
+        """Возвращает название типа прицепа."""
         return self.type
 
     class Meta:
+        """Метаданные справочника типов прицепов."""
         verbose_name = "Тип прицепа"
         verbose_name_plural = "Типы прицепов"
 
@@ -447,7 +522,7 @@ class Trailer(models.Model):
     """
     truck = models.ForeignKey(
         Truck,
-        on_delete=models.DO_NOTHING,
+        on_delete=models.PROTECT,
         verbose_name="Автомобиль",
         related_name='trailer',
         default=1
@@ -456,7 +531,7 @@ class Trailer(models.Model):
     registration_number = models.CharField(unique=True, max_length=10, verbose_name="Регистрационный знак")
     type = models.ForeignKey(
         TrailerType,
-        on_delete=models.DO_NOTHING,
+        on_delete=models.PROTECT,
         verbose_name="Тип",
         default=1
     )
@@ -505,24 +580,30 @@ class Trailer(models.Model):
     departure_at = models.DateTimeField(null=True, blank=True, verbose_name="Дата и время выезда")
 
     def __str__(self):
+        """Возвращает регистрационный знак прицепа."""
         return self.registration_number
 
     class Meta:
+        """Метаданные модели прицепа."""
         verbose_name = "Прицеп"
         verbose_name_plural = "Прицепы"
         ordering = ['-is_on_station', '-entry_at']
 
     def get_absolute_url(self):
+        """URL страницы просмотра прицепа."""
         return reverse('filling_station:trailer_detail', args=[self.pk])
 
     def get_update_url(self):
+        """URL страницы редактирования прицепа."""
         return reverse('filling_station:trailer_update', args=[self.pk])
 
     def get_delete_url(self):
+        """URL страницы удаления прицепа."""
         return reverse('filling_station:trailer_delete', args=[self.pk])
 
 
 class BatchStatus(models.TextChoices):
+    """Статусы жизненного цикла партии баллонов (приёмка/отгрузка)."""
     ACTIVE = 'active', 'В работе'
     PAUSED = 'paused', 'Приостановлена'
     COMPLETED = 'completed', 'Завершена'
@@ -544,12 +625,12 @@ class BalloonsBatch(models.Model):
     completed_at = models.DateTimeField(null=True, blank=True, verbose_name="Дата и время окончания")
     truck = models.ForeignKey(
         Truck,
-        on_delete=models.DO_NOTHING,
+        on_delete=models.PROTECT,
         verbose_name="Автомобиль"
     )
     trailer = models.ForeignKey(
         Trailer,
-        on_delete=models.DO_NOTHING,
+        on_delete=models.PROTECT,
         null=True,
         blank=True,
         verbose_name="Прицеп"
@@ -596,44 +677,62 @@ class BalloonsBatch(models.Model):
     balloons_type = models.CharField(choices=settings.BALLOON_TYPE_CHOICES, default='e', verbose_name="Пустой/полный")
     user = models.ForeignKey(
         User,
-        on_delete=models.DO_NOTHING,
+        on_delete=models.SET_NULL,
+        null=True,
         default=1,
         verbose_name="Пользователь"
     )
 
     def __str__(self):
+        """Краткое представление партии: номер и тип."""
         return f'Партия №{self.id}. Тип {self.batch_type}'
 
     class Meta:
+        """Метаданные модели партий баллонов."""
         verbose_name = "Партия баллонов"
         verbose_name_plural = "Партии баллонов"
         ordering = ['-started_at']
 
     def _batch_url_prefix(self) -> str:
+        """Префикс имени URL для приёмки или отгрузки в зависимости от типа партии."""
         return 'balloon_loading_batch' if self.batch_type == 'l' else 'balloon_unloading_batch'
 
     def get_absolute_url(self):
+        """URL страницы просмотра партии."""
         return reverse(f'filling_station:{self._batch_url_prefix()}_detail', args=[self.pk])
 
     def get_update_url(self):
+        """URL страницы редактирования партии."""
         return reverse(f'filling_station:{self._batch_url_prefix()}_update', args=[self.pk])
 
     def get_delete_url(self):
+        """URL страницы удаления партии."""
         return reverse(f'filling_station:{self._batch_url_prefix()}_delete', args=[self.pk])
 
     def get_retry_close_url(self):
+        """URL повторной попытки закрытия ТТН в Мириаде."""
         return reverse(f'filling_station:{self._batch_url_prefix()}_retry_close', args=[self.pk])
 
     def can_retry_miriada_close(self) -> bool:
+        """Проверяет, можно ли повторить закрытие ТТН после ошибки Мириады."""
         return self.status == BatchStatus.MIRIADA_ERROR and bool(self.ttn_id)
 
     def accepts_rfid(self) -> bool:
+        """Принимает ли партия RFID-метки и показания датчика (только ACTIVE)."""
         return self.status == BatchStatus.ACTIVE
 
     def accepts_manual_edits(self) -> bool:
+        """Допускает ли партия ручные правки состава (ACTIVE или PAUSED)."""
         return self.status in (BatchStatus.ACTIVE, BatchStatus.PAUSED)
 
     def save(self, *args, **kwargs):
+        """
+        Сохраняет партию и синхронизирует флаг ошибки закрытия ТТН со статусом.
+
+        Args:
+            *args: Позиционные аргументы ``Model.save``.
+            **kwargs: Именованные аргументы ``Model.save``.
+        """
         if self.status == BatchStatus.MIRIADA_ERROR:
             self.miriada_close_failed = True
         elif self.status == BatchStatus.COMPLETED:
@@ -641,7 +740,12 @@ class BalloonsBatch(models.Model):
         super().save(*args, **kwargs)
 
     def get_ttn_name(self) -> Optional[str]:
-        """Номер ТТН из Мириады по сохранённому ttn_id"""
+        """
+        Возвращает номер ТТН из Мириады по сохранённому ``ttn_id``.
+
+        Returns:
+            Имя ТТН или ``None``, если идентификатор не задан или запись не найдена.
+        """
         if not self.ttn_id:
             return None
         from ttn.models import MiriadaTtn
@@ -658,13 +762,13 @@ class BalloonsBatch(models.Model):
 
     def add_balloon(self, nfc_tag: str = None) -> dict:
         """
-        Добавляет баллон в партию по NFC-метке. Добавляет общее количество баллонов, посчитанное оптическим датчиком.
-        Возвращает словарь с результатами операции:
-        {
-            'success': bool,
-            'balloon_id': str | None,
-            'message': str
-        }
+        Добавляет баллон в партию по NFC-метке либо учитывает проход оптического датчика.
+
+        Args:
+            nfc_tag: NFC-метка баллона; ``None`` — инкремент счётчика сенсора.
+
+        Returns:
+            Словарь с ключами ``success``, ``balloon_id``, ``message``.
         """
         result = {
             'success': False,
@@ -710,12 +814,13 @@ class BalloonsBatch(models.Model):
 
     def remove_balloon(self, nfc_tag) -> dict:
         """
-        Удаляет баллон из партии по NFC-метке. Возвращает словарь с результатами операции:
-        {
-            'success': bool,
-            'balloon_id': str | None,
-            'message': str
-        }
+        Удаляет баллон из партии по NFC-метке.
+
+        Args:
+            nfc_tag: NFC-метка баллона для удаления из состава партии.
+
+        Returns:
+            Словарь с ключами ``success``, ``balloon_id``, ``message``.
         """
         result = {
             'success': False,
@@ -758,9 +863,16 @@ class BalloonsBatch(models.Model):
     ) -> Dict[str, int]:
         """
         Собирает статистику по партиям за период:
-        - кол-во партий
-        - кол-во баллонов с RFID
-        - кол-во баллонов по ТТН (датчик или сумма объёмов)
+        кол-во партий, баллонов с RFID и по ТТН (датчик или сумма объёмов).
+
+        Args:
+            start_date: Начало периода по дате ``started_at``; вместе с ``end_date``.
+            end_date: Конец периода; без обеих дат фильтр по дате не применяется.
+            batch_type: Тип партии (``l``/``u``); ``None`` — все типы.
+
+        Returns:
+            Словарь с ``total_batches``, ``total_balloon_count_by_rfid``,
+            ``total_balloon_count_by_ttn``.
         """
         queryset = cls.objects.all()
         if start_date is not None and end_date is not None:
@@ -796,7 +908,13 @@ class BalloonsBatch(models.Model):
     @classmethod
     def get_common_stats_for_gns(cls, batch_type: Optional[str] = None) -> list:
         """
-        Собирает статистику по партиям за последние день и месяц
+        Собирает статистику по партиям за текущий день и месяц в разрезе считывателей.
+
+        Args:
+            batch_type: Тип партии (``l``/``u``); ``None`` — все типы.
+
+        Returns:
+            Список словарей с ``reader_id``, ``truck_month``, ``truck_today``.
         """
         now = timezone.localtime()
         today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)

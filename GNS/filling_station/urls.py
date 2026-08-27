@@ -1,3 +1,5 @@
+"""URL-маршруты веб-интерфейса filling_station: баллоны, партии, транспорт, статистика."""
+
 from django.urls import path
 from . import views
 
@@ -7,6 +9,7 @@ urlpatterns = [
     # Архив баллонов
     path('', views.BalloonListView.as_view(), name='balloon_list'),
     path('balloon/<pk>/', views.BalloonDetailView.as_view(), name='balloon_detail'),
+    path('balloon/<pk>/status-history/', views.balloon_status_history, name='balloon_status_history'),
     path("balloon/<pk>/update/", views.BalloonUpdateView.as_view(extra_context={
         "title": "Редактирование паспорта баллона"
     }),

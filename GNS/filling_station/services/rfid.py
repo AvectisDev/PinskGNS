@@ -1,3 +1,5 @@
+"""Обработка сигналов RFID-считывателей: баллоны, партии, кэш Redis."""
+
 import logging
 from typing import Optional, Dict, Any, Tuple
 
@@ -24,11 +26,15 @@ def processing_request_without_nfc(reader_number: int) -> Optional[ReaderSetting
     """
     Обрабатывает сигнал от ридера о сработке оптического датчика.
 
+    Args:
+        reader_number (int): номер RFID-считывателя.
+
     Returns:
-        ReaderSettings при успехе.
+        ReaderSettings: настройки считывателя при успехе.
 
     Raises:
-        ReaderNotFoundError: Если считыватель не найден
+        ReaderNotFoundError: если считыватель не найден.
+        Exception: при прочих ошибках обработки сигнала.
     """
     try:
         reader = ReaderSettings.objects.get(number=reader_number)
@@ -58,7 +64,19 @@ def processing_request_without_nfc(reader_number: int) -> Optional[ReaderSetting
 
 
 def processing_request_with_nfc(nfc_tag: str, reader_number: int) -> Optional[Tuple[Balloon, ReaderSettings]]:
-    """Обрабатывает сигнал от ридера при получении метки."""
+    """
+    Обрабатывает сигнал от ридера при получении NFC-метки.
+
+    Args:
+        nfc_tag (str): NFC-метка баллона.
+        reader_number (int): номер RFID-считывателя.
+
+    Returns:
+        tuple[Balloon, ReaderSettings] | None: баллон и настройки ридера либо None при ошибке.
+
+    Raises:
+        ReaderNotFoundError: если считыватель не найден.
+    """
     try:
         reader = ReaderSettings.objects.get(number=reader_number)
 
@@ -99,7 +117,16 @@ def processing_request_with_nfc(nfc_tag: str, reader_number: int) -> Optional[Tu
 
 
 def update_balloon_passport(balloon: Balloon) -> None:
-    """Обрабатывает данные от API Мириады и обновляет запись баллона."""
+    """
+    Обрабатывает данные от API Мириады и обновляет запись баллона.
+
+    Args:
+        balloon (Balloon): баллон для обновления паспорта.
+
+    Raises:
+        MiriadaAPIError: при ошибке запроса к Мириаде.
+        Exception: при прочих ошибках сохранения паспорта.
+    """
     try:
         api_data = get_balloon_data_from_miriada(balloon.nfc_tag)
         if api_data:
@@ -118,7 +145,15 @@ def update_balloon_passport(balloon: Balloon) -> None:
 
 
 def get_active_batch_for_reader(reader: ReaderSettings) -> Optional[BalloonsBatch]:
-    """Активная партия приёмки/отгрузки, привязанная к считывателю на сегодня."""
+    """
+    Возвращает активную партию приёмки/отгрузки, привязанную к считывателю на сегодня.
+
+    Args:
+        reader (ReaderSettings): настройки считывателя.
+
+    Returns:
+        BalloonsBatch | None: активная партия или None, если функция ридера не l/u.
+    """
     if reader.function not in ['l', 'u']:
         return None
     return BalloonsBatch.objects.select_related('truck', 'trailer', 'truck__type').filter(
@@ -130,7 +165,12 @@ def get_active_batch_for_reader(reader: ReaderSettings) -> Optional[BalloonsBatc
 
 
 def add_sensor_count_to_batch(reader: ReaderSettings) -> None:
-    """Увеличивает счётчик оптического датчика у активной партии считывателя."""
+    """
+    Увеличивает счётчик оптического датчика у активной партии считывателя.
+
+    Args:
+        reader (ReaderSettings): считыватель, для которого ищется активная партия.
+    """
     batch = get_active_batch_for_reader(reader)
     if not batch:
         return
@@ -144,7 +184,16 @@ def add_sensor_count_to_batch(reader: ReaderSettings) -> None:
 
 
 def add_balloon_to_batch(reader: ReaderSettings, balloon: Optional[Balloon] = None) -> Optional[Dict[str, Any]]:
-    """Добавляет баллон в активную партию в зависимости от номера ридера."""
+    """
+    Добавляет баллон в активную партию в зависимости от номера ридера.
+
+    Args:
+        reader (ReaderSettings): считыватель с функцией приёмки/отгрузки.
+        balloon (Balloon | None): баллон для добавления.
+
+    Returns:
+        dict | None: результат add_balloon, сообщение об отсутствии партии или None.
+    """
     if not balloon:
         return None
 
@@ -168,7 +217,16 @@ def add_balloon_to_batch(reader: ReaderSettings, balloon: Optional[Balloon] = No
 
 
 def add_balloon_to_reader_table(balloon: Balloon, reader: ReaderSettings) -> None:
-    """Добавляет запись о прохождении баллона с меткой через определённый ридер."""
+    """
+    Добавляет запись о прохождении баллона с меткой через определённый ридер.
+
+    Args:
+        balloon (Balloon): баллон с данными паспорта.
+        reader (ReaderSettings): считыватель, через который прошёл баллон.
+
+    Raises:
+        Exception: при ошибке создания записи Reader.
+    """
     try:
         Reader.objects.create(
             number=reader,
@@ -185,7 +243,16 @@ def add_balloon_to_reader_table(balloon: Balloon, reader: ReaderSettings) -> Non
 
 
 def add_balloon_to_cache(balloon: Balloon, reader: ReaderSettings) -> None:
-    """Добавляет паспорт баллона в нативную FIFO-очередь Redis."""
+    """
+    Добавляет паспорт баллона в нативную FIFO-очередь Redis.
+
+    Args:
+        balloon (Balloon): баллон для кэширования.
+        reader (ReaderSettings): считыватель (ключ очереди).
+
+    Raises:
+        Exception: при ошибке записи в Redis.
+    """
     cache_timeout_seconds = 10 * 60
 
     try:

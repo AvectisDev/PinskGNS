@@ -6,7 +6,7 @@
 
 <div class="container mt-4">
     <div class="row justify-content-center">
-        <div class="col-12 col-md-8 col-lg-6">
+        <div class="col-12">
             <h5 class="mb-3">{{ title }}</h5>
             <form method="post" enctype="multipart/form-data"{% if request.GET %} action="?{{ request.GET.urlencode }}"{% endif %}>
                 {% csrf_token %}

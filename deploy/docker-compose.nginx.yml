@@ -13,7 +13,7 @@ services:
       - "8080:80"
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
-      - "D:/Program Files/PinskGNS/GNS/static:/var/www/static:ro"
-      - "D:/Program Files/PinskGNS/GNS/media:/var/www/media:ro"
+      - ../GNS/static:/var/www/static:ro
+      - ../GNS/media:/var/www/media:ro
     extra_hosts:
       - "host.docker.internal:host-gateway"

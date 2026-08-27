@@ -1,3 +1,5 @@
+"""API ViewSet партий приёмки/отгрузки баллонов и endpoint для SCADA."""
+
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
@@ -34,6 +36,15 @@ logger = logging.getLogger('filling_station')
 
 
 def _api_user(request) -> str:
+    """
+    Формирует строковый идентификатор пользователя для логов API.
+
+    Args:
+        request: HTTP-запрос DRF.
+
+    Returns:
+        str: ``pk:username`` или ``anonymous``.
+    """
     user = getattr(request, 'user', None)
     if user is None or not getattr(user, 'is_authenticated', False):
         return 'anonymous'
@@ -61,6 +72,15 @@ _BATCH_STATUS_DOC = (
 
 
 def _api_error_payload(payload):
+    """
+    Нормализует payload ошибки: статус партии переводит в API-enum.
+
+    Args:
+        payload: тело ошибки (dict или иное).
+
+    Returns:
+        То же значение с ``status`` в числовом виде при наличии ключа.
+    """
     if isinstance(payload, dict) and 'status' in payload:
         return {**payload, 'status': batch_status_to_api(payload['status'])}
     return payload
@@ -301,6 +321,15 @@ class BalloonsBatchViewSet(viewsets.ViewSet):
     permission_classes = [IsAuthenticated]
 
     def get_batch_type(self, request):
+        """
+        Определяет тип партии по пути URL (loading/unloading).
+
+        Args:
+            request: HTTP-запрос DRF.
+
+        Returns:
+            str | None: ``l``, ``u`` или None, если тип не распознан.
+        """
         path = request.path.lower()
         if 'unloading' in path:
             return 'u'
@@ -310,6 +339,15 @@ class BalloonsBatchViewSet(viewsets.ViewSet):
 
     @action(detail=False, methods=['get'], url_path='active')
     def is_active(self, request):
+        """
+        Возвращает список незавершённых партий выбранного типа.
+
+        Args:
+            request: HTTP-запрос DRF.
+
+        Returns:
+            Response: список ActiveBatchSerializer или 400 без batch_type.
+        """
         batch_type = self.get_batch_type(request)
         if not batch_type:
             return Response(
@@ -327,6 +365,15 @@ class BalloonsBatchViewSet(viewsets.ViewSet):
 
     @action(detail=False, methods=['get'], url_path='last-active')
     def last_active(self, request):
+        """
+        Возвращает последнюю партию со статусом ACTIVE.
+
+        Args:
+            request: HTTP-запрос DRF.
+
+        Returns:
+            Response: данные партии, 404 если активных нет, 400 без batch_type.
+        """
         batch_type = self.get_batch_type(request)
         if not batch_type:
             return Response(
@@ -348,6 +395,16 @@ class BalloonsBatchViewSet(viewsets.ViewSet):
 
     @action(detail=True, methods=['get'], url_path='rfid-amount')
     def rfid_amount(self, request, pk=None):
+        """
+        Возвращает счётчики RFID/датчика/ТТН для партии.
+
+        Args:
+            request: HTTP-запрос DRF.
+            pk: ID партии.
+
+        Returns:
+            Response: BalloonAmountSerializer или ошибка 400/404.
+        """
         batch_type = self.get_batch_type(request)
         if not batch_type:
             return Response(
@@ -360,6 +417,15 @@ class BalloonsBatchViewSet(viewsets.ViewSet):
         return Response(serializer.data)
 
     def create(self, request):
+        """
+        Создаёт новую партию указанного типа.
+
+        Args:
+            request: HTTP-запрос с телом BalloonsBatchSerializer.
+
+        Returns:
+            Response: 201 с данными партии или 400 при ошибке валидации.
+        """
         batch_type = self.get_batch_type(request)
         if not batch_type:
             return Response(
@@ -384,6 +450,16 @@ class BalloonsBatchViewSet(viewsets.ViewSet):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     def partial_update(self, request, pk=None):
+        """
+        Частично обновляет партию или закрывает её при status=COMPLETED.
+
+        Args:
+            request: HTTP-запрос с частичными полями партии.
+            pk: ID партии.
+
+        Returns:
+            Response: обновлённые данные, 400/502 при ошибке закрытия.
+        """
         batch_type = self.get_batch_type(request)
         if not batch_type:
             return Response(
@@ -435,6 +511,16 @@ class BalloonsBatchViewSet(viewsets.ViewSet):
 
     @action(detail=True, methods=['post'], url_path='retry-close')
     def retry_close(self, request, pk=None):
+        """
+        Повторно сохраняет и закрывает партию после ошибки Мириады.
+
+        Args:
+            request: HTTP-запрос с опциональными полями партии.
+            pk: ID партии.
+
+        Returns:
+            Response: данные партии или 400/502 при ошибке.
+        """
         batch_type = self.get_batch_type(request)
         if not batch_type:
             return Response(
@@ -470,6 +556,16 @@ class BalloonsBatchViewSet(viewsets.ViewSet):
 
     @action(detail=True, methods=['patch'], url_path='add-balloon')
     def add_balloon(self, request, pk=None):
+        """
+        Добавляет баллон в партию по NFC-метке.
+
+        Args:
+            request: HTTP-запрос с полем ``nfc``.
+            pk: ID партии.
+
+        Returns:
+            Response: результат операции или ошибка 400/500.
+        """
         batch_type = self.get_batch_type(request)
         if not batch_type:
             return Response(
@@ -507,6 +603,16 @@ class BalloonsBatchViewSet(viewsets.ViewSet):
 
     @action(detail=True, methods=['patch'], url_path='remove-balloon')
     def remove_balloon(self, request, pk=None):
+        """
+        Удаляет баллон из партии по NFC-метке.
+
+        Args:
+            request: HTTP-запрос с полем ``nfc``.
+            pk: ID партии.
+
+        Returns:
+            Response: результат операции или ошибка 400/500.
+        """
         batch_type = self.get_batch_type(request)
         if not batch_type:
             return Response(
@@ -544,6 +650,16 @@ class BalloonsBatchViewSet(viewsets.ViewSet):
 
     @action(detail=True, methods=['post'], url_path='pause')
     def pause(self, request, pk=None):
+        """
+        Приостанавливает активную партию (ACTIVE → PAUSED).
+
+        Args:
+            request: HTTP-запрос DRF.
+            pk: ID партии.
+
+        Returns:
+            Response: данные партии или 400 при недопустимом статусе.
+        """
         batch_type = self.get_batch_type(request)
         if not batch_type:
             return Response(
@@ -562,6 +678,16 @@ class BalloonsBatchViewSet(viewsets.ViewSet):
 
     @action(detail=True, methods=['post'], url_path='resume')
     def resume(self, request, pk=None):
+        """
+        Возобновляет приостановленную партию (PAUSED → ACTIVE).
+
+        Args:
+            request: HTTP-запрос DRF.
+            pk: ID партии.
+
+        Returns:
+            Response: данные партии или 400 при недопустимом статусе.
+        """
         batch_type = self.get_batch_type(request)
         if not batch_type:
             return Response(
@@ -591,7 +717,15 @@ class BalloonsBatchViewSet(viewsets.ViewSet):
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def get_active_balloon_batch(request):
-    """Метод получения списков активных партий для SCADA."""
+    """
+    Возвращает списки активных партий приёмки/отгрузки за сегодня для SCADA.
+
+    Args:
+        request: HTTP-запрос DRF.
+
+    Returns:
+        JsonResponse: список объектов с reader_id и номерами транспорта.
+    """
     today = timezone.localdate()
     loading_batches = BalloonsBatch.objects.select_related('truck', 'trailer').filter(
         batch_type='l', started_at__date=today, status=BatchStatus.ACTIVE,

@@ -1,3 +1,5 @@
+"""Публичный API сервисов filling_station (партии, RFID, Мириада, транспорт)."""
+
 from filling_station.services.batches import (
     BATCH_CLOSE_WRITABLE_FIELDS,
     MIRIADA_BALLOON_STATUS_READERS,

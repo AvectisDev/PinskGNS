@@ -1,3 +1,5 @@
+"""Сериализаторы API filling_station: баллоны, транспорт, партии."""
+
 from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 from ..models import (
@@ -30,9 +32,30 @@ class BatchStatusApiField(serializers.Field):
     }
 
     def to_representation(self, value):
+        """
+        Преобразует статус БД в числовой API-enum.
+
+        Args:
+            value: строковый статус партии из БД.
+
+        Returns:
+            int: числовой статус для API (0 при неизвестном значении).
+        """
         return batch_status_to_api(value)
 
     def to_internal_value(self, data):
+        """
+        Преобразует числовой API-enum в строковый статус БД.
+
+        Args:
+            data: значение из запроса (int или строка с числом).
+
+        Returns:
+            str: статус BatchStatus для сохранения.
+
+        Raises:
+            ValidationError: при некорректном значении статуса.
+        """
         try:
             return batch_status_from_api(data)
         except ValueError:
@@ -40,7 +63,11 @@ class BatchStatusApiField(serializers.Field):
 
 
 class BalloonSerializer(serializers.ModelSerializer):
+    """Сериализатор паспорта газового баллона."""
+
     class Meta:
+        """Метаданные сериализатора Balloon."""
+
         model = Balloon
         fields = [
             'nfc_tag',
@@ -60,10 +87,14 @@ class BalloonSerializer(serializers.ModelSerializer):
 
 
 class TruckSerializer(serializers.ModelSerializer):
+    """Сериализатор грузовика с типом и прицепом."""
+
     type = serializers.SerializerMethodField()
     trailer = serializers.SerializerMethodField()
 
     class Meta:
+        """Метаданные сериализатора Truck."""
+
         model = Truck
         fields = [
             'id',
@@ -83,9 +114,27 @@ class TruckSerializer(serializers.ModelSerializer):
         ]
 
     def get_type(self, obj):
+        """
+        Возвращает название типа грузовика.
+
+        Args:
+            obj (Truck): экземпляр грузовика.
+
+        Returns:
+            str: строковое имя типа транспорта.
+        """
         return obj.type.type
 
     def get_trailer(self, obj):
+        """
+        Возвращает сериализованный прицеп грузовика, если он есть.
+
+        Args:
+            obj (Truck): экземпляр грузовика.
+
+        Returns:
+            dict | None: данные прицепа или None.
+        """
         trailer = obj.trailer.first()
         if trailer:
             return TrailerSerializer(trailer).data
@@ -93,9 +142,13 @@ class TruckSerializer(serializers.ModelSerializer):
 
 
 class TrailerSerializer(serializers.ModelSerializer):
+    """Сериализатор прицепа с типом транспорта."""
+
     type = serializers.SerializerMethodField()
 
     class Meta:
+        """Метаданные сериализатора Trailer."""
+
         model = Trailer
         fields = [
             'id',
@@ -115,10 +168,21 @@ class TrailerSerializer(serializers.ModelSerializer):
         ]
 
     def get_type(self, obj):
+        """
+        Возвращает название типа прицепа.
+
+        Args:
+            obj (Trailer): экземпляр прицепа.
+
+        Returns:
+            str: строковое имя типа транспорта.
+        """
         return obj.type.type
 
 
 class BalloonsBatchSerializer(serializers.ModelSerializer):
+    """Сериализатор создания и обновления партии баллонов."""
+
     batch_type = serializers.CharField(read_only=True)
     ttn_name = serializers.SerializerMethodField()
     status = BatchStatusApiField(
@@ -133,6 +197,8 @@ class BalloonsBatchSerializer(serializers.ModelSerializer):
     amount_of_ttn = serializers.IntegerField(min_value=1)
 
     class Meta:
+        """Метаданные сериализатора BalloonsBatch."""
+
         model = BalloonsBatch
         fields = [
             'id',
@@ -159,9 +225,27 @@ class BalloonsBatchSerializer(serializers.ModelSerializer):
         ]
 
     def get_ttn_name(self, obj):
+        """
+        Возвращает человекочитаемое имя ТТН партии.
+
+        Args:
+            obj (BalloonsBatch): партия баллонов.
+
+        Returns:
+            str | None: имя ТТН.
+        """
         return obj.get_ttn_name()
 
     def create(self, validated_data):
+        """
+        Создаёт партию и при ACTIVE ставит на паузу другие на том же ридере.
+
+        Args:
+            validated_data (dict): провалидированные поля партии.
+
+        Returns:
+            BalloonsBatch: созданная партия.
+        """
         instance = super().create(validated_data)
         if instance.status == BatchStatus.ACTIVE:
             pause_other_active_batches_on_reader(instance)
@@ -170,12 +254,18 @@ class BalloonsBatchSerializer(serializers.ModelSerializer):
 
 # Кастомные сериализаторы для партий приёмки/отгрузки баллонов
 class BalloonsTruckSerializer(serializers.ModelSerializer):
+    """Краткий сериализатор грузовика для вложенного отображения в партии."""
+
     class Meta:
+        """Метаданные сериализатора BalloonsTruck."""
+
         model = Truck
         fields = ['id', 'car_brand', 'registration_number']
 
 
 class ActiveBatchSerializer(serializers.ModelSerializer):
+    """Сериализатор незавершённых (открытых) партий для списка."""
+
     truck = BalloonsTruckSerializer(read_only=True)
     ttn_name = serializers.SerializerMethodField()
     status = BatchStatusApiField(read_only=True)
@@ -183,6 +273,8 @@ class ActiveBatchSerializer(serializers.ModelSerializer):
     miriada_error_message = serializers.CharField(read_only=True)
 
     class Meta:
+        """Метаданные сериализатора ActiveBatch."""
+
         model = BalloonsBatch
         fields = [
             'id',
@@ -209,10 +301,23 @@ class ActiveBatchSerializer(serializers.ModelSerializer):
         ]
 
     def get_ttn_name(self, obj):
+        """
+        Возвращает человекочитаемое имя ТТН партии.
+
+        Args:
+            obj (BalloonsBatch): партия баллонов.
+
+        Returns:
+            str | None: имя ТТН.
+        """
         return obj.get_ttn_name()
 
 
 class BalloonAmountSerializer(serializers.ModelSerializer):
+    """Сериализатор счётчиков RFID/датчика/ТТН партии."""
+
     class Meta:
+        """Метаданные сериализатора BalloonAmount."""
+
         model = BalloonsBatch
         fields = ['id', 'amount_of_rfid', 'amount_of_sensor', 'amount_of_ttn']
