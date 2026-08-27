@@ -12,8 +12,8 @@ class RailwayTankForm(forms.ModelForm):
         self.helper = FormHelper()
         self.helper.form_tag = False
         self.helper.form_class = 'form-horizontal'
-        self.helper.label_class = 'col-lg-4'
-        self.helper.field_class = 'col-lg-8'
+        self.helper.label_class = 'col-lg-5 text-lg-end'
+        self.helper.field_class = 'col-lg-3'
         if show_actions:
             self.helper.add_input(Submit('save', 'Сохранить', css_class='btn btn-success'))
             self.helper.add_input(Submit('cancel', 'Отмена', css_class='btn btn-secondary'))
@@ -37,8 +37,8 @@ class RailwayTankHistoryForm(forms.ModelForm):
         self.helper = FormHelper()
         self.helper.form_tag = False
         self.helper.form_class = 'form-horizontal'
-        self.helper.label_class = 'col-lg-5'
-        self.helper.field_class = 'col-lg-7'
+        self.helper.label_class = 'col-lg-5 text-lg-end'
+        self.helper.field_class = 'col-lg-3'
         # Кнопки рендрим в общем шаблоне, здесь не добавляем
         # Настраиваем парсинг формата datetime-local
         dt_formats = ['%Y-%m-%dT%H:%M', '%Y-%m-%d %H:%M:%S', '%Y-%m-%d %H:%M']
@@ -75,8 +75,8 @@ class RailwayBatchForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
         self.helper = FormHelper()
         self.helper.form_class = 'form-horizontal'
-        self.helper.label_class = 'col-lg-4'
-        self.helper.field_class = 'col-lg-8'
+        self.helper.label_class = 'col-lg-5 text-lg-end'
+        self.helper.field_class = 'col-lg-3'
         self.helper.add_input(Submit('save', 'Сохранить', css_class='btn btn-success'))
         self.helper.add_input(Submit('cancel', 'Отмена', css_class='btn btn-secondary'))
         self.helper.form_method = 'POST'

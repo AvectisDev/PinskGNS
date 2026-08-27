@@ -55,8 +55,8 @@ class BalloonForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
         self.helper = FormHelper()
         self.helper.form_class = 'form-horizontal'
-        self.helper.label_class = 'col-lg-4'
-        self.helper.field_class = 'col-lg-8'
+        self.helper.label_class = 'col-lg-5 text-lg-end'
+        self.helper.field_class = 'col-lg-3'
         self.helper.add_input(Submit('save', 'Сохранить', css_class='btn btn-success'))
         self.helper.add_input(Submit('cancel', 'Отмена', css_class='btn btn-secondary'))
         self.helper.form_method = 'POST'
@@ -93,8 +93,8 @@ class TruckForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
         self.helper = FormHelper()
         self.helper.form_class = 'form-horizontal'
-        self.helper.label_class = 'col-lg-4'
-        self.helper.field_class = 'col-lg-8'
+        self.helper.label_class = 'col-lg-5 text-lg-end'
+        self.helper.field_class = 'col-lg-3'
         self.helper.add_input(Submit('save', 'Сохранить', css_class='btn btn-success'))
         self.helper.add_input(Submit('cancel', 'Отмена', css_class='btn btn-secondary'))
         self.helper.form_method = 'POST'
@@ -134,8 +134,8 @@ class TrailerForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
         self.helper = FormHelper()
         self.helper.form_class = 'form-horizontal'
-        self.helper.label_class = 'col-lg-4'
-        self.helper.field_class = 'col-lg-8'
+        self.helper.label_class = 'col-lg-5 text-lg-end'
+        self.helper.field_class = 'col-lg-3'
         self.helper.add_input(Submit('save', 'Сохранить', css_class='btn btn-success'))
         self.helper.add_input(Submit('cancel', 'Отмена', css_class='btn btn-secondary'))
         self.helper.form_method = 'POST'
@@ -180,8 +180,8 @@ class BalloonsBatchForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
         self.helper = FormHelper()
         self.helper.form_class = 'form-horizontal'
-        self.helper.label_class = 'col-lg-4'
-        self.helper.field_class = 'col-lg-8'
+        self.helper.label_class = 'col-lg-5 text-lg-end'
+        self.helper.field_class = 'col-lg-3'
         self.helper.add_input(Submit('save', 'Сохранить', css_class='btn btn-success'))
         self.helper.add_input(Submit('cancel', 'Отмена', css_class='btn btn-secondary'))
         self.helper.form_method = 'POST'
