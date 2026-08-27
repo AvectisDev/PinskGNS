@@ -149,6 +149,10 @@ openapi-pinskgns-core.yaml
 docs/openapi/*-core.yaml
 docs/openapi/*-core.json
 
+# Local manuals / protocol docs (not committed)
+docs/moxa-nport-w2150a-w2250a-series-manual-v10_2.pdf
+docs/Описание протокола передачи данных.docx
+
 # Local Postman/Newman runs (env may contain credentials)
 postman/*environment*.json
 postman/*.postman_collection.json
