@@ -1,7 +1,7 @@
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import redirect
 from django.http import HttpResponseRedirect
-from core.mixins import ModalDeleteMixin, PreserveListQueryMixin
+from core.mixins import CancelFormMixin, ModalDeleteMixin, PreserveListQueryMixin
 from django.urls import reverse_lazy
 from django.utils.decorators import method_decorator
 from django.views import generic
@@ -44,10 +44,11 @@ class TTNDetailView(generic.DetailView):
     queryset = BalloonTtn.objects.select_related(*BALLOON_TTN_RELATED)
 
 
-class TTNCreateView(PreserveListQueryMixin, generic.CreateView):
+class TTNCreateView(CancelFormMixin, PreserveListQueryMixin, generic.CreateView):
     model = BalloonTtn
     form_class = BalloonTtnForm
     template_name = 'ttn/_equipment_form.html'
+    cancel_url = reverse_lazy('ttn:ttn_list')
 
     def get_success_url(self):
         return self.object.get_absolute_url()
@@ -107,10 +108,11 @@ class RailwayTtnDetailView(generic.DetailView):
         return context
 
 
-class RailwayTtnCreateView(PreserveListQueryMixin, generic.CreateView):
+class RailwayTtnCreateView(CancelFormMixin, PreserveListQueryMixin, generic.CreateView):
     model = RailwayTtn
     form_class = RailwayTtnForm
     template_name = 'ttn/_equipment_form.html'
+    cancel_url = reverse_lazy('ttn:railway_ttn_list')
 
     def get_success_url(self):
         return self.object.get_absolute_url()
@@ -178,10 +180,11 @@ class AutoTtnDetailView(generic.DetailView):
     queryset = AutoTtn.objects.select_related(*AUTO_TTN_RELATED)
 
 
-class AutoTtnCreateView(PreserveListQueryMixin, generic.CreateView):
+class AutoTtnCreateView(CancelFormMixin, PreserveListQueryMixin, generic.CreateView):
     model = AutoTtn
     form_class = AutoTtnForm
     template_name = 'ttn/_equipment_form.html'
+    cancel_url = reverse_lazy('ttn:auto_ttn_list')
 
     def form_valid(self, form):
         self.object = form.save(commit=False)

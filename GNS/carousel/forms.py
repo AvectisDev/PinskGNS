@@ -78,7 +78,7 @@ class CarouselSettingsForm(forms.ModelForm):
                 HTML('<div class="col-lg-5"></div>'),
                 Div(
                     Submit('save', 'Сохранить', css_class='btn btn-success'),
-                    Submit('cancel', 'Отмена', css_class='btn btn-secondary'),
+                    Submit('cancel', 'Отмена', css_class='btn btn-secondary', formnovalidate='formnovalidate'),
                     css_class='col-lg-auto d-flex gap-2',
                 ),
                 css_class='mb-3 row',

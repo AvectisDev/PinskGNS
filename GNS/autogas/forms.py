@@ -12,7 +12,7 @@ class AutoGasBatchForm(forms.ModelForm):
         self.helper.label_class = 'col-lg-5 text-lg-end'
         self.helper.field_class = 'col-lg-3'
         self.helper.add_input(Submit('save', 'Сохранить', css_class='btn btn-success'))
-        self.helper.add_input(Submit('cancel', 'Отмена', css_class='btn btn-secondary'))
+        self.helper.add_input(Submit('cancel', 'Отмена', css_class='btn btn-secondary', formnovalidate='formnovalidate'))
         self.helper.form_method = 'POST'
 
         self.fields['truck'].empty_label = 'Выберите автомобиль'

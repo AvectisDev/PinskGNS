@@ -2,7 +2,7 @@
 
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
-from core.mixins import ModalDeleteMixin, PreserveListQueryMixin
+from core.mixins import CancelFormMixin, ModalDeleteMixin, PreserveListQueryMixin
 from core.navigation import redirect_preserve_query
 from django.http import HttpResponse
 from django.core.paginator import Paginator
@@ -427,12 +427,13 @@ class TruckDetailView(generic.DetailView):
     model = Truck
 
 
-class TruckCreateView(PreserveListQueryMixin, generic.CreateView):
+class TruckCreateView(CancelFormMixin, PreserveListQueryMixin, generic.CreateView):
     """Создание записи тягача."""
 
     model = Truck
     form_class = TruckForm
     template_name = 'filling_station/_equipment_form.html'
+    cancel_url = reverse_lazy('filling_station:truck_list')
 
     def get_success_url(self):
         """
@@ -513,12 +514,13 @@ class TrailerDetailView(generic.DetailView):
     model = Trailer
 
 
-class TrailerCreateView(PreserveListQueryMixin, generic.CreateView):
+class TrailerCreateView(CancelFormMixin, PreserveListQueryMixin, generic.CreateView):
     """Создание записи прицепа."""
 
     model = Trailer
     form_class = TrailerForm
     template_name = 'filling_station/_equipment_form.html'
+    cancel_url = reverse_lazy('filling_station:trailer_list')
 
     def get_success_url(self):
         """

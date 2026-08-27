@@ -54,6 +54,28 @@ class PreserveListQueryMixin:
         return redirect_preserve_query(self.request, to, *args, **kwargs)
 
 
+class CancelFormMixin:
+    """
+    Кнопка «Отмена» (``name=cancel``) выходит из формы без валидации.
+
+    Для CreateView задайте ``cancel_url`` (имя URL, путь или ``reverse_lazy``).
+    Для UpdateView по умолчанию используется ``get_absolute_url()`` объекта.
+    """
+
+    cancel_url = None
+
+    def get_cancel_url(self):
+        if self.cancel_url is not None:
+            return str(self.cancel_url)
+        self.object = getattr(self, 'object', None) or self.get_object()
+        return self.object.get_absolute_url()
+
+    def post(self, request, *args, **kwargs):
+        if 'cancel' in request.POST:
+            return redirect_preserve_query(request, self.get_cancel_url())
+        return super().post(request, *args, **kwargs)
+
+
 class ModalDeleteMixin:
     """
     Подтверждение удаления выполняется модальным окном на странице списка/деталей.
