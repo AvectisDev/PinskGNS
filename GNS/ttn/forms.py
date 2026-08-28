@@ -2,6 +2,7 @@ from django import forms
 from django.utils.html import format_html
 from django.conf import settings
 from filling_station.models import BalloonsBatch
+from filling_station.form_choices import format_truck_choice
 from autogas.models import AutoGasBatch, AutoGasBatchSettings
 from .models import AutoTtn, RailwayTtn, BalloonTtn
 from crispy_forms.helper import FormHelper
@@ -34,8 +35,12 @@ class BalloonTtnForm(forms.ModelForm):
         })
 
         # Оптимизированные запросы для партий с select_related
-        self.fields['loading_batch'].queryset = BalloonsBatch.objects.filter(batch_type='l').select_related('truck')
-        self.fields['unloading_batch'].queryset = BalloonsBatch.objects.filter(batch_type='u').select_related('truck')
+        self.fields['loading_batch'].queryset = BalloonsBatch.objects.filter(
+            batch_type='l',
+        ).select_related('truck__type')
+        self.fields['unloading_batch'].queryset = BalloonsBatch.objects.filter(
+            batch_type='u',
+        ).select_related('truck__type')
 
         self.fields['loading_batch'].label_from_instance = self.format_batch_choice
         self.fields['unloading_batch'].label_from_instance = self.format_batch_choice
@@ -48,7 +53,7 @@ class BalloonTtnForm(forms.ModelForm):
         """Форматирует отображение партии в выпадающем списке"""
         batch_type = 'Приёмка' if obj.batch_type == 'l' else 'Отгрузка'
 
-        truck_number = obj.truck.registration_number if obj.truck else '---'
+        truck_label = format_truck_choice(obj.truck) if obj.truck else '---'
         ttn_number = obj.get_ttn_name() or '---'
 
         return format_html(
@@ -56,7 +61,7 @@ class BalloonTtnForm(forms.ModelForm):
             ttn_number,
             batch_type,
             obj.id,
-            truck_number,
+            truck_label,
             ttn_number
         )
 
@@ -130,7 +135,7 @@ class AutoTtnForm(forms.ModelForm):
         self.fields['batch'].empty_label = 'Выберите партию'
 
         # Оптимизированные запросы для партии с select_related
-        self.fields['batch'].queryset = AutoGasBatch.objects.select_related('truck')
+        self.fields['batch'].queryset = AutoGasBatch.objects.select_related('truck__type')
 
         self.fields['batch'].label_from_instance = self.format_batch_choice
 
@@ -140,11 +145,13 @@ class AutoTtnForm(forms.ModelForm):
     def format_batch_choice(self, obj):
         """Форматирует отображение партии в выпадающем списке"""
 
+        truck_label = format_truck_choice(obj.truck) if obj.truck else '---'
+
         return format_html(
             '<span>{} №{} | Автомобиль: {}</span>',
             'Приёмка' if obj.batch_type == 'l' else 'Отгрузка',
             obj.id,
-            obj.truck.registration_number if obj.truck else '---'
+            truck_label,
         )
 
     class Meta:
