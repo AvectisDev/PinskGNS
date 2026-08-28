@@ -52,6 +52,7 @@ REQUEST_CACHE_SECONDS = 2.0
 RECONNECT_DELAY_SECONDS = 60
 COM_RECONNECT_DELAY_SECONDS = RECONNECT_DELAY_SECONDS  # совместимость
 FATAL_RESTART_DELAY_SECONDS = 300
+WAIT_DATA_LOG_INTERVAL_SECONDS = 60.0
 
 # Ошибки транспорта, при которых имеет смысл переподключиться
 RECONNECTABLE_ERRORS = (
@@ -122,16 +123,38 @@ class TcpTransport:
             try:
                 chunk = self._sock.recv(max(size - len(self._buffer), 1))
             except socket.timeout:
+                if self._buffer:
+                    logger.debug(
+                        "TCP: таймаут, неполный кадр в буфере (%s/%s байт): %s",
+                        len(self._buffer),
+                        size,
+                        bytes(self._buffer).hex().upper(),
+                    )
                 return b''
             if not chunk:
                 raise ConnectionError('NPort закрыл TCP-соединение')
+            logger.debug(
+                "TCP: получено %s байт: %s",
+                len(chunk),
+                chunk.hex().upper(),
+            )
             self._buffer.extend(chunk)
 
         frame = bytes(self._buffer[:size])
         del self._buffer[:size]
+        logger.debug(
+            "TCP: собран кадр %s байт: %s",
+            len(frame),
+            frame.hex().upper(),
+        )
         return frame
 
     def write(self, data: bytes) -> None:
+        logger.debug(
+            "TCP: отправлено %s байт: %s",
+            len(data),
+            data.hex().upper(),
+        )
         self._sock.sendall(data)
 
     def close(self) -> None:
@@ -622,10 +645,13 @@ def serial_exchange(
         if on_connected is not None:
             on_connected()
 
+        last_wait_log_at = time.monotonic()
+
         while True:
             data = transport.read_frame(FRAME_SIZE)
 
             if len(data) == FRAME_SIZE:
+                last_wait_log_at = time.monotonic()
                 logger.info(f"Получен запрос от поста - {data}")
                 request_type = data[0]
                 post_number = data[1]
@@ -709,6 +735,15 @@ def serial_exchange(
                     f'Получено {len(data)} байт: {data.hex().upper()}',
                     metric_name='frame_errors',
                 )
+            else:
+                now = time.monotonic()
+                if now - last_wait_log_at >= WAIT_DATA_LOG_INTERVAL_SECONDS:
+                    logger.info(
+                        "Ожидание данных с постов (transport=%s, "
+                        "соединение активно)...",
+                        TRANSPORT,
+                    )
+                    last_wait_log_at = now
 
     finally:
         if transport is not None:
