@@ -15,5 +15,7 @@ services:
       - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
       - ../GNS/static:/var/www/static:ro
       - ../GNS/media:/var/www/media:ro
+    # Отдельное имя вместо host.docker.internal: Docker DNS отдаёт ещё IPv6
+    # (fdc4:…::254), из контейнера он недостиупен → периодические 502 в nginx.
     extra_hosts:
-      - "host.docker.internal:host-gateway"
+      - "django-host:host-gateway"

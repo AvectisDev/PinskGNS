@@ -18,6 +18,9 @@ flowchart LR
 Конфиг и volumes: [docker-compose.nginx.yml](docker-compose.nginx.yml), [nginx/nginx.conf](nginx/nginx.conf).  
 Static/media монтируются как `../GNS/static` и `../GNS/media` относительно каталога `deploy/`.
 
+Upstream Daphne — `django-host:8000` (IPv4 через `extra_hosts` / `host-gateway`).  
+Не использовать `host.docker.internal`: Docker Desktop добавляет IPv6, из nginx-контейнера он недостижим.
+
 ## Доступ
 
 | Кто | URL |
