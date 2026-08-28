@@ -5,7 +5,14 @@
 
 {% block content %}
 <div class="container mt-4">
-    <h4 class="mb-4">Партии автоцистерн</h4>
+    <div class="batch-list-toolbar d-flex align-items-center mb-4">
+        <h4 class="mb-0 text-nowrap">Партии автоцистерн</h4>
+        <div class="ms-auto">
+            {% include 'core/_date_range_filter.html' %}
+        </div>
+    </div>
+
+    {% include 'core/_date_range_info.html' %}
 
     <div class="card shadow-sm">
         <div class="card-body">

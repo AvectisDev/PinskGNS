@@ -1,0 +1,19 @@
+<form method="get"
+      class="batch-list-filter d-flex align-items-center gap-3"
+      {% if filter_action %}action="{{ filter_action }}"{% endif %}>
+    <div class="batch-list-filter-field">
+        <input type="text" name="query"
+               class="form-control list-filter-query {{ filter_width_class }}"
+               placeholder="{{ query_placeholder }}"
+               value="{{ request.GET.query }}">
+    </div>
+    <div class="batch-list-filter-field d-flex gap-2">
+        <button type="submit" class="btn btn-custom text-nowrap">
+            <i class="bi bi-funnel"></i> Показать
+        </button>
+        <a href="{% if reset_url %}{{ reset_url }}{% else %}{{ request.path }}{% endif %}"
+           class="btn btn-outline-secondary" title="Сбросить фильтры">
+            <i class="bi bi-x-lg"></i>
+        </a>
+    </div>
+</form>

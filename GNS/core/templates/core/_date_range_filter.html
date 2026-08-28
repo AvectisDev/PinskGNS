@@ -1,0 +1,17 @@
+<form method="get" class="batch-list-filter d-flex align-items-center flex-wrap gap-3">
+    {% block filter_extra_fields %}{% endblock %}
+    <div class="batch-list-filter-field">
+        {{ form.start_date }}
+    </div>
+    <div class="batch-list-filter-field">
+        {{ form.end_date }}
+    </div>
+    <div class="batch-list-filter-field d-flex gap-2">
+        <button class="btn btn-custom text-nowrap" type="submit">
+            <i class="bi bi-funnel"></i> Показать
+        </button>
+        <a href="{{ request.path }}" class="btn btn-outline-secondary" title="Сбросить фильтры">
+            <i class="bi bi-x-lg"></i>
+        </a>
+    </div>
+</form>

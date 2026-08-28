@@ -1,18 +1,20 @@
 from django.urls import reverse_lazy
 from django.views import generic
+from core.mixins import DateRangeListFilterMixin, ModalDeleteMixin, PreserveListQueryMixin
 from .models import AutoGasBatch
 from .forms import AutoGasBatchForm
-from core.mixins import ModalDeleteMixin, PreserveListQueryMixin
 
 
 # Партии автоцистерн
-class AutoGasBatchListView(generic.ListView):
+class AutoGasBatchListView(DateRangeListFilterMixin, generic.ListView):
     model = AutoGasBatch
     paginate_by = 10
     template_name = 'autogas/auto_batch_list.html'
 
     def get_queryset(self):
-        return super().get_queryset().select_related('truck', 'trailer')
+        _, start_date, end_date = self.get_date_range_filters()
+        queryset = super().get_queryset().select_related('truck', 'trailer')
+        return self.apply_date_range_filter(queryset, field_name='begin_at')
 
 
 class AutoGasBatchDetailView(generic.DetailView):

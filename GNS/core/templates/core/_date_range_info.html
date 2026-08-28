@@ -1,0 +1,7 @@
+{% if start_date and end_date %}
+<div class="alert alert-info mb-4">
+    <i class="bi bi-info-circle"></i>
+    Период: <strong>{{ start_date|date:"d.m.Y" }}</strong> - <strong>{{ end_date|date:"d.m.Y" }}</strong>
+    {% block date_range_extra_info %}{% endblock %}
+</div>
+{% endif %}
