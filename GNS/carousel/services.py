@@ -85,7 +85,7 @@ def process_carousel_data(data: Mapping[str, Any]) -> Carousel:
 
 
 def process_carousel_data_direct(data: Mapping[str, Any]) -> Carousel:
-    """Обёртка для вызова ORM из долгоживущего COM-процесса."""
+    """Обёртка для вызова ORM из долгоживущего listener-процесса карусели."""
     close_old_connections()
     try:
         return process_carousel_data(data)

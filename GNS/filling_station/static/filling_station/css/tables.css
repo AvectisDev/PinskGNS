@@ -224,3 +224,67 @@ ul.pagination.pagination-custom > .active > .page-link:focus {
     border-color: #2CA9C7 !important;
     box-shadow: none !important;
 }
+
+/* Detail pages: right-align labels like form labels */
+.card-body dl.row > dt {
+    text-align: right;
+}
+
+/* Batch list filter toolbar: title + filters on one line */
+.batch-list-toolbar {
+    flex-wrap: nowrap;
+    gap: 0.75rem;
+}
+
+.batch-list-filter {
+    flex-wrap: nowrap;
+    min-width: 0;
+}
+
+.batch-list-filter-field {
+    flex: 0 0 auto;
+}
+
+.batch-filter-query,
+.list-filter-query {
+    flex: 0 0 auto;
+}
+
+.batch-filter-query {
+    width: 14rem;
+    min-width: 14rem;
+    max-width: 14rem;
+}
+
+.batch-list-filter .form-control.list-filter-query--balloon {
+    width: 19rem;
+    min-width: 19rem;
+    max-width: 19rem;
+}
+
+.list-filter-query--transport {
+    width: 13rem;
+    min-width: 13rem;
+    max-width: 13rem;
+}
+
+.list-filter-query--railway-tank {
+    width: 11rem;
+    min-width: 11rem;
+    max-width: 11rem;
+}
+
+.batch-list-filter input[type="date"] {
+    width: 10.5rem;
+}
+
+@media (max-width: 991.98px) {
+    .batch-list-toolbar {
+        flex-wrap: wrap;
+    }
+
+    .batch-list-filter {
+        flex-wrap: wrap;
+        width: 100%;
+    }
+}

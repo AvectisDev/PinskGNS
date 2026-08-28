@@ -2,7 +2,7 @@
 
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
-from core.mixins import CancelFormMixin, ModalDeleteMixin, PreserveListQueryMixin
+from core.mixins import CancelFormMixin, DateRangeListFilterMixin, ModalDeleteMixin, PreserveListQueryMixin
 from core.navigation import redirect_preserve_query
 from django.http import HttpResponse
 from django.core.paginator import Paginator
@@ -27,6 +27,33 @@ from datetime import datetime, time, timedelta
 
 
 BALLOON_STATUS_HISTORY_PAGE_SIZE = 10
+
+
+def resolve_batch_list_query_filter(query):
+    """
+    Определяет подпись фильтра по строке поиска (ТТН или грузовик).
+
+    Returns:
+        dict | None: ``{'label': str, 'value': str}`` или ``None``.
+    """
+    query = (query or '').strip()
+    if not query:
+        return None
+
+    ttn_match = MiriadaTtn.objects.filter(name__icontains=query).exists()
+    truck_match = Truck.objects.filter(registration_number__icontains=query).exists()
+    if ttn_match and not truck_match:
+        label = 'Фильтр по номеру ТТН'
+    elif truck_match and not ttn_match:
+        label = 'Фильтр по номеру грузовика'
+    elif ttn_match and truck_match:
+        label = 'Фильтр по номеру ТТН' if query.isdigit() else 'Фильтр по номеру грузовика'
+    elif any(char.isalpha() for char in query):
+        label = 'Фильтр по номеру грузовика'
+    else:
+        label = 'Фильтр по номеру ТТН'
+
+    return {'label': label, 'value': query}
 
 
 class BalloonListView(generic.ListView):
@@ -235,16 +262,23 @@ class BalloonBatchTypeMixin:
 
 
 # Единые классы для работы с партиями баллонов
-class BalloonBatchListView(BalloonBatchTypeMixin, generic.ListView):
+class BalloonBatchListView(DateRangeListFilterMixin, BalloonBatchTypeMixin, generic.ListView):
     """Отображает список партий баллонов в зависимости от типа"""
     model = BalloonsBatch
     form_class = BalloonsBatchForm
     paginate_by = 10
     template_name = 'filling_station/balloon_batch_list.html'
 
+    def get_list_query_filter(self):
+        if hasattr(self, '_list_query_filter'):
+            return self._list_query_filter
+        query = self.request.GET.get('query', '').strip()
+        self._list_query_filter = query
+        return query
+
     def get_queryset(self):
         """
-        Список партий с ТТН, отфильтрованный по типу из URL.
+        Список партий с ТТН, отфильтрованный по типу, дате и номеру ТС/ТТН.
 
         Returns:
             QuerySet: Партии приёмки, отгрузки или все.
@@ -257,8 +291,26 @@ class BalloonBatchListView(BalloonBatchTypeMixin, generic.ListView):
             'truck', 'trailer', 'truck__type'
         ).annotate(ttn_name=Subquery(ttn_name_sq))
         if batch_type:
-            return queryset.filter(batch_type=batch_type)
-        return queryset.all()
+            queryset = queryset.filter(batch_type=batch_type)
+
+        query = self.get_list_query_filter()
+        queryset = self.apply_date_range_filter(queryset, field_name='started_at')
+        if query:
+            ttn_ids = MiriadaTtn.objects.filter(
+                name__icontains=query,
+            ).values_list('ttn_id', flat=True)
+            queryset = queryset.filter(
+                Q(truck__registration_number__icontains=query)
+                | Q(ttn_id__in=ttn_ids)
+            )
+        return queryset
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        query = self.get_list_query_filter()
+        context['query'] = query
+        context['query_filter'] = resolve_batch_list_query_filter(query)
+        return context
 
 
 class BalloonBatchDetailView(BalloonBatchTypeMixin, generic.DetailView):

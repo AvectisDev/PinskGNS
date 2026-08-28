@@ -5,6 +5,7 @@ from django.db.utils import IntegrityError
 from django.http import HttpResponseRedirect
 from django.shortcuts import redirect
 
+from core.forms import DateRangeForm
 from core.navigation import merge_query_string, redirect_preserve_query
 
 
@@ -41,6 +42,53 @@ def format_related_delete_message(exc: Exception) -> str:
         return DEFAULT_RELATED_DELETE_MESSAGE
 
     return DEFAULT_RELATED_DELETE_MESSAGE
+
+
+class DateRangeListFilterMixin:
+    """Период дат из GET-параметров; без дат в запросе список не фильтруется."""
+
+    def get_date_range_filters(self):
+        if hasattr(self, '_date_range_filters'):
+            return self._date_range_filters
+
+        start_raw = self.request.GET.get('start_date', '').strip()
+        end_raw = self.request.GET.get('end_date', '').strip()
+        if not start_raw and not end_raw:
+            self._date_range_filters = (DateRangeForm(), None, None)
+            return self._date_range_filters
+
+        form = DateRangeForm(self.request.GET)
+        if form.is_valid():
+            start_date = form.cleaned_data['start_date']
+            end_date = form.cleaned_data['end_date']
+            if not start_date or not end_date:
+                start_date = end_date = None
+        else:
+            start_date = end_date = None
+
+        self._date_range_filters = (form, start_date, end_date)
+        return self._date_range_filters
+
+    def apply_date_range_filter(self, queryset, *, field_name):
+        _, start_date, end_date = self.get_date_range_filters()
+        if start_date is not None and end_date is not None:
+            return queryset.filter(
+                **{
+                    f'{field_name}__date__gte': start_date,
+                    f'{field_name}__date__lte': end_date,
+                }
+            )
+        return queryset
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        form, start_date, end_date = self.get_date_range_filters()
+        context.update({
+            'form': form,
+            'start_date': start_date,
+            'end_date': end_date,
+        })
+        return context
 
 
 class PreserveListQueryMixin:

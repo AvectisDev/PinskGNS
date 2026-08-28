@@ -4,6 +4,7 @@ from django import forms
 from django.utils import timezone
 from django.conf import settings
 from .models import Balloon, Truck, Trailer, BalloonsBatch
+from .form_choices import configure_trailer_field, configure_truck_field
 from crispy_forms.helper import FormHelper
 from crispy_forms.layout import Submit
 
@@ -135,10 +136,13 @@ class TrailerForm(forms.ModelForm):
         self.helper = FormHelper()
         self.helper.form_class = 'form-horizontal'
         self.helper.label_class = 'col-lg-5 text-lg-end'
-        self.helper.field_class = 'col-lg-3'
+        self.helper.field_class = 'col-lg-5'
         self.helper.add_input(Submit('save', 'Сохранить', css_class='btn btn-success'))
         self.helper.add_input(Submit('cancel', 'Отмена', css_class='btn btn-secondary', formnovalidate='formnovalidate'))
         self.helper.form_method = 'POST'
+
+        self.fields['truck'].empty_label = 'Выберите автомобиль'
+        configure_truck_field(self.fields['truck'])
 
     class Meta:
         """Конфигурация полей и виджетов формы прицепа."""
@@ -181,13 +185,15 @@ class BalloonsBatchForm(forms.ModelForm):
         self.helper = FormHelper()
         self.helper.form_class = 'form-horizontal'
         self.helper.label_class = 'col-lg-5 text-lg-end'
-        self.helper.field_class = 'col-lg-3'
+        self.helper.field_class = 'col-lg-5'
         self.helper.add_input(Submit('save', 'Сохранить', css_class='btn btn-success'))
         self.helper.add_input(Submit('cancel', 'Отмена', css_class='btn btn-secondary', formnovalidate='formnovalidate'))
         self.helper.form_method = 'POST'
 
         self.fields['truck'].empty_label = 'Выберите автомобиль'
         self.fields['trailer'].empty_label = 'Выберите прицеп'
+        configure_truck_field(self.fields['truck'])
+        configure_trailer_field(self.fields['trailer'])
         # Скрыть batch_type
         self.fields['batch_type'].widget = forms.HiddenInput()
 

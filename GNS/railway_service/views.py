@@ -1,7 +1,7 @@
 from django.urls import reverse_lazy
 from django.views import generic
 from django.shortcuts import redirect
-from core.mixins import ModalDeleteMixin, PreserveListQueryMixin
+from core.mixins import DateRangeListFilterMixin, ModalDeleteMixin, PreserveListQueryMixin
 from .models import RailwayTank, RailwayBatch, RailwayTankHistory
 from .forms import RailwayTankForm, RailwayBatchForm, RailwayTankHistoryForm
 from django.db import transaction
@@ -140,13 +140,14 @@ def _railway_batch_queryset():
     )
 
 
-class RailwayBatchListView(generic.ListView):
+class RailwayBatchListView(DateRangeListFilterMixin, generic.ListView):
     model = RailwayBatch
     paginate_by = 10
     template_name = 'railway_service/railway_batch_list.html'
 
     def get_queryset(self):
-        return _railway_batch_queryset()
+        queryset = _railway_batch_queryset()
+        return self.apply_date_range_filter(queryset, field_name='begin_date')
 
 
 class RailwayBatchDetailView(generic.DetailView):

@@ -1,5 +1,5 @@
 import os
-import serial
+import socket
 import struct
 import logging.config
 import django
@@ -34,16 +34,26 @@ logger = logging.getLogger('carousel')
 # процессу с собственным CAROUSEL_NUMBER и переменными CAROUSEL_<N>_*.
 CAROUSEL_NUMBER = int(os.getenv('CAROUSEL_NUMBER', '1'))
 CAROUSEL_ENV_PREFIX = f'CAROUSEL_{CAROUSEL_NUMBER}'
-PORT = os.getenv(f'{CAROUSEL_ENV_PREFIX}_COM_PORT', 'COM3')
-BAUD_RATE = int(os.getenv(f'{CAROUSEL_ENV_PREFIX}_BAUD_RATE', '9600'))
+TCP_HOST = os.getenv(f'{CAROUSEL_ENV_PREFIX}_TCP_HOST', '').strip()
+TCP_PORT = int(os.getenv(f'{CAROUSEL_ENV_PREFIX}_TCP_PORT', '4001'))
 RFID_READER_NUMBER = int(
     os.getenv(f'{CAROUSEL_ENV_PREFIX}_RFID_READER', '8')
 )
 BALLOON_QUEUE_KEY = get_reader_balloon_queue_key(RFID_READER_NUMBER)
 
+FRAME_SIZE = 8
+READ_TIMEOUT_SECONDS = 1.0
 REQUEST_CACHE_SECONDS = 2.0
-COM_RECONNECT_DELAY_SECONDS = 60
+RECONNECT_DELAY_SECONDS = 60
 FATAL_RESTART_DELAY_SECONDS = 300
+WAIT_DATA_LOG_INTERVAL_SECONDS = 60.0
+
+RECONNECTABLE_ERRORS = (
+    ConnectionError,
+    TimeoutError,
+    socket.timeout,
+    socket.gaierror,
+)
 
 
 @dataclass(frozen=True)
@@ -53,6 +63,94 @@ class CachedRequest:
 
 
 recent_requests: dict[tuple[str, int, int], CachedRequest] = {}
+
+
+class TcpTransport:
+    """
+    TCP-клиент к NPort в режиме TCP Server.
+
+    Соединение держится открытым; данные с RS-485 пушатся в сокет без polling.
+    Частичные TCP-сегменты накапливаются в буфере до полного кадра.
+    """
+
+    def __init__(self, host: str, port: int, timeout: float) -> None:
+        if not host:
+            raise ValueError(
+                f'Задайте {CAROUSEL_ENV_PREFIX}_TCP_HOST'
+            )
+        self._buffer = bytearray()
+        self._sock = socket.create_connection((host, port), timeout=timeout)
+        self._sock.settimeout(timeout)
+
+    def read_frame(self, size: int = FRAME_SIZE) -> bytes:
+        while len(self._buffer) < size:
+            try:
+                chunk = self._sock.recv(max(size - len(self._buffer), 1))
+            except socket.timeout:
+                if self._buffer:
+                    logger.debug(
+                        "TCP: таймаут, неполный кадр в буфере (%s/%s байт): %s",
+                        len(self._buffer),
+                        size,
+                        bytes(self._buffer).hex().upper(),
+                    )
+                return b''
+            if not chunk:
+                raise ConnectionError('NPort закрыл TCP-соединение')
+            logger.debug(
+                "TCP: получено %s байт: %s",
+                len(chunk),
+                chunk.hex().upper(),
+            )
+            self._buffer.extend(chunk)
+
+        frame = bytes(self._buffer[:size])
+        del self._buffer[:size]
+        logger.debug(
+            "TCP: собран кадр %s байт: %s",
+            len(frame),
+            frame.hex().upper(),
+        )
+        return frame
+
+    def write(self, data: bytes) -> None:
+        logger.debug(
+            "TCP: отправлено %s байт: %s",
+            len(data),
+            data.hex().upper(),
+        )
+        self._sock.sendall(data)
+
+    def close(self) -> None:
+        try:
+            self._sock.shutdown(socket.SHUT_RDWR)
+        except OSError:
+            pass
+        self._sock.close()
+
+
+def recv_exact(sock: socket.socket, size: int) -> bytes:
+    """
+    Читает ровно size байт из сокета (для тестов и низкоуровневой сборки кадра).
+    При закрытии соединения поднимает ConnectionError.
+    """
+    buffer = bytearray()
+    while len(buffer) < size:
+        chunk = sock.recv(size - len(buffer))
+        if not chunk:
+            raise ConnectionError('Соединение закрыто до получения полного кадра')
+        buffer.extend(chunk)
+    return bytes(buffer)
+
+
+def open_transport() -> TcpTransport:
+    logger.info(
+        "Подключение к NPort по TCP %s:%s (карусель=%s)",
+        TCP_HOST,
+        TCP_PORT,
+        CAROUSEL_NUMBER,
+    )
+    return TcpTransport(TCP_HOST, TCP_PORT, READ_TIMEOUT_SECONDS)
 
 
 @dataclass(frozen=True)
@@ -118,8 +216,8 @@ def put_carousel_data(data: dict) -> bool:
     """
     Сохраняет показания поста карусели напрямую через сервис Django.
 
-    Пост передаёт данные через COM-порт в виде набора байт по
-    проприетарному протоколу, поэтому COM-процесс преобразует их в словарь
+    Пост передаёт данные по TCP (NPort) в виде набора байт по
+    проприетарному протоколу, поэтому listener преобразует их в словарь
     и передаёт напрямую в бизнес-логику приложения.
     :param data: Содержит словарь с ключами 'request_type'-тип запроса с поста наполнения, 'post_number' -
     номер поста наполнения, 'weight_combined'- текущий вес баллона, который находится на посту наполнения
@@ -481,24 +579,27 @@ def serial_exchange(
     on_connected=None,
 ) -> None:
     """
-    Функция обработки данных с поста наполнения баллонов. Каждый пост отправляет 8 байт данных, после чего ждёт ответ.
-    В зависимости от типа запроса в ответе должен быть либо вес баллона, либо ответ не нужен.
-    :return:
+    Обработка данных с постов наполнения баллонов.
+
+    Каждый пост отправляет FRAME_SIZE байт, после чего ждёт ответ.
+    Транспорт: TCP к NPort в режиме TCP Server.
     """
-    ser = None
+    transport: TcpTransport | None = None
     try:
         if announce_start:
             logger.info("Запуск программы обработки УНБ...")
-        # Создаем объект Serial для работы с COM-портом
-        ser = serial.Serial(PORT, BAUD_RATE, timeout=1)
-        logger.info(f"Соединение установлено на порту {PORT}.")
+        transport = open_transport()
+        logger.info("Соединение с постами установлено.")
         if on_connected is not None:
             on_connected()
 
-        while True:
-            data = ser.read(8)
+        last_wait_log_at = time.monotonic()
 
-            if len(data) == 8:
+        while True:
+            data = transport.read_frame(FRAME_SIZE)
+
+            if len(data) == FRAME_SIZE:
+                last_wait_log_at = time.monotonic()
                 logger.info(f"Получен запрос от поста - {data}")
                 request_type = data[0]
                 post_number = data[1]
@@ -535,7 +636,7 @@ def serial_exchange(
                 )
                 if is_duplicate:
                     if cached_response is not None:
-                        ser.write(cached_response)
+                        transport.write(cached_response)
                         logger.debug(
                             "Повторно отправлен ответ на пост: "
                             f"{cached_response.hex().upper()}"
@@ -566,7 +667,7 @@ def serial_exchange(
                 )
 
                 if response_packet is not None:
-                    ser.write(response_packet)
+                    transport.write(response_packet)
                     logger.debug(
                         f"Отправлен ответ на пост: "
                         f"{response_packet.hex().upper()}"
@@ -582,50 +683,57 @@ def serial_exchange(
                     f'Получено {len(data)} байт: {data.hex().upper()}',
                     metric_name='frame_errors',
                 )
+            else:
+                now = time.monotonic()
+                if now - last_wait_log_at >= WAIT_DATA_LOG_INTERVAL_SECONDS:
+                    logger.info(
+                        "Ожидание данных с постов (соединение активно)...",
+                    )
+                    last_wait_log_at = now
 
     finally:
-        if ser and ser.is_open:
-            ser.close()
+        if transport is not None:
+            transport.close()
             logger.debug("Соединение закрыто")
 
 
 def main():
-    last_serial_error: str | None = None
+    last_transport_error: str | None = None
     repeat_count = 0
 
     def mark_connected() -> None:
-        nonlocal last_serial_error, repeat_count
-        last_serial_error = None
+        nonlocal last_transport_error, repeat_count
+        last_transport_error = None
         repeat_count = 0
 
     while True:
         try:
             serial_exchange(
-                announce_start=last_serial_error is None,
+                announce_start=last_transport_error is None,
                 on_connected=mark_connected,
             )
-        except serial.SerialException as error:
+        except RECONNECTABLE_ERRORS as error:
             error_text = str(error)
-            if error_text != last_serial_error:
+            if error_text != last_transport_error:
                 logger.error(
-                    "Ошибка: %s. Проверьте правильность указанного порта. "
+                    "Ошибка TCP-соединения: %s. "
                     "Повторное подключение через %s с.",
                     error,
-                    COM_RECONNECT_DELAY_SECONDS,
+                    RECONNECT_DELAY_SECONDS,
                 )
-                last_serial_error = error_text
+                last_transport_error = error_text
                 repeat_count = 1
             else:
                 repeat_count += 1
                 logger.debug(
-                    "Повтор ошибки COM-порта (раз подряд: %s). "
+                    "Повтор ошибки транспорта (раз подряд: %s). "
                     "Повторное подключение через %s с.",
                     repeat_count,
-                    COM_RECONNECT_DELAY_SECONDS,
+                    RECONNECT_DELAY_SECONDS,
                 )
-            time.sleep(COM_RECONNECT_DELAY_SECONDS)
+            time.sleep(RECONNECT_DELAY_SECONDS)
         except Exception as error:
-            last_serial_error = None
+            last_transport_error = None
             repeat_count = 0
             logger.error(
                 "Ошибка в serial_exchange: %s. Перезапуск через %s с...",

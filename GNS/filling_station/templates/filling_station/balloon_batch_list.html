@@ -5,7 +5,44 @@
 
 {% block content %}
 <div class="container mt-4">
-    <h4 class="mb-4"> {{ title }} </h4>
+    <div class="batch-list-toolbar d-flex align-items-center mb-4">
+        <h4 class="mb-0 text-nowrap">{{ title }}</h4>
+
+        <form method="get" class="batch-list-filter d-flex align-items-center ms-auto gap-3">
+            <div class="batch-list-filter-field">
+                <input type="text" name="query" class="form-control batch-filter-query"
+                       placeholder="Номер Грузовика / ТТН" value="{{ query }}" maxlength="20"
+                       title="Номер грузовика или ТТН">
+            </div>
+            <div class="batch-list-filter-field">
+                {{ form.start_date }}
+            </div>
+            <div class="batch-list-filter-field">
+                {{ form.end_date }}
+            </div>
+            <div class="batch-list-filter-field d-flex gap-2">
+                <button class="btn btn-custom text-nowrap" type="submit">
+                    <i class="bi bi-funnel"></i> Показать
+                </button>
+                <a href="{{ request.path }}" class="btn btn-outline-secondary" title="Сбросить фильтры">
+                    <i class="bi bi-x-lg"></i>
+                </a>
+            </div>
+        </form>
+    </div>
+
+    {% if start_date and end_date or query_filter %}
+    <div class="alert alert-info mb-4">
+        <i class="bi bi-info-circle"></i>
+        {% if start_date and end_date %}
+        Период: <strong>{{ start_date|date:"d.m.Y" }}</strong> - <strong>{{ end_date|date:"d.m.Y" }}</strong>
+        {% endif %}
+        {% if query_filter %}
+        {% if start_date and end_date %} | {% endif %}
+        {{ query_filter.label }}: <strong>{{ query_filter.value }}</strong>
+        {% endif %}
+    </div>
+    {% endif %}
 
     <div class="card shadow-sm">
         <div class="card-body">

@@ -60,9 +60,9 @@ def resolve_gas_type(gas_type_code: Any) -> Optional[str]:
 
 def get_truck_capacity(truck: Truck, trailer: Optional[Trailer] = None) -> Any:
     if truck.type.type == 'Цистерна':
-        return truck.max_gas_volume
+        return truck.max_mass_of_transported_gas
     if truck.type.type == 'Седельный тягач' and trailer:
-        return trailer.max_gas_volume
+        return trailer.max_mass_of_transported_gas
     return None
 
 
@@ -213,9 +213,10 @@ def build_batch_statistic(today: Optional[date] = None) -> dict[str, Any]:
             'trailer_number': (
                 active_batch.trailer.registration_number if active_batch.trailer else None
             ),
-            'truck_gas_capacity': (
-                active_batch.truck.max_gas_volume if active_batch.truck.max_gas_volume else 0
-            ),
+            'truck_gas_capacity': get_truck_capacity(
+                active_batch.truck,
+                active_batch.trailer,
+            ) or 0,
             'scale_empty_weight': (
                 active_batch.scale_empty_weight if active_batch.scale_empty_weight else 0
             ),
