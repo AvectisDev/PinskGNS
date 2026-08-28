@@ -38,10 +38,10 @@ class ResolveTypeTests(AutoGasFixturesMixin, TestCase):
 
 
 class TruckCapacityTests(AutoGasFixturesMixin, TestCase):
-    def test_cistern_uses_truck_volume(self):
+    def test_cistern_uses_truck_mass(self):
         self.assertEqual(get_truck_capacity(self.truck), Decimal('20000'))
 
-    def test_tractor_uses_trailer_volume(self):
+    def test_tractor_uses_trailer_mass(self):
         self.assertEqual(
             get_truck_capacity(self.tractor, self.trailer),
             Decimal('18000'),

@@ -194,7 +194,7 @@ class Command(BaseCommand):
             self.set_opc_value("truck_capacity", capacity_value)
         elif capacity_value is None:
             logger.warning(
-                f'Не удалось определить объём ёмкости для {truck.registration_number}'
+                f'Не удалось определить максимальную массу газа для {truck.registration_number}'
             )
 
         self.set_opc_value("response_batch_create", True)

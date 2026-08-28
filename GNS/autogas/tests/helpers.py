@@ -22,19 +22,19 @@ class AutoGasFixturesMixin:
             registration_number='1111AA-1',
             type=self.truck_type,
             car_brand='МАЗ',
-            max_gas_volume=20000,
+            max_mass_of_transported_gas=20000,
         )
         self.tractor = Truck.objects.create(
             registration_number='2222BB-2',
             type=self.tractor_type,
             car_brand='МАЗ',
-            max_gas_volume=0,
+            max_mass_of_transported_gas=0,
         )
         self.trailer = Trailer.objects.create(
             truck=self.truck,
             registration_number='3333CC-3',
             type=self.trailer_type,
-            max_gas_volume=18000,
+            max_mass_of_transported_gas=18000,
         )
 
     def make_batch(self, **kwargs) -> AutoGasBatch:
