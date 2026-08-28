@@ -1,12 +1,10 @@
 import os
-import serial
 import socket
 import struct
 import logging.config
 import django
 import time
 from dataclasses import dataclass
-from typing import Protocol
 
 
 # Инициализация Django
@@ -36,9 +34,6 @@ logger = logging.getLogger('carousel')
 # процессу с собственным CAROUSEL_NUMBER и переменными CAROUSEL_<N>_*.
 CAROUSEL_NUMBER = int(os.getenv('CAROUSEL_NUMBER', '1'))
 CAROUSEL_ENV_PREFIX = f'CAROUSEL_{CAROUSEL_NUMBER}'
-TRANSPORT = os.getenv(f'{CAROUSEL_ENV_PREFIX}_TRANSPORT', 'com').strip().lower()
-PORT = os.getenv(f'{CAROUSEL_ENV_PREFIX}_COM_PORT', 'COM3')
-BAUD_RATE = int(os.getenv(f'{CAROUSEL_ENV_PREFIX}_BAUD_RATE', '9600'))
 TCP_HOST = os.getenv(f'{CAROUSEL_ENV_PREFIX}_TCP_HOST', '').strip()
 TCP_PORT = int(os.getenv(f'{CAROUSEL_ENV_PREFIX}_TCP_PORT', '4001'))
 RFID_READER_NUMBER = int(
@@ -50,13 +45,10 @@ FRAME_SIZE = 8
 READ_TIMEOUT_SECONDS = 1.0
 REQUEST_CACHE_SECONDS = 2.0
 RECONNECT_DELAY_SECONDS = 60
-COM_RECONNECT_DELAY_SECONDS = RECONNECT_DELAY_SECONDS  # совместимость
 FATAL_RESTART_DELAY_SECONDS = 300
 WAIT_DATA_LOG_INTERVAL_SECONDS = 60.0
 
-# Ошибки транспорта, при которых имеет смысл переподключиться
 RECONNECTABLE_ERRORS = (
-    serial.SerialException,
     ConnectionError,
     TimeoutError,
     socket.timeout,
@@ -73,34 +65,6 @@ class CachedRequest:
 recent_requests: dict[tuple[str, int, int], CachedRequest] = {}
 
 
-class DeviceTransport(Protocol):
-    def read_frame(self, size: int = FRAME_SIZE) -> bytes:
-        ...
-
-    def write(self, data: bytes) -> None:
-        ...
-
-    def close(self) -> None:
-        ...
-
-
-class ComTransport:
-    """Обмен с постами через виртуальный/физический COM-порт (Real COM)."""
-
-    def __init__(self, port: str, baud_rate: int, timeout: float) -> None:
-        self._serial = serial.Serial(port, baud_rate, timeout=timeout)
-
-    def read_frame(self, size: int = FRAME_SIZE) -> bytes:
-        return self._serial.read(size)
-
-    def write(self, data: bytes) -> None:
-        self._serial.write(data)
-
-    def close(self) -> None:
-        if self._serial.is_open:
-            self._serial.close()
-
-
 class TcpTransport:
     """
     TCP-клиент к NPort в режиме TCP Server.
@@ -112,7 +76,7 @@ class TcpTransport:
     def __init__(self, host: str, port: int, timeout: float) -> None:
         if not host:
             raise ValueError(
-                f'Для TRANSPORT=tcp задайте {CAROUSEL_ENV_PREFIX}_TCP_HOST'
+                f'Задайте {CAROUSEL_ENV_PREFIX}_TCP_HOST'
             )
         self._buffer = bytearray()
         self._sock = socket.create_connection((host, port), timeout=timeout)
@@ -179,27 +143,14 @@ def recv_exact(sock: socket.socket, size: int) -> bytes:
     return bytes(buffer)
 
 
-def open_transport() -> DeviceTransport:
-    if TRANSPORT == 'tcp':
-        logger.info(
-            "Подключение к NPort по TCP %s:%s (карусель=%s)",
-            TCP_HOST,
-            TCP_PORT,
-            CAROUSEL_NUMBER,
-        )
-        return TcpTransport(TCP_HOST, TCP_PORT, READ_TIMEOUT_SECONDS)
-    if TRANSPORT == 'com':
-        logger.info(
-            "Подключение к COM-порту %s @ %s (карусель=%s)",
-            PORT,
-            BAUD_RATE,
-            CAROUSEL_NUMBER,
-        )
-        return ComTransport(PORT, BAUD_RATE, READ_TIMEOUT_SECONDS)
-    raise ValueError(
-        f'Неизвестный {CAROUSEL_ENV_PREFIX}_TRANSPORT={TRANSPORT!r}. '
-        f'Ожидается com или tcp.'
+def open_transport() -> TcpTransport:
+    logger.info(
+        "Подключение к NPort по TCP %s:%s (карусель=%s)",
+        TCP_HOST,
+        TCP_PORT,
+        CAROUSEL_NUMBER,
     )
+    return TcpTransport(TCP_HOST, TCP_PORT, READ_TIMEOUT_SECONDS)
 
 
 @dataclass(frozen=True)
@@ -265,7 +216,7 @@ def put_carousel_data(data: dict) -> bool:
     """
     Сохраняет показания поста карусели напрямую через сервис Django.
 
-    Пост передаёт данные через COM/TCP в виде набора байт по
+    Пост передаёт данные по TCP (NPort) в виде набора байт по
     проприетарному протоколу, поэтому listener преобразует их в словарь
     и передаёт напрямую в бизнес-логику приложения.
     :param data: Содержит словарь с ключами 'request_type'-тип запроса с поста наполнения, 'post_number' -
@@ -631,17 +582,14 @@ def serial_exchange(
     Обработка данных с постов наполнения баллонов.
 
     Каждый пост отправляет FRAME_SIZE байт, после чего ждёт ответ.
-    Транспорт: COM (Real COM) или TCP к NPort в режиме TCP Server.
+    Транспорт: TCP к NPort в режиме TCP Server.
     """
-    transport: DeviceTransport | None = None
+    transport: TcpTransport | None = None
     try:
         if announce_start:
-            logger.info(
-                "Запуск программы обработки УНБ (transport=%s)...",
-                TRANSPORT,
-            )
+            logger.info("Запуск программы обработки УНБ...")
         transport = open_transport()
-        logger.info("Соединение с постами установлено (transport=%s).", TRANSPORT)
+        logger.info("Соединение с постами установлено.")
         if on_connected is not None:
             on_connected()
 
@@ -739,9 +687,7 @@ def serial_exchange(
                 now = time.monotonic()
                 if now - last_wait_log_at >= WAIT_DATA_LOG_INTERVAL_SECONDS:
                     logger.info(
-                        "Ожидание данных с постов (transport=%s, "
-                        "соединение активно)...",
-                        TRANSPORT,
+                        "Ожидание данных с постов (соединение активно)...",
                     )
                     last_wait_log_at = now
 
@@ -770,9 +716,8 @@ def main():
             error_text = str(error)
             if error_text != last_transport_error:
                 logger.error(
-                    "Ошибка транспорта (%s): %s. "
+                    "Ошибка TCP-соединения: %s. "
                     "Повторное подключение через %s с.",
-                    TRANSPORT,
                     error,
                     RECONNECT_DELAY_SECONDS,
                 )
