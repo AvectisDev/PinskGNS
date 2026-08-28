@@ -224,3 +224,8 @@ ul.pagination.pagination-custom > .active > .page-link:focus {
     border-color: #2CA9C7 !important;
     box-shadow: none !important;
 }
+
+/* Detail pages: right-align labels like form labels */
+.card-body dl.row > dt {
+    text-align: right;
+}
