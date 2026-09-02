@@ -4,6 +4,8 @@ from django.conf import settings
 
 
 class Carousel(models.Model):
+    """Запись о наполнении баллона на посте карусели."""
+
     carousel_number = models.IntegerField(default=1, verbose_name="Номер карусели наполнения")
     is_empty = models.BooleanField(default=False, verbose_name="Принят запрос на наполнение баллона")
     post_number = models.IntegerField(verbose_name="Номер поста наполнения")
@@ -30,6 +32,8 @@ class Carousel(models.Model):
 
 
 class CarouselSettings(models.Model):
+    """Настройки валидации весов и коррекции для постов карусели."""
+
     read_only = models.BooleanField(default=True, verbose_name="Только чтение с постов наполнения")
     use_weight_management = models.BooleanField(default=False, verbose_name="Использовать коррекцию веса")
     use_common_correction = models.BooleanField(default=False, verbose_name="Использовать общее значение коррекции веса")

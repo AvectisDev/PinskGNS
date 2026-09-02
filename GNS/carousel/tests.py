@@ -4,7 +4,7 @@ from unittest.mock import MagicMock, patch
 import socket
 
 from .models import Carousel
-from .management.commands.carousel import main as carousel_main
+from .listener import cache, processing, protocol, transport
 from .services import (
     CarouselPostNotFoundError,
     UnsupportedCarouselRequestError,
@@ -28,7 +28,7 @@ class TcpFrameAssemblyTests(SimpleTestCase):
         sock = MagicMock()
         sock.recv.side_effect = [frame[:3], frame[3:5], frame[5:]]
 
-        result = carousel_main.recv_exact(sock, 8)
+        result = transport.recv_exact(sock, 8)
 
         self.assertEqual(result, frame)
         self.assertEqual(sock.recv.call_count, 3)
@@ -38,9 +38,9 @@ class TcpFrameAssemblyTests(SimpleTestCase):
         sock.recv.side_effect = [b'\x7A\x14', b'']
 
         with self.assertRaises(ConnectionError):
-            carousel_main.recv_exact(sock, 8)
+            transport.recv_exact(sock, 8)
 
-    @patch('carousel.management.commands.carousel.main.socket.create_connection')
+    @patch('carousel.listener.transport.socket.create_connection')
     def test_tcp_transport_assembles_fragments_across_timeout(
         self,
         create_connection,
@@ -54,38 +54,57 @@ class TcpFrameAssemblyTests(SimpleTestCase):
         ]
         create_connection.return_value = sock
 
-        transport = carousel_main.TcpTransport('127.0.0.1', 4001, 1.0)
+        tcp_transport = transport.TcpTransport('127.0.0.1', 4001, 1.0)
 
-        self.assertEqual(transport.read_frame(8), b'')
-        self.assertEqual(transport.read_frame(8), frame)
+        self.assertEqual(tcp_transport.read_frame(8), b'')
+        self.assertEqual(tcp_transport.read_frame(8), frame)
 
-    @patch('carousel.management.commands.carousel.main.socket.create_connection')
+    @patch('carousel.listener.transport.socket.create_connection')
     def test_tcp_transport_write_uses_sendall(self, create_connection):
         sock = MagicMock()
         create_connection.return_value = sock
-        transport = carousel_main.TcpTransport('127.0.0.1', 4001, 1.0)
+        tcp_transport = transport.TcpTransport('127.0.0.1', 4001, 1.0)
 
         payload = bytes.fromhex('5A14FFA410FF7D88')
-        transport.write(payload)
+        tcp_transport.write(payload)
 
         sock.sendall.assert_called_once_with(payload)
+
+    @patch('carousel.listener.transport.time.monotonic')
+    @patch('carousel.listener.transport.socket.create_connection')
+    def test_stale_partial_buffer_raises_and_clears_buffer(
+        self,
+        create_connection,
+        monotonic,
+    ):
+        sock = MagicMock()
+        sock.recv.side_effect = [b'\xC2\x9B', socket.timeout, socket.timeout]
+        create_connection.return_value = sock
+        monotonic.side_effect = [0.0, 0.0, 11.0]
+
+        tcp_transport = transport.TcpTransport('127.0.0.1', 4001, 1.0)
+
+        self.assertEqual(tcp_transport.read_frame(8), b'')
+        with self.assertRaises(transport.PartialBufferStaleError):
+            tcp_transport.read_frame(8)
+        self.assertEqual(tcp_transport._buffer, bytearray())
 
 
 class CarouselRequestProcessingTests(SimpleTestCase):
     def setUp(self):
-        carousel_main.recent_requests.clear()
+        cache.recent_requests.clear()
 
     def test_duplicate_request_reuses_response_from_memory(self):
-        found, response = carousel_main.get_cached_request(
+        found, response = cache.get_cached_request(
             '0x7a', 1, 18000
         )
         self.assertFalse(found)
         self.assertIsNone(response)
 
-        carousel_main.cache_request_result(
+        cache.cache_request_result(
             '0x7a', 1, 18000, b'response'
         )
-        found, response = carousel_main.get_cached_request(
+        found, response = cache.get_cached_request(
             '0x7a', 1, 18000
         )
         self.assertTrue(found)
@@ -102,7 +121,7 @@ class CarouselRequestProcessingTests(SimpleTestCase):
         for frame_hex in examples:
             with self.subTest(frame=frame_hex):
                 valid, received, calculated = (
-                    carousel_main.validate_frame_crc(
+                    protocol.validate_frame_crc(
                         bytes.fromhex(frame_hex)
                     )
                 )
@@ -110,15 +129,15 @@ class CarouselRequestProcessingTests(SimpleTestCase):
                 self.assertEqual(received, calculated)
 
     def test_response_packet_matches_protocol_example(self):
-        response = carousel_main.build_response_packet(
+        response = protocol.build_response_packet(
             request_type=0x7A,
             post_number=20,
             full_weight=42000,
         )
         self.assertEqual(response.hex().upper(), '5A14FFA410FF7D88')
 
-    @patch.object(carousel_main, 'get_and_remove_last_balloon')
-    @patch.object(carousel_main, 'check_settings')
+    @patch.object(processing, 'get_and_remove_last_balloon')
+    @patch.object(processing, 'check_settings')
     def test_read_only_saves_data_without_response(
         self,
         check_settings,
@@ -131,7 +150,7 @@ class CarouselRequestProcessingTests(SimpleTestCase):
             'brutto': 39.0,
             'filling_status': True,
         }, True)
-        check_settings.return_value = carousel_main.PostSettings(
+        check_settings.return_value = processing.PostSettings(
             available=True,
             read_only=True,
             weight_correction=0.0,
@@ -144,7 +163,7 @@ class CarouselRequestProcessingTests(SimpleTestCase):
         )
 
         response_required, full_weight, data = (
-            carousel_main.request_processing('0x7a', 1, 18500)
+            processing.request_processing('0x7a', 1, 18500)
         )
 
         self.assertFalse(response_required)
@@ -152,8 +171,8 @@ class CarouselRequestProcessingTests(SimpleTestCase):
         self.assertEqual(data['nfc_tag'], 'test-tag')
         self.assertEqual(data['empty_weight'], 18.5)
 
-    @patch.object(carousel_main, 'get_and_remove_last_balloon')
-    @patch.object(carousel_main, 'check_settings')
+    @patch.object(processing, 'get_and_remove_last_balloon')
+    @patch.object(processing, 'check_settings')
     def test_active_mode_returns_corrected_passport_weight(
         self,
         check_settings,
@@ -166,7 +185,7 @@ class CarouselRequestProcessingTests(SimpleTestCase):
             'brutto': 39.0,
             'filling_status': True,
         }, True)
-        check_settings.return_value = carousel_main.PostSettings(
+        check_settings.return_value = processing.PostSettings(
             available=True,
             read_only=False,
             weight_correction=0.2,
@@ -179,15 +198,15 @@ class CarouselRequestProcessingTests(SimpleTestCase):
         )
 
         response_required, full_weight, _ = (
-            carousel_main.request_processing('0x7a', 1, 18500)
+            processing.request_processing('0x7a', 1, 18500)
         )
 
         self.assertTrue(response_required)
         self.assertEqual(full_weight, 39200)
 
-    @patch.object(carousel_main, 'record_post_error')
-    @patch.object(carousel_main, 'get_and_remove_last_balloon')
-    @patch.object(carousel_main, 'check_settings')
+    @patch.object(processing, 'record_post_error')
+    @patch.object(processing, 'get_and_remove_last_balloon')
+    @patch.object(processing, 'check_settings')
     def test_missing_settings_fails_safely(
         self,
         check_settings,
@@ -199,7 +218,7 @@ class CarouselRequestProcessingTests(SimpleTestCase):
             'brutto': 39.0,
             'filling_status': True,
         }, True)
-        check_settings.return_value = carousel_main.PostSettings(
+        check_settings.return_value = processing.PostSettings(
             available=False,
             read_only=True,
             weight_correction=0.0,
@@ -212,7 +231,7 @@ class CarouselRequestProcessingTests(SimpleTestCase):
         )
 
         response_required, full_weight, _ = (
-            carousel_main.request_processing('0x7a', 1, 18500)
+            processing.request_processing('0x7a', 1, 18500)
         )
 
         self.assertFalse(response_required)

@@ -42,7 +42,18 @@ def get_carousel_settings_data() -> Optional[dict[str, Any]]:
 
 @transaction.atomic
 def process_carousel_data(data: Mapping[str, Any]) -> Carousel:
-    """Сохраняет данные от карусели без промежуточного HTTP-запроса."""
+    """
+    Сохраняет данные от карусели без промежуточного HTTP-запроса.
+
+    Ветки по request_type:
+        0x7a — создаёт новую запись Carousel (пустой баллон, паспорт RFID).
+        0x70 — обновляет последнюю запись поста: is_empty=False, full_weight.
+
+    Raises:
+        ValidationError: Не указан request_type.
+        CarouselPostNotFoundError: Для 0x70 нет записи поста.
+        UnsupportedCarouselRequestError: Неизвестный тип запроса.
+    """
     request_type = data.get('request_type')
 
     if request_type == '0x7a':
