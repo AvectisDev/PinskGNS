@@ -381,17 +381,17 @@ LOGGING = {
         'filling_station': {
             'handlers': ['filling_station_file'],
             'level': 'DEBUG',
-            'propagate': True,
+            'propagate': False,
         },
         'carousel': {
             'handlers': ['carousel_file'],
             'level': 'DEBUG',
-            'propagate': True,
+            'propagate': False,
         },
         'rfid': {
             'handlers': ['rfid_file'],
             'level': 'INFO',
-            'propagate': True,
+            'propagate': False,
         },
         'celery': {
             'handlers': ['celery_file'],
@@ -421,14 +421,14 @@ OPC_SERVER_URL = "opc.tcp://localhost:4841"
 
 # Настройки почты
 EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
-EMAIL_HOST = '10.11.7.1'
-EMAIL_PORT = 25
-EMAIL_HOST_USER = os.environ.get('GNS_EMAIL_USER')
-EMAIL_HOST_PASSWORD = os.environ.get('GNS_EMAIL_PASSWORD')
-DEFAULT_FROM_EMAIL = os.environ.get('GNS_DEFAULT_FROM_EMAIL')
+EMAIL_HOST = os.environ.get('EMAIL_HOST')
+EMAIL_PORT = int(os.environ.get('EMAIL_PORT', '25'))
+EMAIL_HOST_USER = os.environ.get('EMAIL_USER')
+EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_PASSWORD')
+DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL')
 
 # Intellect
-INTELLECT_SERVER_ADDRESS = 'http://10.10.0.252:10001'
+INTELLECT_SERVER_ADDRESS = os.environ.get('INTELLECT_SERVER_ADDRESS')
 
 # ITGas
 MIRIADA_API_URL = os.environ.get('MIRIADA_API_URL')
