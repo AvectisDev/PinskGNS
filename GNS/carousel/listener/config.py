@@ -1,28 +1,22 @@
 """
-Конфигурация экземпляра listener карусели.
+Конфигурация экземпляров listener карусели.
 
-Читается из переменных окружения при импорте модуля.
-Для нескольких каруселей запускается отдельный процесс с собственным
-``CAROUSEL_NUMBER`` и префиксом ``CAROUSEL_<N>_``:
+Читается из переменных окружения. Один процесс обслуживает все карусели,
+у которых задан ``CAROUSEL_<N>_TCP_HOST``:
 
-    CAROUSEL_<N>_TCP_HOST   — IP NPort (обязателен)
+    CAROUSEL_<N>_TCP_HOST   — IP NPort (обязателен для включения инстанса)
     CAROUSEL_<N>_TCP_PORT   — TCP-порт NPort (по умолчанию 4001)
     CAROUSEL_<N>_RFID_READER — номер RFID-считывателя для очереди паспортов
 """
 
+from __future__ import annotations
+
 import os
-import socket
+from dataclasses import dataclass
 
 from core.redis_queue import get_reader_balloon_queue_key
 
-CAROUSEL_NUMBER = int(os.getenv('CAROUSEL_NUMBER', '1'))
-CAROUSEL_ENV_PREFIX = f'CAROUSEL_{CAROUSEL_NUMBER}'
-TCP_HOST = os.getenv(f'{CAROUSEL_ENV_PREFIX}_TCP_HOST', '').strip()
-TCP_PORT = int(os.getenv(f'{CAROUSEL_ENV_PREFIX}_TCP_PORT', '4001'))
-RFID_READER_NUMBER = int(
-    os.getenv(f'{CAROUSEL_ENV_PREFIX}_RFID_READER', '8')
-)
-BALLOON_QUEUE_KEY = get_reader_balloon_queue_key(RFID_READER_NUMBER)
+MAX_CAROUSEL_SCAN = 16
 
 FRAME_SIZE = 8
 READ_TIMEOUT_SECONDS = 1.0
@@ -34,6 +28,54 @@ STALE_PARTIAL_BUFFER_SECONDS = 10.0
 RECONNECTABLE_ERRORS = (
     ConnectionError,
     TimeoutError,
-    socket.timeout,
-    socket.gaierror,
+    OSError,
 )
+
+
+@dataclass(frozen=True)
+class CarouselInstanceConfig:
+    """Параметры одного TCP-клиента к NPort карусели."""
+
+    number: int
+    tcp_host: str
+    tcp_port: int
+    rfid_reader: int
+    balloon_queue_key: str
+
+    @property
+    def env_prefix(self) -> str:
+        return f'CAROUSEL_{self.number}'
+
+
+def _load_instance(number: int) -> CarouselInstanceConfig | None:
+    """Собирает конфиг карусели N, если задан TCP_HOST."""
+    prefix = f'CAROUSEL_{number}'
+    tcp_host = os.getenv(f'{prefix}_TCP_HOST', '').strip()
+    if not tcp_host:
+        return None
+
+    tcp_port = int(os.getenv(f'{prefix}_TCP_PORT', '4001'))
+    rfid_reader = int(os.getenv(f'{prefix}_RFID_READER', '8'))
+    return CarouselInstanceConfig(
+        number=number,
+        tcp_host=tcp_host,
+        tcp_port=tcp_port,
+        rfid_reader=rfid_reader,
+        balloon_queue_key=get_reader_balloon_queue_key(rfid_reader),
+    )
+
+
+def load_carousel_configs() -> list[CarouselInstanceConfig]:
+    """
+    Возвращает конфиги всех каруселей с заданным ``CAROUSEL_<N>_TCP_HOST``.
+
+    Сканирует номера 1..MAX_CAROUSEL_SCAN. Обратная совместимость:
+    достаточно задать ``CAROUSEL_1_TCP_HOST`` (или любой один N) — процесс
+    запустит только найденные инстансы.
+    """
+    configs: list[CarouselInstanceConfig] = []
+    for number in range(1, MAX_CAROUSEL_SCAN + 1):
+        instance = _load_instance(number)
+        if instance is not None:
+            configs.append(instance)
+    return configs

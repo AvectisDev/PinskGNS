@@ -69,14 +69,20 @@ def process_carousel_data(data: Mapping[str, Any]) -> Carousel:
 
     if request_type == '0x70':
         post_number = data.get('post_number')
+        carousel_number = data.get('carousel_number', 1)
         carousel_post = (
             Carousel.objects.select_for_update()
-            .filter(post_number=post_number)
+            .filter(
+                post_number=post_number,
+                carousel_number=carousel_number,
+            )
             .order_by('-change_at', '-pk')
             .first()
         )
         if carousel_post is None:
-            raise CarouselPostNotFoundError(f'Пост {post_number} не найден')
+            raise CarouselPostNotFoundError(
+                f'Пост {post_number} карусели {carousel_number} не найден'
+            )
 
         carousel_post.is_empty = False
         update_fields = ['is_empty', 'change_at']

@@ -3,6 +3,8 @@
 
 Контроллер поста может повторить тот же кадр в течение ~2 с;
 кэш возвращает сохранённый ответ без повторной обработки Redis/ORM.
+Ключ включает номер карусели, чтобы одинаковые посты разных каруселей
+не считались дубликатами.
 """
 
 import logging
@@ -22,10 +24,11 @@ class CachedRequest:
     response_packet: bytes | None
 
 
-recent_requests: dict[tuple[str, int, int], CachedRequest] = {}
+recent_requests: dict[tuple[int, str, int, int], CachedRequest] = {}
 
 
 def get_cached_request(
+    carousel_number: int,
     request_type: str,
     post_number: int,
     weight: int,
@@ -45,7 +48,7 @@ def get_cached_request(
     for key in expired_keys:
         recent_requests.pop(key, None)
 
-    request_key = (request_type, post_number, weight)
+    request_key = (carousel_number, request_type, post_number, weight)
     cached_request = recent_requests.get(request_key)
     if cached_request is None:
         return False, None
@@ -55,13 +58,14 @@ def get_cached_request(
 
 
 def cache_request_result(
+    carousel_number: int,
     request_type: str,
     post_number: int,
     weight: int,
     response_packet: bytes | None,
 ) -> None:
     """Сохраняет результат обработки запроса на REQUEST_CACHE_SECONDS."""
-    request_key = (request_type, post_number, weight)
+    request_key = (carousel_number, request_type, post_number, weight)
     recent_requests[request_key] = CachedRequest(
         expires_at=time.monotonic() + REQUEST_CACHE_SECONDS,
         response_packet=response_packet,

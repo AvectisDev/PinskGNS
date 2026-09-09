@@ -1,10 +1,12 @@
 from django.core.exceptions import ValidationError
 from django.test import SimpleTestCase, TestCase
-from unittest.mock import MagicMock, patch
-import socket
+from unittest import IsolatedAsyncioTestCase
+from unittest.mock import AsyncMock, MagicMock, patch
+import asyncio
+import time
 
 from .models import Carousel
-from .listener import cache, processing, protocol, transport
+from .listener import cache, config, processing, protocol, transport
 from .services import (
     CarouselPostNotFoundError,
     UnsupportedCarouselRequestError,
@@ -22,71 +24,135 @@ class RangeValidationTests(SimpleTestCase):
         self.assertFalse(is_value_in_range(20.0, 17.0, 19.0))
 
 
-class TcpFrameAssemblyTests(SimpleTestCase):
-    def test_recv_exact_assembles_fragments(self):
-        frame = bytes.fromhex('7A141036B0000D53')
-        sock = MagicMock()
-        sock.recv.side_effect = [frame[:3], frame[3:5], frame[5:]]
+class LoadCarouselConfigsTests(SimpleTestCase):
+    def test_loads_two_instances_with_tcp_host(self):
+        env = {
+            'CAROUSEL_1_TCP_HOST': '192.168.1.50',
+            'CAROUSEL_1_TCP_PORT': '4001',
+            'CAROUSEL_1_RFID_READER': '8',
+            'CAROUSEL_2_TCP_HOST': '192.168.1.51',
+            'CAROUSEL_2_TCP_PORT': '4002',
+            'CAROUSEL_2_RFID_READER': '9',
+        }
+        with patch.dict('os.environ', env, clear=False):
+            # Clear other carousel hosts that might exist in the real env
+            with patch('carousel.listener.config.os.getenv') as getenv:
+                def _getenv(key, default=''):
+                    return env.get(key, default)
 
-        result = transport.recv_exact(sock, 8)
+                getenv.side_effect = _getenv
+                configs = config.load_carousel_configs()
+
+        self.assertEqual(len(configs), 2)
+        self.assertEqual(configs[0].number, 1)
+        self.assertEqual(configs[0].tcp_host, '192.168.1.50')
+        self.assertEqual(configs[0].tcp_port, 4001)
+        self.assertEqual(configs[0].rfid_reader, 8)
+        self.assertEqual(configs[1].number, 2)
+        self.assertEqual(configs[1].tcp_host, '192.168.1.51')
+        self.assertEqual(configs[1].tcp_port, 4002)
+        self.assertEqual(configs[1].rfid_reader, 9)
+
+    def test_skips_instances_without_tcp_host(self):
+        with patch('carousel.listener.config.os.getenv') as getenv:
+            getenv.side_effect = lambda key, default='': (
+                '10.0.0.1' if key == 'CAROUSEL_3_TCP_HOST' else default
+            )
+            configs = config.load_carousel_configs()
+
+        self.assertEqual(len(configs), 1)
+        self.assertEqual(configs[0].number, 3)
+
+
+class AsyncTcpFrameAssemblyTests(IsolatedAsyncioTestCase):
+    async def test_read_exact_assembles_fragments(self):
+        frame = bytes.fromhex('7A141036B0000D53')
+        reader = asyncio.StreamReader()
+        reader.feed_data(frame[:3])
+        reader.feed_data(frame[3:5])
+        reader.feed_data(frame[5:])
+
+        result = await transport.read_exact(reader, 8)
 
         self.assertEqual(result, frame)
-        self.assertEqual(sock.recv.call_count, 3)
 
-    def test_recv_exact_raises_when_connection_closed(self):
-        sock = MagicMock()
-        sock.recv.side_effect = [b'\x7A\x14', b'']
+    async def test_read_exact_raises_when_connection_closed(self):
+        reader = asyncio.StreamReader()
+        reader.feed_data(b'\x7A\x14')
+        reader.feed_eof()
 
         with self.assertRaises(ConnectionError):
-            transport.recv_exact(sock, 8)
+            await transport.read_exact(reader, 8)
 
-    @patch('carousel.listener.transport.socket.create_connection')
-    def test_tcp_transport_assembles_fragments_across_timeout(
-        self,
-        create_connection,
-    ):
+    async def test_async_transport_assembles_fragments_across_timeout(self):
         frame = bytes.fromhex('7A141036B0000D53')
-        sock = MagicMock()
-        sock.recv.side_effect = [
-            frame[:2],
-            socket.timeout,
-            frame[2:],
-        ]
-        create_connection.return_value = sock
+        reader = AsyncMock()
+        reader.read = AsyncMock(
+            side_effect=[
+                frame[:2],
+                TimeoutError(),
+                frame[2:],
+            ]
+        )
+        writer = MagicMock()
+        writer.close = MagicMock()
+        writer.wait_closed = AsyncMock()
 
-        tcp_transport = transport.TcpTransport('127.0.0.1', 4001, 1.0)
+        tcp_transport = transport.AsyncTcpTransport(
+            '127.0.0.1',
+            4001,
+            1.0,
+            reader=reader,
+            writer=writer,
+        )
 
-        self.assertEqual(tcp_transport.read_frame(8), b'')
-        self.assertEqual(tcp_transport.read_frame(8), frame)
+        self.assertEqual(await tcp_transport.read_frame(8), b'')
+        self.assertEqual(await tcp_transport.read_frame(8), frame)
 
-    @patch('carousel.listener.transport.socket.create_connection')
-    def test_tcp_transport_write_uses_sendall(self, create_connection):
-        sock = MagicMock()
-        create_connection.return_value = sock
-        tcp_transport = transport.TcpTransport('127.0.0.1', 4001, 1.0)
+    async def test_async_transport_write_uses_drain(self):
+        reader = AsyncMock()
+        writer = MagicMock()
+        writer.write = MagicMock()
+        writer.drain = AsyncMock()
+        writer.close = MagicMock()
+        writer.wait_closed = AsyncMock()
+
+        tcp_transport = transport.AsyncTcpTransport(
+            '127.0.0.1',
+            4001,
+            1.0,
+            reader=reader,
+            writer=writer,
+        )
 
         payload = bytes.fromhex('5A14FFA410FF7D88')
-        tcp_transport.write(payload)
+        await tcp_transport.write(payload)
 
-        sock.sendall.assert_called_once_with(payload)
+        writer.write.assert_called_once_with(payload)
+        writer.drain.assert_awaited_once()
 
-    @patch('carousel.listener.transport.time.monotonic')
-    @patch('carousel.listener.transport.socket.create_connection')
-    def test_stale_partial_buffer_raises_and_clears_buffer(
-        self,
-        create_connection,
-        monotonic,
-    ):
-        sock = MagicMock()
-        sock.recv.side_effect = [b'\xC2\x9B', socket.timeout, socket.timeout]
-        create_connection.return_value = sock
-        monotonic.side_effect = [0.0, 0.0, 11.0]
+    async def test_stale_partial_buffer_raises_and_clears_buffer(self):
+        reader = AsyncMock()
+        reader.read = AsyncMock(
+            side_effect=[b'\xC2\x9B', TimeoutError(), TimeoutError()]
+        )
+        writer = MagicMock()
+        writer.close = MagicMock()
+        writer.wait_closed = AsyncMock()
 
-        tcp_transport = transport.TcpTransport('127.0.0.1', 4001, 1.0)
+        tcp_transport = transport.AsyncTcpTransport(
+            '127.0.0.1',
+            4001,
+            1.0,
+            reader=reader,
+            writer=writer,
+        )
 
-        self.assertEqual(tcp_transport.read_frame(8), b'')
+        self.assertEqual(await tcp_transport.read_frame(8), b'')
+        # Эмулируем, что неполный кадр «завис» дольше порога.
+        tcp_transport._partial_buffer_since = time.monotonic() - 11.0
         with self.assertRaises(transport.PartialBufferStaleError):
-            tcp_transport.read_frame(8)
+            await tcp_transport.read_frame(8)
         self.assertEqual(tcp_transport._buffer, bytearray())
 
 
@@ -96,19 +162,29 @@ class CarouselRequestProcessingTests(SimpleTestCase):
 
     def test_duplicate_request_reuses_response_from_memory(self):
         found, response = cache.get_cached_request(
-            '0x7a', 1, 18000
+            1, '0x7a', 1, 18000
         )
         self.assertFalse(found)
         self.assertIsNone(response)
 
         cache.cache_request_result(
-            '0x7a', 1, 18000, b'response'
+            1, '0x7a', 1, 18000, b'response'
         )
         found, response = cache.get_cached_request(
-            '0x7a', 1, 18000
+            1, '0x7a', 1, 18000
         )
         self.assertTrue(found)
         self.assertEqual(response, b'response')
+
+    def test_cache_keys_are_isolated_per_carousel(self):
+        cache.cache_request_result(1, '0x7a', 1, 18000, b'response-1')
+        found, response = cache.get_cached_request(2, '0x7a', 1, 18000)
+        self.assertFalse(found)
+        self.assertIsNone(response)
+
+        found, response = cache.get_cached_request(1, '0x7a', 1, 18000)
+        self.assertTrue(found)
+        self.assertEqual(response, b'response-1')
 
     def test_crc_matches_protocol_examples(self):
         examples = (
@@ -163,13 +239,16 @@ class CarouselRequestProcessingTests(SimpleTestCase):
         )
 
         response_required, full_weight, data = (
-            processing.request_processing('0x7a', 1, 18500)
+            processing.request_processing(
+                1, 'reader_8_balloon_queue', '0x7a', 1, 18500
+            )
         )
 
         self.assertFalse(response_required)
         self.assertEqual(full_weight, 0)
         self.assertEqual(data['nfc_tag'], 'test-tag')
         self.assertEqual(data['empty_weight'], 18.5)
+        self.assertEqual(data['carousel_number'], 1)
 
     @patch.object(processing, 'get_and_remove_last_balloon')
     @patch.object(processing, 'check_settings')
@@ -198,7 +277,9 @@ class CarouselRequestProcessingTests(SimpleTestCase):
         )
 
         response_required, full_weight, _ = (
-            processing.request_processing('0x7a', 1, 18500)
+            processing.request_processing(
+                1, 'reader_8_balloon_queue', '0x7a', 1, 18500
+            )
         )
 
         self.assertTrue(response_required)
@@ -231,7 +312,9 @@ class CarouselRequestProcessingTests(SimpleTestCase):
         )
 
         response_required, full_weight, _ = (
-            processing.request_processing('0x7a', 1, 18500)
+            processing.request_processing(
+                1, 'reader_8_balloon_queue', '0x7a', 1, 18500
+            )
         )
 
         self.assertFalse(response_required)
@@ -262,11 +345,13 @@ class ProcessCarouselDataTests(TestCase):
 
     def test_request_0x70_updates_latest_post_record(self):
         old_post = Carousel.objects.create(
+            carousel_number=1,
             post_number=3,
             is_empty=True,
             full_weight=None,
         )
         latest_post = Carousel.objects.create(
+            carousel_number=1,
             post_number=3,
             is_empty=True,
             full_weight=None,
@@ -274,6 +359,7 @@ class ProcessCarouselDataTests(TestCase):
 
         updated_post = process_carousel_data({
             'request_type': '0x70',
+            'carousel_number': 1,
             'post_number': 3,
             'full_weight': 40.5,
         })
@@ -285,10 +371,39 @@ class ProcessCarouselDataTests(TestCase):
         self.assertFalse(latest_post.is_empty)
         self.assertEqual(latest_post.full_weight, 40.5)
 
+    def test_request_0x70_filters_by_carousel_number(self):
+        post_carousel_1 = Carousel.objects.create(
+            carousel_number=1,
+            post_number=5,
+            is_empty=True,
+            full_weight=None,
+        )
+        post_carousel_2 = Carousel.objects.create(
+            carousel_number=2,
+            post_number=5,
+            is_empty=True,
+            full_weight=None,
+        )
+
+        updated_post = process_carousel_data({
+            'request_type': '0x70',
+            'carousel_number': 2,
+            'post_number': 5,
+            'full_weight': 41.0,
+        })
+
+        post_carousel_1.refresh_from_db()
+        post_carousel_2.refresh_from_db()
+        self.assertEqual(updated_post.pk, post_carousel_2.pk)
+        self.assertTrue(post_carousel_1.is_empty)
+        self.assertFalse(post_carousel_2.is_empty)
+        self.assertEqual(post_carousel_2.full_weight, 41.0)
+
     def test_request_0x70_raises_when_post_does_not_exist(self):
         with self.assertRaises(CarouselPostNotFoundError):
             process_carousel_data({
                 'request_type': '0x70',
+                'carousel_number': 1,
                 'post_number': 20,
                 'full_weight': 40.5,
             })

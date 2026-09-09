@@ -1,92 +1,117 @@
 """
 Основной цикл listener и логика переподключения.
 
+Один процесс asyncio обслуживает несколько каруселей параллельно:
+каждая — отдельная задача с собственным TCP-клиентом к NPort.
+
 serial_exchange — чтение кадров, CRC, дедупликация, обработка, ответ, запись.
-main — внешний цикл с тихим retry каждые RECONNECT_DELAY_SECONDS.
+run_carousel — внешний цикл reconnect для одной карусели.
+main — супервизор: gather по всем конфигам из окружения.
 """
 
+from __future__ import annotations
+
+import asyncio
 import logging
-import time
 
 from .cache import cache_request_result, get_cached_request
 from .config import (
-    CAROUSEL_NUMBER,
     FATAL_RESTART_DELAY_SECONDS,
     FRAME_SIZE,
     READ_TIMEOUT_SECONDS,
     RECONNECTABLE_ERRORS,
     RECONNECT_DELAY_SECONDS,
-    TCP_HOST,
-    TCP_PORT,
+    CarouselInstanceConfig,
+    load_carousel_configs,
 )
 from .processing import put_carousel_data, record_post_error, request_processing
 from .protocol import build_response_packet, parse_request_frame, validate_frame_crc
-from .transport import TcpTransport
+from .transport import AsyncTcpTransport
 
 logger = logging.getLogger('carousel')
 
 
-def serial_exchange(
+async def serial_exchange(
+    config: CarouselInstanceConfig,
     *,
     on_connected=None,
 ) -> None:
     """
-    Обработка данных с постов наполнения баллонов.
+    Обработка данных с постов одной карусели.
 
     Цикл: read_frame → CRC → dedup → request_processing → write → persist.
-    Каждый пост отправляет FRAME_SIZE байт, после чего ждёт ответ.
+    Блокирующие Redis/ORM вызываются через asyncio.to_thread.
     """
-    transport: TcpTransport | None = None
+    transport: AsyncTcpTransport | None = None
     try:
-        transport = TcpTransport(TCP_HOST, TCP_PORT, READ_TIMEOUT_SECONDS)
+        transport = await AsyncTcpTransport.connect(
+            config.tcp_host,
+            config.tcp_port,
+            READ_TIMEOUT_SECONDS,
+        )
         if on_connected is not None:
             on_connected()
 
         while True:
-            data = transport.read_frame(FRAME_SIZE)
+            data = await transport.read_frame(FRAME_SIZE)
 
             if len(data) == FRAME_SIZE:
-                logger.info(f"Получен запрос от поста - {data}")
+                logger.info(
+                    "Карусель=%s получен запрос от поста - %s",
+                    config.number,
+                    data,
+                )
                 frame = parse_request_frame(data)
 
                 crc_is_valid, received_crc, calculated_crc = (
                     validate_frame_crc(data)
                 )
                 if not crc_is_valid:
-                    record_post_error(
+                    await asyncio.to_thread(
+                        record_post_error,
+                        config.number,
                         frame.post_number,
                         frame.request_type_str,
                         'invalid_crc',
                         f'Кадр={data.hex().upper()}, '
                         f'получен CRC={received_crc:04X}, '
                         f'рассчитан CRC={calculated_crc:04X}',
-                        metric_name='crc_errors',
+                        'crc_errors',
                     )
                     continue
 
                 logger.info(
-                    f"Парсинг: тип={frame.request_type_str}, "
-                    f"пост={frame.post_number}, "
-                    f"служебный байт={frame.service_byte:02X}, "
-                    f"масса={frame.weight_combined}, флаг={frame.fill_flag:02X}"
+                    "Карусель=%s парсинг: тип=%s, пост=%s, "
+                    "служебный байт=%02X, масса=%s, флаг=%02X",
+                    config.number,
+                    frame.request_type_str,
+                    frame.post_number,
+                    frame.service_byte,
+                    frame.weight_combined,
+                    frame.fill_flag,
                 )
 
                 is_duplicate, cached_response = get_cached_request(
+                    config.number,
                     frame.request_type_str,
                     frame.post_number,
                     frame.weight_combined,
                 )
                 if is_duplicate:
                     if cached_response is not None:
-                        transport.write(cached_response)
+                        await transport.write(cached_response)
                         logger.debug(
-                            "Повторно отправлен ответ на пост: "
-                            f"{cached_response.hex().upper()}"
+                            "Карусель=%s повторно отправлен ответ на пост: %s",
+                            config.number,
+                            cached_response.hex().upper(),
                         )
                     continue
 
                 response_required, full_weight, process_data = (
-                    request_processing(
+                    await asyncio.to_thread(
+                        request_processing,
+                        config.number,
+                        config.balloon_queue_key,
                         frame.request_type_str,
                         frame.post_number,
                         frame.weight_combined,
@@ -102,6 +127,7 @@ def serial_exchange(
                     )
 
                 cache_request_result(
+                    config.number,
                     frame.request_type_str,
                     frame.post_number,
                     frame.weight_combined,
@@ -109,40 +135,52 @@ def serial_exchange(
                 )
 
                 if response_packet is not None:
-                    transport.write(response_packet)
+                    await transport.write(response_packet)
                     logger.debug(
-                        f"Отправлен ответ на пост: "
-                        f"{response_packet.hex().upper()}"
+                        "Карусель=%s отправлен ответ на пост: %s",
+                        config.number,
+                        response_packet.hex().upper(),
                     )
 
                 if process_data and isinstance(process_data, dict):
-                    put_carousel_data(process_data)
+                    await asyncio.to_thread(
+                        put_carousel_data,
+                        config.number,
+                        process_data,
+                    )
             elif data:
-                record_post_error(
+                await asyncio.to_thread(
+                    record_post_error,
+                    config.number,
                     None,
                     None,
                     'invalid_frame_length',
                     f'Получено {len(data)} байт: {data.hex().upper()}',
-                    metric_name='frame_errors',
+                    'frame_errors',
                 )
 
     finally:
         if transport is not None:
-            transport.close()
-            logger.debug("Соединение закрыто")
+            await transport.close()
+            logger.debug(
+                "Карусель=%s соединение закрыто",
+                config.number,
+            )
 
 
-def main() -> None:
+async def run_carousel(config: CarouselInstanceConfig) -> None:
     """
-    Точка входа listener-процесса.
+    Внешний цикл переподключения для одной карусели.
 
-    Внешний цикл переподключения: при обрыве — WARNING «Нет связи»,
-    затем INFO «Попытка подключения» и «Связь установлена» при успехе.
-    Неожиданные ошибки — пауза FATAL_RESTART_DELAY_SECONDS.
+    При обрыве — WARNING «Нет связи», затем INFO «Попытка подключения»
+    и «Связь установлена» при успехе. Неожиданные ошибки — пауза
+    FATAL_RESTART_DELAY_SECONDS.
     """
     logger.info(
-        "Запуск обработки постов наполнения (карусель %s).",
-        CAROUSEL_NUMBER,
+        "Запуск обработки постов наполнения (карусель %s, NPort %s:%s).",
+        config.number,
+        config.tcp_host,
+        config.tcp_port,
     )
     is_connected = False
     awaiting_reconnect_attempt_log = True
@@ -151,30 +189,61 @@ def main() -> None:
         nonlocal is_connected, awaiting_reconnect_attempt_log
         is_connected = True
         awaiting_reconnect_attempt_log = False
-        logger.info("Связь с каруселью установлена.")
+        logger.info(
+            "Карусель=%s связь установлена.",
+            config.number,
+        )
 
     while True:
         try:
             if awaiting_reconnect_attempt_log:
                 logger.info(
-                    "Попытка подключения к карусели (NPort %s:%s)...",
-                    TCP_HOST,
-                    TCP_PORT,
+                    "Карусель=%s попытка подключения к NPort %s:%s...",
+                    config.number,
+                    config.tcp_host,
+                    config.tcp_port,
                 )
                 awaiting_reconnect_attempt_log = False
-            serial_exchange(on_connected=mark_connected)
+            await serial_exchange(config, on_connected=mark_connected)
         except RECONNECTABLE_ERRORS:
             if is_connected:
-                logger.warning("Нет связи с каруселью.")
+                logger.warning(
+                    "Карусель=%s нет связи.",
+                    config.number,
+                )
             is_connected = False
             awaiting_reconnect_attempt_log = True
-            time.sleep(RECONNECT_DELAY_SECONDS)
+            await asyncio.sleep(RECONNECT_DELAY_SECONDS)
         except Exception as error:
             is_connected = False
             awaiting_reconnect_attempt_log = True
             logger.error(
-                "Ошибка в serial_exchange: %s. Перезапуск через %s с...",
+                "Карусель=%s ошибка в serial_exchange: %s. "
+                "Перезапуск через %s с...",
+                config.number,
                 error,
                 FATAL_RESTART_DELAY_SECONDS,
             )
-            time.sleep(FATAL_RESTART_DELAY_SECONDS)
+            await asyncio.sleep(FATAL_RESTART_DELAY_SECONDS)
+
+
+async def main() -> None:
+    """
+    Точка входа listener-процесса.
+
+    Загружает все карусели с заданным CAROUSEL_<N>_TCP_HOST и запускает
+    параллельные задачи asyncio.
+    """
+    configs = load_carousel_configs()
+    if not configs:
+        logger.error(
+            "Не найдено ни одной карусели с CAROUSEL_<N>_TCP_HOST. "
+            "Задайте хотя бы CAROUSEL_1_TCP_HOST."
+        )
+        return
+
+    logger.info(
+        "Запуск listener для каруселей: %s",
+        ', '.join(str(c.number) for c in configs),
+    )
+    await asyncio.gather(*(run_carousel(config) for config in configs))

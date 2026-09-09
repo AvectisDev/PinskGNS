@@ -3,8 +3,12 @@
 
 Запускается из asgi.py или management command carousel_process
 как ``python -m carousel.management.commands.carousel.main``.
+
+Один процесс обслуживает все карусели с заданным ``CAROUSEL_<N>_TCP_HOST``
+через asyncio.
 """
 
+import asyncio
 import logging.config
 import os
 
@@ -18,4 +22,4 @@ logging.config.dictConfig(django.conf.settings.LOGGING)
 from carousel.listener.runner import main  # noqa: E402
 
 if __name__ == '__main__':
-    main()
+    asyncio.run(main())

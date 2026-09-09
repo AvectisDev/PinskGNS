@@ -191,7 +191,7 @@ python manage.py carousel_process
 python -m carousel.management.commands.carousel.main
 ```
 
-Для нескольких каруселей запускается отдельный процесс на каждую с своим `CAROUSEL_NUMBER` и переменными `CAROUSEL_<N>_*` в `.env`.
+Один asyncio-процесс обслуживает все карусели, у которых в `.env` задан `CAROUSEL_<N>_TCP_HOST` (сканируются номера 1–16). Каждая карусель — отдельная задача с собственным TCP-клиентом к своему NPort.
 
 **Назначение:**
 - Обмен данными с постами наполнения по TCP с NPort W2150A (режим TCP Server)
@@ -201,14 +201,15 @@ python -m carousel.management.commands.carousel.main
 - Сохранение состояния постов через ORM (`Carousel`)
 
 **Особенности:**
+- Асинхронный TCP-клиент (`asyncio`) — несколько каруселей в одном процессе
 - Чтение 8-байтных кадров, проверка CRC-16
 - Атомарная FIFO-очередь Redis `reader_<N>_balloon_queue` (`LPUSH` / `RPOP`)
-- Дедупликация повторных запросов в памяти процесса (~2 с)
-- Автоматический перезапуск при ошибках TCP (~60 с) и прочих ошибках (~5 мин)
+- Дедупликация повторных запросов в памяти процесса (~2 с), ключ с номером карусели
+- Автоматический перезапуск при ошибках TCP (~60 с) и прочих ошибках (~5 мин) — независимо по каждой карусели
 
 **Транспорт к постам**
 
-Приложение — TCP-клиент к NPort W2150A в режиме **TCP Server**. Соединение держится открытым; кадры с RS-485 пушатся в сокет (без polling).
+Приложение — TCP-клиент к NPort W2150A в режиме **TCP Server**. Соединение держится открытым; кадры с RS-485 пушатся в сокет (без polling). У каждой карусели — свой NPort (Max connection = 1).
 
 Настройки NPort (web console → Operating Settings / Port):
 
@@ -223,21 +224,31 @@ python -m carousel.management.commands.carousel.main
 | Delimiter 1/2 | выкл |
 | Inactivity time | `0` (не рвать сессию в паузах) |
 
-**Конфигурация экземпляра (`.env` / переменные окружения)** — читаются в `carousel/management/commands/carousel/main.py`, в БД не хранятся:
+**Конфигурация (`.env` / переменные окружения)** — читаются в `carousel/listener/config.py`, в БД не хранятся. Инстанс включается, если задан `CAROUSEL_<N>_TCP_HOST`:
 
 | Переменная | Назначение | По умолчанию |
 |---|---|---|
-| `CAROUSEL_NUMBER` | номер запускаемой карусели (`N`) | `1` |
-| `CAROUSEL_<N>_TCP_HOST` | IP NPort (обязателен) | — |
+| `CAROUSEL_<N>_TCP_HOST` | IP NPort (обязателен для включения карусели N) | — |
 | `CAROUSEL_<N>_TCP_PORT` | TCP-порт NPort (TCP Server) | `4001` |
 | `CAROUSEL_<N>_RFID_READER` | номер RFID-считывателя, чья очередь используется | `8` |
 
-Пример:
+Пример одной карусели:
 
 ```env
 CAROUSEL_1_TCP_HOST=192.168.1.50
 CAROUSEL_1_TCP_PORT=4001
 CAROUSEL_1_RFID_READER=8
+```
+
+Пример двух каруселей (один процесс listener):
+
+```env
+CAROUSEL_1_TCP_HOST=192.168.1.50
+CAROUSEL_1_TCP_PORT=4001
+CAROUSEL_1_RFID_READER=8
+CAROUSEL_2_TCP_HOST=192.168.1.51
+CAROUSEL_2_TCP_PORT=4001
+CAROUSEL_2_RFID_READER=9
 ```
 
 **Настройки из БД (`CarouselSettings`)** — режим работы и весовая политика:

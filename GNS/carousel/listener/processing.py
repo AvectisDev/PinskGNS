@@ -5,6 +5,8 @@
 настройками карусели (ORM) и сервисом сохранения данных.
 """
 
+from __future__ import annotations
+
 import logging
 from dataclasses import dataclass
 
@@ -19,7 +21,6 @@ from carousel.services import (
 from carousel.validation import is_value_in_range
 from core.redis_queue import increment_metric, pop_json_from_queue
 
-from .config import BALLOON_QUEUE_KEY, CAROUSEL_NUMBER
 from .protocol import (
     REQUEST_TYPE_FILL_STR,
     REQUEST_TYPE_FULL_WEIGHT_STR,
@@ -44,6 +45,7 @@ class PostSettings:
 
 
 def record_post_error(
+    carousel_number: int,
     post_number: int | None,
     request_type: str | None,
     error_code: str,
@@ -53,19 +55,21 @@ def record_post_error(
     """Логирует ошибку поста и увеличивает счётчик метрики в Redis."""
     logger.error(
         "Карусель=%s пост=%s тип=%s ошибка=%s: %s",
-        CAROUSEL_NUMBER,
+        carousel_number,
         post_number,
         request_type,
         error_code,
         message,
     )
     try:
-        increment_metric(CAROUSEL_NUMBER, metric_name)
+        increment_metric(carousel_number, metric_name)
     except Exception as error:
         logger.error(f"Не удалось обновить метрику {metric_name}: {error}")
 
 
 def get_and_remove_last_balloon(
+    carousel_number: int,
+    balloon_queue_key: str,
     post_number: int,
     request_type: str,
 ) -> tuple[dict | None, bool]:
@@ -76,14 +80,15 @@ def get_and_remove_last_balloon(
         (balloon_dict, queue_available) — queue_available=False при ошибке Redis.
     """
     try:
-        balloon, queue_size = pop_json_from_queue(BALLOON_QUEUE_KEY)
+        balloon, queue_size = pop_json_from_queue(balloon_queue_key)
         logger.debug(
-            f"Карусель={CAROUSEL_NUMBER} очередь={BALLOON_QUEUE_KEY} "
+            f"Карусель={carousel_number} очередь={balloon_queue_key} "
             f"размер={queue_size}"
         )
         return balloon, True
     except Exception as error:
         record_post_error(
+            carousel_number,
             post_number,
             request_type,
             'queue_read_error',
@@ -93,11 +98,12 @@ def get_and_remove_last_balloon(
         return None, False
 
 
-def put_carousel_data(data: dict) -> bool:
+def put_carousel_data(carousel_number: int, data: dict) -> bool:
     """
     Сохраняет показания поста карусели через сервис Django.
 
     Args:
+        carousel_number: Номер карусели (для метрик/логов).
         data: Словарь с request_type, post_number, весами и паспортом баллона.
 
     Returns:
@@ -114,6 +120,7 @@ def put_carousel_data(data: dict) -> bool:
         UnsupportedCarouselRequestError,
     ) as error:
         record_post_error(
+            carousel_number,
             data.get('post_number'),
             data.get('request_type'),
             'persistence_validation_error',
@@ -121,6 +128,7 @@ def put_carousel_data(data: dict) -> bool:
         )
     except Exception as error:
         record_post_error(
+            carousel_number,
             data.get('post_number'),
             data.get('request_type'),
             'persistence_error',
@@ -179,6 +187,8 @@ def check_balloon_size(weight: int) -> int:
 
 
 def request_processing(
+    carousel_number: int,
+    balloon_queue_key: str,
     request_type: str,
     post_number: int,
     weight: int,
@@ -198,7 +208,7 @@ def request_processing(
     response_required = False
     full_weight = 0
     process_data_to_server = {
-        'carousel_number': CAROUSEL_NUMBER,
+        'carousel_number': carousel_number,
         'request_type': request_type,
         'post_number': post_number,
         'size': check_balloon_size(weight)
@@ -208,6 +218,8 @@ def request_processing(
         logger.debug("Запрос 0x7a")
 
         balloon_from_cache, queue_available = get_and_remove_last_balloon(
+            carousel_number,
+            balloon_queue_key,
             post_number,
             request_type,
         )
@@ -215,10 +227,11 @@ def request_processing(
         if balloon_from_cache is None:
             if queue_available:
                 record_post_error(
+                    carousel_number,
                     post_number,
                     request_type,
                     'empty_balloon_queue',
-                    f'В очереди {BALLOON_QUEUE_KEY} нет паспорта баллона',
+                    f'В очереди {balloon_queue_key} нет паспорта баллона',
                     metric_name='empty_queue',
                 )
             process_data_to_server.update({
@@ -233,6 +246,7 @@ def request_processing(
 
         if not filling_status:
             record_post_error(
+                carousel_number,
                 post_number,
                 request_type,
                 'balloon_not_ready',
@@ -241,6 +255,7 @@ def request_processing(
             )
         elif netto is None or brutto is None:
             record_post_error(
+                carousel_number,
                 post_number,
                 request_type,
                 'incomplete_passport',
@@ -251,6 +266,7 @@ def request_processing(
             post_settings = check_settings(post_number)
             if not post_settings.available:
                 record_post_error(
+                    carousel_number,
                     post_number,
                     request_type,
                     'settings_missing',
@@ -267,6 +283,7 @@ def request_processing(
                 ):
                     weight_is_valid = False
                     record_post_error(
+                        carousel_number,
                         post_number,
                         request_type,
                         'weight_out_of_range',
@@ -284,6 +301,7 @@ def request_processing(
                 ):
                     weight_is_valid = False
                     record_post_error(
+                        carousel_number,
                         post_number,
                         request_type,
                         'weight_out_of_range',
@@ -301,6 +319,7 @@ def request_processing(
                 ):
                     weight_is_valid = False
                     record_post_error(
+                        carousel_number,
                         post_number,
                         request_type,
                         'invalid_settings',
@@ -314,6 +333,7 @@ def request_processing(
                 ):
                     weight_is_valid = False
                     record_post_error(
+                        carousel_number,
                         post_number,
                         request_type,
                         'passport_weight_diff',
@@ -327,6 +347,7 @@ def request_processing(
                 if post_settings.weight_correction is None:
                     weight_is_valid = False
                     record_post_error(
+                        carousel_number,
                         post_number,
                         request_type,
                         'invalid_post_correction',
@@ -358,6 +379,7 @@ def request_processing(
         process_data_to_server['full_weight'] = weight / 1000
     else:
         record_post_error(
+            carousel_number,
             post_number,
             request_type,
             'unknown_request_type',
