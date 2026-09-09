@@ -1,3 +1,4 @@
+from django.core.exceptions import ValidationError
 from django.db import models
 from django.contrib.auth.models import User
 from django.conf import settings
@@ -32,7 +33,38 @@ class Carousel(models.Model):
 
 
 class CarouselSettings(models.Model):
-    """Настройки валидации весов и коррекции для постов карусели."""
+    """
+    Настройки одной карусели: оборудование (NPort, RFID) и весовая политика.
+
+    Одна запись = одна карусель. Поле ``number`` — бизнес-номер (unique), не PK.
+    """
+
+    number = models.IntegerField(unique=True, verbose_name="Номер карусели")
+    name = models.CharField(
+        max_length=100,
+        blank=True,
+        default='',
+        verbose_name="Название",
+    )
+    tcp_host = models.CharField(
+        max_length=15,
+        blank=True,
+        default='',
+        verbose_name="IP NPort",
+    )
+    tcp_port = models.IntegerField(default=4001, verbose_name="TCP-порт NPort")
+    rfid_reader = models.ForeignKey(
+        'filling_station.ReaderSettings',
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name='carousels',
+        verbose_name="RFID-считыватель",
+    )
+    is_active = models.BooleanField(
+        default=True,
+        verbose_name="Активна (listener)",
+    )
 
     read_only = models.BooleanField(default=True, verbose_name="Только чтение с постов наполнения")
     use_weight_management = models.BooleanField(default=False, verbose_name="Использовать коррекцию веса")
@@ -72,12 +104,30 @@ class CarouselSettings(models.Model):
         default=1
     )
 
+    def clean(self):
+        super().clean()
+        if self.is_active:
+            errors = {}
+            if not (self.tcp_host or '').strip():
+                errors['tcp_host'] = (
+                    'Для активной карусели необходимо указать IP NPort.'
+                )
+            if self.rfid_reader_id is None:
+                errors['rfid_reader'] = (
+                    'Для активной карусели необходимо указать RFID-считыватель.'
+                )
+            if errors:
+                raise ValidationError(errors)
+
     def __int__(self):
         return self.pk
 
     def __str__(self):
-        return 'Карусель'
+        if self.name:
+            return self.name
+        return f'Карусель {self.number}'
 
     class Meta:
         verbose_name = "Настройки карусели"
         verbose_name_plural = "Настройки карусели"
+        ordering = ['number']

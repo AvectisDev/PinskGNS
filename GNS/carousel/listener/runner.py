@@ -231,14 +231,14 @@ async def main() -> None:
     """
     Точка входа listener-процесса.
 
-    Загружает все карусели с заданным CAROUSEL_<N>_TCP_HOST и запускает
+    Загружает активные карусели из CarouselSettings и запускает
     параллельные задачи asyncio.
     """
     configs = load_carousel_configs()
     if not configs:
         logger.error(
-            "Не найдено ни одной карусели с CAROUSEL_<N>_TCP_HOST. "
-            "Задайте хотя бы CAROUSEL_1_TCP_HOST."
+            "Не найдено ни одной активной карусели в CarouselSettings "
+            "(нужны is_active, tcp_host и rfid_reader)."
         )
         return
 

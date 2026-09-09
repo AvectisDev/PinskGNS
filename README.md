@@ -191,7 +191,7 @@ python manage.py carousel_process
 python -m carousel.management.commands.carousel.main
 ```
 
-Один asyncio-процесс обслуживает все карусели, у которых в `.env` задан `CAROUSEL_<N>_TCP_HOST` (сканируются номера 1–16). Каждая карусель — отдельная задача с собственным TCP-клиентом к своему NPort.
+Один asyncio-процесс обслуживает все **активные** карусели из таблицы `CarouselSettings` (флаг `is_active`, заполненные `tcp_host` и `rfid_reader`). Каждая карусель — отдельная задача с собственным TCP-клиентом к своему NPort.
 
 **Назначение:**
 - Обмен данными с постами наполнения по TCP с NPort W2150A (режим TCP Server)
@@ -216,7 +216,7 @@ python -m carousel.management.commands.carousel.main
 | Параметр | Значение |
 |---|---|
 | Operation Mode | `TCP Server` |
-| TCP port | `4001` (или свой; тот же в `.env`) |
+| TCP port | `4001` (или свой; тот же в `CarouselSettings.tcp_port`) |
 | Max connection | `1` |
 | Serial | `9600 8N1` (+ RS-485, как у постов) |
 | Packet length | `0` |
@@ -224,36 +224,17 @@ python -m carousel.management.commands.carousel.main
 | Delimiter 1/2 | выкл |
 | Inactivity time | `0` (не рвать сессию в паузах) |
 
-**Конфигурация (`.env` / переменные окружения)** — читаются в `carousel/listener/config.py`, в БД не хранятся. Инстанс включается, если задан `CAROUSEL_<N>_TCP_HOST`:
+**Конфигурация в БД (`CarouselSettings`)** — одна запись на карусель (admin / UI `/carousel/settings/`):
 
-| Переменная | Назначение | По умолчанию |
-|---|---|---|
-| `CAROUSEL_<N>_TCP_HOST` | IP NPort (обязателен для включения карусели N) | — |
-| `CAROUSEL_<N>_TCP_PORT` | TCP-порт NPort (TCP Server) | `4001` |
-| `CAROUSEL_<N>_RFID_READER` | номер RFID-считывателя, чья очередь используется | `8` |
+| Поле | Назначение |
+|---|---|
+| `number` | бизнес-номер карусели (unique, не PK) |
+| `name` | название для UI |
+| `tcp_host` / `tcp_port` | IP и порт NPort |
+| `rfid_reader` | FK на `ReaderSettings` (очередь паспортов) |
+| `is_active` | включать ли карусель в listener |
+| `read_only`, диапазоны весов, корректоры постов | весовая политика этой карусели |
 
-Пример одной карусели:
+После изменения `number` / NPort / `is_active` перезапустите listener.
 
-```env
-CAROUSEL_1_TCP_HOST=192.168.1.50
-CAROUSEL_1_TCP_PORT=4001
-CAROUSEL_1_RFID_READER=8
-```
-
-Пример двух каруселей (один процесс listener):
-
-```env
-CAROUSEL_1_TCP_HOST=192.168.1.50
-CAROUSEL_1_TCP_PORT=4001
-CAROUSEL_1_RFID_READER=8
-CAROUSEL_2_TCP_HOST=192.168.1.51
-CAROUSEL_2_TCP_PORT=4001
-CAROUSEL_2_RFID_READER=9
-```
-
-**Настройки из БД (`CarouselSettings`)** — режим работы и весовая политика:
-
-- `read_only` — только чтение с постов без ответа целевым весом
-- `use_weight_management` / `use_common_correction` / `weight_correction_value`
-- диапазоны весов: `min_balloon_weight_*`, `max_balloon_weight_*`, `passport_weight_diff_*`
-- корректоры постов: `post_1_correction` … `post_20_correction`
+Пример: две активные карусели создаются в admin или через UI настроек (не через `.env`).

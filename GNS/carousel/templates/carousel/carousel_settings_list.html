@@ -1,0 +1,65 @@
+{% extends 'base.html' %}
+
+{% block title %}Настройки каруселей{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h4 class="mb-0">Настройки каруселей</h4>
+    </div>
+
+    <div class="card shadow-sm">
+        <div class="card-body p-0">
+            <table class="table table-hover mb-0">
+                <thead>
+                    <tr>
+                        <th>№</th>
+                        <th>Название</th>
+                        <th>NPort</th>
+                        <th>RFID</th>
+                        <th>Активна</th>
+                        <th>Только чтение</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in carousel_settings_list %}
+                    <tr>
+                        <td>{{ item.number }}</td>
+                        <td>{{ item.name|default:"—" }}</td>
+                        <td>
+                            {% if item.tcp_host %}
+                                {{ item.tcp_host }}:{{ item.tcp_port }}
+                            {% else %}
+                                —
+                            {% endif %}
+                        </td>
+                        <td>{{ item.rfid_reader_id|default:"—" }}</td>
+                        <td>
+                            <span class="badge bg-{% if item.is_active %}success{% else %}secondary{% endif %}">
+                                {% if item.is_active %}Да{% else %}Нет{% endif %}
+                            </span>
+                        </td>
+                        <td>
+                            <span class="badge bg-{% if item.read_only %}success{% else %}secondary{% endif %}">
+                                {% if item.read_only %}Да{% else %}Нет{% endif %}
+                            </span>
+                        </td>
+                        <td class="text-end">
+                            <a href="{% url 'carousel:carousel_settings_detail' number=item.number %}"
+                               class="btn btn-sm btn-custom">Открыть</a>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="7" class="text-center text-muted py-4">
+                            Нет записей настроек карусели. Добавьте через Django admin.
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

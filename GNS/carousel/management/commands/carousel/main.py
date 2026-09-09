@@ -4,7 +4,7 @@
 Запускается из asgi.py или management command carousel_process
 как ``python -m carousel.management.commands.carousel.main``.
 
-Один процесс обслуживает все карусели с заданным ``CAROUSEL_<N>_TCP_HOST``
+Один процесс обслуживает все активные карусели из ``CarouselSettings``
 через asyncio.
 """
 

@@ -138,9 +138,9 @@ def put_carousel_data(carousel_number: int, data: dict) -> bool:
     return False
 
 
-def check_settings(post_number: int) -> PostSettings:
-    """Читает настройки обработки постов из базы данных."""
-    post_settings = get_carousel_settings_data()
+def check_settings(carousel_number: int, post_number: int) -> PostSettings:
+    """Читает настройки обработки постов из базы данных для карусели."""
+    post_settings = get_carousel_settings_data(carousel_number)
     if not post_settings:
         return PostSettings(
             available=False,
@@ -263,7 +263,7 @@ def request_processing(
                 metric_name='passport_errors',
             )
         else:
-            post_settings = check_settings(post_number)
+            post_settings = check_settings(carousel_number, post_number)
             if not post_settings.available:
                 record_post_error(
                     carousel_number,

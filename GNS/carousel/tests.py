@@ -5,11 +5,14 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import asyncio
 import time
 
-from .models import Carousel
+from filling_station.models import ReaderSettings
+
+from .models import Carousel, CarouselSettings
 from .listener import cache, config, processing, protocol, transport
 from .services import (
     CarouselPostNotFoundError,
     UnsupportedCarouselRequestError,
+    get_carousel_settings_data,
     process_carousel_data,
 )
 from .validation import is_value_in_range
@@ -24,24 +27,36 @@ class RangeValidationTests(SimpleTestCase):
         self.assertFalse(is_value_in_range(20.0, 17.0, 19.0))
 
 
-class LoadCarouselConfigsTests(SimpleTestCase):
-    def test_loads_two_instances_with_tcp_host(self):
-        env = {
-            'CAROUSEL_1_TCP_HOST': '192.168.1.50',
-            'CAROUSEL_1_TCP_PORT': '4001',
-            'CAROUSEL_1_RFID_READER': '8',
-            'CAROUSEL_2_TCP_HOST': '192.168.1.51',
-            'CAROUSEL_2_TCP_PORT': '4002',
-            'CAROUSEL_2_RFID_READER': '9',
-        }
-        with patch.dict('os.environ', env, clear=False):
-            # Clear other carousel hosts that might exist in the real env
-            with patch('carousel.listener.config.os.getenv') as getenv:
-                def _getenv(key, default=''):
-                    return env.get(key, default)
+class LoadCarouselConfigsTests(TestCase):
+    def setUp(self):
+        self.reader_8 = ReaderSettings.objects.create(
+            number=8, ip='10.0.0.8', need_cache=True
+        )
+        self.reader_9 = ReaderSettings.objects.create(
+            number=9, ip='10.0.0.9', need_cache=True
+        )
 
-                getenv.side_effect = _getenv
-                configs = config.load_carousel_configs()
+    def test_loads_two_active_instances(self):
+        CarouselSettings.objects.create(
+            number=1,
+            name='Карусель 1',
+            tcp_host='192.168.1.50',
+            tcp_port=4001,
+            rfid_reader=self.reader_8,
+            is_active=True,
+            user=None,
+        )
+        CarouselSettings.objects.create(
+            number=2,
+            name='Карусель 2',
+            tcp_host='192.168.1.51',
+            tcp_port=4002,
+            rfid_reader=self.reader_9,
+            is_active=True,
+            user=None,
+        )
+
+        configs = config.load_carousel_configs()
 
         self.assertEqual(len(configs), 2)
         self.assertEqual(configs[0].number, 1)
@@ -53,15 +68,66 @@ class LoadCarouselConfigsTests(SimpleTestCase):
         self.assertEqual(configs[1].tcp_port, 4002)
         self.assertEqual(configs[1].rfid_reader, 9)
 
-    def test_skips_instances_without_tcp_host(self):
-        with patch('carousel.listener.config.os.getenv') as getenv:
-            getenv.side_effect = lambda key, default='': (
-                '10.0.0.1' if key == 'CAROUSEL_3_TCP_HOST' else default
-            )
-            configs = config.load_carousel_configs()
+    def test_skips_inactive_and_incomplete(self):
+        CarouselSettings.objects.create(
+            number=1,
+            tcp_host='10.0.0.1',
+            tcp_port=4001,
+            rfid_reader=self.reader_8,
+            is_active=False,
+            user=None,
+        )
+        CarouselSettings.objects.create(
+            number=2,
+            tcp_host='',
+            tcp_port=4001,
+            rfid_reader=self.reader_8,
+            is_active=True,
+            user=None,
+        )
+        CarouselSettings.objects.create(
+            number=3,
+            tcp_host='10.0.0.3',
+            tcp_port=4001,
+            rfid_reader=self.reader_9,
+            is_active=True,
+            user=None,
+        )
+
+        configs = config.load_carousel_configs()
 
         self.assertEqual(len(configs), 1)
         self.assertEqual(configs[0].number, 3)
+
+
+class GetCarouselSettingsDataTests(TestCase):
+    def test_returns_settings_for_requested_number(self):
+        CarouselSettings.objects.create(
+            number=1,
+            name='One',
+            tcp_host='10.0.0.1',
+            is_active=False,
+            read_only=True,
+            user=None,
+        )
+        CarouselSettings.objects.create(
+            number=2,
+            name='Two',
+            tcp_host='10.0.0.2',
+            is_active=False,
+            read_only=False,
+            user=None,
+        )
+
+        data = get_carousel_settings_data(2)
+
+        self.assertIsNotNone(data)
+        self.assertEqual(data['number'], 2)
+        self.assertEqual(data['name'], 'Two')
+        self.assertFalse(data['read_only'])
+
+    def test_returns_none_when_missing(self):
+        self.assertIsNone(get_carousel_settings_data(99))
 
 
 class AsyncTcpFrameAssemblyTests(IsolatedAsyncioTestCase):

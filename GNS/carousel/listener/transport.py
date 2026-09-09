@@ -55,7 +55,7 @@ class AsyncTcpTransport:
     ) -> AsyncTcpTransport:
         """Устанавливает TCP-соединение с NPort."""
         if not host:
-            raise ValueError('Задайте CAROUSEL_<N>_TCP_HOST')
+            raise ValueError('Задайте tcp_host в CarouselSettings')
         try:
             reader, writer = await asyncio.wait_for(
                 asyncio.open_connection(host, port),

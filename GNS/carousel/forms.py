@@ -45,11 +45,18 @@ class CarouselSettingsForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         for field_from, field_to, _ in RANGE_FIELDS:
-            # Подписи выводятся в layout: «от» в заголовке ряда, «до» между полями
             self.fields[field_from].label = 'от'
             self.fields[field_to].label = 'до'
 
         layout_items = [
+            HTML('<div class="mb-2 mt-3 fw-semibold">Оборудование</div>'),
+            'number',
+            'name',
+            'tcp_host',
+            'tcp_port',
+            'rfid_reader',
+            'is_active',
+            HTML('<div class="mb-2 mt-3 fw-semibold">Весовая политика</div>'),
             'read_only',
             'use_weight_management',
             'use_common_correction',
@@ -73,7 +80,6 @@ class CarouselSettingsForm(forms.ModelForm):
         layout_items.extend([
             HTML('<div class="mb-2 mt-3 fw-semibold">Корректоры постов</div>'),
             *[f'post_{i}_correction' for i in range(1, 21)],
-            # Шире col-lg-3, иначе две кнопки не помещаются в одну строку
             Div(
                 HTML('<div class="col-lg-5"></div>'),
                 Div(
@@ -101,12 +107,33 @@ class CarouselSettingsForm(forms.ModelForm):
                 raise forms.ValidationError(
                     f'{title}: значение «от» не может быть больше значения «до».'
                 )
+
+        is_active = cleaned_data.get('is_active')
+        tcp_host = (cleaned_data.get('tcp_host') or '').strip()
+        rfid_reader = cleaned_data.get('rfid_reader')
+        if is_active:
+            if not tcp_host:
+                self.add_error(
+                    'tcp_host',
+                    'Для активной карусели необходимо указать IP NPort.',
+                )
+            if rfid_reader is None:
+                self.add_error(
+                    'rfid_reader',
+                    'Для активной карусели необходимо указать RFID-считыватель.',
+                )
         return cleaned_data
 
     class Meta:
         model = CarouselSettings
         exclude = ['user']
         widgets = {
+            'number': forms.NumberInput(attrs={'class': 'form-control'}),
+            'name': forms.TextInput(attrs={'class': 'form-control'}),
+            'tcp_host': forms.TextInput(attrs={'class': 'form-control'}),
+            'tcp_port': forms.NumberInput(attrs={'class': 'form-control'}),
+            'rfid_reader': forms.Select(attrs={'class': 'form-select'}),
+            'is_active': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
             'read_only': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
             'use_weight_management': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
             'weight_correction_value': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),

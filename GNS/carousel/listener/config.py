@@ -1,22 +1,18 @@
 """
 Конфигурация экземпляров listener карусели.
 
-Читается из переменных окружения. Один процесс обслуживает все карусели,
-у которых задан ``CAROUSEL_<N>_TCP_HOST``:
-
-    CAROUSEL_<N>_TCP_HOST   — IP NPort (обязателен для включения инстанса)
-    CAROUSEL_<N>_TCP_PORT   — TCP-порт NPort (по умолчанию 4001)
-    CAROUSEL_<N>_RFID_READER — номер RFID-считывателя для очереди паспортов
+Загружается из ``CarouselSettings`` (активные записи с TCP host и RFID).
+Один процесс обслуживает все активные карусели параллельно.
 """
 
 from __future__ import annotations
 
-import os
+import logging
 from dataclasses import dataclass
 
 from core.redis_queue import get_reader_balloon_queue_key
 
-MAX_CAROUSEL_SCAN = 16
+logger = logging.getLogger('carousel')
 
 FRAME_SIZE = 8
 READ_TIMEOUT_SECONDS = 1.0
@@ -42,40 +38,46 @@ class CarouselInstanceConfig:
     rfid_reader: int
     balloon_queue_key: str
 
-    @property
-    def env_prefix(self) -> str:
-        return f'CAROUSEL_{self.number}'
-
-
-def _load_instance(number: int) -> CarouselInstanceConfig | None:
-    """Собирает конфиг карусели N, если задан TCP_HOST."""
-    prefix = f'CAROUSEL_{number}'
-    tcp_host = os.getenv(f'{prefix}_TCP_HOST', '').strip()
-    if not tcp_host:
-        return None
-
-    tcp_port = int(os.getenv(f'{prefix}_TCP_PORT', '4001'))
-    rfid_reader = int(os.getenv(f'{prefix}_RFID_READER', '8'))
-    return CarouselInstanceConfig(
-        number=number,
-        tcp_host=tcp_host,
-        tcp_port=tcp_port,
-        rfid_reader=rfid_reader,
-        balloon_queue_key=get_reader_balloon_queue_key(rfid_reader),
-    )
-
 
 def load_carousel_configs() -> list[CarouselInstanceConfig]:
     """
-    Возвращает конфиги всех каруселей с заданным ``CAROUSEL_<N>_TCP_HOST``.
+    Возвращает конфиги всех активных каруселей из БД.
 
-    Сканирует номера 1..MAX_CAROUSEL_SCAN. Обратная совместимость:
-    достаточно задать ``CAROUSEL_1_TCP_HOST`` (или любой один N) — процесс
-    запустит только найденные инстансы.
+    Пропускает ``is_active`` записи без ``tcp_host`` или без ``rfid_reader``
+    (WARNING в лог).
     """
+    from carousel.models import CarouselSettings
+
+    rows = list(
+        CarouselSettings.objects.filter(is_active=True)
+        .select_related('rfid_reader')
+        .order_by('number')
+    )
+
     configs: list[CarouselInstanceConfig] = []
-    for number in range(1, MAX_CAROUSEL_SCAN + 1):
-        instance = _load_instance(number)
-        if instance is not None:
-            configs.append(instance)
+    for settings in rows:
+        tcp_host = (settings.tcp_host or '').strip()
+        if not tcp_host:
+            logger.warning(
+                "Карусель number=%s активна, но tcp_host пуст — пропуск",
+                settings.number,
+            )
+            continue
+        if settings.rfid_reader_id is None:
+            logger.warning(
+                "Карусель number=%s активна, но rfid_reader не задан — пропуск",
+                settings.number,
+            )
+            continue
+
+        rfid_reader = int(settings.rfid_reader_id)
+        configs.append(
+            CarouselInstanceConfig(
+                number=settings.number,
+                tcp_host=tcp_host,
+                tcp_port=int(settings.tcp_port),
+                rfid_reader=rfid_reader,
+                balloon_queue_key=get_reader_balloon_queue_key(rfid_reader),
+            )
+        )
     return configs

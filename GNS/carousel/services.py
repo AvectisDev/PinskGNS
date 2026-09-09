@@ -31,13 +31,13 @@ CAROUSEL_CREATE_FIELDS = frozenset({
 })
 
 
-def get_carousel_settings_data() -> Optional[dict[str, Any]]:
-    """Возвращает настройки карусели через Django ORM."""
-    close_old_connections()
-    try:
-        return CarouselSettings.objects.order_by('pk').values().first()
-    finally:
-        close_old_connections()
+def get_carousel_settings_data(carousel_number: int) -> Optional[dict[str, Any]]:
+    """Возвращает настройки карусели ``carousel_number`` через Django ORM."""
+    return (
+        CarouselSettings.objects.filter(number=carousel_number)
+        .values()
+        .first()
+    )
 
 
 @transaction.atomic
