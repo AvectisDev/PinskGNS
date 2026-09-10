@@ -234,6 +234,9 @@ async def main() -> None:
     Загружает активные карусели из CarouselSettings и запускает
     параллельные задачи asyncio.
     """
+    from carousel.settings_cache import load_from_db_and_publish
+
+    await asyncio.to_thread(load_from_db_and_publish)
     configs = await asyncio.to_thread(load_carousel_configs)
     if not configs:
         logger.error(

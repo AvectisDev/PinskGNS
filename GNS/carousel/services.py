@@ -5,7 +5,7 @@ from typing import Any, Mapping, Optional
 from django.core.exceptions import ValidationError
 from django.db import close_old_connections, transaction
 
-from .models import Carousel, CarouselSettings
+from .models import Carousel
 
 
 class CarouselPostNotFoundError(Exception):
@@ -32,12 +32,10 @@ CAROUSEL_CREATE_FIELDS = frozenset({
 
 
 def get_carousel_settings_data(carousel_number: int) -> Optional[dict[str, Any]]:
-    """Возвращает настройки карусели ``carousel_number`` через Django ORM."""
-    return (
-        CarouselSettings.objects.filter(number=carousel_number)
-        .values()
-        .first()
-    )
+    """Возвращает настройки карусели ``carousel_number`` из кэша (без ORM на hot path)."""
+    from .settings_cache import get_settings_dict
+
+    return get_settings_dict(carousel_number)
 
 
 @transaction.atomic

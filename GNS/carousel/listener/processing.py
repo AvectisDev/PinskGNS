@@ -139,7 +139,10 @@ def put_carousel_data(carousel_number: int, data: dict) -> bool:
 
 
 def check_settings(carousel_number: int, post_number: int) -> PostSettings:
-    """Читает настройки обработки постов из базы данных для карусели."""
+    """Читает настройки обработки постов из in-memory кэша (sync Redis при смене rev)."""
+    from carousel.settings_cache import sync_from_redis_if_stale
+
+    sync_from_redis_if_stale()
     post_settings = get_carousel_settings_data(carousel_number)
     if not post_settings:
         return PostSettings(

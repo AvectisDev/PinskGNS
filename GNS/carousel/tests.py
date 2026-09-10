@@ -29,6 +29,8 @@ class RangeValidationTests(SimpleTestCase):
 
 class LoadCarouselConfigsTests(TestCase):
     def setUp(self):
+        # data-migration может сидить number 1..N — очищаем для изолированных кейсов
+        CarouselSettings.objects.all().delete()
         self.reader_8 = ReaderSettings.objects.create(
             number=8, ip='10.0.0.8', need_cache=True
         )
@@ -101,6 +103,19 @@ class LoadCarouselConfigsTests(TestCase):
 
 
 class GetCarouselSettingsDataTests(TestCase):
+    def setUp(self):
+        from carousel.settings_cache import (
+            REDIS_HASH_KEY,
+            REDIS_REV_KEY,
+            reset_cache_for_tests,
+        )
+        from core.redis_queue import get_redis_client
+
+        reset_cache_for_tests()
+        client = get_redis_client()
+        client.delete(REDIS_HASH_KEY, REDIS_REV_KEY)
+        CarouselSettings.objects.all().delete()
+
     def test_returns_settings_for_requested_number(self):
         CarouselSettings.objects.create(
             number=1,
@@ -128,6 +143,87 @@ class GetCarouselSettingsDataTests(TestCase):
 
     def test_returns_none_when_missing(self):
         self.assertIsNone(get_carousel_settings_data(99))
+
+
+class SettingsCacheSignalTests(TestCase):
+    def setUp(self):
+        from carousel.settings_cache import (
+            REDIS_HASH_KEY,
+            REDIS_REV_KEY,
+            reset_cache_for_tests,
+        )
+        from core.redis_queue import get_redis_client
+
+        reset_cache_for_tests()
+        self.redis = get_redis_client()
+        self.redis.delete(REDIS_HASH_KEY, REDIS_REV_KEY)
+        CarouselSettings.objects.all().delete()
+
+    def test_save_updates_cache_and_bumps_redis_rev(self):
+        from carousel.settings_cache import REDIS_REV_KEY, get_settings_dict
+
+        row = CarouselSettings.objects.create(
+            number=1,
+            name='Cached',
+            weight_correction_value=1.5,
+            use_weight_management=True,
+            use_common_correction=True,
+            is_active=False,
+            user=None,
+        )
+        data = get_settings_dict(1)
+        self.assertIsNotNone(data)
+        self.assertEqual(data['weight_correction_value'], 1.5)
+        rev_after_create = int(self.redis.get(REDIS_REV_KEY) or 0)
+        self.assertGreater(rev_after_create, 0)
+
+        row.weight_correction_value = 3.25
+        row.save(update_fields=['weight_correction_value'])
+
+        data = get_settings_dict(1)
+        self.assertEqual(data['weight_correction_value'], 3.25)
+        self.assertGreater(
+            int(self.redis.get(REDIS_REV_KEY) or 0),
+            rev_after_create,
+        )
+
+    def test_delete_removes_from_cache(self):
+        from carousel.settings_cache import get_settings_dict
+
+        row = CarouselSettings.objects.create(
+            number=5,
+            is_active=False,
+            user=None,
+        )
+        self.assertIsNotNone(get_settings_dict(5))
+        row.delete()
+        self.assertIsNone(get_settings_dict(5))
+
+    def test_sync_from_redis_restores_after_local_reset(self):
+        from carousel.listener.processing import check_settings
+        from carousel.settings_cache import (
+            get_settings_dict,
+            reset_cache_for_tests,
+            sync_from_redis_if_stale,
+        )
+
+        CarouselSettings.objects.create(
+            number=1,
+            use_weight_management=True,
+            use_common_correction=True,
+            weight_correction_value=7.0,
+            read_only=False,
+            is_active=False,
+            user=None,
+        )
+        self.assertEqual(get_settings_dict(1)['weight_correction_value'], 7.0)
+
+        reset_cache_for_tests()
+        sync_from_redis_if_stale()
+        post_settings = check_settings(1, post_number=1)
+        self.assertTrue(post_settings.available)
+        self.assertEqual(post_settings.weight_correction, 7.0)
+        self.assertFalse(post_settings.read_only)
 
 
 class AsyncTcpFrameAssemblyTests(IsolatedAsyncioTestCase):
