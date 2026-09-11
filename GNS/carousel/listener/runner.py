@@ -172,9 +172,12 @@ async def run_carousel(config: CarouselInstanceConfig) -> None:
     """
     Внешний цикл переподключения для одной карусели.
 
-    При обрыве — WARNING «Нет связи», затем INFO «Попытка подключения»
-    и «Связь установлена» при успехе. Неожиданные ошибки — пауза
-    FATAL_RESTART_DELAY_SECONDS.
+    Логи состояния связи:
+    - при успехе — INFO «связь установлена»;
+    - при первой неудаче / обрыве — WARNING один раз;
+    - дальнейшие попытки reconnect без повторных сообщений о статусе,
+      пока связь снова не появится.
+    Неожиданные ошибки — пауза FATAL_RESTART_DELAY_SECONDS.
     """
     logger.info(
         "Запуск обработки постов наполнения (карусель %s, NPort %s:%s).",
@@ -183,40 +186,43 @@ async def run_carousel(config: CarouselInstanceConfig) -> None:
         config.tcp_port,
     )
     is_connected = False
-    awaiting_reconnect_attempt_log = True
+    disconnect_logged = False
 
     def mark_connected() -> None:
-        nonlocal is_connected, awaiting_reconnect_attempt_log
+        nonlocal is_connected, disconnect_logged
+        was_down = not is_connected
         is_connected = True
-        awaiting_reconnect_attempt_log = False
-        logger.info(
-            "Карусель=%s связь установлена.",
-            config.number,
-        )
+        disconnect_logged = False
+        if was_down:
+            logger.info(
+                "Карусель=%s связь установлена.",
+                config.number,
+            )
 
     while True:
         try:
-            if awaiting_reconnect_attempt_log:
-                logger.info(
-                    "Карусель=%s попытка подключения к NPort %s:%s...",
-                    config.number,
-                    config.tcp_host,
-                    config.tcp_port,
-                )
-                awaiting_reconnect_attempt_log = False
             await serial_exchange(config, on_connected=mark_connected)
-        except RECONNECTABLE_ERRORS:
+        except RECONNECTABLE_ERRORS as error:
             if is_connected:
                 logger.warning(
                     "Карусель=%s нет связи.",
                     config.number,
                 )
-            is_connected = False
-            awaiting_reconnect_attempt_log = True
+                is_connected = False
+                disconnect_logged = True
+            elif not disconnect_logged:
+                logger.warning(
+                    "Карусель=%s нельзя подключиться к NPort %s:%s (%s).",
+                    config.number,
+                    config.tcp_host,
+                    config.tcp_port,
+                    error,
+                )
+                disconnect_logged = True
             await asyncio.sleep(RECONNECT_DELAY_SECONDS)
         except Exception as error:
             is_connected = False
-            awaiting_reconnect_attempt_log = True
+            disconnect_logged = False
             logger.error(
                 "Карусель=%s ошибка в serial_exchange: %s. "
                 "Перезапуск через %s с...",
