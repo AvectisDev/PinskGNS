@@ -8,7 +8,7 @@
     <div class="row justify-content-center">
         <div class="col-12">
             <h5 class="mb-3">{{ title }}</h5>
-            <form method="post" enctype="multipart/form-data"{% if request.GET %} action="?{{ request.GET.urlencode }}"{% endif %}>
+            <form method="post" class="equipment-form" enctype="multipart/form-data"{% if request.GET %} action="?{{ request.GET.urlencode }}"{% endif %}>
                 {% csrf_token %}
                 {% crispy form %}
             </form>
@@ -19,5 +19,3 @@
 {% endblock content %}
 
 {% block extra_scripts %}{% endblock %}
-
-

@@ -49,16 +49,6 @@
                             </span>
                         </dd>
 
-                        <dt class="col-sm-8">Объём по весу (27/50):</dt>
-                        <dd class="col-sm-4">
-                            <span class="badge bg-{% if carousel_settings.classify_size_by_weight %}success{% else %}secondary{% endif %}">
-                                {% if carousel_settings.classify_size_by_weight %}Да{% else %}Нет{% endif %}
-                            </span>
-                        </dd>
-
-                        <dt class="col-sm-8">Макс. вес пустого 27 л, г:</dt>
-                        <dd class="col-sm-4">{{ carousel_settings.size_27_empty_weight_max_g }}</dd>
-
                         <dt class="col-sm-8">Использовать коррекцию веса:</dt>
                         <dd class="col-sm-4">
                             <span class="badge bg-{% if carousel_settings.use_weight_management %}success{% else %}secondary{% endif %}">
