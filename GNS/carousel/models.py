@@ -63,7 +63,7 @@ class CarouselSettings(models.Model):
     )
     is_active = models.BooleanField(
         default=True,
-        verbose_name="Активна (listener)",
+        verbose_name="Активна",
     )
     classify_size_by_weight = models.BooleanField(
         default=False,

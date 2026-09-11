@@ -33,7 +33,7 @@
                         <dt class="col-sm-8">RFID-считыватель:</dt>
                         <dd class="col-sm-4">{{ carousel_settings.rfid_reader_id|default:"—" }}</dd>
 
-                        <dt class="col-sm-8">Активна (listener):</dt>
+                        <dt class="col-sm-8">Активна:</dt>
                         <dd class="col-sm-4">
                             <span class="badge bg-{% if carousel_settings.is_active %}success{% else %}secondary{% endif %}">
                                 {% if carousel_settings.is_active %}Да{% else %}Нет{% endif %}
