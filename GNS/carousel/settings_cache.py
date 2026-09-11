@@ -35,6 +35,8 @@ class CarouselSettingsSnapshot:
     tcp_port: int = 4001
     rfid_reader_id: Optional[int] = None
     is_active: bool = True
+    classify_size_by_weight: bool = False
+    size_27_empty_weight_max_g: int = 16000
     read_only: bool = True
     use_weight_management: bool = False
     use_common_correction: bool = False

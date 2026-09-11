@@ -65,6 +65,14 @@ class CarouselSettings(models.Model):
         default=True,
         verbose_name="Активна (listener)",
     )
+    classify_size_by_weight = models.BooleanField(
+        default=False,
+        verbose_name="Определять объём (27/50) по весу пустого баллона",
+    )
+    size_27_empty_weight_max_g = models.PositiveIntegerField(
+        default=16000,
+        verbose_name="Макс. вес пустого 27 л, г",
+    )
 
     read_only = models.BooleanField(default=True, verbose_name="Только чтение с постов наполнения")
     use_weight_management = models.BooleanField(default=False, verbose_name="Использовать коррекцию веса")

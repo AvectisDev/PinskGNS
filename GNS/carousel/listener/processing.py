@@ -179,13 +179,29 @@ def check_settings(carousel_number: int, post_number: int) -> PostSettings:
     )
 
 
-def check_balloon_size(weight: int) -> int:
+def check_balloon_size(
+    weight: int,
+    *,
+    classify: bool = False,
+    size_27_max_g: int = 16000,
+) -> int:
     """
-    Определяет объём баллона по весу пустого баллона на посту.
+    Определяет объём баллона по весу пустого баллона на посту (граммы).
 
-    Сейчас всегда возвращает 50 л — пороги по весу отключены
-  (см. историю в git); при необходимости восстановить ветвление по weight.
+    Если classify выключен — всегда 50 л.
+    Если включён: weight <= size_27_max_g → 27, иначе 50.
+    При weight <= 0 — fallback 50 с WARNING.
     """
+    if not classify:
+        return 50
+    if weight <= 0:
+        logger.warning(
+            'Некорректный вес пустого баллона %s г — объём по умолчанию 50 л',
+            weight,
+        )
+        return 50
+    if weight <= size_27_max_g:
+        return 27
     return 50
 
 
@@ -210,11 +226,19 @@ def request_processing(
     """
     response_required = False
     full_weight = 0
+    settings_data = get_carousel_settings_data(carousel_number) or {}
+    balloon_size = check_balloon_size(
+        weight,
+        classify=bool(settings_data.get('classify_size_by_weight')),
+        size_27_max_g=int(
+            settings_data.get('size_27_empty_weight_max_g') or 16000
+        ),
+    )
     process_data_to_server = {
         'carousel_number': carousel_number,
         'request_type': request_type,
         'post_number': post_number,
-        'size': check_balloon_size(weight)
+        'size': balloon_size,
     }
 
     if request_type == REQUEST_TYPE_FILL_STR:
