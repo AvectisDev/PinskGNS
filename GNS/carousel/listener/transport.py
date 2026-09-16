@@ -10,7 +10,6 @@ from __future__ import annotations
 
 import asyncio
 import logging
-import socket
 import time
 
 from .config import (
@@ -28,26 +27,6 @@ class PartialBufferStaleError(ConnectionError):
 
 class ConnectionIdleError(ConnectionError):
     """Долго нет данных от NPort — вероятный half-open TCP, нужен reconnect."""
-
-
-def _enable_tcp_keepalive(writer: asyncio.StreamWriter) -> None:
-    """Включает SO_KEEPALIVE (доп. детекция мёртвого peer на уровне ОС)."""
-    sock = writer.get_extra_info('socket')
-    if sock is None:
-        return
-    try:
-        sock.setsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1)
-        if hasattr(socket, 'TCP_KEEPIDLE'):
-            sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_KEEPIDLE, 60)
-            if hasattr(socket, 'TCP_KEEPINTVL'):
-                sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_KEEPINTVL, 10)
-            if hasattr(socket, 'TCP_KEEPCNT'):
-                sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_KEEPCNT, 3)
-        elif hasattr(socket, 'TCP_KEEPALIVE'):
-            # Windows: idle до первого probe, секунды
-            sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_KEEPALIVE, 60)
-    except OSError:
-        logger.debug('TCP keepalive недоступен', exc_info=True)
 
 
 class AsyncTcpTransport:
@@ -99,7 +78,6 @@ class AsyncTcpTransport:
             raise TimeoutError(
                 f'Таймаут подключения к NPort {host}:{port}'
             ) from error
-        _enable_tcp_keepalive(writer)
         return cls(
             host,
             port,
