@@ -11,12 +11,15 @@ from datetime import datetime
 from core.opc import create_opc_client, disconnect_opc
 from railway_service.models import RailwayBatch, RailwayTank, RailwayTankHistory
 from railway_service.services.ocryp import log_number_comparison
+from railway_service.services.status_log import log_railway_tank_status
 from .intellect import get_registration_number_list, INTELLECT_SERVER_LIST, get_plate_image
 
 logger = logging.getLogger('railway')
 
 
 class Command(BaseCommand):
+    PENDING_REQUEST_CACHE_TIMEOUT = 30
+
     OPC_NODE_PATHS = {
         "tank_weight": "ns=4; s=Address Space.PLC_SU1.tank.stable_weight",
         "camera_worked": "ns=4; s=Address Space.PLC_SU1.tank.camera_worked",
@@ -204,13 +207,22 @@ class Command(BaseCommand):
 
             cache_key = 'railway_tank_processing'
             cached_data = cache.get(cache_key)
-            
-            opc_values = f'tank_weight={tank_weight}, camera_worked={camera_worked}, is_on_station={is_on_station}'
+            opc_values = (
+                f'tank_weight={tank_weight}, '
+                f'camera_worked={camera_worked}, '
+                f'is_on_station={is_on_station}'
+            )
+
+            log_railway_tank_status(opc_values)
+
             if opc_values == cached_data:
                 return
-            
-            cache.set(cache_key, opc_values, timeout=3600)
-            logger.info(opc_values)
+
+            cache.set(
+                cache_key,
+                opc_values,
+                timeout=self.PENDING_REQUEST_CACHE_TIMEOUT if camera_worked else None,
+            )
 
             if not camera_worked:
                 return
