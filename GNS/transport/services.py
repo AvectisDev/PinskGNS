@@ -12,11 +12,39 @@ from transport.management.commands.intellect import check_on_station
 logger = logging.getLogger('kpp')
 
 CACHE_TIMEOUT = 300
+NUMBERS_SNAPSHOT_CACHE_KEY = 'kpp:last_logged_numbers'
 Vehicle = Union[Truck, Trailer]
 
 
 def _event_cache_key(registration_number: str, is_on_station: bool) -> str:
     return f'kpp:{registration_number}:{int(is_on_station)}'
+
+
+def _log_unique(
+    cache_key: str,
+    message: str,
+    *,
+    level: int = logging.DEBUG,
+    timeout: Optional[int] = CACHE_TIMEOUT,
+) -> None:
+    if cache.get(cache_key) == message:
+        return
+    logger.log(level, message)
+    cache.set(cache_key, message, timeout)
+
+
+def log_kpp_numbers_snapshot(numbers: list[Any]) -> None:
+    """
+    Пишет список номеров в kpp.log только при изменении.
+    Пустой список не логируется, но сохраняется в кеш, чтобы повторное
+    появление тех же номеров снова попало в лог.
+    """
+    snapshot = list(numbers)
+    if cache.get(NUMBERS_SNAPSHOT_CACHE_KEY) == snapshot:
+        return
+    if snapshot:
+        logger.debug(f'КПП. Список номеров c интеллекта: {snapshot}')
+    cache.set(NUMBERS_SNAPSHOT_CACHE_KEY, snapshot, timeout=None)
 
 
 def find_vehicle(registration_number: str) -> Optional[Vehicle]:
@@ -68,9 +96,10 @@ def process_kpp_event(transport: Mapping[str, Any]) -> None:
 
     cache_key = _event_cache_key(registration_number, is_on_station)
     if cache.get(cache_key):
-        logger.debug(
+        _log_unique(
+            f'{cache_key}:skip_log',
             f'КПП. Номер {registration_number} с направлением '
-            f'{"въезд" if is_on_station else "выезд"} уже обрабатывался'
+            f'{"въезд" if is_on_station else "выезд"} уже обрабатывался',
         )
         return
 

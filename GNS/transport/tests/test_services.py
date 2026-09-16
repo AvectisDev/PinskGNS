@@ -1,7 +1,8 @@
 from datetime import datetime
+from unittest.mock import patch
 
 from django.core.cache import cache
-from django.test import TestCase, override_settings
+from django.test import SimpleTestCase, TestCase, override_settings
 from django.utils import timezone
 
 from filling_station.models import Truck
@@ -9,6 +10,7 @@ from transport.management.commands.intellect import get_start_time
 from transport.services import (
     close_all_on_station,
     find_vehicle,
+    log_kpp_numbers_snapshot,
     process_kpp_event,
     process_kpp_events,
 )
@@ -120,6 +122,49 @@ class KppServiceTests(TransportFixturesMixin, TestCase):
         })
         self.trailer.refresh_from_db()
         self.assertTrue(self.trailer.is_on_station)
+
+    def test_duplicate_event_skip_is_logged_once(self):
+        process_kpp_event(ENTRY_EVENT)
+        with self.assertLogs('kpp', level='DEBUG') as captured:
+            process_kpp_event(ENTRY_EVENT)
+            process_kpp_event(ENTRY_EVENT)
+        skip_logs = [line for line in captured.output if 'уже обрабатывался' in line]
+        self.assertEqual(len(skip_logs), 1)
+
+
+@override_settings(CACHES={
+    'default': {
+        'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+        'LOCATION': 'transport-kpp-snapshot-tests',
+    }
+})
+class KppNumbersSnapshotTests(SimpleTestCase):
+    def setUp(self):
+        cache.clear()
+
+    @patch('transport.services.logger')
+    def test_empty_and_unchanged_lists_are_not_logged(self, logger):
+        log_kpp_numbers_snapshot([])
+        log_kpp_numbers_snapshot([])
+        logger.debug.assert_not_called()
+
+        log_kpp_numbers_snapshot(['AC12781'])
+        log_kpp_numbers_snapshot(['AC12781'])
+        logger.debug.assert_called_once_with(
+            "КПП. Список номеров c интеллекта: ['AC12781']"
+        )
+
+        log_kpp_numbers_snapshot(['AC12781', 'A2783K1'])
+        self.assertEqual(logger.debug.call_count, 2)
+        logger.debug.assert_called_with(
+            "КПП. Список номеров c интеллекта: ['AC12781', 'A2783K1']"
+        )
+
+        log_kpp_numbers_snapshot([])
+        self.assertEqual(logger.debug.call_count, 2)
+
+        log_kpp_numbers_snapshot(['AC12781'])
+        self.assertEqual(logger.debug.call_count, 3)
 
 
 class IntellectTimeOffsetTests(TestCase):
