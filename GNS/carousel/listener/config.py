@@ -20,6 +20,10 @@ REQUEST_CACHE_SECONDS = 2.0
 RECONNECT_DELAY_SECONDS = 60
 FATAL_RESTART_DELAY_SECONDS = 300
 STALE_PARTIAL_BUFFER_SECONDS = 10.0
+# Нет байт от NPort дольше этого порога → закрыть сокет и переподключиться.
+# Нужно при half-open TCP: обесточивание NPort без FIN/RST, read() только
+# таймаутится и цикл listener иначе ждёт вечно.
+CONNECTION_IDLE_TIMEOUT_SECONDS = 300.0
 
 RECONNECTABLE_ERRORS = (
     ConnectionError,

@@ -343,6 +343,26 @@ class AsyncTcpFrameAssemblyTests(IsolatedAsyncioTestCase):
             await tcp_transport.read_frame(8)
         self.assertEqual(tcp_transport._buffer, bytearray())
 
+    async def test_connection_idle_raises_after_silence(self):
+        """Half-open: долгий таймаут без байт → reconnect, не вечное ожидание."""
+        reader = AsyncMock()
+        reader.read = AsyncMock(side_effect=TimeoutError())
+        writer = MagicMock()
+        writer.close = MagicMock()
+        writer.wait_closed = AsyncMock()
+
+        tcp_transport = transport.AsyncTcpTransport(
+            '127.0.0.1',
+            4001,
+            1.0,
+            reader=reader,
+            writer=writer,
+            idle_timeout=5.0,
+        )
+        tcp_transport._last_rx_at = time.monotonic() - 6.0
+        with self.assertRaises(transport.ConnectionIdleError):
+            await tcp_transport.read_frame(8)
+
 
 class CarouselRequestProcessingTests(SimpleTestCase):
     def setUp(self):
