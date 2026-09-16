@@ -1,9 +1,10 @@
 from datetime import timedelta
 from decimal import Decimal
+from unittest.mock import patch
 
 from django.core.cache import cache
 from django.db import IntegrityError, transaction
-from django.test import TestCase, override_settings
+from django.test import SimpleTestCase, TestCase, override_settings
 from django.utils import timezone
 
 from autogas.models import AutoGasBatch
@@ -17,6 +18,8 @@ from autogas.services import (
     get_batch_statistic,
     get_today_active_batches,
     get_truck_capacity,
+    log_autogas_batch_status,
+    log_autogas_numbers_snapshot,
     resolve_batch_type,
     resolve_gas_type,
     with_completed_at_on_deactivate,
@@ -203,3 +206,52 @@ class StatisticCacheTests(AutoGasFixturesMixin, TestCase):
             fresh['unloading_batch']['СПБТ']['today_unloading_batches'],
             1,
         )
+
+
+@override_settings(CACHES={
+    'default': {
+        'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+        'LOCATION': 'autogas-log-snapshot-tests',
+    }
+})
+class AutoGasLogSnapshotTests(SimpleTestCase):
+    def setUp(self):
+        cache.clear()
+
+    @patch('autogas.services.logger')
+    def test_batch_status_logged_only_when_changed(self, logger):
+        idle = {
+            'batch_type_code': 2,
+            'gas_type': 2,
+            'request_batch_create': False,
+            'request_batch_complete': False,
+        }
+        log_autogas_batch_status(idle)
+        log_autogas_batch_status(idle)
+        logger.debug.assert_called_once_with(
+            'Тип партии=2, Тип газа=2, Запрос создания=False, Запрос завершения=False'
+        )
+
+        creating = {**idle, 'request_batch_create': True}
+        log_autogas_batch_status(creating)
+        self.assertEqual(logger.debug.call_count, 2)
+        logger.debug.assert_called_with(
+            'Тип партии=2, Тип газа=2, Запрос создания=True, Запрос завершения=False'
+        )
+
+    @patch('autogas.services.logger')
+    def test_empty_and_unchanged_numbers_are_not_logged(self, logger):
+        log_autogas_numbers_snapshot([])
+        log_autogas_numbers_snapshot([])
+        logger.debug.assert_not_called()
+
+        log_autogas_numbers_snapshot(['AC17911', 'AP75311'])
+        log_autogas_numbers_snapshot(['AC17911', 'AP75311'])
+        logger.debug.assert_called_once_with(
+            "Список номеров: ['AC17911', 'AP75311']"
+        )
+
+        log_autogas_numbers_snapshot([])
+        self.assertEqual(logger.debug.call_count, 1)
+        log_autogas_numbers_snapshot(['AC17911', 'AP75311'])
+        self.assertEqual(logger.debug.call_count, 2)

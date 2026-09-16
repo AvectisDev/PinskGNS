@@ -1,4 +1,8 @@
+from __future__ import annotations
+
 import logging
+from typing import Any
+
 from opcua import ua
 from django.conf import settings
 from django.core.management.base import BaseCommand
@@ -12,6 +16,8 @@ from autogas.services import (
     complete_active_batch,
     create_active_batch,
     get_truck_capacity,
+    log_autogas_batch_status,
+    log_autogas_numbers_snapshot,
     resolve_batch_type,
     resolve_gas_type,
 )
@@ -20,9 +26,32 @@ from .intellect import get_registration_number_list, INTELLECT_SERVER_LIST
 
 logger = logging.getLogger('autogas')
 
+_INTEGER_VARIANT_TYPES = frozenset({
+    ua.VariantType.SByte,
+    ua.VariantType.Byte,
+    ua.VariantType.Int16,
+    ua.VariantType.UInt16,
+    ua.VariantType.Int32,
+    ua.VariantType.UInt32,
+    ua.VariantType.Int64,
+    ua.VariantType.UInt64,
+})
+
+
+def convert_value_for_opc(value: Any, variant_type: ua.VariantType) -> Any:
+    """Приводит значение к Python-типу, который python-opcua отправит как variant_type."""
+    if variant_type == ua.VariantType.Boolean:
+        return bool(value)
+    if variant_type in _INTEGER_VARIANT_TYPES:
+        return int(value)
+    if variant_type in (ua.VariantType.Float, ua.VariantType.Double):
+        return float(value)
+    if variant_type == ua.VariantType.String:
+        return str(value)
+    return value
+
 
 class Command(BaseCommand):
-    DEFAULT_CACHE_TIMEOUT = 1200
     PENDING_REQUEST_CACHE_TIMEOUT = 30
 
     OPC_NODE_PATHS = {
@@ -74,41 +103,28 @@ class Command(BaseCommand):
             logger.error(f"Error getting OPC value for {node_key}: {error}", exc_info=True)
             return None
 
+    def _resolve_opc_variant_type(self, node) -> ua.VariantType:
+        try:
+            return node.get_data_type_as_variant_type()
+        except Exception:
+            return node.get_data_value().Value.VariantType
+
     def set_opc_value(self, node_key, value):
         """Устанавливает значение в OPC UA сервере по ключу"""
         node_path = self.OPC_NODE_PATHS.get(node_key)
         if not node_path:
             logger.error(f"Invalid OPC node key: {node_key}")
+            return
 
         try:
             node = self.client.get_node(node_path)
-
-            # Получаем текущий тип значения узла
-            node_value = node.get_value()
-
-            # Преобразуем value к типу current_value
-            if node_value is not None:
-                target_type = type(node_value)
-                try:
-                    if target_type == bool:
-                        converted_value = bool(value)
-                    elif target_type == int:
-                        converted_value = int(value)
-                    elif target_type == float:
-                        converted_value = float(value)
-                    elif target_type == str:
-                        converted_value = str(value)
-                    else:
-                        converted_value = value
-                except (ValueError, TypeError):
-                    logger.warning(f"Cannot convert {value} to {target_type}, using default")
-                    converted_value = target_type()  # Значение по умолчанию для типа
-            else:
-                converted_value = value
-
-            logger.debug(f"Setting {node_key} to {converted_value} (type: {type(converted_value)})")
-            node.set_attribute(ua.AttributeIds.Value, ua.DataValue(converted_value))
-
+            variant_type = self._resolve_opc_variant_type(node)
+            converted_value = convert_value_for_opc(value, variant_type)
+            logger.debug(
+                f'Setting {node_key} to {converted_value} '
+                f'(type: {type(converted_value)}, ua: {variant_type.name})'
+            )
+            node.set_value(converted_value, variant_type)
         except Exception as error:
             logger.error(f"Error setting OPC value for {node_key}: {error}", exc_info=True)
 
@@ -116,10 +132,9 @@ class Command(BaseCommand):
         """Получает список номеров из Интеллекта"""
         try:
             transport_list = get_registration_number_list(INTELLECT_SERVER_LIST[1])
-            if not transport_list:
-                logger.debug('Машина не определена')
-                return []
-            return [transport['number'] for transport in transport_list]
+            numbers = [transport['number'] for transport in transport_list] if transport_list else []
+            log_autogas_numbers_snapshot(numbers)
+            return numbers
         except Exception as e:
             logger.error(f'Ошибка при получении списка номеров: {e}', exc_info=True)
             return []
@@ -161,7 +176,6 @@ class Command(BaseCommand):
         if not registration_numbers:
             logger.warning('Список номеров пуст, партия не создана')
             return
-        logger.debug(f'Список номеров: {registration_numbers}')
 
         truck, trailer = self.find_transports(registration_numbers)
 
@@ -227,20 +241,15 @@ class Command(BaseCommand):
             cache_timeout = (
                 self.PENDING_REQUEST_CACHE_TIMEOUT
                 if (has_pending_create or has_pending_complete)
-                else self.DEFAULT_CACHE_TIMEOUT
+                else None
             )
+
+            log_autogas_batch_status(opc_values)
 
             if opc_values_str == cached_data:
                 return
 
             cache.set(cache_key, opc_values_str, timeout=cache_timeout)
-
-            logger.debug(
-                f'Тип партии={opc_values["batch_type_code"]}, '
-                f'Тип газа={opc_values["gas_type"]}, '
-                f'Запрос создания={opc_values["request_batch_create"]}, '
-                f'Запрос завершения={opc_values["request_batch_complete"]}'
-            )
 
             # Обработка создания партии
             if opc_values["request_batch_create"] and not opc_values["response_batch_create"]:
