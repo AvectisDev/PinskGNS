@@ -3,6 +3,7 @@ from django.test import SimpleTestCase, TestCase
 from unittest import IsolatedAsyncioTestCase
 from unittest.mock import AsyncMock, MagicMock, patch
 import asyncio
+import socket
 import time
 
 from filling_station.models import ReaderSettings
@@ -343,8 +344,8 @@ class AsyncTcpFrameAssemblyTests(IsolatedAsyncioTestCase):
             await tcp_transport.read_frame(8)
         self.assertEqual(tcp_transport._buffer, bytearray())
 
-    async def test_connection_idle_raises_after_silence(self):
-        """Half-open: долгий таймаут без байт → reconnect, не вечное ожидание."""
+    async def test_read_timeout_without_data_keeps_connection(self):
+        """Тишина постов: пустой таймаут → b'', без закрытия соединения."""
         reader = AsyncMock()
         reader.read = AsyncMock(side_effect=TimeoutError())
         writer = MagicMock()
@@ -357,11 +358,20 @@ class AsyncTcpFrameAssemblyTests(IsolatedAsyncioTestCase):
             1.0,
             reader=reader,
             writer=writer,
-            idle_timeout=5.0,
         )
-        tcp_transport._last_rx_at = time.monotonic() - 6.0
-        with self.assertRaises(transport.ConnectionIdleError):
-            await tcp_transport.read_frame(8)
+        self.assertEqual(await tcp_transport.read_frame(8), b'')
+        writer.close.assert_not_called()
+
+    def test_enable_tcp_keepalive_sets_options(self):
+        writer = MagicMock()
+        sock = MagicMock()
+        writer.get_extra_info = MagicMock(return_value=sock)
+
+        transport._enable_tcp_keepalive(writer)
+
+        sock.setsockopt.assert_any_call(
+            socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1
+        )
 
 
 class CarouselRequestProcessingTests(SimpleTestCase):

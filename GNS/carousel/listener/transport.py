@@ -10,23 +10,62 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import socket
 import time
 
-from .config import (
-    CONNECTION_IDLE_TIMEOUT_SECONDS,
-    FRAME_SIZE,
-    STALE_PARTIAL_BUFFER_SECONDS,
-)
+from .config import FRAME_SIZE, STALE_PARTIAL_BUFFER_SECONDS
 
 logger = logging.getLogger('carousel')
+
+# Keepalive: детект half-open после обесточивания NPort (~2 мин без peer).
+_TCP_KEEPALIVE_IDLE_SECONDS = 60
+_TCP_KEEPALIVE_INTERVAL_SECONDS = 10
+_TCP_KEEPALIVE_COUNT = 5
 
 
 class PartialBufferStaleError(ConnectionError):
     """Неполный кадр в буфере не дополнен за STALE_PARTIAL_BUFFER_SECONDS."""
 
 
-class ConnectionIdleError(ConnectionError):
-    """Долго нет данных от NPort — вероятный half-open TCP, нужен reconnect."""
+def _enable_tcp_keepalive(writer: asyncio.StreamWriter) -> None:
+    """
+    Включает SO_KEEPALIVE на asyncio-сокете (только setsockopt, без sync I/O).
+
+    Нужен при half-open TCP: peer исчез без FIN/RST, прикладных байт нет,
+    но соединение должно закрыться ОС и дать reconnect в run_carousel.
+    """
+    sock = writer.get_extra_info('socket')
+    if sock is None:
+        return
+    try:
+        sock.setsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1)
+        if hasattr(socket, 'TCP_KEEPIDLE'):
+            sock.setsockopt(
+                socket.IPPROTO_TCP,
+                socket.TCP_KEEPIDLE,
+                _TCP_KEEPALIVE_IDLE_SECONDS,
+            )
+            if hasattr(socket, 'TCP_KEEPINTVL'):
+                sock.setsockopt(
+                    socket.IPPROTO_TCP,
+                    socket.TCP_KEEPINTVL,
+                    _TCP_KEEPALIVE_INTERVAL_SECONDS,
+                )
+            if hasattr(socket, 'TCP_KEEPCNT'):
+                sock.setsockopt(
+                    socket.IPPROTO_TCP,
+                    socket.TCP_KEEPCNT,
+                    _TCP_KEEPALIVE_COUNT,
+                )
+        elif hasattr(socket, 'TCP_KEEPALIVE'):
+            # Windows: время idle до первого probe, секунды
+            sock.setsockopt(
+                socket.IPPROTO_TCP,
+                socket.TCP_KEEPALIVE,
+                _TCP_KEEPALIVE_IDLE_SECONDS,
+            )
+    except OSError:
+        logger.debug('TCP keepalive недоступен', exc_info=True)
 
 
 class AsyncTcpTransport:
@@ -35,6 +74,7 @@ class AsyncTcpTransport:
 
     Соединение держится открытым; данные с RS-485 пушатся в сокет без polling.
     Частичные TCP-сегменты накапливаются в буфере до полного кадра.
+    Тишина постов не закрывает соединение; half-open ловит TCP keepalive.
     """
 
     def __init__(
@@ -45,17 +85,14 @@ class AsyncTcpTransport:
         *,
         reader: asyncio.StreamReader,
         writer: asyncio.StreamWriter,
-        idle_timeout: float = CONNECTION_IDLE_TIMEOUT_SECONDS,
     ) -> None:
         self._host = host
         self._port = port
         self._timeout = timeout
-        self._idle_timeout = idle_timeout
         self._reader = reader
         self._writer = writer
         self._buffer = bytearray()
         self._partial_buffer_since: float | None = None
-        self._last_rx_at = time.monotonic()
 
     @classmethod
     async def connect(
@@ -63,8 +100,6 @@ class AsyncTcpTransport:
         host: str,
         port: int,
         timeout: float,
-        *,
-        idle_timeout: float = CONNECTION_IDLE_TIMEOUT_SECONDS,
     ) -> AsyncTcpTransport:
         """Устанавливает TCP-соединение с NPort."""
         if not host:
@@ -78,24 +113,17 @@ class AsyncTcpTransport:
             raise TimeoutError(
                 f'Таймаут подключения к NPort {host}:{port}'
             ) from error
-        return cls(
-            host,
-            port,
-            timeout,
-            reader=reader,
-            writer=writer,
-            idle_timeout=idle_timeout,
-        )
+        _enable_tcp_keepalive(writer)
+        return cls(host, port, timeout, reader=reader, writer=writer)
 
     def _reset_partial_buffer_timer(self) -> None:
         self._partial_buffer_since = None
 
     def _handle_read_timeout(self, size: int) -> bytes:
         """
-        Обрабатывает таймаут чтения: пустой кадр, idle reconnect или stale.
+        Обрабатывает таймаут чтения: пустой кадр или stale partial.
 
         Raises:
-            ConnectionIdleError: Нет данных дольше CONNECTION_IDLE_TIMEOUT.
             PartialBufferStaleError: Неполный кадр висит слишком долго.
         """
         if self._buffer:
@@ -121,14 +149,6 @@ class AsyncTcpTransport:
                 size,
                 bytes(self._buffer).hex().upper(),
             )
-            return b''
-
-        idle_for = time.monotonic() - self._last_rx_at
-        if idle_for >= self._idle_timeout:
-            raise ConnectionIdleError(
-                f'Нет данных от NPort {idle_for:.0f} с '
-                f'(порог {self._idle_timeout:.0f} с) — переподключение'
-            )
         return b''
 
     async def read_frame(self, size: int = FRAME_SIZE) -> bytes:
@@ -136,10 +156,9 @@ class AsyncTcpTransport:
         Читает один кадр из TCP-потока.
 
         При таймауте без данных возвращает пустые байты — цикл listener
-        продолжает ждать. Если байт нет дольше CONNECTION_IDLE_TIMEOUT,
-        поднимает ConnectionIdleError (half-open после обесточивания NPort).
-        Если в буфере есть неполный кадр дольше STALE_PARTIAL_BUFFER_SECONDS,
-        сбрасывает буфер и поднимает PartialBufferStaleError.
+        продолжает ждать (тишина постов допустима часами). Если в буфере
+        есть неполный кадр дольше STALE_PARTIAL_BUFFER_SECONDS, сбрасывает
+        буфер и поднимает PartialBufferStaleError для переподключения.
         """
         while len(self._buffer) < size:
             try:
@@ -151,7 +170,6 @@ class AsyncTcpTransport:
                 return self._handle_read_timeout(size)
             if not chunk:
                 raise ConnectionError('NPort закрыл TCP-соединение')
-            self._last_rx_at = time.monotonic()
             if not self._buffer:
                 self._partial_buffer_since = time.monotonic()
             logger.debug(
