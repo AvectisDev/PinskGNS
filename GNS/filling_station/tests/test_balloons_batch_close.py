@@ -7,6 +7,7 @@ from rest_framework.test import APITestCase
 
 from filling_station.exceptions import MiriadaAPIError
 from filling_station.models import Balloon, BalloonsBatch, BatchStatus, ReaderSettings, Truck, TruckType
+from filling_station.api.balloon_batches import _balloon_operation_error_status
 from filling_station.api.batch_status import STATUS_TO_API
 from filling_station.services import (
     add_balloon_to_batch_by_nfc,
@@ -290,3 +291,39 @@ class BalloonsBatchCloseTests(APITestCase):
         url = reverse('filling_station_api:balloons-loading-add-balloon', args=[self.batch.id])
         response = self.client.patch(url, {'nfc': self.balloon.nfc_tag}, format='json')
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_api_add_balloon_conflict_when_already_in_batch(self):
+        url = reverse('filling_station_api:balloons-loading-add-balloon', args=[self.batch.id])
+        first = self.client.patch(url, {'nfc': self.balloon.nfc_tag}, format='json')
+        self.assertEqual(first.status_code, status.HTTP_200_OK)
+        response = self.client.patch(url, {'nfc': self.balloon.nfc_tag}, format='json')
+        self.assertEqual(response.status_code, status.HTTP_409_CONFLICT)
+        self.assertIn('уже в партии', response.data['message'])
+
+    def test_api_add_balloon_not_found(self):
+        url = reverse('filling_station_api:balloons-loading-add-balloon', args=[self.batch.id])
+        response = self.client.patch(url, {'nfc': 'missingnfc0001'}, format='json')
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_api_remove_balloon_not_in_batch(self):
+        url = reverse('filling_station_api:balloons-loading-remove-balloon', args=[self.batch.id])
+        response = self.client.patch(url, {'nfc': self.balloon.nfc_tag}, format='json')
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_balloon_operation_error_status_mapping(self):
+        self.assertEqual(
+            _balloon_operation_error_status('Баллон с меткой x уже в партии'),
+            status.HTTP_409_CONFLICT,
+        )
+        self.assertEqual(
+            _balloon_operation_error_status('Баллон с меткой x не найден в партии'),
+            status.HTTP_404_NOT_FOUND,
+        )
+        self.assertEqual(
+            _balloon_operation_error_status('Партия не принимает изменения в текущем статусе'),
+            status.HTTP_400_BAD_REQUEST,
+        )
+        self.assertEqual(
+            _balloon_operation_error_status('Ошибка сервера: boom'),
+            status.HTTP_500_INTERNAL_SERVER_ERROR,
+        )

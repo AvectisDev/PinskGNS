@@ -71,6 +71,30 @@ _BATCH_STATUS_DOC = (
 )
 
 
+def _balloon_operation_error_status(message: str | None) -> int:
+    """
+    HTTP-статус для отказа add/remove balloon.
+
+    Бизнес-отказы не должны уходить как 500: иначе django.request
+    пишет Internal Server Error в stderr NSSM.
+
+    Args:
+        message: текст отказа из ``BalloonsBatch.add_balloon`` / ``remove_balloon``.
+
+    Returns:
+        int: 409 при дубликате в партии, 404 если метка не найдена,
+        500 только для непредвиденной ошибки сервера, иначе 400.
+    """
+    text = message or ''
+    if 'уже в партии' in text:
+        return status.HTTP_409_CONFLICT
+    if 'не найден' in text:
+        return status.HTTP_404_NOT_FOUND
+    if text.startswith('Ошибка сервера'):
+        return status.HTTP_500_INTERNAL_SERVER_ERROR
+    return status.HTTP_400_BAD_REQUEST
+
+
 def _api_error_payload(payload):
     """
     Нормализует payload ошибки: статус партии переводит в API-enum.
@@ -564,7 +588,7 @@ class BalloonsBatchViewSet(viewsets.ViewSet):
             pk: ID партии.
 
         Returns:
-            Response: результат операции или ошибка 400/500.
+            Response: результат операции или ошибка 400/404/409.
         """
         batch_type = self.get_batch_type(request)
         if not batch_type:
@@ -599,7 +623,10 @@ class BalloonsBatchViewSet(viewsets.ViewSet):
             f"API add-balloon failed: user={_api_user(request)}, batch_id={batch.id}, "
             f"nfc={nfc}, message={result.get('message')}"
         )
-        return Response({'message': result.get('message')}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        return Response(
+            {'message': result.get('message')},
+            status=_balloon_operation_error_status(result.get('message')),
+        )
 
     @action(detail=True, methods=['patch'], url_path='remove-balloon')
     def remove_balloon(self, request, pk=None):
@@ -611,7 +638,7 @@ class BalloonsBatchViewSet(viewsets.ViewSet):
             pk: ID партии.
 
         Returns:
-            Response: результат операции или ошибка 400/500.
+            Response: результат операции или ошибка 400/404.
         """
         batch_type = self.get_batch_type(request)
         if not batch_type:
@@ -646,7 +673,10 @@ class BalloonsBatchViewSet(viewsets.ViewSet):
             f"API remove-balloon failed: user={_api_user(request)}, batch_id={batch.id}, "
             f"nfc={nfc}, message={result.get('message')}"
         )
-        return Response({'message': result.get('message')}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        return Response(
+            {'message': result.get('message')},
+            status=_balloon_operation_error_status(result.get('message')),
+        )
 
     @action(detail=True, methods=['post'], url_path='pause')
     def pause(self, request, pk=None):
