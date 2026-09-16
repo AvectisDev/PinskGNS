@@ -10,6 +10,7 @@ from django.conf import settings
 from datetime import datetime
 from core.opc import create_opc_client, disconnect_opc
 from railway_service.models import RailwayBatch, RailwayTank, RailwayTankHistory
+from railway_service.services.ocryp import log_number_comparison
 from .intellect import get_registration_number_list, INTELLECT_SERVER_LIST, get_plate_image
 
 logger = logging.getLogger('railway')
@@ -232,6 +233,15 @@ class Command(BaseCommand):
                 return
 
             cache.set('last_tank_number', registration_number)
+
+            if getattr(settings, 'OCRYP_URL', ''):
+                try:
+                    log_number_comparison(registration_number, image_data)
+                except Exception as error:
+                    logger.error(
+                        f'OCR сравнение завершилось ошибкой: {error}',
+                        exc_info=True,
+                    )
 
             # Вызываем метод обработки цистерн
             railway_tank = self.tank_process(registration_number, image_data, is_on_station, tank_weight)

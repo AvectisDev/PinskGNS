@@ -125,7 +125,7 @@ redis-server
 
 - **railway_tank_processing** (`railway_service.tasks.railway_tank_processing`)
   - обработка данных по железнодорожным цистернам (management-команда `railway_tank`)
-  - каждые 10 секунд (`expires=9`)
+  - каждые 10 секунд (`expires=60`)
 
 - **railway_batch_processing** (`railway_service.tasks.railway_batch_processing`)
   - проверка/обработка активных ж/д партий (`railway_batch`)

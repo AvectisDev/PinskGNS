@@ -260,7 +260,7 @@ CELERY_BEAT_SCHEDULE = {
     'railway_tank_processing': {
         'task': 'railway_service.tasks.railway_tank_processing',
         'schedule': 10.0,  # каждые 10 сек
-        'options': {'expires': 9},
+        'options': {'expires': 60},
     },
     'railway_batch_processing': {
         'task': 'railway_service.tasks.railway_batch_processing',
@@ -299,6 +299,10 @@ LOGGING = {
         },
         'with_msecs': {
             'format': '%(asctime)s.%(msecs)03d - %(levelname)s - %(module)s:%(lineno)d - %(message)s',
+            'datefmt': '%Y-%m-%d %H:%M:%S',
+        },
+        'ocr_compare': {
+            'format': '%(asctime)s %(message)s',
             'datefmt': '%Y-%m-%d %H:%M:%S',
         },
     },
@@ -357,6 +361,17 @@ LOGGING = {
             'delay': True,
             'use_gzip': False,
         },
+        'ocr_compare_file': {
+            'level': 'INFO',
+            'class': 'concurrent_log_handler.ConcurrentRotatingFileHandler',
+            'filename': os.path.join(LOGS_DIR, 'railway/ocr_compare.log'),
+            'maxBytes': 10 * 1024 * 1024,  # 10MB
+            'backupCount': 30,
+            'formatter': 'ocr_compare',
+            'encoding': 'utf-8',
+            'delay': True,
+            'use_gzip': False,
+        },
         'autogas_file': {
             'level': 'DEBUG',
             'class': 'concurrent_log_handler.ConcurrentRotatingFileHandler',
@@ -406,6 +421,11 @@ LOGGING = {
             'level': 'DEBUG',
             'propagate': False,
         },
+        'railway.ocr_compare': {
+            'handlers': ['ocr_compare_file'],
+            'level': 'INFO',
+            'propagate': False,
+        },
         'autogas': {
             'handlers': ['autogas_file'],
             'level': 'DEBUG',
@@ -441,6 +461,10 @@ DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL')
 
 # Intellect
 INTELLECT_SERVER_ADDRESS = os.environ.get('INTELLECT_SERVER_ADDRESS')
+
+# ocryp — параллельное распознавание номеров ж/д цистерн (пустое = выключено)
+OCRYP_URL = os.environ.get('OCRYP_URL', '')
+OCRYP_TIMEOUT = float(os.environ.get('OCRYP_TIMEOUT', '30'))
 
 # ITGas
 MIRIADA_API_URL = os.environ.get('MIRIADA_API_URL')
