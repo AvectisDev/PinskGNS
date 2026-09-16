@@ -11,7 +11,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 LOGS_DIR = os.path.join(BASE_DIR, 'log')
 
 SECRET_KEY = os.environ.get('SECRET_KEY')
-DEBUG = os.environ.get('DEBUG')
+DEBUG = os.environ.get('DEBUG', 'False').lower() in ('1', 'true', 'yes')
 
 # CSRF и сессии
 CSRF_COOKIE_SECURE = False  # True только для HTTPS
@@ -66,10 +66,12 @@ INSTALLED_APPS = [
     'rest_framework_simplejwt',
     'crispy_forms',
     "crispy_bootstrap5",
-    'debug_toolbar',
     'pghistory',
     'pgtrigger'
 ]
+
+if DEBUG:
+    INSTALLED_APPS.append('debug_toolbar')
 
 INTERNAL_IPS = [
     '127.0.0.1',
@@ -152,9 +154,11 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
-    "debug_toolbar.middleware.DebugToolbarMiddleware",
     # 'filling_station.middleware.TimingMiddleware'
 ]
+
+if DEBUG:
+    MIDDLEWARE.append('debug_toolbar.middleware.DebugToolbarMiddleware')
 
 ROOT_URLCONF = 'GNS.urls'
 
@@ -184,7 +188,6 @@ DATABASES = {
         'PASSWORD': os.environ.get('DB_PASSWORD'),
         'HOST': os.environ.get('DB_HOST'),
         'PORT': os.environ.get('DB_PORT'),
-        'CONN_MAX_AGE': 600,
     }
 }
 
@@ -381,17 +384,17 @@ LOGGING = {
         'filling_station': {
             'handlers': ['filling_station_file'],
             'level': 'DEBUG',
-            'propagate': True,
+            'propagate': False,
         },
         'carousel': {
             'handlers': ['carousel_file'],
             'level': 'DEBUG',
-            'propagate': True,
+            'propagate': False,
         },
         'rfid': {
             'handlers': ['rfid_file'],
             'level': 'INFO',
-            'propagate': True,
+            'propagate': False,
         },
         'celery': {
             'handlers': ['celery_file'],
@@ -416,19 +419,28 @@ LOGGING = {
     },
 }
 
+# создаёт родительские каталоги при загрузке settings
+for _handler_cfg in LOGGING.get('handlers', {}).values():
+    _filename = _handler_cfg.get('filename')
+    if not _filename:
+        continue
+    _log_dir = os.path.dirname(_filename)
+    if _log_dir:
+        os.makedirs(_log_dir, exist_ok=True)
+
 # OPC_SERVER_URL = "opc.tcp://host.docker.internal:4841"
 OPC_SERVER_URL = "opc.tcp://localhost:4841"
 
 # Настройки почты
 EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
-EMAIL_HOST = '10.11.7.1'
-EMAIL_PORT = 25
-EMAIL_HOST_USER = os.environ.get('GNS_EMAIL_USER')
-EMAIL_HOST_PASSWORD = os.environ.get('GNS_EMAIL_PASSWORD')
-DEFAULT_FROM_EMAIL = os.environ.get('GNS_DEFAULT_FROM_EMAIL')
+EMAIL_HOST = os.environ.get('EMAIL_HOST')
+EMAIL_PORT = int(os.environ.get('EMAIL_PORT', '25'))
+EMAIL_HOST_USER = os.environ.get('EMAIL_USER')
+EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_PASSWORD')
+DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL')
 
 # Intellect
-INTELLECT_SERVER_ADDRESS = 'http://10.10.0.252:10001'
+INTELLECT_SERVER_ADDRESS = os.environ.get('INTELLECT_SERVER_ADDRESS')
 
 # ITGas
 MIRIADA_API_URL = os.environ.get('MIRIADA_API_URL')

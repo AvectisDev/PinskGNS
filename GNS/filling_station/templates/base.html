@@ -118,13 +118,13 @@
                 </div>
             </li>
             <li class="nav-item">
-                <a href="/carousel/1" class="nav-link">
+                <a href="{% url 'carousel:carousel_info' carousel_number=1 %}" class="nav-link">
                     <i class="bi bi-gear me-2"></i>
                     УНБ
                 </a>
             </li>
             <li class="nav-item">
-                <a href="{% url 'carousel:carousel_settings_detail' %}" class="nav-link">
+                <a href="{% url 'carousel:carousel_settings_list' %}" class="nav-link">
                     <i class="bi bi-sliders me-2"></i>
                     Настройки карусели
                 </a>
@@ -202,12 +202,17 @@
 </script>
 {% block extra_scripts %}{% endblock %}
     <script>
-        // Активация текущего пункта меню
+        // Активация текущего пункта меню (игнор trailing slash)
+        const normalizeUrl = (href) => href.replace(/\/$/, '');
+        const currentUrl = normalizeUrl(window.location.href);
         document.querySelectorAll('.nav-link').forEach(link => {
-            if(link.href === window.location.href) {
+            if (!link.href || link.getAttribute('href')?.startsWith('#')) {
+                return;
+            }
+            if (normalizeUrl(link.href) === currentUrl) {
                 link.classList.add('active');
                 let parentCollapse = link.closest('.collapse');
-                if(parentCollapse) {
+                if (parentCollapse) {
                     parentCollapse.classList.add('show');
                     let parentLink = parentCollapse.previousElementSibling;
                     parentLink.classList.remove('collapsed');

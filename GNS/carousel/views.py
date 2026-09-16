@@ -1,7 +1,7 @@
 from django.shortcuts import render, redirect
 from django.http import HttpResponse
 from django.core.paginator import Paginator
-from django.urls import reverse_lazy, reverse
+from django.urls import reverse
 from django.views import generic
 from datetime import datetime, time
 from .models import Carousel, CarouselSettings
@@ -88,13 +88,18 @@ def carousel_info(request, carousel_number=1):
     return render(request, "carousel/carousel_list.html", context)
 
 
+class CarouselSettingsListView(generic.ListView):
+    model = CarouselSettings
+    template_name = 'carousel/carousel_settings_list.html'
+    context_object_name = 'carousel_settings_list'
+
+
 class CarouselSettingsDetailView(generic.DetailView):
     model = CarouselSettings
     template_name = 'carousel/carousel_settings_detail.html'
     context_object_name = 'carousel_settings'
-
-    def get_object(self, queryset=None):
-        return CarouselSettings.objects.first()
+    slug_field = 'number'
+    slug_url_kwarg = 'number'
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -106,16 +111,21 @@ class CarouselSettingsUpdateView(generic.UpdateView):
     model = CarouselSettings
     form_class = CarouselSettingsForm
     template_name = 'carousel/_equipment_form.html'
-
-    def get_object(self, queryset=None):
-        return CarouselSettings.objects.first()
+    slug_field = 'number'
+    slug_url_kwarg = 'number'
 
     def get_success_url(self):
-        return reverse('carousel:carousel_settings_detail')
+        return reverse(
+            'carousel:carousel_settings_detail',
+            kwargs={'number': self.object.number},
+        )
 
     def post(self, request, *args, **kwargs):
         if 'cancel' in request.POST:
-            return redirect('carousel:carousel_settings_detail')
+            return redirect(
+                'carousel:carousel_settings_detail',
+                number=self.get_object().number,
+            )
         return super().post(request, *args, **kwargs)
 
     def get_context_data(self, **kwargs):

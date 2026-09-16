@@ -1,3 +1,34 @@
 {% extends 'core/_equipment_form.html' %}
 {% load crispy_forms_tags %}
 {% block title %} {{ title }} {% endblock %}
+
+{% block content %}
+<style>
+.equipment-form .form-control,
+.equipment-form .form-select {
+    border: 1px solid #ced4da;
+}
+.equipment-form .form-control:focus,
+.equipment-form .form-select:focus {
+    border-color: #86b7fe;
+    outline: 0;
+    box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25);
+}
+.equipment-form .form-check-input {
+    width: 1.25em;
+    height: 1.25em;
+    margin: 0;
+    float: none;
+    border: 1px solid #6c757d;
+    background-color: #fff;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
+}
+.equipment-form .form-check-input:checked {
+    background-color: #0d6efd;
+    border-color: #0d6efd;
+}
+</style>
+{{ block.super }}
+{% endblock %}

@@ -10,9 +10,13 @@ DJANGO_PROJECT_DIR = Path(__file__).resolve().parents[3]
 
 
 class Command(BaseCommand):
-    help = 'Запуск main.py - приложения обработки данных с постов наполнения УНБ'
+    help = (
+        'Запускает subprocess listener постов наполнения '
+        '(carousel.management.commands.carousel.main)'
+    )
 
     def handle(self, *args, **kwargs):
+        """Создаёт отдельный процесс listener с текущими переменными окружения."""
         env = os.environ.copy()
         subprocess.Popen(
             [

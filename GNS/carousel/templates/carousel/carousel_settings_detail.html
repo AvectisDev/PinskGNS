@@ -6,7 +6,14 @@
 {% block content %}
 <div class="container mt-4">
     <div class="d-flex justify-content-between align-items-center mb-4">
-        <h4 class="mb-0">Настройки карусели</h4>
+        <h4 class="mb-0">
+            {% if carousel_settings.name %}
+                {{ carousel_settings.name }}
+            {% else %}
+                Карусель {{ carousel_settings.number }}
+            {% endif %}
+        </h4>
+        <a href="{% url 'carousel:carousel_settings_list' %}" class="btn btn-outline-secondary btn-sm">К списку</a>
     </div>
 
     <div class="card shadow-sm mb-4">
@@ -14,6 +21,27 @@
             <div class="row">
                 <div class="col-md-6">
                     <dl class="row">
+                        <dt class="col-sm-8">Номер:</dt>
+                        <dd class="col-sm-4">{{ carousel_settings.number }}</dd>
+
+                        <dt class="col-sm-8">IP NPort:</dt>
+                        <dd class="col-sm-4">{{ carousel_settings.tcp_host|default:"—" }}</dd>
+
+                        <dt class="col-sm-8">TCP-порт:</dt>
+                        <dd class="col-sm-4">{{ carousel_settings.tcp_port }}</dd>
+
+                        <dt class="col-sm-8">RFID-считыватель:</dt>
+                        <dd class="col-sm-4">{{ carousel_settings.rfid_reader_id|default:"—" }}</dd>
+
+                        <dt class="col-sm-8">Активна:</dt>
+                        <dd class="col-sm-4">
+                            <span class="badge bg-{% if carousel_settings.is_active %}success{% else %}secondary{% endif %}">
+                                {% if carousel_settings.is_active %}Да{% else %}Нет{% endif %}
+                            </span>
+                        </dd>
+
+                        <hr>
+
                         <dt class="col-sm-8">Только чтение:</dt>
                         <dd class="col-sm-4">
                             <span class="badge bg-{% if carousel_settings.read_only %}success{% else %}secondary{% endif %}">
@@ -116,7 +144,7 @@
     </div>
 
     <div class="d-flex justify-content-end">
-        <a href="{% url 'carousel:carousel_settings_update' %}" class="btn btn-custom">
+        <a href="{% url 'carousel:carousel_settings_update' number=carousel_settings.number %}" class="btn btn-custom">
             <i class="bi bi-pencil"></i> Редактировать
         </a>
     </div>

@@ -18,7 +18,16 @@ from core.api.schema import ApiErrorSerializer
     get_parameter=extend_schema(
         tags=['Карусель'],
         summary='Получить параметры карусели',
-        description='Получение настроек карусели наполнения баллонов',
+        description='Получение настроек карусели наполнения баллонов по номеру',
+        parameters=[
+            OpenApiParameter(
+                name='number',
+                type=OpenApiTypes.INT,
+                location=OpenApiParameter.QUERY,
+                description='Номер карусели (по умолчанию 1)',
+                required=False,
+            ),
+        ],
         responses={
             200: CarouselSettingsSerializer,
             404: ApiErrorSerializer
@@ -27,7 +36,7 @@ from core.api.schema import ApiErrorSerializer
     partial_update=extend_schema(
         tags=['Карусель'],
         summary='Обновить параметры карусели',
-        description='Частичное обновление настроек карусели',
+        description='Частичное обновление настроек карусели по бизнес-номеру',
         request=CarouselSettingsSerializer,
         responses={
             200: CarouselSettingsSerializer,
@@ -39,7 +48,7 @@ from core.api.schema import ApiErrorSerializer
                 name='pk',
                 type=OpenApiTypes.INT,
                 location=OpenApiParameter.PATH,
-                description='ID карусели'
+                description='Номер карусели (CarouselSettings.number)'
             )
         ]
     ),
@@ -49,20 +58,22 @@ class CarouselViewSet(viewsets.ViewSet):
 
     @action(detail=False, methods=['get'], url_path='get-parameter')
     def get_parameter(self, request):
-        settings = CarouselSettings.objects.get(id=1)
+        number = int(request.query_params.get('number', 1))
+        settings = get_object_or_404(CarouselSettings, number=number)
         serializer = CarouselSettingsSerializer(settings)
         return Response(serializer.data)
 
     def partial_update(self, request, pk=1):
         """
-        Запись параметров карусели
-        :param request:
-        :param pk: номер карусели
-        :return:
-        """
-        carousel = get_object_or_404(CarouselSettings, id=pk)
+        Запись параметров карусели.
 
-        serializer = CarouselSettingsSerializer(carousel, data=request.data, partial=True)
+        :param pk: бизнес-номер карусели (``CarouselSettings.number``)
+        """
+        carousel = get_object_or_404(CarouselSettings, number=pk)
+
+        serializer = CarouselSettingsSerializer(
+            carousel, data=request.data, partial=True
+        )
         if serializer.is_valid():
             serializer.save()
             return Response(serializer.data)
