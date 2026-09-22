@@ -123,17 +123,9 @@ redis-server
 
 ### Периодические задачи (Celery Beat)
 
-- **railway_tank_processing** (`railway_service.tasks.railway_tank_processing`)
-  - обработка данных по железнодорожным цистернам (management-команда `railway_tank`)
-  - каждые 10 секунд (`expires=60`)
-
 - **railway_batch_processing** (`railway_service.tasks.railway_batch_processing`)
   - проверка/обработка активных ж/д партий (`railway_batch`)
   - каждые 20 минут (`crontab(minute='*/20')`)
-
-- **auto_gas_processing** (`autogas.tasks.auto_gas_processing`)
-  - обработка данных по автоцистернам (`auto_gas_batch`)
-  - каждые 10 секунд (`expires=9`)
 
 - **kpp_processing** (`transport.tasks.kpp_processing`)
   - обработка данных КПП (`kpp_processing`)
@@ -146,6 +138,16 @@ redis-server
 - **fetch_current_ttn_from_miriada** (`ttn.tasks.fetch_current_ttn_from_miriada`)
   - синхронизация текущих ТТН из Мириады в БД (`sync_current_ttn_from_miriada`)
   - ежедневно в 22:00 (`crontab(hour=22, minute=0)`)
+
+### Задачи по событиям OPC UA Bridge
+
+События с Melsoft MX OPC Server приходят через долгоживущий процесс `opcua.bridge` (OPC UA Subscription). Bridge ставит Celery-задачи только при изменении тегов:
+
+- **process_railway_tank_event** (`railway_service.tasks.process_railway_tank_event`) — фронт `camera_worked`
+- **process_autogas_batch_create** (`autogas.tasks.process_autogas_batch_create`) — pending create handshake
+- **process_autogas_batch_complete** (`autogas.tasks.process_autogas_batch_complete`) — pending complete handshake
+
+Запись тегов обратно в OPC (ACK, сброс флагов) идёт через Redis-очередь того же bridge-процесса (`opcua.api.write_tag`).
 
 ### Задачи по требованию
 
@@ -206,6 +208,16 @@ python -m carousel.management.commands.carousel.main
 - Атомарная FIFO-очередь Redis `reader_<N>_balloon_queue` (`LPUSH` / `RPOP`)
 - Дедупликация повторных запросов в памяти процесса (~2 с), ключ с номером карусели
 - Автоматический перезапуск при ошибках TCP (~60 с) и прочих ошибках (~5 мин) — независимо по каждой карусели
+
+### OPC UA Bridge
+
+Процесс OPC UA bridge запускается автоматически при старте приложения через ASGI (`GNS/GNS/asgi.py`) как отдельный subprocess:
+
+```bash
+python -m opcua.bridge
+```
+
+Держит одно постоянное соединение с Melsoft MX OPC Server UA (`OPC_SERVER_URL`), подписывается на теги ЖД весовой и автоколонки через OPC UA Subscription (`asyncua`) и при фронтах условий ставит Celery-задачи. Запись тегов из workers — через Redis-очередь в этот же процесс.
 
 **Транспорт к постам**
 

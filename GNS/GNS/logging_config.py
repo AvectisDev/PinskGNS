@@ -100,6 +100,17 @@ def build_logging_config(logs_dir: str) -> dict[str, Any]:
                 'delay': True,
                 'use_gzip': False,
             },
+            'opcua_file': {
+                'level': 'DEBUG',
+                'class': 'concurrent_log_handler.ConcurrentRotatingFileHandler',
+                'filename': os.path.join(logs_dir, 'opcua/opcua.log'),
+                'maxBytes': 10 * 1024 * 1024,  # 10MB
+                'backupCount': 30,
+                'formatter': 'verbose',
+                'encoding': 'utf-8',
+                'delay': True,
+                'use_gzip': False,
+            },
             'kpp_file': {
                 'level': 'DEBUG',
                 'class': 'concurrent_log_handler.ConcurrentRotatingFileHandler',
@@ -145,6 +156,11 @@ def build_logging_config(logs_dir: str) -> dict[str, Any]:
             },
             'autogas': {
                 'handlers': ['autogas_file'],
+                'level': 'DEBUG',
+                'propagate': False,
+            },
+            'opcua': {
+                'handlers': ['opcua_file'],
                 'level': 'DEBUG',
                 'propagate': False,
             },

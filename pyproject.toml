@@ -3,6 +3,7 @@ name = "pinskgns"
 version = "0.1.0"
 requires-python = ">=3.12,<3.13"
 dependencies = [
+    "asyncua==2.0.1",
     "celery==5.5.3",
     "concurrent-log-handler==0.9.25",
     "crispy-bootstrap5==2025.6",
@@ -15,7 +16,6 @@ dependencies = [
     "djangorestframework==3.16.0",
     "djangorestframework-simplejwt==5.5.1",
     "drf-spectacular==0.28.0",
-    "opcua==0.98.13",
     "openpyxl==3.1.5",
     "pillow==11.3.0",
     "psycopg2-binary==2.9.10",

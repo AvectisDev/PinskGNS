@@ -62,6 +62,7 @@ INSTALLED_APPS = [
     'railway_service.apps.RailwayServiceConfig',
     'autogas.apps.AutogasConfig',
     'transport.apps.TransportConfig',
+    'opcua.apps.OpcuaConfig',
     'drf_spectacular',
     'import_export',
     'rest_framework',
@@ -259,19 +260,9 @@ CELERY_WORKER_HIJACK_ROOT_LOGGER = False
 CELERY_WORKER_PREFETCH_MULTIPLIER = 1
 CELERY_TASK_IGNORE_RESULT = True
 CELERY_BEAT_SCHEDULE = {
-    'railway_tank_processing': {
-        'task': 'railway_service.tasks.railway_tank_processing',
-        'schedule': 10.0,  # каждые 10 сек
-        'options': {'expires': 9},
-    },
     'railway_batch_processing': {
         'task': 'railway_service.tasks.railway_batch_processing',
         'schedule': crontab(minute='*/20'),  # задача выполняется каждые 20 минут, начиная с 0 минут каждого часа
-    },
-    'auto_gas_processing': {
-        'task': 'autogas.tasks.auto_gas_processing',
-        'schedule': 10.0,
-        'options': {'expires': 9},
     },
     'kpp_processing': {
         'task': 'transport.tasks.kpp_processing',
