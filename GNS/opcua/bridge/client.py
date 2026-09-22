@@ -28,9 +28,16 @@ class OpcBridgeClient:
         self._subscription = None
 
     async def connect(self) -> None:
+        self.client.connection_lost_callback = self._on_connection_lost
         await self.client.connect(auto_reconnect=True, reconnect_max_delay=5.0)
         logger.info('OPC UA подключено: %s', self.url)
         await self._resolve_nodes()
+
+    async def _on_connection_lost(self, exc: BaseException) -> None:
+        logger.error(
+            'OPC UA связь потеряна (%s), пытаюсь переподключиться…',
+            exc,
+        )
 
     async def disconnect(self) -> None:
         try:
@@ -43,6 +50,8 @@ class OpcBridgeClient:
             await self.client.disconnect()
         except Exception as error:
             logger.warning('Ошибка disconnect OPC: %s', error)
+        finally:
+            self.client.connection_lost_callback = None
 
     async def _resolve_nodes(self) -> None:
         self._nodes_by_name = {
