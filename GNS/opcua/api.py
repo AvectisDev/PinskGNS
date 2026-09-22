@@ -16,7 +16,9 @@ logger = logging.getLogger('opcua')
 
 WRITE_QUEUE_KEY = 'opcua:write_queue'
 WRITE_RESULT_PREFIX = 'opcua:write_result:'
-DEFAULT_WRITE_TIMEOUT = 5.0
+# Redis BRPOP/BLPOP принимают только целый timeout (секунды).
+DEFAULT_WRITE_TIMEOUT = 5
+WRITE_POLL_TIMEOUT = 1
 
 
 def _redis_client() -> redis.Redis:
@@ -30,7 +32,7 @@ def write_tag(
     name: str,
     value: Any,
     *,
-    timeout: float = DEFAULT_WRITE_TIMEOUT,
+    timeout: int = DEFAULT_WRITE_TIMEOUT,
 ) -> bool:
     """
     Ставит запрос на запись тега в очередь bridge-процесса и ждёт ACK.
@@ -52,7 +54,7 @@ def write_tag(
     result_key = f'{WRITE_RESULT_PREFIX}{request_id}'
     try:
         client.lpush(WRITE_QUEUE_KEY, payload)
-        result = client.blpop(result_key, timeout=timeout)
+        result = client.blpop(result_key, timeout=int(timeout))
         if result is None:
             logger.error('OPC write timeout для %s=%s', name, value)
             return False
@@ -71,7 +73,7 @@ def write_tag(
             pass
 
 
-def write_tags(values: dict[str, Any], *, timeout: float = DEFAULT_WRITE_TIMEOUT) -> bool:
+def write_tags(values: dict[str, Any], *, timeout: int = DEFAULT_WRITE_TIMEOUT) -> bool:
     """Записывает несколько тегов последовательно. False если любая запись не удалась."""
     ok = True
     for name, value in values.items():
@@ -85,10 +87,10 @@ def enqueue_write_raw(payload: str) -> None:
     _redis_client().lpush(WRITE_QUEUE_KEY, payload)
 
 
-def pop_write_request(timeout: float = 1.0) -> Optional[dict[str, Any]]:
+def pop_write_request(timeout: int = WRITE_POLL_TIMEOUT) -> Optional[dict[str, Any]]:
     """Читает один write-запрос (для bridge)."""
     client = _redis_client()
-    item = client.brpop(WRITE_QUEUE_KEY, timeout=timeout)
+    item = client.brpop(WRITE_QUEUE_KEY, timeout=int(timeout))
     if item is None:
         return None
     _, raw = item

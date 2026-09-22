@@ -13,8 +13,6 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger('opcua')
 
-WRITE_POLL_TIMEOUT = 1.0
-
 
 async def run_write_loop(bridge: OpcBridgeClient, stop_event: asyncio.Event) -> None:
     """Читает запросы записи из Redis и выполняет их в OPC-сессии bridge."""
@@ -22,7 +20,7 @@ async def run_write_loop(bridge: OpcBridgeClient, stop_event: asyncio.Event) -> 
         try:
             request = await asyncio.to_thread(
                 opc_api.pop_write_request,
-                WRITE_POLL_TIMEOUT,
+                opc_api.WRITE_POLL_TIMEOUT,
             )
         except Exception as error:
             logger.error('OPC write queue error: %s', error, exc_info=True)
