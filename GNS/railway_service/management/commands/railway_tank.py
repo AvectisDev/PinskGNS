@@ -1,6 +1,8 @@
 import logging
 import time
 from decimal import Decimal
+from typing import Any, Optional
+
 from django.core.cache import cache
 from django.core.files.base import ContentFile
 from opcua import ua
@@ -15,6 +17,12 @@ from railway_service.services.status_log import log_railway_tank_status
 from .intellect import get_registration_number_list, INTELLECT_SERVER_LIST, get_plate_image
 
 logger = logging.getLogger('railway')
+
+HANDLE_LOCK_KEY = 'railway_tank:handle_lock'
+HANDLE_LOCK_TIMEOUT = 25
+OPC_READ_RETRIES = 3
+OPC_READ_RETRY_DELAY = 0.4
+OPC_CONNECT_SETTLE_DELAY = 0.2
 
 
 class Command(BaseCommand):
@@ -33,28 +41,50 @@ class Command(BaseCommand):
         self._opc_connected = False
 
 
-    def get_opc_value(self, node_key):
-        """Получить значение с OPC UA сервера по ключу."""
+    def get_opc_value(self, node_key: str) -> Any:
+        """Получить значение с OPC UA сервера по ключу (с повторами при Bad)."""
         node_path = self.OPC_NODE_PATHS.get(node_key)
         if not node_path:
             logger.error(f"Invalid OPC node key: {node_key}")
             return None
+
+        last_error: Optional[BaseException] = None
+        for attempt in range(1, OPC_READ_RETRIES + 1):
+            try:
+                return self.client.get_node(node_path).get_value()
+            except Exception as error:
+                last_error = error
+                if attempt < OPC_READ_RETRIES:
+                    time.sleep(OPC_READ_RETRY_DELAY)
+
+        logger.error(
+            f"Error getting OPC value for {node_key} "
+            f"after {OPC_READ_RETRIES} attempts: {last_error}"
+        )
+        return None
+
+
+    def _resolve_opc_variant_type(self, node) -> ua.VariantType:
         try:
-            return self.client.get_node(node_path).get_value()
-        except Exception as error:
-            logger.error(f"Error getting OPC value for {node_key}: {error}")
-            return None
+            return node.get_data_type_as_variant_type()
+        except Exception:
+            return node.get_data_value().Value.VariantType
 
 
-    def set_opc_value(self, node_key, value):
-        """Установить значение на OPC UA сервере."""
+    def set_opc_value(self, node_key: str, value: Any) -> bool:
+        """Установить значение на OPC UA сервере с корректным VariantType."""
         node_path = self.OPC_NODE_PATHS.get(node_key)
         if not node_path:
             logger.error(f"Invalid OPC node key: {node_key}")
             return False
         try:
             node = self.client.get_node(node_path)
-            node.set_attribute(ua.AttributeIds.Value, ua.DataValue(value))
+            variant_type = self._resolve_opc_variant_type(node)
+            if variant_type == ua.VariantType.Boolean:
+                value = bool(value)
+            elif variant_type in (ua.VariantType.Float, ua.VariantType.Double):
+                value = float(value)
+            node.set_value(value, variant_type)
             return True
         except Exception as error:
             logger.error(f"Error setting OPC value for {node_key}: {error}")
@@ -197,9 +227,14 @@ class Command(BaseCommand):
 
 
     def handle(self, *args, **kwargs):
+        if not cache.add(HANDLE_LOCK_KEY, True, timeout=HANDLE_LOCK_TIMEOUT):
+            logger.debug('ЖД весовая. Предыдущий цикл ещё выполняется — пропуск')
+            return
+
         try:
             self.client.connect()
             self._opc_connected = True
+            time.sleep(OPC_CONNECT_SETTLE_DELAY)
 
             tank_weight = self.get_opc_value("tank_weight")
             camera_worked = self.get_opc_value("camera_worked")
@@ -214,6 +249,13 @@ class Command(BaseCommand):
             )
 
             log_railway_tank_status(opc_values)
+
+            if None in (tank_weight, camera_worked, is_on_station):
+                logger.warning(
+                    'ЖД весовая. Неполные OPC-значения, пропуск цикла: %s',
+                    opc_values,
+                )
+                return
 
             if opc_values == cached_data:
                 return
@@ -269,3 +311,4 @@ class Command(BaseCommand):
             if self._opc_connected:
                 disconnect_opc(self.client)
                 self._opc_connected = False
+            cache.delete(HANDLE_LOCK_KEY)

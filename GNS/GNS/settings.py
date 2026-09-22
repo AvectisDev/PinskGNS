@@ -262,7 +262,7 @@ CELERY_BEAT_SCHEDULE = {
     'railway_tank_processing': {
         'task': 'railway_service.tasks.railway_tank_processing',
         'schedule': 10.0,  # каждые 10 сек
-        'options': {'expires': 60},
+        'options': {'expires': 9},
     },
     'railway_batch_processing': {
         'task': 'railway_service.tasks.railway_batch_processing',
