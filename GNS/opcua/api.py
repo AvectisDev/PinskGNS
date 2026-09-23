@@ -15,9 +15,6 @@ from opcua.registry import TAGS
 logger = logging.getLogger('opcua')
 
 WRITE_QUEUE_KEY = 'opcua:write_queue'
-WRITE_RESULT_PREFIX = 'opcua:write_result:'
-# Redis BRPOP/BLPOP принимают только целый timeout (секунды).
-DEFAULT_WRITE_TIMEOUT = 5
 WRITE_POLL_TIMEOUT = 1
 
 
@@ -28,63 +25,41 @@ def _redis_client() -> redis.Redis:
     )
 
 
-def write_tag(
-    name: str,
-    value: Any,
-    *,
-    timeout: int = DEFAULT_WRITE_TIMEOUT,
-) -> bool:
+def write_tag(name: str, value: Any) -> bool:
     """
-    Ставит запрос на запись тега в очередь bridge-процесса и ждёт ACK.
+    Ставит запрос на запись тега в очередь bridge (fire-and-forget).
+
+    Worker не ждёт ACK: Redis хранит сообщение до обработки bridge,
+    ретраи записи в Melsoft выполняются на стороне bridge.
 
     Returns:
-        True при успешной записи, False при ошибке/таймауте.
+        True если запрос поставлен в Redis, False при ошибке постановки.
     """
     if name not in TAGS:
         logger.error('OPC write: неизвестный тег %s', name)
         return False
 
-    request_id = str(uuid.uuid4())
     payload = json.dumps({
-        'id': request_id,
+        'id': str(uuid.uuid4()),
         'name': name,
         'value': value,
     }, default=str)
-    client = _redis_client()
-    result_key = f'{WRITE_RESULT_PREFIX}{request_id}'
     try:
-        client.lpush(WRITE_QUEUE_KEY, payload)
-        result = client.blpop(result_key, timeout=int(timeout))
-        if result is None:
-            logger.error('OPC write timeout для %s=%s', name, value)
-            return False
-        _, status = result
-        if status != 'ok':
-            logger.error('OPC write failed для %s: %s', name, status)
-            return False
+        _redis_client().lpush(WRITE_QUEUE_KEY, payload)
+        logger.debug('OPC write enqueued %s=%s', name, value)
         return True
     except Exception as error:
-        logger.error('OPC write error для %s: %s', name, error, exc_info=True)
+        logger.error('OPC write enqueue error для %s: %s', name, error, exc_info=True)
         return False
-    finally:
-        try:
-            client.delete(result_key)
-        except Exception:
-            pass
 
 
-def write_tags(values: dict[str, Any], *, timeout: int = DEFAULT_WRITE_TIMEOUT) -> bool:
-    """Записывает несколько тегов последовательно. False если любая запись не удалась."""
+def write_tags(values: dict[str, Any]) -> bool:
+    """Ставит несколько тегов в очередь. False если любая постановка не удалась."""
     ok = True
     for name, value in values.items():
-        if not write_tag(name, value, timeout=timeout):
+        if not write_tag(name, value):
             ok = False
     return ok
-
-
-def enqueue_write_raw(payload: str) -> None:
-    """Низкоуровневая постановка в очередь (для тестов)."""
-    _redis_client().lpush(WRITE_QUEUE_KEY, payload)
 
 
 def pop_write_request(timeout: int = WRITE_POLL_TIMEOUT) -> Optional[dict[str, Any]]:
@@ -95,11 +70,3 @@ def pop_write_request(timeout: int = WRITE_POLL_TIMEOUT) -> Optional[dict[str, A
         return None
     _, raw = item
     return json.loads(raw)
-
-
-def publish_write_result(request_id: str, status: str) -> None:
-    """Публикует результат записи для ожидающего worker."""
-    client = _redis_client()
-    key = f'{WRITE_RESULT_PREFIX}{request_id}'
-    client.lpush(key, status)
-    client.expire(key, 60)

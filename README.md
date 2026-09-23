@@ -147,7 +147,7 @@ redis-server
 - **process_autogas_batch_create** (`autogas.tasks.process_autogas_batch_create`) — pending create handshake
 - **process_autogas_batch_complete** (`autogas.tasks.process_autogas_batch_complete`) — pending complete handshake
 
-Запись тегов обратно в OPC (ACK, сброс флагов) идёт через Redis-очередь того же bridge-процесса (`opcua.api.write_tag`).
+Запись тегов обратно в OPC (ACK, сброс флагов) идёт через Redis-очередь того же bridge-процесса (`opcua.api.write_tag`, fire-and-forget). Ретраи записи в Melsoft выполняет bridge.
 
 ### Задачи по требованию
 
