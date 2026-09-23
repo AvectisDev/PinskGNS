@@ -103,6 +103,87 @@ TAGS: Mapping[str, TagDef] = {
         node_id='ns=4; s=Address Space.PLC_SU2.batch.response_batch_complete',
         domain='autogas',
     ),
+    # VehicleSelect (GS21 manual / propose)
+    'autogas.vehicle_select.proposed_truck_number': TagDef(
+        name='autogas.vehicle_select.proposed_truck_number',
+        node_id='ns=4; s=Address Space.PLC_SU2.vehicle_select.proposed_truck_number',
+        domain='autogas',
+    ),
+    'autogas.vehicle_select.proposed_trailer_number': TagDef(
+        name='autogas.vehicle_select.proposed_trailer_number',
+        node_id='ns=4; s=Address Space.PLC_SU2.vehicle_select.proposed_trailer_number',
+        domain='autogas',
+    ),
+    'autogas.vehicle_select.proposed_ready': TagDef(
+        name='autogas.vehicle_select.proposed_ready',
+        node_id='ns=4; s=Address Space.PLC_SU2.vehicle_select.proposed_ready',
+        domain='autogas',
+    ),
+    'autogas.vehicle_select.list_mode': TagDef(
+        name='autogas.vehicle_select.list_mode',
+        node_id='ns=4; s=Address Space.PLC_SU2.vehicle_select.list_mode',
+        domain='autogas',
+    ),
+    'autogas.vehicle_select.operator_confirm': TagDef(
+        name='autogas.vehicle_select.operator_confirm',
+        node_id='ns=4; s=Address Space.PLC_SU2.vehicle_select.operator_confirm',
+        domain='autogas',
+    ),
+    'autogas.vehicle_select.selected_vehicle_index': TagDef(
+        name='autogas.vehicle_select.selected_vehicle_index',
+        node_id='ns=4; s=Address Space.PLC_SU2.vehicle_select.selected_vehicle_index',
+        domain='autogas',
+    ),
+    'autogas.vehicle_select.vehicle_list_0': TagDef(
+        name='autogas.vehicle_select.vehicle_list_0',
+        node_id='ns=4; s=Address Space.PLC_SU2.vehicle_select.vehicle_list_0',
+        domain='autogas',
+    ),
+    'autogas.vehicle_select.vehicle_list_1': TagDef(
+        name='autogas.vehicle_select.vehicle_list_1',
+        node_id='ns=4; s=Address Space.PLC_SU2.vehicle_select.vehicle_list_1',
+        domain='autogas',
+    ),
+    'autogas.vehicle_select.vehicle_list_2': TagDef(
+        name='autogas.vehicle_select.vehicle_list_2',
+        node_id='ns=4; s=Address Space.PLC_SU2.vehicle_select.vehicle_list_2',
+        domain='autogas',
+    ),
+    'autogas.vehicle_select.vehicle_list_3': TagDef(
+        name='autogas.vehicle_select.vehicle_list_3',
+        node_id='ns=4; s=Address Space.PLC_SU2.vehicle_select.vehicle_list_3',
+        domain='autogas',
+    ),
+    'autogas.vehicle_select.vehicle_list_4': TagDef(
+        name='autogas.vehicle_select.vehicle_list_4',
+        node_id='ns=4; s=Address Space.PLC_SU2.vehicle_select.vehicle_list_4',
+        domain='autogas',
+    ),
+    'autogas.vehicle_select.vehicle_list_5': TagDef(
+        name='autogas.vehicle_select.vehicle_list_5',
+        node_id='ns=4; s=Address Space.PLC_SU2.vehicle_select.vehicle_list_5',
+        domain='autogas',
+    ),
+    'autogas.vehicle_select.vehicle_list_6': TagDef(
+        name='autogas.vehicle_select.vehicle_list_6',
+        node_id='ns=4; s=Address Space.PLC_SU2.vehicle_select.vehicle_list_6',
+        domain='autogas',
+    ),
+    'autogas.vehicle_select.vehicle_list_7': TagDef(
+        name='autogas.vehicle_select.vehicle_list_7',
+        node_id='ns=4; s=Address Space.PLC_SU2.vehicle_select.vehicle_list_7',
+        domain='autogas',
+    ),
+    'autogas.vehicle_select.vehicle_list_8': TagDef(
+        name='autogas.vehicle_select.vehicle_list_8',
+        node_id='ns=4; s=Address Space.PLC_SU2.vehicle_select.vehicle_list_8',
+        domain='autogas',
+    ),
+    'autogas.vehicle_select.vehicle_list_9': TagDef(
+        name='autogas.vehicle_select.vehicle_list_9',
+        node_id='ns=4; s=Address Space.PLC_SU2.vehicle_select.vehicle_list_9',
+        domain='autogas',
+    ),
 }
 
 

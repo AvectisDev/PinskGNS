@@ -116,6 +116,7 @@ class TruckForm(forms.ModelForm):
             'empty_weight': forms.NumberInput(attrs={'class': 'form-control'}),
             'full_weight': forms.NumberInput(attrs={'class': 'form-control'}),
             'is_on_station': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+            'is_active': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
             'entry_at': forms.DateTimeInput(format='%Y-%m-%dT%H:%M', attrs={
                 'type': 'datetime-local',
                 'class': 'form-control'
@@ -161,6 +162,7 @@ class TrailerForm(forms.ModelForm):
             'empty_weight': forms.NumberInput(attrs={'class': 'form-control'}),
             'full_weight': forms.NumberInput(attrs={'class': 'form-control'}),
             'is_on_station': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+            'is_active': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
             'entry_at': forms.DateTimeInput(format='%Y-%m-%dT%H:%M',attrs={
                 'type': 'datetime-local',
                 'class': 'form-control'

@@ -1,0 +1,159 @@
+(*Процесс приёмки/отгрузки газа в автоцистернах*)
+
+(*Для определения стабильных показаний сравниваем предыдущее значение веса с текущим.
+При взвешивании стабильность веса определяем в диапазоне от min до max, с учётом погрешности. Погрешность = 50 кг *)
+min_weight := old_weight - 50.0;
+max_weight := old_weight + 50.0;
+
+IF weight > 1000.0 AND ( weight > min_weight  AND weight < max_weight)  THEN	
+	start_stabilization_timer := TRUE;
+ELSE
+	start_stabilization_timer := FALSE;
+END_IF;
+
+weight_stabilization_timer(IN:= start_stabilization_timer, PT:= T#5s, Q:= weight_is_stable, ET:= stabilization_timer_ET);
+
+(*Сохранение предыдущих показаний массового и объёмного расходов для реализации фильтра. 
+На SCADA устанавливается минимальный расход, при котором считается что идёт наполнение цистерны*)
+periodic_1s_rtrig(_CLK:= SM412 ,Q:= periodic_1s_rtrig_worked );
+IF periodic_1s_rtrig_worked THEN
+	current_difference_m_flow:= MassMeter.Mass_flow_rate - old_mass_flow_rate;
+	old_mass_flow_rate:= MassMeter.Mass_flow_rate;
+	
+	current_difference_v_flow:= MassMeter.Volume_flow_rate - old_volume_flow_rate;
+	old_volume_flow_rate:= MassMeter.volume_flow_rate;
+END_IF;
+
+(*Цикл наполнения цистерны*)
+(*Сброс цикла. Кнопка стоп*)
+IF batch.stop_batch THEN
+	 	batch.process_step:= 0;
+	 	batch.stop_batch := FALSE;
+END_IF;
+
+(*Сохранение начального показания массомера. Сброс флага начала партии*)
+IF batch.start_batch THEN
+	 	batch.process_step:= 1;
+	 	batch.start_batch:= FALSE;
+	 	batch.is_active:= TRUE;
+END_IF;
+
+(*Тригер для сохранения показаний веса в цикле*)
+weight_stable_rtrig(_CLK:= weight_is_stable ,Q:= weight_stable_rtrig_worked);
+
+CASE batch.process_step OF
+	1:		(*По весу определяем, есть ли машина на весах. Если да, то проверяем тип партии, сохраняем начальный вес*)
+	IF weight_stable_rtrig_worked THEN
+		(*Обнуляем данные партии перед её началом*)
+		batch.initial_mass_meter:= 0.0;
+		batch.final_mass_meter:= 0.0;
+		batch.gas_amount:= 0.0;
+		batch.truck_full_weight:= 0.0;
+		batch.truck_empty_weight:= 0.0;
+		batch.weight_gas_amount:= 0.0;
+		batch.truck_capacity:= 0.0;
+		batch.fill_percentage:= 0.0;
+		(*Сброс UI выбора транспорта перед запросом номера*)
+		vehicle_select.proposed_ready:= FALSE;
+		vehicle_select.list_mode:= FALSE;
+		vehicle_select.operator_confirm:= FALSE;
+		vehicle_select.selected_vehicle_index:= -1;
+		vehicle_select.proposed_truck_number:= '';
+		vehicle_select.proposed_trailer_number:= '';
+		vehicle_select.vehicle_list_0:= '';
+		vehicle_select.vehicle_list_1:= '';
+		vehicle_select.vehicle_list_2:= '';
+		vehicle_select.vehicle_list_3:= '';
+		vehicle_select.vehicle_list_4:= '';
+		vehicle_select.vehicle_list_5:= '';
+		vehicle_select.vehicle_list_6:= '';
+		vehicle_select.vehicle_list_7:= '';
+		vehicle_select.vehicle_list_8:= '';
+		vehicle_select.vehicle_list_9:= '';
+		(*Отправляем запрос на распознавание номера*)
+		batch.request_number_identification:= TRUE;
+		
+		IF batch.batch_type = 1 THEN (*приёмка*)
+			batch.truck_full_weight:= weight;
+		ELSIF batch.batch_type = 2 THEN (*отгрузка*)
+		 	batch.truck_empty_weight:= weight;
+		END_IF;
+		
+		batch.process_step:= 2;
+	END_IF;
+		 
+	2:		(*Ждём подтверждение от SCADA о успешном считывании номера*)
+
+		 (*Есть подтверждение о считывании номера со SCADA и машина съехала с весов*)
+	IF batch.response_number_detect AND batch.request_number_identification  AND weight < 1000.0 THEN
+		batch.process_step:= 3;
+		batch.initial_mass_meter:= MassMeter.Volume_total;
+		batch.response_number_detect:= FALSE;
+		batch.request_number_identification:= FALSE;
+	END_IF;
+	
+	3:		(*По весу определяем, есть ли машина на весах. Означает, что машина заправилась на колонке и проходит повторное взвешивание*)
+	IF weight > 1000.0 THEN
+		batch.process_step:= 4;
+		batch.final_mass_meter:= MassMeter.Volume_total;
+		batch.gas_filling_in_progress:= FALSE;
+	END_IF;
+
+	IF current_difference_v_flow >= min_difference_volume_flow_rate THEN
+		batch.gas_filling_in_progress:= TRUE;
+	ELSE
+		batch.gas_filling_in_progress:= FALSE;
+	END_IF;
+	
+	(*Пока машина заправляется на колонке высчитываем % её заполнения*)
+	IF batch.truck_capacity > 0.0 THEN
+		batch.fill_percentage:= ((MassMeter.Volume_total - batch.initial_mass_meter) / batch.truck_capacity) * 100.0 ;
+	END_IF;
+	
+	4:		(*Проверка типа партии, взвешивание машины и сохранение конечного веса*)
+	IF weight_stable_rtrig_worked THEN
+		(*Отправляем запрос на завершение партии*)
+		batch.request_batch_complete:= TRUE;
+		IF batch.batch_type = 1 THEN (*приёмка*)
+			batch.truck_empty_weight:= weight;
+		ELSIF batch.batch_type = 2 THEN (*отгрузка*)
+		 	batch.truck_full_weight:= weight;
+		END_IF;
+		
+		(*Итоговые показания веса газа*)
+		batch.weight_gas_amount:= batch.truck_full_weight - batch.truck_empty_weight;
+		batch.gas_amount:= batch.final_mass_meter - batch.initial_mass_meter;
+		
+		batch.process_step:= 5;
+	END_IF;
+	
+	5:		(*Есть подтверждение о завершении партии со SCADA*)
+	IF batch.request_batch_complete AND batch.response_batch_complete THEN
+		batch.process_step:= 0;
+		batch.request_batch_complete := FALSE;
+		batch.response_batch_complete := FALSE;
+	END_IF;
+	
+END_CASE;
+
+(*Обнуляем показания, если шаг = 0*)
+IF batch.process_step = 0 THEN
+	batch.is_active:= FALSE;
+	batch.gas_filling_in_progress:= FALSE;
+	vehicle_select.proposed_ready:= FALSE;
+	vehicle_select.list_mode:= FALSE;
+	vehicle_select.operator_confirm:= FALSE;
+	vehicle_select.selected_vehicle_index:= -1;
+	vehicle_select.proposed_truck_number:= '';
+	vehicle_select.proposed_trailer_number:= '';
+	vehicle_select.vehicle_list_0:= '';
+	vehicle_select.vehicle_list_1:= '';
+	vehicle_select.vehicle_list_2:= '';
+	vehicle_select.vehicle_list_3:= '';
+	vehicle_select.vehicle_list_4:= '';
+	vehicle_select.vehicle_list_5:= '';
+	vehicle_select.vehicle_list_6:= '';
+	vehicle_select.vehicle_list_7:= '';
+	vehicle_select.vehicle_list_8:= '';
+	vehicle_select.vehicle_list_9:= '';
+END_IF;

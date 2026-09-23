@@ -33,6 +33,16 @@ def _autogas_create_pending(snapshot: Snapshot) -> bool:
     return (
         _truthy(snapshot.get('autogas.request_batch_create'))
         and not _truthy(snapshot.get('autogas.response_batch_create'))
+        and not _truthy(snapshot.get('autogas.vehicle_select.proposed_ready'))
+        and not _truthy(snapshot.get('autogas.vehicle_select.list_mode'))
+    )
+
+
+def _autogas_operator_confirm(snapshot: Snapshot) -> bool:
+    return (
+        _truthy(snapshot.get('autogas.vehicle_select.operator_confirm'))
+        and _truthy(snapshot.get('autogas.request_batch_create'))
+        and not _truthy(snapshot.get('autogas.response_batch_create'))
     )
 
 
@@ -68,6 +78,24 @@ TRIGGERS: tuple[TriggerDef, ...] = (
         idempotency_ttl=30,
     ),
     TriggerDef(
+        name='autogas_operator_confirm',
+        task='autogas.tasks.process_autogas_operator_confirm',
+        condition=_autogas_operator_confirm,
+        snapshot_keys=(
+            'autogas.batch_type_code',
+            'autogas.gas_type',
+            'autogas.request_batch_create',
+            'autogas.response_batch_create',
+            'autogas.vehicle_select.list_mode',
+            'autogas.vehicle_select.proposed_ready',
+            'autogas.vehicle_select.proposed_truck_number',
+            'autogas.vehicle_select.proposed_trailer_number',
+            'autogas.vehicle_select.selected_vehicle_index',
+            'autogas.vehicle_select.operator_confirm',
+        ),
+        idempotency_ttl=30,
+    ),
+    TriggerDef(
         name='autogas_batch_complete',
         task='autogas.tasks.process_autogas_batch_complete',
         condition=_autogas_complete_pending,
@@ -90,6 +118,9 @@ def build_payload(trigger: TriggerDef, snapshot: Snapshot) -> dict[str, Any]:
     """Собирает payload для Celery из снимка тегов (короткие ключи без префикса домена)."""
     payload: dict[str, Any] = {}
     for key in trigger.snapshot_keys:
-        short = key.split('.', 1)[-1]
+        if key.startswith('autogas.vehicle_select.'):
+            short = key[len('autogas.vehicle_select.'):]
+        else:
+            short = key.split('.', 1)[-1]
         payload[short] = snapshot.get(key)
     return payload

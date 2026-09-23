@@ -471,6 +471,7 @@ class Truck(models.Model):
         verbose_name="Вес полного т/с (по техпаспорту)"
         )
     is_on_station = models.BooleanField(default=False, verbose_name="Находится на станции")
+    is_active = models.BooleanField(default=True, verbose_name="Активен")
     entry_at = models.DateTimeField(null=True, blank=True, verbose_name="Дата и время въезда")
     departure_at = models.DateTimeField(null=True, blank=True, verbose_name="Дата и время выезда")
 
@@ -576,6 +577,7 @@ class Trailer(models.Model):
         verbose_name="Вес полного т/с (по техпаспорту)"
         )
     is_on_station = models.BooleanField(default=False, verbose_name="Находится на станции")
+    is_active = models.BooleanField(default=True, verbose_name="Активен")
     entry_at = models.DateTimeField(null=True, blank=True, verbose_name="Дата и время въезда")
     departure_at = models.DateTimeField(null=True, blank=True, verbose_name="Дата и время выезда")
 

@@ -108,6 +108,7 @@ class TruckSerializer(serializers.ModelSerializer):
             'empty_weight',
             'full_weight',
             'is_on_station',
+            'is_active',
             'entry_at',
             'departure_at',
             'trailer'
@@ -163,6 +164,7 @@ class TrailerSerializer(serializers.ModelSerializer):
             'empty_weight',
             'full_weight',
             'is_on_station',
+            'is_active',
             'entry_at',
             'departure_at'
         ]

@@ -144,10 +144,13 @@ redis-server
 События с Melsoft MX OPC Server приходят через долгоживущий процесс `opcua.bridge` (OPC UA Subscription). Bridge ставит Celery-задачи только при изменении тегов:
 
 - **process_railway_tank_event** (`railway_service.tasks.process_railway_tank_event`) — фронт `camera_worked`
-- **process_autogas_batch_create** (`autogas.tasks.process_autogas_batch_create`) — pending create handshake
+- **process_autogas_batch_create** (`autogas.tasks.process_autogas_batch_create`) — `request_number_identification`: Intellect → `is_on_station` → propose или сразу ручной список (`VehicleSelect`); партию не создаёт
+- **process_autogas_operator_confirm** (`autogas.tasks.process_autogas_operator_confirm`) — фронт `vehicle_select.operator_confirm`: создание партии + `response_number_detect`
 - **process_autogas_batch_complete** (`autogas.tasks.process_autogas_batch_complete`) — pending complete handshake
 
 Запись тегов обратно в OPC (ACK, сброс флагов) идёт через Redis-очередь того же bridge-процесса (`opcua.api.write_tag`, fire-and-forget). Ретраи записи в Melsoft выполняет bridge.
+
+**Автоколонка / GS21 (`VehicleSelect`):** структура ПЛК `VehicleSelect`, instance `vehicle_select` (см. `SU2/VehicleSelect.csv`, `SU2/BatchProcess.txt`). Шаг 2: Django пишет `proposed_*` / `vehicle_list_0`…`_9`; оператор Confirm на панели; до Confirm партия в БД не создаётся. В списке только `is_active` цистерны и связки тягач+полуприцеп (`Trailer.truck`). Пустая STRING = нет строки. Выход без Confirm — `stop_batch`.
 
 ### Задачи по требованию
 
