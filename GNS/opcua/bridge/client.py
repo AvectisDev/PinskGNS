@@ -75,12 +75,15 @@ class OpcBridgeClient:
         node = self._nodes_by_name.get(name)
         if node is None:
             raise KeyError(f'Unknown tag: {name}')
-        converted = await self._convert_for_write(node, value)
-        await node.write_value(converted)
-        self.dispatcher.update_tag(name, converted)
+        variant = await self._to_variant(node, value)
+        # Melsoft MX OPC UA отклоняет запись со SourceTimestamp (BadWriteNotSupported).
+        # value_to_datavalue() всегда ставит timestamp — передаём DataValue без него.
+        await node.write_value(ua.DataValue(variant))
+        written = variant.Value
+        self.dispatcher.update_tag(name, written)
         logger.debug('OPC write %s=%s', name, value)
 
-    async def _convert_for_write(self, node: Node, value: Any) -> Any:
+    async def _to_variant(self, node: Node, value: Any) -> ua.Variant:
         try:
             variant_type = await node.read_data_type_as_variant_type()
         except Exception:
@@ -88,7 +91,7 @@ class OpcBridgeClient:
             variant_type = data_value.Value.VariantType
 
         if variant_type == ua.VariantType.Boolean:
-            return bool(value)
+            return ua.Variant(bool(value), variant_type)
         if variant_type in (
             ua.VariantType.SByte,
             ua.VariantType.Byte,
@@ -99,12 +102,12 @@ class OpcBridgeClient:
             ua.VariantType.Int64,
             ua.VariantType.UInt64,
         ):
-            return int(value)
+            return ua.Variant(int(value), variant_type)
         if variant_type in (ua.VariantType.Float, ua.VariantType.Double):
-            return float(value)
+            return ua.Variant(float(value), variant_type)
         if variant_type == ua.VariantType.String:
-            return str(value)
-        return value
+            return ua.Variant(str(value), variant_type)
+        return ua.Variant(value, variant_type)
 
     def resolve_tag_name(self, node: Node) -> Optional[str]:
         node_id_str = node.nodeid.to_string()
