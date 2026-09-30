@@ -150,7 +150,7 @@ redis-server
 
 Запись тегов обратно в OPC (ACK, сброс флагов) идёт через Redis-очередь того же bridge-процесса (`opcua.api.write_tag`, fire-and-forget). Ретраи записи в Melsoft выполняет bridge.
 
-**Автоколонка / GS21 (`VehicleSelect`):** структура ПЛК `VehicleSelect`, instance `vehicle_select` (см. `SU2/VehicleSelect.csv`, `SU2/BatchProcess.txt`). Шаг 2: Django пишет `proposed_*` / `vehicle_list_0`…`_9`; оператор Confirm на панели; до Confirm партия в БД не создаётся. В списке только `is_active` цистерны и связки тягач+полуприцеп (`Trailer.truck`). Пустая STRING = нет строки. Выход без Confirm — `stop_batch`.
+**Автоколонка / GS21:** OPC instance партии — `vehicle_batch` (NodeId `PLC_SU2.vehicle_batch.*`); выбор транспорта — `vehicle_select` (см. `GNS/autogas/SU2/Structures/`, `GNS/autogas/SU2/Code/BatchProcess.txt`). Шаг 2: Django пишет `proposed_*` / `vehicle_list_0`…`_9`; оператор Confirm на панели; до Confirm партия в БД не создаётся. В списке только `is_active` цистерны и связки тягач+полуприцеп (`Trailer.truck`). Пустая STRING = нет строки. Выход без Confirm — `stop_batch`. Поля `*_mass_meter` / `gas_amount` — объём (`Volume_total`); при `mass_meter.CommError` ПЛК отдаёт 0, Django сохраняет значения как есть и не останавливает партию.
 
 ### Задачи по требованию
 

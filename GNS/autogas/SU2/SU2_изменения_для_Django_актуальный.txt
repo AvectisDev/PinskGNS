@@ -1,0 +1,67 @@
+﻿Изменения в обмене Django с контроллером SU2
+
+1. Переименованы глобальные экземпляры структур:
+- batch заменён на vehicle_batch;
+- batch_settings заменён на vehicle_batch_settings;
+- MassMeter заменён на mass_meter;
+- vehicle_scale и vehicle_select сохраняют свои имена.
+
+2. Данные автомобильных весов объединены в структуру vehicle_scale:
+- vehicle_scale.current_weight вместо weight;
+- vehicle_scale.previous_weight вместо old_weight;
+- vehicle_scale.is_stable вместо weight_is_stable;
+- vehicle_scale.start_stabilization_timer вместо отдельного глобального тега start_stabilization_timer.
+
+3. Настройки обработки весов находятся в структуре vehicle_batch_settings:
+- vehicle_batch_settings.weight_stability_tolerance — допустимое изменение веса;
+- vehicle_batch_settings.vehicle_presence_weight — порог наличия автомобиля на весах;
+- vehicle_batch_settings.weight_stabilization_time — время стабилизации веса.
+
+4. Структура партии теперь доступна через vehicle_batch. Имена её внутренних полей не изменились. Основные теги обмена:
+- vehicle_batch.process_step;
+- vehicle_batch.batch_type;
+- vehicle_batch.gas_type;
+- vehicle_batch.is_active;
+- vehicle_batch.start_batch и vehicle_batch.stop_batch;
+- vehicle_batch.request_number_identification и vehicle_batch.response_number_detect;
+- vehicle_batch.request_batch_complete и vehicle_batch.response_batch_complete;
+- vehicle_batch.gas_filling_in_progress.
+
+5. Изменена логика vehicle_batch.gas_filling_in_progress:
+- на всём шаге vehicle_batch.process_step = 3 значение устанавливается в TRUE;
+- при возвращении автомобиля на весы и переходе к шагу 4 значение устанавливается в FALSE;
+- мгновенный расход больше не используется для определения факта перекачки.
+
+6. Ошибка связи с расходомером не блокирует выполнение партии:
+- переходы между шагами продолжаются по данным автомобильных весов;
+- начальное и конечное показания объёмного сумматора записываются только при mass_meter.CommError = FALSE;
+- при отсутствии связи недоступные значения расходомера сохраняются как 0.0;
+- расчёт vehicle_batch.fill_percentage выполняется только при наличии связи и положительной вместимости цистерны;
+- vehicle_batch.weight_gas_amount рассчитывается независимо от состояния связи с расходомером.
+
+7. Учёт по расходомеру остаётся объёмным, несмотря на исторические имена тегов:
+- vehicle_batch.initial_mass_meter содержит начальное значение mass_meter.Volume_total;
+- vehicle_batch.final_mass_meter содержит конечное значение mass_meter.Volume_total;
+- vehicle_batch.gas_amount содержит разность конечного и начального объёмных сумматоров.
+
+8. Логика запуска партии:
+- запуск разрешён только при vehicle_batch.batch_type = 1 или 2;
+- запуск разрешён только при vehicle_batch.gas_type = 2 или 3;
+- vehicle_batch.gas_type = 1 означает, что тип газа не выбран.
+
+9. Последовательный модуль:
+- SM_1.NormalCompletionFlag заменён на SM_1.CompletionFlag;
+- SM_1.ErrorCompletionFlag сохраняет прежнее назначение;
+- программа MassMeter уже использует актуальные имена SM_1.CompletionFlag и mass_meter.CommError.
+
+10. Требуемые изменения в Django:
+- заменить OPC-префикс batch на vehicle_batch;
+- заменить OPC-префикс batch_settings на vehicle_batch_settings;
+- заменить OPC-префикс MassMeter на mass_meter;
+- заменить старые отдельные теги weight, old_weight, weight_is_stable и start_stabilization_timer на соответствующие поля vehicle_scale;
+- использовать vehicle_scale.current_weight, vehicle_scale.previous_weight, vehicle_scale.is_stable и vehicle_scale.start_stabilization_timer;
+- удалить использование исключённых тегов фильтрации расхода;
+- не считать mass_meter.CommError причиной остановки или отмены партии;
+- при mass_meter.CommError = TRUE считать данные объёмного сумматора недоступными, но продолжать обработку партии по автомобильным весам;
+- сохранить существующую логику подтверждений через vehicle_batch.request_number_identification, vehicle_batch.response_number_detect, vehicle_batch.request_batch_complete и vehicle_batch.response_batch_complete;
+- сохранить существующий обмен выбора транспорта через vehicle_select.

@@ -35,72 +35,72 @@ TAGS: Mapping[str, TagDef] = {
     # Autogas PLC_SU2
     'autogas.batch_type_code': TagDef(
         name='autogas.batch_type_code',
-        node_id='ns=4; s=Address Space.PLC_SU2.batch.batch_type',
+        node_id='ns=4; s=Address Space.PLC_SU2.vehicle_batch.batch_type',
         domain='autogas',
     ),
     'autogas.gas_type': TagDef(
         name='autogas.gas_type',
-        node_id='ns=4; s=Address Space.PLC_SU2.batch.gas_type',
+        node_id='ns=4; s=Address Space.PLC_SU2.vehicle_batch.gas_type',
         domain='autogas',
     ),
     'autogas.stop_batch': TagDef(
         name='autogas.stop_batch',
-        node_id='ns=4; s=Address Space.PLC_SU2.batch.stop_batch',
+        node_id='ns=4; s=Address Space.PLC_SU2.vehicle_batch.stop_batch',
         domain='autogas',
     ),
     'autogas.initial_mass_meter': TagDef(
         name='autogas.initial_mass_meter',
-        node_id='ns=4; s=Address Space.PLC_SU2.batch.initial_mass_meter',
+        node_id='ns=4; s=Address Space.PLC_SU2.vehicle_batch.initial_mass_meter',
         domain='autogas',
     ),
     'autogas.final_mass_meter': TagDef(
         name='autogas.final_mass_meter',
-        node_id='ns=4; s=Address Space.PLC_SU2.batch.final_mass_meter',
+        node_id='ns=4; s=Address Space.PLC_SU2.vehicle_batch.final_mass_meter',
         domain='autogas',
     ),
     'autogas.gas_amount': TagDef(
         name='autogas.gas_amount',
-        node_id='ns=4; s=Address Space.PLC_SU2.batch.gas_amount',
+        node_id='ns=4; s=Address Space.PLC_SU2.vehicle_batch.gas_amount',
         domain='autogas',
     ),
     'autogas.truck_full_weight': TagDef(
         name='autogas.truck_full_weight',
-        node_id='ns=4; s=Address Space.PLC_SU2.batch.truck_full_weight',
+        node_id='ns=4; s=Address Space.PLC_SU2.vehicle_batch.truck_full_weight',
         domain='autogas',
     ),
     'autogas.truck_empty_weight': TagDef(
         name='autogas.truck_empty_weight',
-        node_id='ns=4; s=Address Space.PLC_SU2.batch.truck_empty_weight',
+        node_id='ns=4; s=Address Space.PLC_SU2.vehicle_batch.truck_empty_weight',
         domain='autogas',
     ),
     'autogas.weight_gas_amount': TagDef(
         name='autogas.weight_gas_amount',
-        node_id='ns=4; s=Address Space.PLC_SU2.batch.weight_gas_amount',
+        node_id='ns=4; s=Address Space.PLC_SU2.vehicle_batch.weight_gas_amount',
         domain='autogas',
     ),
     'autogas.truck_capacity': TagDef(
         name='autogas.truck_capacity',
-        node_id='ns=4; s=Address Space.PLC_SU2.batch.truck_capacity',
+        node_id='ns=4; s=Address Space.PLC_SU2.vehicle_batch.truck_capacity',
         domain='autogas',
     ),
     'autogas.request_batch_create': TagDef(
         name='autogas.request_batch_create',
-        node_id='ns=4; s=Address Space.PLC_SU2.batch.request_number_identification',
+        node_id='ns=4; s=Address Space.PLC_SU2.vehicle_batch.request_number_identification',
         domain='autogas',
     ),
     'autogas.response_batch_create': TagDef(
         name='autogas.response_batch_create',
-        node_id='ns=4; s=Address Space.PLC_SU2.batch.response_number_detect',
+        node_id='ns=4; s=Address Space.PLC_SU2.vehicle_batch.response_number_detect',
         domain='autogas',
     ),
     'autogas.request_batch_complete': TagDef(
         name='autogas.request_batch_complete',
-        node_id='ns=4; s=Address Space.PLC_SU2.batch.request_batch_complete',
+        node_id='ns=4; s=Address Space.PLC_SU2.vehicle_batch.request_batch_complete',
         domain='autogas',
     ),
     'autogas.response_batch_complete': TagDef(
         name='autogas.response_batch_complete',
-        node_id='ns=4; s=Address Space.PLC_SU2.batch.response_batch_complete',
+        node_id='ns=4; s=Address Space.PLC_SU2.vehicle_batch.response_batch_complete',
         domain='autogas',
     ),
     # VehicleSelect (GS21 manual / propose)
