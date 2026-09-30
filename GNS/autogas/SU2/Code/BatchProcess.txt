@@ -9,149 +9,144 @@
   1 - не выбран;
   2 - СПБТ;
   3 - ПБА.
+
+  Последовательность запуска:
+  0 - партия не активна, оператор выбирает тип партии и тип газа;
+  1 - запрос, выбор и подтверждение номера автомобиля;
+  2 - партия создана и активна, ожидание выезда автомобиля с весов;
+  3 - приёмка или отгрузка газа;
+  4 - повторное взвешивание автомобиля;
+  5 - ожидание сохранения завершённой партии.
+
+  Важно:
+  Команда start_batch теперь запускает только предварительный запрос номера.
+  Партия становится активной после того, как Django создаст партию и установит
+  response_number_detect = TRUE, а вес автомобиля будет стабилен.
 *)
 
 (* -------------------------------------------------------------------------- *)
 (* Определение стабильного показания автомобильных весов.                      *)
 (* -------------------------------------------------------------------------- *)
+
 min_weight := vehicle_scale.previous_weight - vehicle_batch_settings.weight_stability_tolerance;
 max_weight := vehicle_scale.previous_weight + vehicle_batch_settings.weight_stability_tolerance;
 
-(*
-  Автомобиль считается находящимся на весах, если вес превышает заданную
-  границу. Для запуска таймера текущее значение также должно находиться
-  в пределах допуска относительно предыдущего значения.
-*)
-IF (vehicle_scale.current_weight > vehicle_batch_settings.vehicle_presence_weight) AND
-   (vehicle_scale.current_weight >= min_weight) AND
-   (vehicle_scale.current_weight <= max_weight) THEN
+IF (vehicle_scale.current_weight > vehicle_batch_settings.vehicle_presence_weight) AND (vehicle_scale.current_weight >= min_weight) AND (vehicle_scale.current_weight <= max_weight) THEN
   vehicle_scale.start_stabilization_timer := TRUE;
 ELSE
   vehicle_scale.start_stabilization_timer := FALSE;
 END_IF;
 
-weight_stabilization_timer(
-  IN := vehicle_scale.start_stabilization_timer,
-  PT := vehicle_batch_settings.weight_stabilization_time,
-  Q := vehicle_scale.is_stable,
-  ET := stabilization_timer_ET
-);
-
-(* Формируем однократный импульс при появлении стабильного веса*)
-weight_stable_rtrig( _CLK := vehicle_scale.is_stable);
+weight_stabilization_timer(IN := vehicle_scale.start_stabilization_timer, PT := vehicle_batch_settings.weight_stabilization_time, Q := vehicle_scale.is_stable, ET := stabilization_timer_ET);
 
 (* -------------------------------------------------------------------------- *)
-(* Обработка команд запуска и остановки партии*)
-(* Команда остановки имеет приоритет над командой запуска*)
+(* Обработка команд запуска и остановки.                                       *)
 (* -------------------------------------------------------------------------- *)
 
 IF vehicle_batch.stop_batch THEN
   vehicle_batch.process_step := 0;
-  vehicle_batch.stop_batch := FALSE;
+  vehicle_batch.is_active := FALSE;
+  vehicle_batch.gas_filling_in_progress := FALSE;
   vehicle_batch.start_batch := FALSE;
+  vehicle_batch.stop_batch := FALSE;
 
 ELSIF vehicle_batch.start_batch THEN
-  (* Сбрасываем кнопку независимо от корректности выбранных параметров. *)
+  (* Команда обрабатывается только из исходного состояния. *)
   vehicle_batch.start_batch := FALSE;
 
-  (* Партия запускается только при корректно выбранных типе партии и типе газа *)
-  IF ((vehicle_batch.batch_type = 1) OR (vehicle_batch.batch_type = 2)) AND ((vehicle_batch.gas_type = 2) OR (vehicle_batch.gas_type = 3)) THEN
+  IF (vehicle_batch.process_step = 0) AND ((vehicle_batch.batch_type = 1) OR (vehicle_batch.batch_type = 2)) AND ((vehicle_batch.gas_type = 2) OR (vehicle_batch.gas_type = 3)) THEN
+    (* Сбрасываем результаты предыдущей партии. *)
+    vehicle_batch.initial_mass_meter := 0.0;
+    vehicle_batch.final_mass_meter := 0.0;
+    vehicle_batch.gas_amount := 0.0;
+    vehicle_batch.truck_full_weight := 0.0;
+    vehicle_batch.truck_empty_weight := 0.0;
+    vehicle_batch.weight_gas_amount := 0.0;
+    vehicle_batch.truck_capacity := 0.0;
+    vehicle_batch.fill_percentage := 0.0;
+    vehicle_batch.gas_filling_in_progress := FALSE;
+    vehicle_batch.is_active := FALSE;
+
+    (* Сбрасываем подтверждения предыдущего обмена. *)
+    vehicle_batch.request_batch_complete := FALSE;
+    vehicle_batch.response_batch_complete := FALSE;
+    vehicle_batch.request_number_identification := FALSE;
+    vehicle_batch.response_number_detect := FALSE;
+
+    (* Очищаем интерфейс выбора автомобиля перед новым запросом. *)
+    vehicle_select.proposed_ready := FALSE;
+    vehicle_select.list_mode := FALSE;
+    vehicle_select.operator_confirm := FALSE;
+    vehicle_select.selected_vehicle_index := -1;
+    vehicle_select.proposed_truck_number := '';
+    vehicle_select.proposed_trailer_number := '';
+    vehicle_select.vehicle_list_0 := '';
+    vehicle_select.vehicle_list_1 := '';
+    vehicle_select.vehicle_list_2 := '';
+    vehicle_select.vehicle_list_3 := '';
+    vehicle_select.vehicle_list_4 := '';
+    vehicle_select.vehicle_list_5 := '';
+    vehicle_select.vehicle_list_6 := '';
+    vehicle_select.vehicle_list_7 := '';
+    vehicle_select.vehicle_list_8 := '';
+    vehicle_select.vehicle_list_9 := '';
+
+    (* Запрашиваем у Django распознавание номера и список автомобилей. *)
+    vehicle_batch.request_number_identification := TRUE;
     vehicle_batch.process_step := 1;
-    vehicle_batch.is_active := TRUE;
   END_IF;
 END_IF;
 
 (* -------------------------------------------------------------------------- *)
-(* Основная последовательность партии*)
+(* Основная последовательность партии.                                         *)
 (* -------------------------------------------------------------------------- *)
 
 CASE vehicle_batch.process_step OF
 
   1:
     (*
-      Первое взвешивание.
-      После стабилизации веса сохраняем начальный вес автомобиля и
-      отправляем запрос на определение его регистрационного номера.
+      Партия ещё не активна. Django распознаёт номер, передаёт предложение
+      и список автомобилей. Оператор подтверждает предложенный номер либо
+      выбирает автомобиль из списка через vehicle_select.operator_confirm.
+
+      После успешного создания партии Django устанавливает
+      vehicle_batch.response_number_detect = TRUE.
     *)
-    IF weight_stable_rtrig.Q THEN
+    vehicle_batch.is_active := FALSE;
+    vehicle_batch.gas_filling_in_progress := FALSE;
 
-      (* Обнуляем результаты предыдущей партии. *)
-      vehicle_batch.initial_mass_meter := 0.0;
-      vehicle_batch.final_mass_meter := 0.0;
-      vehicle_batch.gas_amount := 0.0;
-      vehicle_batch.truck_full_weight := 0.0;
-      vehicle_batch.truck_empty_weight := 0.0;
-      vehicle_batch.weight_gas_amount := 0.0;
-      vehicle_batch.truck_capacity := 0.0;
-      vehicle_batch.fill_percentage := 0.0;
-      vehicle_batch.gas_filling_in_progress := FALSE;
-
-      (* Сбрасываем флаги завершения предыдущей партии. *)
-      vehicle_batch.request_batch_complete := FALSE;
-      vehicle_batch.response_batch_complete := FALSE;
-      vehicle_batch.response_number_detect := FALSE;
-
-      (* Сбрасываем интерфейс выбора транспорта перед новым запросом. *)
-      vehicle_select.proposed_ready := FALSE;
-      vehicle_select.list_mode := FALSE;
-      vehicle_select.operator_confirm := FALSE;
-      vehicle_select.selected_vehicle_index := -1;
-      vehicle_select.proposed_truck_number := '';
-      vehicle_select.proposed_trailer_number := '';
-      vehicle_select.vehicle_list_0 := '';
-      vehicle_select.vehicle_list_1 := '';
-      vehicle_select.vehicle_list_2 := '';
-      vehicle_select.vehicle_list_3 := '';
-      vehicle_select.vehicle_list_4 := '';
-      vehicle_select.vehicle_list_5 := '';
-      vehicle_select.vehicle_list_6 := '';
-      vehicle_select.vehicle_list_7 := '';
-      vehicle_select.vehicle_list_8 := '';
-      vehicle_select.vehicle_list_9 := '';
-
-      (* Запрашиваем распознавание и подтверждение номера автомобиля. *)
-      vehicle_batch.request_number_identification := TRUE;
-
+    IF vehicle_batch.request_number_identification AND vehicle_batch.response_number_detect AND vehicle_scale.is_stable THEN
+      (* Сохраняем первое стабильное взвешивание. *)
       IF vehicle_batch.batch_type = 1 THEN
-        (* Приёмка: автомобиль до слива считается полным. *)
         vehicle_batch.truck_full_weight := vehicle_scale.current_weight;
       ELSIF vehicle_batch.batch_type = 2 THEN
-        (* Отгрузка: автомобиль до наполнения считается пустым. *)
         vehicle_batch.truck_empty_weight := vehicle_scale.current_weight;
       END_IF;
 
+      (* Только после подтверждения Django партия становится активной. *)
+      vehicle_batch.is_active := TRUE;
+      vehicle_batch.request_number_identification := FALSE;
+      vehicle_batch.response_number_detect := FALSE;
       vehicle_batch.process_step := 2;
     END_IF;
 
   2:
-    (* Ожидаем подтверждение номера от SCADA и выезд автомобиля с весов *)
-    IF vehicle_batch.response_number_detect AND vehicle_batch.request_number_identification AND
-       (vehicle_scale.current_weight< vehicle_batch_settings.vehicle_presence_weight) THEN
-
-      (*
-        Если данные доступны, фиксируем начальное показание объёмного
-        сумматора. При ошибке связи сохраняем 0.0 как признак отсутствия
-        достоверного показания.
-         *)
+    (* Партия активна. Ожидаем выезд автомобиля с весов. *)
+    IF vehicle_scale.current_weight < vehicle_batch_settings.vehicle_presence_weight THEN
       IF NOT mass_meter.CommError THEN
         vehicle_batch.initial_mass_meter := mass_meter.Volume_total;
       ELSE
         vehicle_batch.initial_mass_meter := 0.0;
       END_IF;
-      vehicle_batch.response_number_detect := FALSE;
-      vehicle_batch.request_number_identification := FALSE;
       vehicle_batch.process_step := 3;
     END_IF;
 
   3:
-    (* На всём шаге 3 считаем, что идёт приёмка или отгрузка газа *)
+    (* На всём шаге 3 считаем, что идёт приёмка или отгрузка газа. *)
     vehicle_batch.gas_filling_in_progress := TRUE;
 
-    (* Рассчитываем текущее заполнение автомобиля по объёмному сумматору. *)
     IF (vehicle_batch.truck_capacity > 0.0) AND (NOT mass_meter.CommError) THEN
       vehicle_batch.fill_percentage := ((mass_meter.Volume_total - vehicle_batch.initial_mass_meter) / vehicle_batch.truck_capacity) * 100.0;
-
-      (* Ограничиваем отображаемое значение диапазоном 0..100 %. *)
       IF vehicle_batch.fill_percentage < 0.0 THEN
         vehicle_batch.fill_percentage := 0.0;
       ELSIF vehicle_batch.fill_percentage > 100.0 THEN
@@ -159,25 +154,14 @@ CASE vehicle_batch.process_step OF
       END_IF;
     END_IF;
 
-    (* Возвращение автомобиля на весы означает завершение перекачки *)
     IF vehicle_scale.current_weight > vehicle_batch_settings.vehicle_presence_weight THEN
       vehicle_batch.gas_filling_in_progress := FALSE;
       vehicle_batch.process_step := 4;
     END_IF;
 
   4:
-    (*
-      Второе взвешивание. После стабилизации веса фиксируем конечное показание
-      объёмного сумматора и рассчитываем результаты партии.
-    *)
-    vehicle_batch.gas_filling_in_progress := FALSE;
-
-    IF weight_stable_rtrig.Q THEN
-
-      (*
-       При наличии данных фиксируем конечный объёмный сумматор. При ошибке
-        связи сохраняем 0.0.
-      *)
+    (* Второе взвешивание и расчёт результатов партии. *)
+    IF vehicle_scale.is_stable THEN
       IF NOT mass_meter.CommError THEN
         vehicle_batch.final_mass_meter := mass_meter.Volume_total;
       ELSE
@@ -185,35 +169,25 @@ CASE vehicle_batch.process_step OF
       END_IF;
 
       IF vehicle_batch.batch_type = 1 THEN
-        (* Приёмка: после слива автомобиль считается пустым. *)
         vehicle_batch.truck_empty_weight := vehicle_scale.current_weight;
       ELSIF vehicle_batch.batch_type = 2 THEN
-        (* Отгрузка: после наполнения автомобиль считается полным. *)
         vehicle_batch.truck_full_weight := vehicle_scale.current_weight;
       END_IF;
 
-      (* Количество газа по автомобильным весам. *)
       vehicle_batch.weight_gas_amount := vehicle_batch.truck_full_weight - vehicle_batch.truck_empty_weight;
 
-      (*
-        Количество по объёмному сумматору рассчитываем только при исправной
-        связи и наличии обоих показаний.
-      *)
       IF (NOT mass_meter.CommError) AND (vehicle_batch.initial_mass_meter <> 0.0) AND (vehicle_batch.final_mass_meter <> 0.0) THEN
         vehicle_batch.gas_amount := vehicle_batch.final_mass_meter - vehicle_batch.initial_mass_meter;
       ELSE
         vehicle_batch.gas_amount := 0.0;
       END_IF;
 
-      (* Передаём в SCADA запрос на завершение партии. *)
       vehicle_batch.request_batch_complete := TRUE;
       vehicle_batch.process_step := 5;
     END_IF;
 
   5:
-    (* Ожидаем подтверждение сохранения завершённой партии от SCADA. *)
-    vehicle_batch.gas_filling_in_progress := FALSE;
-
+    (* Ожидаем подтверждение сохранения завершённой партии от Django. *)
     IF vehicle_batch.request_batch_complete AND vehicle_batch.response_batch_complete THEN
       vehicle_batch.request_batch_complete := FALSE;
       vehicle_batch.response_batch_complete := FALSE;
@@ -221,25 +195,21 @@ CASE vehicle_batch.process_step OF
     END_IF;
 
 ELSE
-  (* Неизвестный шаг считается безопасным остановленным состоянием. *)
   vehicle_batch.process_step := 0;
 END_CASE;
 
 (* -------------------------------------------------------------------------- *)
-(* Безопасное состояние при отсутствии активной партии*)
+(* Безопасное состояние при отсутствии активной партии.                        *)
 (* -------------------------------------------------------------------------- *)
 
 IF vehicle_batch.process_step = 0 THEN
   vehicle_batch.is_active := FALSE;
   vehicle_batch.gas_filling_in_progress := FALSE;
-
-  (* Сбрасываем обменные флаги, чтобы они не перешли в следующую партию. *)
   vehicle_batch.request_number_identification := FALSE;
   vehicle_batch.response_number_detect := FALSE;
   vehicle_batch.request_batch_complete := FALSE;
   vehicle_batch.response_batch_complete := FALSE;
 
-  (* Сбрасываем интерфейс выбора транспорта. *)
   vehicle_select.proposed_ready := FALSE;
   vehicle_select.list_mode := FALSE;
   vehicle_select.operator_confirm := FALSE;

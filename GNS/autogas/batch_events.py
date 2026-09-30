@@ -8,7 +8,7 @@ from typing import Any, Mapping, Optional, Sequence, Tuple
 
 from django.db.models import Case, IntegerField, Q, Value, When
 
-from filling_station.models import Trailer, TrailerType, Truck
+from filling_station.models import Trailer, Truck
 from opcua.api import write_tag
 from autogas.management.commands.intellect import (
     INTELLECT_SERVER_LIST,
@@ -42,21 +42,35 @@ class VehicleCombo:
     trailer: Optional[Trailer] = None
 
     @property
-    def display(self) -> str:
-        truck_no = self.truck.registration_number
-        if self.trailer:
-            text = f'{truck_no} / {self.trailer.registration_number}'
-        else:
-            text = truck_no
-        return text[:DISPLAY_MAX_LEN]
-
-    @property
     def on_station_rank(self) -> int:
         if self.truck.is_on_station:
             return 1
         if self.trailer and self.trailer.is_on_station:
             return 1
         return 0
+
+
+def format_list_line(index: int, combo: VehicleCombo) -> str:
+    """Строка vehicle_list_i: «N    truck    [trailer]» (N — 1-based)."""
+    n = index + 1
+    truck_no = combo.truck.registration_number
+    if combo.trailer:
+        text = f'{n}    {truck_no}    {combo.trailer.registration_number}'
+    else:
+        text = f'{n}    {truck_no}'
+    return text[:DISPLAY_MAX_LEN]
+
+
+def parse_vehicle_list_line(line: Any) -> Tuple[Optional[str], Optional[str]]:
+    """Разбор строки списка → (truck_number, trailer_number|None)."""
+    if line is None:
+        return None, None
+    parts = str(line).split()
+    if len(parts) < 2:
+        return None, None
+    truck_no = parts[1]
+    trailer_no = parts[2] if len(parts) >= 3 else None
+    return truck_no, trailer_no
 
 
 def get_transport_numbers() -> list[str]:
@@ -238,18 +252,18 @@ def combo_from_numbers(
     return VehicleCombo(truck=truck, trailer=trailer)
 
 
-def combo_from_list_index(index: Any) -> Optional[VehicleCombo]:
-    """Связка по индексу ручного списка (тот же порядок, что при выгрузке)."""
+def combo_from_list_selection(payload: Mapping[str, Any]) -> Optional[VehicleCombo]:
+    """Связка из vehicle_list_[selected_vehicle_index] (list_mode, без пересборки БД)."""
     try:
-        idx = int(index)
+        idx = int(payload.get('selected_vehicle_index'))
     except (TypeError, ValueError):
         return None
     if idx < 0 or idx >= VEHICLE_LIST_SIZE:
         return None
-    combos = build_manual_vehicle_list()
-    if idx >= len(combos):
+    truck_no, trailer_no = parse_vehicle_list_line(payload.get(f'vehicle_list_{idx}'))
+    if not truck_no:
         return None
-    return combos[idx]
+    return combo_from_numbers(truck_no, trailer_no)
 
 
 def _write_propose(combo: VehicleCombo) -> None:
@@ -259,18 +273,16 @@ def _write_propose(combo: VehicleCombo) -> None:
         combo.trailer.registration_number if combo.trailer else '',
     )
     write_tag('autogas.vehicle_select.proposed_ready', True)
-    write_tag('autogas.vehicle_select.list_mode', False)
     for i in range(VEHICLE_LIST_SIZE):
         write_tag(f'autogas.vehicle_select.vehicle_list_{i}', '')
 
 
 def _write_manual_list(combos: Sequence[VehicleCombo]) -> None:
     write_tag('autogas.vehicle_select.proposed_ready', False)
-    write_tag('autogas.vehicle_select.list_mode', True)
     write_tag('autogas.vehicle_select.proposed_truck_number', '')
     write_tag('autogas.vehicle_select.proposed_trailer_number', '')
     for i in range(VEHICLE_LIST_SIZE):
-        text = combos[i].display if i < len(combos) else ''
+        text = format_list_line(i, combos[i]) if i < len(combos) else ''
         write_tag(f'autogas.vehicle_select.vehicle_list_{i}', text)
 
 
@@ -280,7 +292,6 @@ def _clear_vehicle_select_ui(*, keep_propose: bool = False) -> None:
     if keep_propose:
         return
     write_tag('autogas.vehicle_select.proposed_ready', False)
-    write_tag('autogas.vehicle_select.list_mode', False)
     write_tag('autogas.vehicle_select.proposed_truck_number', '')
     write_tag('autogas.vehicle_select.proposed_trailer_number', '')
     for i in range(VEHICLE_LIST_SIZE):
@@ -388,7 +399,7 @@ def process_autogas_operator_confirm(payload: Mapping[str, Any]) -> None:
 
     list_mode = bool(payload.get('list_mode'))
     if list_mode:
-        combo = combo_from_list_index(payload.get('selected_vehicle_index'))
+        combo = combo_from_list_selection(payload)
     else:
         combo = combo_from_numbers(
             payload.get('proposed_truck_number'),

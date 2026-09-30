@@ -37,12 +37,17 @@ def _railway_camera_worked(snapshot: Snapshot) -> bool:
     return _truthy(snapshot.get('railway.camera_worked'))
 
 
+def _vehicle_list_prepared(snapshot: Snapshot) -> bool:
+    value = snapshot.get('autogas.vehicle_select.vehicle_list_0')
+    return bool(value and str(value).strip())
+
+
 def _autogas_create_pending(snapshot: Snapshot) -> bool:
     return (
         _truthy(snapshot.get('autogas.request_batch_create'))
         and not _truthy(snapshot.get('autogas.response_batch_create'))
         and not _truthy(snapshot.get('autogas.vehicle_select.proposed_ready'))
-        and not _truthy(snapshot.get('autogas.vehicle_select.list_mode'))
+        and not _vehicle_list_prepared(snapshot)
     )
 
 
@@ -101,6 +106,8 @@ TRIGGERS: tuple[TriggerDef, ...] = (
             'autogas.gas_type',
             'autogas.request_batch_create',
             'autogas.response_batch_create',
+            'autogas.vehicle_select.proposed_ready',
+            'autogas.vehicle_select.vehicle_list_0',
         ),
         idempotency_ttl=30,
     ),
@@ -119,6 +126,16 @@ TRIGGERS: tuple[TriggerDef, ...] = (
             'autogas.vehicle_select.proposed_trailer_number',
             'autogas.vehicle_select.selected_vehicle_index',
             'autogas.vehicle_select.operator_confirm',
+            'autogas.vehicle_select.vehicle_list_0',
+            'autogas.vehicle_select.vehicle_list_1',
+            'autogas.vehicle_select.vehicle_list_2',
+            'autogas.vehicle_select.vehicle_list_3',
+            'autogas.vehicle_select.vehicle_list_4',
+            'autogas.vehicle_select.vehicle_list_5',
+            'autogas.vehicle_select.vehicle_list_6',
+            'autogas.vehicle_select.vehicle_list_7',
+            'autogas.vehicle_select.vehicle_list_8',
+            'autogas.vehicle_select.vehicle_list_9',
         ),
         idempotency_ttl=30,
     ),

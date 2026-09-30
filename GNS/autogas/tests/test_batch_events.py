@@ -4,14 +4,23 @@ from unittest.mock import patch
 from django.test import TestCase
 
 from autogas.batch_events import (
-    build_manual_vehicle_list,
+    format_list_line,
+    parse_vehicle_list_line,
     process_autogas_batch_complete,
     process_autogas_batch_create,
     process_autogas_operator_confirm,
+    VehicleCombo,
 )
 from autogas.models import AutoGasBatch
 from filling_station.models import Trailer
 from .helpers import AutoGasFixturesMixin
+
+
+def _list_mode_writes(write_tag):
+    return [
+        c for c in write_tag.call_args_list
+        if c.args and c.args[0] == 'autogas.vehicle_select.list_mode'
+    ]
 
 
 class AutoGasBatchEventTests(AutoGasFixturesMixin, TestCase):
@@ -26,10 +35,10 @@ class AutoGasBatchEventTests(AutoGasFixturesMixin, TestCase):
             'response_batch_create': False,
         })
         self.assertEqual(AutoGasBatch.objects.count(), 0)
-        write_tag.assert_any_call('autogas.vehicle_select.list_mode', True)
+        self.assertEqual(_list_mode_writes(write_tag), [])
         write_tag.assert_any_call(
             'autogas.vehicle_select.vehicle_list_0',
-            self.truck.registration_number,
+            f'1    {self.truck.registration_number}',
         )
         response_calls = [
             c for c in write_tag.call_args_list
@@ -64,7 +73,7 @@ class AutoGasBatchEventTests(AutoGasFixturesMixin, TestCase):
             self.truck.registration_number,
         )
         write_tag.assert_any_call('autogas.vehicle_select.proposed_ready', True)
-        write_tag.assert_any_call('autogas.vehicle_select.list_mode', False)
+        self.assertEqual(_list_mode_writes(write_tag), [])
 
     @patch('autogas.batch_events.write_tag')
     @patch('autogas.batch_events.get_transport_numbers')
@@ -84,6 +93,7 @@ class AutoGasBatchEventTests(AutoGasFixturesMixin, TestCase):
             'autogas.vehicle_select.proposed_truck_number',
             self.truck.registration_number,
         )
+        self.assertEqual(_list_mode_writes(write_tag), [])
 
     @patch('autogas.batch_events.write_tag')
     def test_confirm_propose_creates_batch(self, write_tag):
@@ -107,16 +117,15 @@ class AutoGasBatchEventTests(AutoGasFixturesMixin, TestCase):
         write_tag.assert_any_call('autogas.truck_capacity', Decimal('20000'))
         write_tag.assert_any_call('autogas.response_batch_create', True)
         write_tag.assert_any_call('autogas.vehicle_select.operator_confirm', False)
+        self.assertEqual(_list_mode_writes(write_tag), [])
 
     @patch('autogas.batch_events.write_tag')
-    def test_confirm_list_index_creates_batch(self, write_tag):
+    def test_confirm_list_mode_parses_vehicle_list_line(self, write_tag):
         Trailer.objects.filter(pk=self.trailer.pk).update(truck=self.tractor)
         self.trailer.refresh_from_db()
-        combos = build_manual_vehicle_list()
-        self.assertGreaterEqual(len(combos), 2)
-        idx = next(
-            i for i, c in enumerate(combos)
-            if c.truck.pk == self.tractor.pk
+        line = format_list_line(
+            2,
+            VehicleCombo(truck=self.tractor, trailer=self.trailer),
         )
         process_autogas_operator_confirm({
             'batch_type_code': 2,
@@ -127,13 +136,31 @@ class AutoGasBatchEventTests(AutoGasFixturesMixin, TestCase):
             'proposed_ready': False,
             'proposed_truck_number': '',
             'proposed_trailer_number': '',
-            'selected_vehicle_index': idx,
+            'selected_vehicle_index': 2,
+            'vehicle_list_2': line,
             'operator_confirm': True,
         })
         batch = AutoGasBatch.objects.get()
         self.assertEqual(batch.truck_id, self.tractor.pk)
         self.assertEqual(batch.trailer_id, self.trailer.pk)
         write_tag.assert_any_call('autogas.response_batch_create', True)
+
+    @patch('autogas.batch_events.write_tag')
+    def test_confirm_list_mode_truck_only(self, write_tag):
+        line = format_list_line(0, VehicleCombo(truck=self.truck))
+        process_autogas_operator_confirm({
+            'batch_type_code': 1,
+            'gas_type': 2,
+            'request_batch_create': True,
+            'response_batch_create': False,
+            'list_mode': True,
+            'selected_vehicle_index': 0,
+            'vehicle_list_0': line,
+            'operator_confirm': True,
+        })
+        batch = AutoGasBatch.objects.get()
+        self.assertEqual(batch.truck_id, self.truck.pk)
+        self.assertIsNone(batch.trailer_id)
 
     @patch('autogas.batch_events.write_tag')
     def test_confirm_stops_when_active_exists(self, write_tag):
@@ -171,6 +198,8 @@ class AutoGasBatchEventTests(AutoGasFixturesMixin, TestCase):
     def test_inactive_truck_skipped_for_camera(self, get_numbers, write_tag):
         self.truck.is_active = False
         self.truck.save(update_fields=['is_active'])
+        Trailer.objects.filter(pk=self.trailer.pk).update(truck=self.tractor)
+        self.trailer.refresh_from_db()
         get_numbers.return_value = [self.truck.registration_number]
         process_autogas_batch_create({
             'batch_type_code': 1,
@@ -179,7 +208,11 @@ class AutoGasBatchEventTests(AutoGasFixturesMixin, TestCase):
             'response_batch_create': False,
         })
         self.assertEqual(AutoGasBatch.objects.count(), 0)
-        write_tag.assert_any_call('autogas.vehicle_select.list_mode', True)
+        self.assertEqual(_list_mode_writes(write_tag), [])
+        write_tag.assert_any_call(
+            'autogas.vehicle_select.vehicle_list_0',
+            f'1    {self.tractor.registration_number}    {self.trailer.registration_number}',
+        )
         propose_ready = [
             c for c in write_tag.call_args_list
             if c.args == ('autogas.vehicle_select.proposed_ready', True)
@@ -210,3 +243,27 @@ class AutoGasBatchEventTests(AutoGasFixturesMixin, TestCase):
             'response_batch_complete': False,
         })
         write_tag.assert_not_called()
+
+    def test_parse_vehicle_list_line(self):
+        self.assertEqual(
+            parse_vehicle_list_line('1    AH1245-1    F5679U-2'),
+            ('AH1245-1', 'F5679U-2'),
+        )
+        self.assertEqual(
+            parse_vehicle_list_line('2    1111AA-1'),
+            ('1111AA-1', None),
+        )
+        self.assertEqual(parse_vehicle_list_line(''), (None, None))
+        self.assertEqual(parse_vehicle_list_line(None), (None, None))
+
+    def test_format_list_line(self):
+        self.assertEqual(
+            format_list_line(0, VehicleCombo(truck=self.truck)),
+            f'1    {self.truck.registration_number}',
+        )
+        Trailer.objects.filter(pk=self.trailer.pk).update(truck=self.tractor)
+        self.trailer.refresh_from_db()
+        self.assertEqual(
+            format_list_line(1, VehicleCombo(truck=self.tractor, trailer=self.trailer)),
+            f'2    {self.tractor.registration_number}    {self.trailer.registration_number}',
+        )
