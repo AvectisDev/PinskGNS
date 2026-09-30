@@ -1,0 +1,54 @@
+﻿Изменения в обмене Django с контроллером SU1
+
+1. Переименованы глобальные экземпляры структур:
+- tank заменён на railway_tank;
+- batch заменён на railway_batch;
+- railway_scale сохраняет своё имя.
+
+2. Данные железнодорожных весов находятся в структуре railway_scale:
+- railway_scale.current_weight вместо weight;
+- railway_scale.previous_weight вместо old_weight;
+- railway_scale.is_stable вместо weight_is_stable;
+- railway_scale.weight_difference содержит абсолютную разницу между текущим и предыдущим весом.
+
+3. Параметры и состояния цистерны находятся в структуре railway_tank:
+- railway_tank.weight_stability_tolerance вместо value_for_weight_range;
+- railway_tank.stabilization_time_seconds вместо time_for_stabilization;
+- railway_tank.camera_on_time_seconds вместо camera_on_time;
+- добавлен railway_tank.min_weight_on_scale, порог наличия цистерны на весах;
+- railway_tank.stable_weight содержит последнее стабилизированное показание;
+- railway_tank.on_station показывает, что по стабилизированному весу определена полная цистерна;
+- railway_tank.camera_worked устанавливается контроллером после завершения работы камеры и должен сбрасываться Django после обработки события.
+
+4. Структура партии теперь доступна через railway_batch:
+- railway_batch.batch_type: 0 = не определён, 1 = приёмка, 2 = отгрузка;
+- railway_batch.active указывает на активную партию;
+- railway_batch.weight_change_detected указывает, что после начала партии обнаружено присутствие или движение цистерны;
+- railway_batch.completion_timer_active указывает на выполнение отсчёта до автоматического завершения партии;
+- railway_batch.completion_time_minutes задаёт время ожидания следующей цистерны;
+- railway_batch.start_batch и railway_batch.stop_batch остаются командами ручного запуска и завершения.
+
+5. Изменена логика партии:
+- партия автоматически начинается только после стабилизации веса первой цистерны;
+- простой проезд объекта через весы без стабилизации веса не запускает партию;
+- railway_batch.active и railway_batch.batch_type устанавливаются в одном цикле контроллера;
+- railway_batch.batch_type = 1 означает приёмку полной цистерны;
+- railway_batch.batch_type = 2 означает отгрузку пустой цистерны;
+- тип активной партии определяется только по первой стабилизированной цистерне и не изменяется последующими цистернами;
+- начало партии для Django определяется переходом railway_batch.active из FALSE в TRUE;
+- после прохода цистерны запускается отсчёт завершения, когда весовая свободна и вес стабилен;
+- появление следующей цистерны сбрасывает отсчёт;
+- завершение партии для Django определяется переходом railway_batch.active из TRUE в FALSE;
+- railway_batch.completion_timer_active является только признаком текущего отсчёта и не означает завершение партии.
+
+6. Программы TankProcess и BatchProcess объединены в одну программу RailwayProcess. Это внутреннее изменение ПЛК и не меняет имена OPC-тегов или механизм обмена с Django.
+
+7. Требуемые изменения в Django:
+- заменить OPC-префикс tank на railway_tank;
+- заменить OPC-префикс batch на railway_batch;
+- использовать поля railway_scale в стиле snake_case;
+- создавать партию по фронту railway_batch.active FALSE -> TRUE;
+- при создании партии сразу читать railway_batch.batch_type, поскольку active и batch_type устанавливаются контроллером в одном цикле;
+- завершать партию по спаду railway_batch.active TRUE -> FALSE;
+- не использовать railway_batch.completion_timer_active как признак завершения партии;
+- продолжить сбрасывать railway_tank.camera_worked в FALSE после успешной обработки события камеры.

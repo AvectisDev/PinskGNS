@@ -123,10 +123,6 @@ redis-server
 
 ### Периодические задачи (Celery Beat)
 
-- **railway_batch_processing** (`railway_service.tasks.railway_batch_processing`)
-  - проверка/обработка активных ж/д партий (`railway_batch`)
-  - каждые 20 минут (`crontab(minute='*/20')`)
-
 - **kpp_processing** (`transport.tasks.kpp_processing`)
   - обработка данных КПП (`kpp_processing`)
   - каждую минуту (`expires=55`)
@@ -143,12 +139,16 @@ redis-server
 
 События с Melsoft MX OPC Server приходят через долгоживущий процесс `opcua.bridge` (OPC UA Subscription). Bridge ставит Celery-задачи только при изменении тегов:
 
-- **process_railway_tank_event** (`railway_service.tasks.process_railway_tank_event`) — фронт `camera_worked`
+- **process_railway_batch_started** (`railway_service.tasks.process_railway_batch_started`) — фронт `railway.active` FALSE→TRUE; создаёт `RailwayBatch` с `batch_type` из ПЛК
+- **process_railway_batch_ended** (`railway_service.tasks.process_railway_batch_ended`) — спад `railway.active` TRUE→FALSE; закрывает активную партию
+- **process_railway_tank_event** (`railway_service.tasks.process_railway_tank_event`) — фронт `camera_worked`; Intellect + история цистерны; add в активную партию; ACK `camera_worked=False`
 - **process_autogas_batch_create** (`autogas.tasks.process_autogas_batch_create`) — `request_number_identification`: Intellect → `is_on_station` → propose или сразу ручной список (`VehicleSelect`); партию не создаёт
 - **process_autogas_operator_confirm** (`autogas.tasks.process_autogas_operator_confirm`) — фронт `vehicle_select.operator_confirm`: создание партии + `response_number_detect`
 - **process_autogas_batch_complete** (`autogas.tasks.process_autogas_batch_complete`) — pending complete handshake
 
 Запись тегов обратно в OPC (ACK, сброс флагов) идёт через Redis-очередь того же bridge-процесса (`opcua.api.write_tag`, fire-and-forget). Ретраи записи в Melsoft выполняет bridge.
+
+**ЖД весовая (SU1):** instances `railway_tank` / `railway_batch` (см. `GNS/railway_service/SU1/`). Логические OPC-имена = поля ПЛК: `stable_weight`, `on_station`, `camera_worked`, `active`, `batch_type`. Партия стартует/заканчивается в контроллере; Django синхронизирует по фронтам `active`. Камера только добавляет цистерну в уже активную партию.
 
 **Автоколонка / GS21:** OPC instance партии — `vehicle_batch` (NodeId `PLC_SU2.vehicle_batch.*`); выбор транспорта — `vehicle_select` (см. `GNS/autogas/SU2/Structures/`, `GNS/autogas/SU2/Code/BatchProcess.txt`). Шаг 2: Django пишет `proposed_*` / `vehicle_list_0`…`_9`; оператор Confirm на панели; до Confirm партия в БД не создаётся. В списке только `is_active` цистерны и связки тягач+полуприцеп (`Trailer.truck`). Пустая STRING = нет строки. Выход без Confirm — `stop_batch`. Поля `*_mass_meter` / `gas_amount` — объём (`Volume_total`); при `mass_meter.CommError` ПЛК отдаёт 0, Django сохраняет значения как есть и не останавливает партию.
 

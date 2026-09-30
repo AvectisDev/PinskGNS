@@ -260,10 +260,6 @@ CELERY_WORKER_HIJACK_ROOT_LOGGER = False
 CELERY_WORKER_PREFETCH_MULTIPLIER = 1
 CELERY_TASK_IGNORE_RESULT = True
 CELERY_BEAT_SCHEDULE = {
-    'railway_batch_processing': {
-        'task': 'railway_service.tasks.railway_batch_processing',
-        'schedule': crontab(minute='*/20'),  # задача выполняется каждые 20 минут, начиная с 0 минут каждого часа
-    },
     'kpp_processing': {
         'task': 'transport.tasks.kpp_processing',
         'schedule': 60.0,

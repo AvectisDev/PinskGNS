@@ -22,12 +22,12 @@
                 <div class="col-md-6">
                     <dl class="row">
                         <dt class="col-sm-6">Дата начала:</dt>
-                        <dd class="col-sm-6">{{ batch.begin_date|date:"d.m.Y H:i"|default:"-" }}</dd>
+                        <dd class="col-sm-6">{{ batch.started_at|date:"d.m.Y H:i"|default:"-" }}</dd>
 
                         <dt class="col-sm-6">Дата окончания:</dt>
                         <dd class="col-sm-6">
-                            {% if batch.end_date %}
-                                {{ batch.end_date|date:"d.m.Y H:i" }}
+                            {% if batch.completed_at %}
+                                {{ batch.completed_at|date:"d.m.Y H:i" }}
                             {% else %}
                                 <span class="text-muted">Не завершена</span>
                             {% endif %}

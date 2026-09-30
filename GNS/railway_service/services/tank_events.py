@@ -10,7 +10,6 @@ from typing import Any, Mapping, Optional
 
 from django.conf import settings
 from django.core.cache import cache
-from django.core.exceptions import MultipleObjectsReturned
 from django.core.files.base import ContentFile
 
 from opcua.api import write_tag
@@ -44,20 +43,21 @@ def fetch_railway_tank_data() -> tuple[Optional[int], Optional[bytes]]:
 
 
 def batch_process(railway_tank: RailwayTank) -> None:
-    """Создаёт активную партию (если нужно) и добавляет в неё цистерну."""
+    """Добавляет цистерну в активную партию (партия создаётся по OPC active)."""
     try:
-        railway_batch, _batch_created = RailwayBatch.objects.get_or_create(
-            is_active=True,
-            defaults={'is_active': True},
-        )
+        railway_batch = RailwayBatch.objects.filter(is_active=True).first()
+        if railway_batch is None:
+            logger.warning(
+                'Нет активной партии — цистерна %s не добавлена',
+                railway_tank.registration_number,
+            )
+            return
         railway_batch.railway_tank_list.add(railway_tank)
         logger.info(
             'Цистерна %s добавлена в партию %s',
             railway_tank.registration_number,
             railway_batch.id,
         )
-    except MultipleObjectsReturned:
-        logger.error('Найдено более одной активной партии')
     except Exception as error:
         logger.error('Ошибка при обработке партии: %s', error, exc_info=True)
 
@@ -202,20 +202,20 @@ def process_railway_tank_event(payload: Mapping[str, Any]) -> None:
     Обработка срабатывания камеры ЖД весовой.
 
     Args:
-        payload: снимок OPC-тегов (tank_weight, camera_worked, is_on_station).
+        payload: снимок OPC-тегов (stable_weight, camera_worked, on_station).
     """
-    tank_weight = payload.get('tank_weight')
+    stable_weight = payload.get('stable_weight')
     camera_worked = payload.get('camera_worked')
-    is_on_station = payload.get('is_on_station')
+    on_station = payload.get('on_station')
 
     opc_values = (
-        f'tank_weight={tank_weight}, '
+        f'stable_weight={stable_weight}, '
         f'camera_worked={camera_worked}, '
-        f'is_on_station={is_on_station}'
+        f'on_station={on_station}'
     )
     log_railway_tank_status(opc_values)
 
-    if None in (tank_weight, camera_worked, is_on_station):
+    if None in (stable_weight, camera_worked, on_station):
         logger.warning('ЖД весовая. Неполные OPC-значения, пропуск: %s', opc_values)
         return
 
@@ -224,8 +224,8 @@ def process_railway_tank_event(payload: Mapping[str, Any]) -> None:
 
     logger.info(
         'Камера сработала. Вес жд цистерны %s. Цистерна на станции: %s',
-        tank_weight,
-        is_on_station,
+        stable_weight,
+        on_station,
     )
     write_tag('railway.camera_worked', False)
 
@@ -254,8 +254,8 @@ def process_railway_tank_event(payload: Mapping[str, Any]) -> None:
     railway_tank = tank_process(
         registration_number,
         image_data,
-        bool(is_on_station),
-        tank_weight,
+        bool(on_station),
+        stable_weight,
     )
     if railway_tank:
         batch_process(railway_tank)

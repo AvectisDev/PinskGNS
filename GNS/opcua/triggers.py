@@ -25,6 +25,14 @@ def _truthy(value: Any) -> bool:
     return bool(value)
 
 
+def _railway_batch_active(snapshot: Snapshot) -> bool:
+    return _truthy(snapshot.get('railway.active'))
+
+
+def _railway_batch_inactive(snapshot: Snapshot) -> bool:
+    return not _truthy(snapshot.get('railway.active'))
+
+
 def _railway_camera_worked(snapshot: Snapshot) -> bool:
     return _truthy(snapshot.get('railway.camera_worked'))
 
@@ -55,13 +63,32 @@ def _autogas_complete_pending(snapshot: Snapshot) -> bool:
 
 TRIGGERS: tuple[TriggerDef, ...] = (
     TriggerDef(
+        name='railway_batch_started',
+        task='railway_service.tasks.process_railway_batch_started',
+        condition=_railway_batch_active,
+        snapshot_keys=(
+            'railway.active',
+            'railway.batch_type',
+        ),
+        idempotency_ttl=30,
+    ),
+    TriggerDef(
+        name='railway_batch_ended',
+        task='railway_service.tasks.process_railway_batch_ended',
+        condition=_railway_batch_inactive,
+        snapshot_keys=(
+            'railway.active',
+        ),
+        idempotency_ttl=30,
+    ),
+    TriggerDef(
         name='railway_camera_worked',
         task='railway_service.tasks.process_railway_tank_event',
         condition=_railway_camera_worked,
         snapshot_keys=(
-            'railway.tank_weight',
+            'railway.stable_weight',
             'railway.camera_worked',
-            'railway.is_on_station',
+            'railway.on_station',
         ),
         idempotency_ttl=30,
     ),

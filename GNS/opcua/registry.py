@@ -17,19 +17,29 @@ class TagDef:
 
 TAGS: Mapping[str, TagDef] = {
     # Railway PLC_SU1
-    'railway.tank_weight': TagDef(
-        name='railway.tank_weight',
-        node_id='ns=4; s=Address Space.PLC_SU1.tank.stable_weight',
+    'railway.stable_weight': TagDef(
+        name='railway.stable_weight',
+        node_id='ns=4; s=Address Space.PLC_SU1.railway_tank.stable_weight',
         domain='railway',
     ),
     'railway.camera_worked': TagDef(
         name='railway.camera_worked',
-        node_id='ns=4; s=Address Space.PLC_SU1.tank.camera_worked',
+        node_id='ns=4; s=Address Space.PLC_SU1.railway_tank.camera_worked',
         domain='railway',
     ),
-    'railway.is_on_station': TagDef(
-        name='railway.is_on_station',
-        node_id='ns=4; s=Address Space.PLC_SU1.tank.on_station',
+    'railway.on_station': TagDef(
+        name='railway.on_station',
+        node_id='ns=4; s=Address Space.PLC_SU1.railway_tank.on_station',
+        domain='railway',
+    ),
+    'railway.active': TagDef(
+        name='railway.active',
+        node_id='ns=4; s=Address Space.PLC_SU1.railway_batch.active',
+        domain='railway',
+    ),
+    'railway.batch_type': TagDef(
+        name='railway.batch_type',
+        node_id='ns=4; s=Address Space.PLC_SU1.railway_batch.batch_type',
         domain='railway',
     ),
     # Autogas PLC_SU2

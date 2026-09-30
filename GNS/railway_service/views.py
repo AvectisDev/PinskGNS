@@ -147,7 +147,7 @@ class RailwayBatchListView(DateRangeListFilterMixin, generic.ListView):
 
     def get_queryset(self):
         queryset = _railway_batch_queryset()
-        return self.apply_date_range_filter(queryset, field_name='begin_date')
+        return self.apply_date_range_filter(queryset, field_name='started_at')
 
 
 class RailwayBatchDetailView(generic.DetailView):
