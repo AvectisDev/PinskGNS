@@ -8,8 +8,6 @@ from .form_choices import configure_trailer_field, configure_truck_field
 from filling_station.services.transport import (
     TRAILER_INPUT_HELP,
     TRUCK_INPUT_HELP,
-    format_trailer_display,
-    format_truck_display,
     validate_trailer_input,
     validate_truck_input,
 )
@@ -111,10 +109,6 @@ class TruckForm(forms.ModelForm):
         reg_field = self.fields['registration_number']
         reg_field.help_text = TRUCK_INPUT_HELP
         reg_field.widget.attrs.setdefault('placeholder', 'AH 0193-1')
-        if self.instance and self.instance.pk and self.instance.registration_number:
-            self.initial['registration_number'] = format_truck_display(
-                self.instance.registration_number
-            )
 
     def clean_registration_number(self):
         return validate_truck_input(self.cleaned_data.get('registration_number', ''))
@@ -167,10 +161,6 @@ class TrailerForm(forms.ModelForm):
         reg_field = self.fields['registration_number']
         reg_field.help_text = TRAILER_INPUT_HELP
         reg_field.widget.attrs.setdefault('placeholder', 'A 3779B-1')
-        if self.instance and self.instance.pk and self.instance.registration_number:
-            self.initial['registration_number'] = format_trailer_display(
-                self.instance.registration_number
-            )
 
     def clean_registration_number(self):
         return validate_trailer_input(self.cleaned_data.get('registration_number', ''))

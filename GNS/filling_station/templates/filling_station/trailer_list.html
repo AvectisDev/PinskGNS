@@ -37,7 +37,7 @@
                             <td>{{ trailer.trailer_brand|default:"-" }}</td>
                             <td>
                                 <a href="{% url_with_query trailer.get_absolute_url %}" class="custom-link fw-bold">
-                                    {{ trailer.registration_number }}
+                                    {{ trailer }}
                                 </a>
                             </td>
                             <td>{{ trailer.type|default:"-" }}</td>

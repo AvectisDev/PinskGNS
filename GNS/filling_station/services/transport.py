@@ -10,14 +10,9 @@ from django.core.exceptions import ValidationError
 
 logger = logging.getLogger('filling_station')
 
-# Мириада (legacy): допускает кириллицу.
-_BELARUS_PLATE_PATTERN = re.compile(
-    r'^([A-Za-zА-Яа-яЁё]{2})(\d{4})(\d)$',
-)
-
-# Канон storage (латиница): грузовик AI00081, прицеп A3779B1.
-_TRUCK_STORAGE_PATTERN = re.compile(r'^([A-Za-z]{2})(\d{4})(\d)$')
-_TRAILER_STORAGE_PATTERN = re.compile(r'^([A-Za-z])(\d{4})([A-Za-z])(\d)$')
+# Компакт (Интеллект): грузовик AI00081, прицеп A3779B1.
+_TRUCK_COMPACT_PATTERN = re.compile(r'^([A-Za-z]{2})(\d{4})(\d)$')
+_TRAILER_COMPACT_PATTERN = re.compile(r'^([A-Za-z])(\d{4})([A-Za-z])(\d)$')
 
 # Строгий ввод в формах (латиница + пробел + дефис).
 _TRUCK_INPUT_PATTERN = re.compile(r'^([A-Za-z]{2}) (\d{4})-(\d)$')
@@ -34,72 +29,41 @@ def compact_registration_number(reg_number: str) -> str:
     return re.sub(r'[\s\-]+', '', reg_number.strip())
 
 
-def to_storage(reg_number: str) -> str:
-    """Канон БД / Интеллект: компактный номер в нижнем регистре (`ai00081`)."""
-    return compact_registration_number(reg_number).lower()
-
-
-def normalize_registration_number(reg_number: str) -> str:
+def canonicalize_registration_number(reg_number: str) -> str:
     """
-    Компактный номер для поиска/хранения.
+    Канон БД / веб: ``AI 0008-1`` (грузовик) или ``A 3779B-1`` (прицеп).
 
-    Alias для ``to_storage`` (нижний регистр).
-    """
-    return to_storage(reg_number)
-
-
-def _format_registration_number(reg_number: str) -> str:
-    """
-    Формат номера для API Мириады: «АС 5512-1».
-    Эквивалентные входные формы: «АС5512-1», «АС55121», «АС 5512-1», «AP71081».
+    Принимает компакт Интеллекта, HMI без пробела или уже каноническую строку.
+    Если шаблон не распознан — возвращает исходную строку (служебные записи).
     """
     if not reg_number:
-        return reg_number
+        return ''
+    original = reg_number.strip()
+    compact = compact_registration_number(original)
+    if not compact:
+        return original
 
-    compact = compact_registration_number(reg_number)
-    match = _BELARUS_PLATE_PATTERN.match(compact)
-    if match:
-        letters, digits, region = match.groups()
+    truck = _TRUCK_COMPACT_PATTERN.match(compact)
+    if truck:
+        letters, digits, region = truck.groups()
         return f'{letters.upper()} {digits}-{region}'
 
-    if len(compact) >= 7:
-        return f'{compact[:2].upper()} {compact[2:6]}-{compact[6]}'
+    trailer = _TRAILER_COMPACT_PATTERN.match(compact)
+    if trailer:
+        letter, digits, middle, region = trailer.groups()
+        return f'{letter.upper()} {digits}{middle.upper()}-{region}'
 
-    return reg_number.strip()
-
-
-def format_truck_display(reg_number: str) -> str:
-    """Веб/формы: ``AI 0008-1``."""
-    if not reg_number:
-        return ''
-    compact = to_storage(reg_number)
-    match = _TRUCK_STORAGE_PATTERN.match(compact)
-    if not match:
-        return reg_number.strip()
-    letters, digits, region = match.groups()
-    return f'{letters.upper()} {digits}-{region}'
-
-
-def format_trailer_display(reg_number: str) -> str:
-    """Веб/формы: ``A 3779B-1``."""
-    if not reg_number:
-        return ''
-    compact = to_storage(reg_number)
-    match = _TRAILER_STORAGE_PATTERN.match(compact)
-    if not match:
-        return reg_number.strip()
-    letter, digits, middle, region = match.groups()
-    return f'{letter.upper()} {digits}{middle.upper()}-{region}'
+    return original
 
 
 def format_truck_hmi(reg_number: str) -> str:
     """OPC/HMI: ``AI0008-1`` (дефис, без пробела)."""
     if not reg_number:
         return ''
-    compact = to_storage(reg_number)
-    match = _TRUCK_STORAGE_PATTERN.match(compact)
+    compact = compact_registration_number(reg_number)
+    match = _TRUCK_COMPACT_PATTERN.match(compact)
     if not match:
-        return compact.upper()
+        return compact.upper() or reg_number.strip()
     letters, digits, region = match.groups()
     return f'{letters.upper()}{digits}-{region}'
 
@@ -108,10 +72,10 @@ def format_trailer_hmi(reg_number: str) -> str:
     """OPC/HMI: ``A3779B-1`` (дефис, без пробела)."""
     if not reg_number:
         return ''
-    compact = to_storage(reg_number)
-    match = _TRAILER_STORAGE_PATTERN.match(compact)
+    compact = compact_registration_number(reg_number)
+    match = _TRAILER_COMPACT_PATTERN.match(compact)
     if not match:
-        return compact.upper()
+        return compact.upper() or reg_number.strip()
     letter, digits, middle, region = match.groups()
     return f'{letter.upper()}{digits}{middle.upper()}-{region}'
 
@@ -121,7 +85,7 @@ def validate_truck_input(reg_number: str) -> str:
     Строгий ввод грузовика ``AH 0193-1`` (латиница).
 
     Returns:
-        storage-значение ``ah01931``.
+        канон БД ``AH 0193-1``.
     """
     value = (reg_number or '').strip()
     match = _TRUCK_INPUT_PATTERN.match(value)
@@ -130,7 +94,7 @@ def validate_truck_input(reg_number: str) -> str:
             f'Введите номер грузовика в формате AH 0193-1 (латиница). Получено: «{value}»'
         )
     letters, digits, region = match.groups()
-    return to_storage(f'{letters}{digits}{region}')
+    return f'{letters.upper()} {digits}-{region}'
 
 
 def validate_trailer_input(reg_number: str) -> str:
@@ -138,7 +102,7 @@ def validate_trailer_input(reg_number: str) -> str:
     Строгий ввод прицепа ``A 3779B-1`` (латиница).
 
     Returns:
-        storage-значение ``a3779b1``.
+        канон БД ``A 3779B-1``.
     """
     value = (reg_number or '').strip()
     match = _TRAILER_INPUT_PATTERN.match(value)
@@ -147,24 +111,24 @@ def validate_trailer_input(reg_number: str) -> str:
             f'Введите номер прицепа в формате A 3779B-1 (латиница). Получено: «{value}»'
         )
     letter, digits, middle, region = match.groups()
-    return to_storage(f'{letter}{digits}{middle}{region}')
+    return f'{letter.upper()} {digits}{middle.upper()}-{region}'
 
 
 def find_transport_by_registration_number(reg_number: str) -> Tuple[Optional['Truck'], Optional['Trailer']]:
     """
     Находит грузовик и прицеп по регистрационному номеру.
-    Номер может быть в любом допустимом виде; поиск по storage-канону.
+    Номер с камеры/HMI приводится к канону БД перед поиском.
     """
     from filling_station.models import Truck, Trailer
 
     if not reg_number:
         return None, None
 
-    normalized_number = to_storage(reg_number)
+    canonical = canonicalize_registration_number(reg_number)
 
     try:
-        truck = Truck.objects.filter(registration_number=normalized_number).first()
-        trailer = Trailer.objects.filter(registration_number=normalized_number).first()
+        truck = Truck.objects.filter(registration_number=canonical).first()
+        trailer = Trailer.objects.filter(registration_number=canonical).first()
         return truck, trailer
     except Exception as e:
         logger.error(f"Ошибка при поиске транспорта по номеру {reg_number}: {e}")

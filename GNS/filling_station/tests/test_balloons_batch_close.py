@@ -29,7 +29,7 @@ class BalloonsBatchCloseTests(APITestCase):
 
         self.truck_type = TruckType.objects.create(type='Трал')
         self.truck = Truck.objects.create(
-            registration_number='bb22221',
+            registration_number='BB 2222-1',
             type=self.truck_type,
             car_brand='МАЗ',
         )

@@ -1,14 +1,14 @@
 {% extends 'base.html' %}
 {% load custom_filters navigation %}
 
-{% block title %}Грузовик {{ truck.registration_number }}{% endblock %}
+{% block title %}Грузовик {{ truck }}{% endblock %}
 
 {% block content %}
 <div class="container mt-4">
     <div class="card shadow-sm">
         <div class="card-header card-header-custom">
             <div class="d-flex justify-content-between align-items-center">
-                <h4 class="mb-0">Грузовик {{ truck.registration_number }}</h4>
+                <h4 class="mb-0">Грузовик {{ truck }}</h4>
                 <div>
                     <span class="badge bg-{% if truck.is_on_station %}success{% else %}secondary{% endif %}">
                         {% if truck.is_on_station %}На станции{% else %}Отсутствует{% endif %}

@@ -7,7 +7,10 @@ from django.core.cache import cache
 from django.utils import timezone
 
 from filling_station.models import Trailer, Truck
-from filling_station.services.transport import to_storage
+from filling_station.services.transport import (
+    canonicalize_registration_number,
+    compact_registration_number,
+)
 from transport.management.commands.intellect import check_on_station
 
 logger = logging.getLogger('kpp')
@@ -18,7 +21,8 @@ Vehicle = Union[Truck, Trailer]
 
 
 def _event_cache_key(registration_number: str, is_on_station: bool) -> str:
-    return f'kpp:{registration_number}:{int(is_on_station)}'
+    key_number = compact_registration_number(registration_number).upper()
+    return f'kpp:{key_number}:{int(is_on_station)}'
 
 
 def _log_unique(
@@ -49,11 +53,11 @@ def log_kpp_numbers_snapshot(numbers: list[Any]) -> None:
 
 
 def find_vehicle(registration_number: str) -> Optional[Vehicle]:
-    storage_number = to_storage(registration_number)
-    if not storage_number:
+    canonical = canonicalize_registration_number(registration_number)
+    if not canonical:
         return None
-    truck = Truck.objects.filter(registration_number=storage_number).first()
-    trailer = Trailer.objects.filter(registration_number=storage_number).first()
+    truck = Truck.objects.filter(registration_number=canonical).first()
+    trailer = Trailer.objects.filter(registration_number=canonical).first()
     if truck and trailer:
         logger.warning(
             f'КПП. Номер {registration_number} найден и у грузовика, и у прицепа, '
@@ -85,7 +89,7 @@ def apply_station_status(vehicle: Vehicle, is_on_station: bool) -> bool:
 
 
 def process_kpp_event(transport: Mapping[str, Any]) -> None:
-    registration_number = to_storage(transport.get('number') or '')
+    registration_number = canonicalize_registration_number(transport.get('number') or '')
     if not registration_number:
         logger.warning('КПП. Пропуск записи без регистрационного номера')
         return

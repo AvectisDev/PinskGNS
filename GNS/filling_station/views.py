@@ -464,7 +464,11 @@ class TruckView(generic.ListView):
         Returns:
             QuerySet: Тягачи с ``select_related('type')``.
         """
-        queryset = super().get_queryset().select_related('type')
+        queryset = (
+            super().get_queryset()
+            .select_related('type')
+            .exclude(car_brand__iexact='Самовывоз')
+        )
         query = self.request.GET.get('query', '').strip()
         if query:
             queryset = queryset.filter(

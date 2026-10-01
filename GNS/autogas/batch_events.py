@@ -10,9 +10,9 @@ from django.db.models import Case, IntegerField, Q, Value, When
 
 from filling_station.models import Trailer, Truck
 from filling_station.services.transport import (
+    canonicalize_registration_number,
     format_trailer_hmi,
     format_truck_hmi,
-    to_storage,
 )
 from opcua.api import write_tag
 from autogas.management.commands.intellect import (
@@ -68,23 +68,29 @@ def format_list_line(index: int, combo: VehicleCombo) -> str:
 
 
 def parse_vehicle_list_line(line: Any) -> Tuple[Optional[str], Optional[str]]:
-    """Разбор строки списка → (truck_number, trailer_number|None) в storage."""
+    """Разбор строки списка → (truck_number, trailer_number|None) в каноне БД."""
     if line is None:
         return None, None
     parts = str(line).split()
     if len(parts) < 2:
         return None, None
-    truck_no = to_storage(parts[1]) or None
-    trailer_no = to_storage(parts[2]) if len(parts) >= 3 else None
+    truck_no = canonicalize_registration_number(parts[1]) or None
+    trailer_no = (
+        canonicalize_registration_number(parts[2]) if len(parts) >= 3 else None
+    )
     return truck_no, trailer_no or None
 
 
 def get_transport_numbers() -> list[str]:
-    """Список номеров из Интеллекта для автовесовой (storage-канон)."""
+    """Список номеров из Интеллекта для автовесовой (канон БД)."""
     try:
         transport_list = get_registration_number_list(INTELLECT_SERVER_LIST[1])
         numbers = (
-            [to_storage(transport['number']) for transport in transport_list if transport.get('number')]
+            [
+                canonicalize_registration_number(transport['number'])
+                for transport in transport_list
+                if transport.get('number')
+            ]
             if transport_list
             else []
         )
@@ -115,14 +121,16 @@ def find_transports(
 ) -> Tuple[Optional[Truck], Optional[Trailer]]:
     """Находит активный грузовик и прицеп по списку номеров."""
     try:
-        storage_numbers = [to_storage(n) for n in registration_numbers if n]
-        storage_numbers = [n for n in storage_numbers if n]
-        if not storage_numbers:
+        canonical_numbers = [
+            canonicalize_registration_number(n) for n in registration_numbers if n
+        ]
+        canonical_numbers = [n for n in canonical_numbers if n]
+        if not canonical_numbers:
             return None, None
 
         truck = (
             Truck.objects.filter(
-                registration_number__in=storage_numbers,
+                registration_number__in=canonical_numbers,
                 is_active=True,
             )
             .filter(TRUCK_TYPE_FILTER)
@@ -133,7 +141,7 @@ def find_transports(
             return None, None
 
         trailer = Trailer.objects.filter(
-            registration_number__in=storage_numbers,
+            registration_number__in=canonical_numbers,
             type__type=TRAILER_TYPE_NAME,
             is_active=True,
         ).select_related('type').first()
@@ -251,11 +259,19 @@ def combo_from_numbers(
     trailer_number: Any = None,
 ) -> Optional[VehicleCombo]:
     """Резолв связки по предложенным номерам с HMI."""
-    truck_no = to_storage(str(truck_number)) if truck_number is not None else ''
+    truck_no = (
+        canonicalize_registration_number(str(truck_number))
+        if truck_number is not None
+        else ''
+    )
     if not truck_no:
         return None
     numbers = [truck_no]
-    trailer_no = to_storage(str(trailer_number)) if trailer_number is not None else ''
+    trailer_no = (
+        canonicalize_registration_number(str(trailer_number))
+        if trailer_number is not None
+        else ''
+    )
     if trailer_no:
         numbers.append(trailer_no)
     truck, trailer = find_transports(numbers)

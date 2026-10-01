@@ -12,7 +12,6 @@ from requests.adapters import HTTPAdapter
 
 from filling_station.exceptions import MiriadaAPIError
 from filling_station.models import BalloonsBatch, BatchStatus
-from filling_station.services.transport import _format_registration_number
 
 logger = logging.getLogger('filling_station')
 
@@ -127,7 +126,7 @@ def _build_loading_payload(batch: BalloonsBatch) -> Dict[str, Any]:
     number_auto = batch.truck.registration_number
     data = {
         'fulness': 1,
-        'number_auto': _format_registration_number(number_auto),
+        'number_auto': number_auto,
     }
 
     if batch.truck.type and batch.truck.type.type:

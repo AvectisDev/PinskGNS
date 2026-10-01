@@ -85,8 +85,9 @@ class KppServiceTests(TransportFixturesMixin, TestCase):
         self.assertIsNotNone(self.truck.departure_at)
 
     def test_finds_vehicle_by_orm_not_plate_length(self):
-        self.assertEqual(len(self.truck.registration_number), 7)
+        self.assertEqual(self.truck.registration_number, 'AA 1234-7')
         self.assertEqual(find_vehicle('AA1234-7'), self.truck)
+        self.assertEqual(find_vehicle('aa12347'), self.truck)
         process_kpp_event(ENTRY_EVENT)
         self.truck.refresh_from_db()
         self.assertTrue(self.truck.is_on_station)
@@ -98,7 +99,7 @@ class KppServiceTests(TransportFixturesMixin, TestCase):
             'direction': '2',
         })
         self.assertFalse(
-            Truck.objects.filter(registration_number='zz99999').exists()
+            Truck.objects.filter(registration_number='ZZ 9999-9').exists()
         )
 
     def test_close_all_on_station_only_active(self):

@@ -247,11 +247,11 @@ class AutoGasBatchEventTests(AutoGasFixturesMixin, TestCase):
     def test_parse_vehicle_list_line(self):
         self.assertEqual(
             parse_vehicle_list_line('1    AH1245-1    A5679B-2'),
-            ('ah12451', 'a5679b2'),
+            ('AH 1245-1', 'A 5679B-2'),
         )
         self.assertEqual(
             parse_vehicle_list_line('2    AI0008-1'),
-            ('ai00081', None),
+            ('AI 0008-1', None),
         )
         self.assertEqual(parse_vehicle_list_line(''), (None, None))
         self.assertEqual(parse_vehicle_list_line(None), (None, None))

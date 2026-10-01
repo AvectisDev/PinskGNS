@@ -10,12 +10,12 @@ class TransportChoiceLabelTests(TestCase):
         self.truck_type = TruckType.objects.create(type='Трал')
         self.trailer_type = TrailerType.objects.create(type='Полуприцеп')
         self.truck = Truck.objects.create(
-            registration_number='am54481',
+            registration_number='AM 5448-1',
             car_brand='МАЗ',
             type=self.truck_type,
         )
         self.trailer = Trailer.objects.create(
-            registration_number='a1234e5',
+            registration_number='A 1234E-5',
             trailer_brand='Schmitz',
             type=self.trailer_type,
             truck=self.truck,

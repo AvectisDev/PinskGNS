@@ -36,7 +36,7 @@
                             <td>{{ truck.car_brand|default:"-" }}</td>
                             <td>
                                 <a href="{% url_with_query truck.get_absolute_url %}" class="custom-link fw-bold">
-                                    {{ truck.registration_number }}
+                                    {{ truck }}
                                 </a>
                             </td>
                             <td>{{ truck.type|default:"-" }}</td>

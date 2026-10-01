@@ -17,8 +17,6 @@ from .models import (
 from filling_station.services.transport import (
     TRAILER_INPUT_HELP,
     TRUCK_INPUT_HELP,
-    format_trailer_display,
-    format_truck_display,
     validate_trailer_input,
     validate_truck_input,
 )
@@ -33,12 +31,7 @@ class TruckAdminForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        field = self.fields['registration_number']
-        field.help_text = TRUCK_INPUT_HELP
-        if self.instance and self.instance.pk and self.instance.registration_number:
-            self.initial['registration_number'] = format_truck_display(
-                self.instance.registration_number
-            )
+        self.fields['registration_number'].help_text = TRUCK_INPUT_HELP
 
     def clean_registration_number(self):
         return validate_truck_input(self.cleaned_data.get('registration_number', ''))
@@ -53,12 +46,7 @@ class TrailerAdminForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        field = self.fields['registration_number']
-        field.help_text = TRAILER_INPUT_HELP
-        if self.instance and self.instance.pk and self.instance.registration_number:
-            self.initial['registration_number'] = format_trailer_display(
-                self.instance.registration_number
-            )
+        self.fields['registration_number'].help_text = TRAILER_INPUT_HELP
 
     def clean_registration_number(self):
         return validate_trailer_input(self.cleaned_data.get('registration_number', ''))
