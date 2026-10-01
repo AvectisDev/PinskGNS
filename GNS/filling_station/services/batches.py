@@ -218,6 +218,9 @@ def send_batch_balloon_statuses_to_miriada(batch: BalloonsBatch) -> Tuple[bool, 
     Отправляет в Мириаду статусы всех баллонов партии тем же методом,
     что раньше вызывался в момент сканирования на рамке.
 
+    Вызывается при каждом закрытии партии, включая повтор после ошибки
+    closettn: актуальный состав balloon_list уходит заново.
+
     HTTP идёт параллельно (лимит потоков MIRIADA_BATCH_SEND_WORKERS),
     у каждого потока своя keep-alive сессия. Payload готовится заранее,
     чтобы не ходить в ORM из воркеров.
@@ -228,9 +231,6 @@ def send_batch_balloon_statuses_to_miriada(batch: BalloonsBatch) -> Tuple[bool, 
     Returns:
         tuple[bool, str | None]: успех и текст первой ошибки (или None).
     """
-    if batch.miriada_balloons_sent:
-        return True, None
-
     reader_number = batch.reader_number
     if reader_number not in MIRIADA_BATCH_STATUS_READERS:
         return True, None
@@ -253,6 +253,8 @@ def send_batch_balloon_statuses_to_miriada(batch: BalloonsBatch) -> Tuple[bool, 
         except ValueError as exc:
             error_msg = f"Ошибка подготовки данных для отправки: {exc}"
             logger.error(error_msg)
+            batch.miriada_balloons_sent = False
+            batch.save(update_fields=['miriada_balloons_sent'])
             return False, error_msg
         jobs.append((nfc_tag, url, payload, send_type))
 
@@ -296,6 +298,8 @@ def send_batch_balloon_statuses_to_miriada(batch: BalloonsBatch) -> Tuple[bool, 
                 continue
 
     if first_error:
+        batch.miriada_balloons_sent = False
+        batch.save(update_fields=['miriada_balloons_sent'])
         return False, first_error
 
     batch.miriada_balloons_sent = True

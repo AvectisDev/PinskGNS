@@ -193,7 +193,7 @@ class BalloonsBatchCloseTests(APITestCase):
 
     @patch('ttn.services.close_ttn_in_miriada')
     @patch('filling_station.services.batches.post_status_to_miriada')
-    def test_retry_does_not_resend_balloons(self, mock_send, mock_close):
+    def test_retry_resends_balloons_before_closettn(self, mock_send, mock_close):
         mock_close.return_value = (True, None)
         self.batch.add_balloon(self.balloon.nfc_tag)
         self.batch.miriada_balloons_sent = True
@@ -203,7 +203,32 @@ class BalloonsBatchCloseTests(APITestCase):
         success, error, _data = save_and_close_balloons_batch(self.batch)
         self.assertTrue(success)
         self.assertIsNone(error)
-        mock_send.assert_not_called()
+        mock_send.assert_called_once()
+        self.assertEqual(mock_send.call_args.args[1]['nfctag'], self.balloon.nfc_tag)
+        mock_close.assert_called_once()
+        self.batch.refresh_from_db()
+        self.assertTrue(self.batch.miriada_balloons_sent)
+
+    @patch('ttn.services.close_ttn_in_miriada')
+    @patch('filling_station.services.batches.post_status_to_miriada')
+    def test_retry_resends_all_current_balloons(self, mock_send, mock_close):
+        mock_close.return_value = (True, None)
+        self.batch.add_balloon(self.balloon.nfc_tag)
+        self.batch.miriada_balloons_sent = True
+        self.batch.status = BatchStatus.PAUSED
+        self.batch.save(update_fields=['miriada_balloons_sent', 'status', 'miriada_close_failed'])
+        extra = Balloon.objects.create(nfc_tag='bbccddeeffe0')
+        self.batch.add_balloon(extra.nfc_tag)
+        self.batch.amount_of_ttn = 2
+        self.batch.status = BatchStatus.MIRIADA_ERROR
+        self.batch.save(update_fields=['amount_of_ttn', 'status', 'miriada_close_failed'])
+
+        success, error, _data = save_and_close_balloons_batch(self.batch)
+        self.assertTrue(success)
+        self.assertIsNone(error)
+        self.assertEqual(mock_send.call_count, 2)
+        sent_tags = {call.args[1]['nfctag'] for call in mock_send.call_args_list}
+        self.assertEqual(sent_tags, {self.balloon.nfc_tag, extra.nfc_tag})
         mock_close.assert_called_once()
 
     @patch('ttn.services.close_ttn_in_miriada')

@@ -243,10 +243,18 @@ def close_ttn_in_miriada(
             )
             prepared = session.prepare_request(req)
 
-            logger.debug(f"Запрос закрытия ТТН {ttn_id} в Мириаде: {prepared.url}")
+            logger.info(
+                f"Запрос закрытия ТТН {ttn_id} в Мириаде: {prepared.url}, "
+                f"Body: {payload}"
+            )
 
             response = session.send(prepared, timeout=settings.MIRIADA_TIMEOUT)
             status_code = response.status_code
+            logger.info(
+                f"Ответ закрытия ТТН {ttn_id}: "
+                f"Status: {response.status_code} {response.reason}, "
+                f"Body: {response.text}"
+            )
             if response.status_code == 200:
                 result = response.json()
                 if isinstance(result, dict) and _is_miriada_success_response(result):
@@ -257,7 +265,7 @@ def close_ttn_in_miriada(
                     or result.get('message')
                     or str(result)
                 )
-                logger.error(f"ТТН {ttn_id} не закрыта. Ответ: {result}")
+                logger.error(f"ТТН {ttn_id} не закрыта. Ответ: {response.text}")
             else:
                 last_error = _parse_miriada_close_error(response.text) or (
                     f"Status: {response.status_code} {response.reason}, "
