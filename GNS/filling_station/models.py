@@ -475,9 +475,24 @@ class Truck(models.Model):
     entry_at = models.DateTimeField(null=True, blank=True, verbose_name="Дата и время въезда")
     departure_at = models.DateTimeField(null=True, blank=True, verbose_name="Дата и время выезда")
 
+    def clean(self):
+        """Нормализует регистрационный номер к storage-канону."""
+        super().clean()
+        if self.registration_number:
+            from filling_station.services.transport import to_storage
+            self.registration_number = to_storage(self.registration_number)
+
+    def save(self, *args, **kwargs):
+        """Сохраняет грузовик с нормализованным регистрационным номером."""
+        if self.registration_number:
+            from filling_station.services.transport import to_storage
+            self.registration_number = to_storage(self.registration_number)
+        super().save(*args, **kwargs)
+
     def __str__(self):
-        """Возвращает регистрационный знак грузовика."""
-        return self.registration_number
+        """Человекочитаемый регистрационный знак грузовика."""
+        from filling_station.services.transport import format_truck_display
+        return format_truck_display(self.registration_number)
 
     class Meta:
         """Метаданные модели грузовика."""
@@ -581,9 +596,24 @@ class Trailer(models.Model):
     entry_at = models.DateTimeField(null=True, blank=True, verbose_name="Дата и время въезда")
     departure_at = models.DateTimeField(null=True, blank=True, verbose_name="Дата и время выезда")
 
+    def clean(self):
+        """Нормализует регистрационный номер к storage-канону."""
+        super().clean()
+        if self.registration_number:
+            from filling_station.services.transport import to_storage
+            self.registration_number = to_storage(self.registration_number)
+
+    def save(self, *args, **kwargs):
+        """Сохраняет прицеп с нормализованным регистрационным номером."""
+        if self.registration_number:
+            from filling_station.services.transport import to_storage
+            self.registration_number = to_storage(self.registration_number)
+        super().save(*args, **kwargs)
+
     def __str__(self):
-        """Возвращает регистрационный знак прицепа."""
-        return self.registration_number
+        """Человекочитаемый регистрационный знак прицепа."""
+        from filling_station.services.transport import format_trailer_display
+        return format_trailer_display(self.registration_number)
 
     class Meta:
         """Метаданные модели прицепа."""

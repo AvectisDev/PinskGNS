@@ -9,6 +9,11 @@ from typing import Any, Mapping, Optional, Sequence, Tuple
 from django.db.models import Case, IntegerField, Q, Value, When
 
 from filling_station.models import Trailer, Truck
+from filling_station.services.transport import (
+    format_trailer_hmi,
+    format_truck_hmi,
+    to_storage,
+)
 from opcua.api import write_tag
 from autogas.management.commands.intellect import (
     INTELLECT_SERVER_LIST,
@@ -51,37 +56,39 @@ class VehicleCombo:
 
 
 def format_list_line(index: int, combo: VehicleCombo) -> str:
-    """Строка vehicle_list_i: «N    truck    [trailer]» (N — 1-based)."""
+    """Строка vehicle_list_i: «N    truck    [trailer]» (N — 1-based, HMI-формат)."""
     n = index + 1
-    truck_no = combo.truck.registration_number
+    truck_no = format_truck_hmi(combo.truck.registration_number)
     if combo.trailer:
-        text = f'{n}    {truck_no}    {combo.trailer.registration_number}'
+        trailer_no = format_trailer_hmi(combo.trailer.registration_number)
+        text = f'{n}    {truck_no}    {trailer_no}'
     else:
         text = f'{n}    {truck_no}'
     return text[:DISPLAY_MAX_LEN]
 
 
 def parse_vehicle_list_line(line: Any) -> Tuple[Optional[str], Optional[str]]:
-    """Разбор строки списка → (truck_number, trailer_number|None)."""
+    """Разбор строки списка → (truck_number, trailer_number|None) в storage."""
     if line is None:
         return None, None
     parts = str(line).split()
     if len(parts) < 2:
         return None, None
-    truck_no = parts[1]
-    trailer_no = parts[2] if len(parts) >= 3 else None
-    return truck_no, trailer_no
+    truck_no = to_storage(parts[1]) or None
+    trailer_no = to_storage(parts[2]) if len(parts) >= 3 else None
+    return truck_no, trailer_no or None
 
 
 def get_transport_numbers() -> list[str]:
-    """Список номеров из Интеллекта для автовесовой."""
+    """Список номеров из Интеллекта для автовесовой (storage-канон)."""
     try:
         transport_list = get_registration_number_list(INTELLECT_SERVER_LIST[1])
         numbers = (
-            [transport['number'] for transport in transport_list]
+            [to_storage(transport['number']) for transport in transport_list if transport.get('number')]
             if transport_list
             else []
         )
+        numbers = [n for n in numbers if n]
         log_autogas_numbers_snapshot(numbers)
         return numbers
     except Exception as error:
@@ -108,9 +115,14 @@ def find_transports(
 ) -> Tuple[Optional[Truck], Optional[Trailer]]:
     """Находит активный грузовик и прицеп по списку номеров."""
     try:
+        storage_numbers = [to_storage(n) for n in registration_numbers if n]
+        storage_numbers = [n for n in storage_numbers if n]
+        if not storage_numbers:
+            return None, None
+
         truck = (
             Truck.objects.filter(
-                registration_number__in=registration_numbers,
+                registration_number__in=storage_numbers,
                 is_active=True,
             )
             .filter(TRUCK_TYPE_FILTER)
@@ -121,7 +133,7 @@ def find_transports(
             return None, None
 
         trailer = Trailer.objects.filter(
-            registration_number__in=registration_numbers,
+            registration_number__in=storage_numbers,
             type__type=TRAILER_TYPE_NAME,
             is_active=True,
         ).select_related('type').first()
@@ -239,11 +251,11 @@ def combo_from_numbers(
     trailer_number: Any = None,
 ) -> Optional[VehicleCombo]:
     """Резолв связки по предложенным номерам с HMI."""
-    truck_no = (str(truck_number).strip() if truck_number is not None else '')
+    truck_no = to_storage(str(truck_number)) if truck_number is not None else ''
     if not truck_no:
         return None
     numbers = [truck_no]
-    trailer_no = (str(trailer_number).strip() if trailer_number is not None else '')
+    trailer_no = to_storage(str(trailer_number)) if trailer_number is not None else ''
     if trailer_no:
         numbers.append(trailer_no)
     truck, trailer = find_transports(numbers)
@@ -267,10 +279,13 @@ def combo_from_list_selection(payload: Mapping[str, Any]) -> Optional[VehicleCom
 
 
 def _write_propose(combo: VehicleCombo) -> None:
-    write_tag('autogas.vehicle_select.proposed_truck_number', combo.truck.registration_number)
+    write_tag(
+        'autogas.vehicle_select.proposed_truck_number',
+        format_truck_hmi(combo.truck.registration_number),
+    )
     write_tag(
         'autogas.vehicle_select.proposed_trailer_number',
-        combo.trailer.registration_number if combo.trailer else '',
+        format_trailer_hmi(combo.trailer.registration_number) if combo.trailer else '',
     )
     write_tag('autogas.vehicle_select.proposed_ready', True)
     for i in range(VEHICLE_LIST_SIZE):

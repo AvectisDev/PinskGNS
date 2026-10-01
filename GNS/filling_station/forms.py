@@ -5,6 +5,14 @@ from django.utils import timezone
 from django.conf import settings
 from .models import Balloon, Truck, Trailer, BalloonsBatch
 from .form_choices import configure_trailer_field, configure_truck_field
+from filling_station.services.transport import (
+    TRAILER_INPUT_HELP,
+    TRUCK_INPUT_HELP,
+    format_trailer_display,
+    format_truck_display,
+    validate_trailer_input,
+    validate_truck_input,
+)
 from crispy_forms.helper import FormHelper
 from crispy_forms.layout import Submit
 
@@ -100,6 +108,17 @@ class TruckForm(forms.ModelForm):
         self.helper.add_input(Submit('cancel', 'Отмена', css_class='btn btn-secondary', formnovalidate='formnovalidate'))
         self.helper.form_method = 'POST'
 
+        reg_field = self.fields['registration_number']
+        reg_field.help_text = TRUCK_INPUT_HELP
+        reg_field.widget.attrs.setdefault('placeholder', 'AH 0193-1')
+        if self.instance and self.instance.pk and self.instance.registration_number:
+            self.initial['registration_number'] = format_truck_display(
+                self.instance.registration_number
+            )
+
+    def clean_registration_number(self):
+        return validate_truck_input(self.cleaned_data.get('registration_number', ''))
+
     class Meta:
         """Конфигурация полей и виджетов формы грузовика."""
 
@@ -144,6 +163,17 @@ class TrailerForm(forms.ModelForm):
 
         self.fields['truck'].empty_label = 'Выберите автомобиль'
         configure_truck_field(self.fields['truck'])
+
+        reg_field = self.fields['registration_number']
+        reg_field.help_text = TRAILER_INPUT_HELP
+        reg_field.widget.attrs.setdefault('placeholder', 'A 3779B-1')
+        if self.instance and self.instance.pk and self.instance.registration_number:
+            self.initial['registration_number'] = format_trailer_display(
+                self.instance.registration_number
+            )
+
+    def clean_registration_number(self):
+        return validate_trailer_input(self.cleaned_data.get('registration_number', ''))
 
     class Meta:
         """Конфигурация полей и виджетов формы прицепа."""

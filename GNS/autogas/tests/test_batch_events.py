@@ -38,7 +38,7 @@ class AutoGasBatchEventTests(AutoGasFixturesMixin, TestCase):
         self.assertEqual(_list_mode_writes(write_tag), [])
         write_tag.assert_any_call(
             'autogas.vehicle_select.vehicle_list_0',
-            f'1    {self.truck.registration_number}',
+            '1    AI0008-1',
         )
         response_calls = [
             c for c in write_tag.call_args_list
@@ -70,7 +70,7 @@ class AutoGasBatchEventTests(AutoGasFixturesMixin, TestCase):
         self.assertEqual(AutoGasBatch.objects.count(), 0)
         write_tag.assert_any_call(
             'autogas.vehicle_select.proposed_truck_number',
-            self.truck.registration_number,
+            'AI0008-1',
         )
         write_tag.assert_any_call('autogas.vehicle_select.proposed_ready', True)
         self.assertEqual(_list_mode_writes(write_tag), [])
@@ -91,7 +91,7 @@ class AutoGasBatchEventTests(AutoGasFixturesMixin, TestCase):
         write_tag.assert_any_call('autogas.vehicle_select.proposed_ready', True)
         write_tag.assert_any_call(
             'autogas.vehicle_select.proposed_truck_number',
-            self.truck.registration_number,
+            'AI0008-1',
         )
         self.assertEqual(_list_mode_writes(write_tag), [])
 
@@ -211,7 +211,7 @@ class AutoGasBatchEventTests(AutoGasFixturesMixin, TestCase):
         self.assertEqual(_list_mode_writes(write_tag), [])
         write_tag.assert_any_call(
             'autogas.vehicle_select.vehicle_list_0',
-            f'1    {self.tractor.registration_number}    {self.trailer.registration_number}',
+            '1    AH0193-1    A3779B-1',
         )
         propose_ready = [
             c for c in write_tag.call_args_list
@@ -246,12 +246,12 @@ class AutoGasBatchEventTests(AutoGasFixturesMixin, TestCase):
 
     def test_parse_vehicle_list_line(self):
         self.assertEqual(
-            parse_vehicle_list_line('1    AH1245-1    F5679U-2'),
-            ('AH1245-1', 'F5679U-2'),
+            parse_vehicle_list_line('1    AH1245-1    A5679B-2'),
+            ('ah12451', 'a5679b2'),
         )
         self.assertEqual(
-            parse_vehicle_list_line('2    1111AA-1'),
-            ('1111AA-1', None),
+            parse_vehicle_list_line('2    AI0008-1'),
+            ('ai00081', None),
         )
         self.assertEqual(parse_vehicle_list_line(''), (None, None))
         self.assertEqual(parse_vehicle_list_line(None), (None, None))
@@ -259,11 +259,11 @@ class AutoGasBatchEventTests(AutoGasFixturesMixin, TestCase):
     def test_format_list_line(self):
         self.assertEqual(
             format_list_line(0, VehicleCombo(truck=self.truck)),
-            f'1    {self.truck.registration_number}',
+            '1    AI0008-1',
         )
         Trailer.objects.filter(pk=self.trailer.pk).update(truck=self.tractor)
         self.trailer.refresh_from_db()
         self.assertEqual(
             format_list_line(1, VehicleCombo(truck=self.tractor, trailer=self.trailer)),
-            f'2    {self.tractor.registration_number}    {self.trailer.registration_number}',
+            '2    AH0193-1    A3779B-1',
         )

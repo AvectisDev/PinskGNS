@@ -1,12 +1,16 @@
 """Форматирование вариантов выбора грузовиков и прицепов в формах."""
 
 from .models import Truck, Trailer
+from filling_station.services.transport import (
+    format_trailer_display,
+    format_truck_display,
+)
 
 
 def format_truck_choice(truck: Truck) -> str:
     """Подпись грузовика в выпадающем списке: номер, марка, тип."""
     return (
-        f'{truck.registration_number} | '
+        f'{format_truck_display(truck.registration_number)} | '
         f'Марка: {truck.car_brand or "---"} | '
         f'Тип: {truck.type}'
     )
@@ -15,7 +19,7 @@ def format_truck_choice(truck: Truck) -> str:
 def format_trailer_choice(trailer: Trailer) -> str:
     """Подпись прицепа в выпадающем списке: номер, марка, тип."""
     return (
-        f'{trailer.registration_number} | '
+        f'{format_trailer_display(trailer.registration_number)} | '
         f'Марка: {trailer.trailer_brand or "---"} | '
         f'Тип: {trailer.type}'
     )

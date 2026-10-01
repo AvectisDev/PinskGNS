@@ -1,5 +1,6 @@
 """Регистрация моделей filling_station в Django Admin."""
 
+from django import forms
 from django.contrib import admin
 from import_export import resources
 from .models import (
@@ -13,6 +14,54 @@ from .models import (
     TotalReadersCounter,
     DailyReaderCounter,
 )
+from filling_station.services.transport import (
+    TRAILER_INPUT_HELP,
+    TRUCK_INPUT_HELP,
+    format_trailer_display,
+    format_truck_display,
+    validate_trailer_input,
+    validate_truck_input,
+)
+
+
+class TruckAdminForm(forms.ModelForm):
+    """Admin-форма грузовика со строгой валидацией номера."""
+
+    class Meta:
+        model = Truck
+        fields = '__all__'
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        field = self.fields['registration_number']
+        field.help_text = TRUCK_INPUT_HELP
+        if self.instance and self.instance.pk and self.instance.registration_number:
+            self.initial['registration_number'] = format_truck_display(
+                self.instance.registration_number
+            )
+
+    def clean_registration_number(self):
+        return validate_truck_input(self.cleaned_data.get('registration_number', ''))
+
+
+class TrailerAdminForm(forms.ModelForm):
+    """Admin-форма прицепа со строгой валидацией номера."""
+
+    class Meta:
+        model = Trailer
+        fields = '__all__'
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        field = self.fields['registration_number']
+        field.help_text = TRAILER_INPUT_HELP
+        if self.instance and self.instance.pk and self.instance.registration_number:
+            self.initial['registration_number'] = format_trailer_display(
+                self.instance.registration_number
+            )
+
+    def clean_registration_number(self):
+        return validate_trailer_input(self.cleaned_data.get('registration_number', ''))
 
 
 class BalloonResources(resources.ModelResource):
@@ -85,6 +134,7 @@ class ReaderSettingsAdmin(admin.ModelAdmin):
 class TruckAdmin(admin.ModelAdmin):
     """Админка грузовиков, используемых на ГНС."""
 
+    form = TruckAdminForm
     list_display = [
         'id',
         'car_brand',
@@ -120,6 +170,7 @@ class TruckTypeAdmin(admin.ModelAdmin):
 class TrailerAdmin(admin.ModelAdmin):
     """Админка прицепов, используемых на ГНС."""
 
+    form = TrailerAdminForm
     list_display = [
         'id',
         'truck',

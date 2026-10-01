@@ -11,7 +11,7 @@ class TruckDeleteProtectionTests(TestCase):
         self.user = User.objects.create_user(username='truck_delete_user', password='x')
         self.truck_type = TruckType.objects.create(type='Трал')
         self.truck = Truck.objects.create(
-            registration_number='5555AA-7',
+            registration_number='aa55557',
             type=self.truck_type,
             car_brand='МАЗ',
         )
@@ -42,7 +42,7 @@ class TruckDeleteProtectionTests(TestCase):
 
     def test_delete_truck_without_relations_succeeds(self):
         free_truck = Truck.objects.create(
-            registration_number='6666BB-7',
+            registration_number='bb66667',
             type=self.truck_type,
             car_brand='МАЗ',
         )

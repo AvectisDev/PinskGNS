@@ -123,7 +123,7 @@ class TriggerDispatcherTests(SimpleTestCase):
             'autogas.batch_type_code': 1,
             'autogas.gas_type': 2,
             'autogas.vehicle_select.proposed_ready': False,
-            'autogas.vehicle_select.vehicle_list_0': '1    1111AA-1',
+            'autogas.vehicle_select.vehicle_list_0': '1    AI0008-1',
         }
         fired = self.dispatcher.on_snapshot(snapshot, force_pending=True)
         self.assertNotIn('autogas_batch_create', fired)
@@ -138,7 +138,7 @@ class TriggerDispatcherTests(SimpleTestCase):
             'autogas.vehicle_select.operator_confirm': True,
             'autogas.vehicle_select.list_mode': False,
             'autogas.vehicle_select.proposed_ready': True,
-            'autogas.vehicle_select.proposed_truck_number': '1111AA-1',
+            'autogas.vehicle_select.proposed_truck_number': 'AI0008-1',
             'autogas.vehicle_select.proposed_trailer_number': '',
             'autogas.vehicle_select.selected_vehicle_index': -1,
         }
@@ -173,9 +173,9 @@ class TriggerDispatcherTests(SimpleTestCase):
             'autogas.vehicle_select.proposed_trailer_number': '',
             'autogas.vehicle_select.selected_vehicle_index': 2,
             'autogas.vehicle_select.operator_confirm': True,
-            'autogas.vehicle_select.vehicle_list_2': '3    2222BB-2    3333CC-3',
+            'autogas.vehicle_select.vehicle_list_2': '3    AH0193-1    A3779B-1',
         })
         self.assertEqual(payload['list_mode'], True)
         self.assertEqual(payload['selected_vehicle_index'], 2)
         self.assertEqual(payload['batch_type_code'], 1)
-        self.assertEqual(payload['vehicle_list_2'], '3    2222BB-2    3333CC-3')
+        self.assertEqual(payload['vehicle_list_2'], '3    AH0193-1    A3779B-1')

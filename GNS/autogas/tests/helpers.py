@@ -19,20 +19,20 @@ class AutoGasFixturesMixin:
         self.tractor_type = TruckType.objects.create(type='Седельный тягач')
         self.trailer_type = TrailerType.objects.create(type='Полуприцеп цистерна')
         self.truck = Truck.objects.create(
-            registration_number='1111AA-1',
+            registration_number='ai00081',
             type=self.truck_type,
             car_brand='МАЗ',
             max_mass_of_transported_gas=20000,
         )
         self.tractor = Truck.objects.create(
-            registration_number='2222BB-2',
+            registration_number='ah01931',
             type=self.tractor_type,
             car_brand='МАЗ',
             max_mass_of_transported_gas=0,
         )
         self.trailer = Trailer.objects.create(
             truck=self.truck,
-            registration_number='3333CC-3',
+            registration_number='a3779b1',
             type=self.trailer_type,
             max_mass_of_transported_gas=18000,
         )
@@ -47,4 +47,3 @@ class AutoGasFixturesMixin:
         }
         defaults.update(kwargs)
         return AutoGasBatch.objects.create(**defaults)
-

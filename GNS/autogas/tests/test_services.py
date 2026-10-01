@@ -1,4 +1,4 @@
-from datetime import timedelta
+from datetime import date, datetime, timedelta
 from decimal import Decimal
 from unittest.mock import patch
 
@@ -123,6 +123,9 @@ class StatisticServiceTests(AutoGasFixturesMixin, TestCase):
         self.assertNotIn('active_batch', data)
 
     def test_aggregates_month_and_today(self):
+        # Фиксируем «сегодня» серединой месяца, чтобы партия «раньше» оставалась
+        # в том же календарном месяце на любой дате прогона.
+        today = date(2026, 6, 15)
         today_batch = self.make_batch(
             batch_type='l',
             gas_type='ПБА',
@@ -134,11 +137,14 @@ class StatisticServiceTests(AutoGasFixturesMixin, TestCase):
             weight_gas_amount=Decimal('2000'),
             truck=self.tractor,
         )
+        AutoGasBatch.objects.filter(pk=today_batch.pk).update(
+            begin_at=timezone.make_aware(datetime(2026, 6, 15, 12, 0, 0)),
+        )
         AutoGasBatch.objects.filter(pk=earlier.pk).update(
-            begin_at=timezone.now() - timedelta(days=5),
+            begin_at=timezone.make_aware(datetime(2026, 6, 10, 12, 0, 0)),
         )
 
-        data = build_batch_statistic()
+        data = build_batch_statistic(today=today)
         pba = data['loading_batch']['ПБА']
         self.assertEqual(pba['today_loading_batches'], 1)
         self.assertEqual(pba['today_loading_weight'], Decimal('1000'))
