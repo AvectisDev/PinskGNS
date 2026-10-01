@@ -181,14 +181,14 @@ def _count_mismatch_payload(batch: BalloonsBatch) -> dict:
         dict: сообщение и числовые поля для API-ответа.
     """
     message = (
-        f'Количество отсканированных RFID ({batch.amount_of_rfid or 0}) '
+        f'Количество отсканированных RFID ({batch.rfid_balloon_count()}) '
         f'не совпадает с количеством по электронной ТТН ({batch.amount_of_ttn or 0})'
     )
     return {
         'message': message,
         'count_mismatch': True,
         'amount_of_ttn': batch.amount_of_ttn or 0,
-        'amount_of_rfid': batch.amount_of_rfid or 0,
+        'amount_of_rfid': batch.rfid_balloon_count(),
         'amount_of_sensor': batch.amount_of_sensor or 0,
         'id': batch.id,
     }
@@ -325,7 +325,7 @@ def attempt_close_balloons_batch(batch: BalloonsBatch) -> Tuple[bool, Optional[s
     from ttn.services import close_ttn_in_miriada
 
     if batch.amount_of_ttn:
-        if (batch.amount_of_rfid or 0) != batch.amount_of_ttn:
+        if batch.rfid_balloon_count() != batch.amount_of_ttn:
             return False, _count_mismatch_payload(batch)['message']
 
     statuses_ok, statuses_error = send_batch_balloon_statuses_to_miriada(batch)
@@ -373,7 +373,6 @@ BATCH_CLOSE_WRITABLE_FIELDS = frozenset({
     'truck',
     'trailer',
     'reader_number',
-    'amount_of_rfid',
     'amount_of_sensor',
     'amount_of_ttn',
     'amount_of_5_liters',
@@ -413,7 +412,7 @@ def save_and_close_balloons_batch(batch: BalloonsBatch, data=None):
         serializer.save()
         batch.refresh_from_db()
 
-    if batch.amount_of_ttn and (batch.amount_of_rfid or 0) != batch.amount_of_ttn:
+    if batch.amount_of_ttn and batch.rfid_balloon_count() != batch.amount_of_ttn:
         return False, _count_mismatch_payload(batch), None
 
     success, error_message = attempt_close_balloons_batch(batch)

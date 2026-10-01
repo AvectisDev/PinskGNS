@@ -26,6 +26,7 @@ from filling_station.services import (
 )
 from filling_station.services.batches import OPEN_BATCH_STATUSES
 from core.api.schema import ApiErrorSerializer
+from django.db.models import Count
 from .serializers import (
     ActiveBatchSerializer,
     BalloonAmountSerializer,
@@ -379,7 +380,9 @@ class BalloonsBatchViewSet(viewsets.ViewSet):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        batches = BalloonsBatch.objects.select_related('truck', 'trailer', 'truck__type').filter(
+        batches = BalloonsBatch.objects.select_related('truck', 'trailer', 'truck__type').annotate(
+            annotated_rfid_count=Count('balloon_list', distinct=True),
+        ).filter(
             batch_type=batch_type,
             status__in=OPEN_BATCH_STATUSES,
         )
@@ -405,7 +408,9 @@ class BalloonsBatchViewSet(viewsets.ViewSet):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        batch = BalloonsBatch.objects.select_related('truck', 'trailer', 'truck__type').filter(
+        batch = BalloonsBatch.objects.select_related('truck', 'trailer', 'truck__type').annotate(
+            annotated_rfid_count=Count('balloon_list', distinct=True),
+        ).filter(
             batch_type=batch_type,
             status=BatchStatus.ACTIVE,
         ).first()
@@ -503,7 +508,7 @@ class BalloonsBatchViewSet(viewsets.ViewSet):
         if is_closing:
             logger.info(
                 f"API close batch: user={_api_user(request)}, batch_id={batch.id}, "
-                f"ttn_id={batch.ttn_id}, amount_of_rfid={batch.amount_of_rfid}, "
+                f"ttn_id={batch.ttn_id}, amount_of_rfid={batch.rfid_balloon_count()}, "
                 f"amount_of_ttn={batch.amount_of_ttn}, data={dict(request.data)}"
             )
             success, error_payload, response_data = save_and_close_balloons_batch(batch, request.data)
@@ -562,7 +567,7 @@ class BalloonsBatchViewSet(viewsets.ViewSet):
 
         logger.info(
             f"API retry-close: user={_api_user(request)}, batch_id={batch.id}, "
-            f"ttn_id={batch.ttn_id}, amount_of_rfid={batch.amount_of_rfid}, "
+            f"ttn_id={batch.ttn_id}, amount_of_rfid={batch.rfid_balloon_count()}, "
             f"amount_of_ttn={batch.amount_of_ttn}"
         )
         success, error_payload, response_data = save_and_close_balloons_batch(batch, request.data)
@@ -615,7 +620,7 @@ class BalloonsBatchViewSet(viewsets.ViewSet):
             batch.refresh_from_db()
             logger.info(
                 f"API add-balloon: user={_api_user(request)}, batch_id={batch.id}, "
-                f"nfc={nfc}, amount_of_rfid={batch.amount_of_rfid}"
+                f"nfc={nfc}, amount_of_rfid={batch.rfid_balloon_count()}"
             )
             return Response(result, status=status.HTTP_200_OK)
 
@@ -665,7 +670,7 @@ class BalloonsBatchViewSet(viewsets.ViewSet):
             batch.refresh_from_db()
             logger.info(
                 f"API remove-balloon: user={_api_user(request)}, batch_id={batch.id}, "
-                f"nfc={nfc}, amount_of_rfid={batch.amount_of_rfid}"
+                f"nfc={nfc}, amount_of_rfid={batch.rfid_balloon_count()}"
             )
             return Response(result, status=status.HTTP_200_OK)
 

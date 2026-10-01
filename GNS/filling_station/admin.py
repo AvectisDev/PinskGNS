@@ -203,7 +203,7 @@ class BalloonsBatchAdmin(admin.ModelAdmin):
         'truck',
         'trailer',
         'reader_number',
-        'amount_of_rfid',
+        'display_rfid_count',
         'amount_of_sensor',
         'amount_of_ttn',
         'amount_of_5_liters',
@@ -218,6 +218,19 @@ class BalloonsBatchAdmin(admin.ModelAdmin):
     ]
     list_filter = ['batch_type', 'started_at', 'completed_at', 'status', 'miriada_close_failed']
     search_fields = ['truck', 'ttn_id', 'batch_type']
+
+    @admin.display(description='Баллонов по RFID')
+    def display_rfid_count(self, obj):
+        """
+        Число связанных баллонов партии для колонки списка.
+
+        Args:
+            obj (BalloonsBatch): Экземпляр партии.
+
+        Returns:
+            int: количество баллонов с RFID.
+        """
+        return obj.amount_of_rfid
 
     @admin.display(description='Номер ТТН')
     def display_ttn_name(self, obj):

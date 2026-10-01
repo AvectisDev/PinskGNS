@@ -666,7 +666,6 @@ class BalloonsBatch(models.Model):
         verbose_name="Прицеп"
     )
     reader_number = models.IntegerField(null=True, blank=True, verbose_name="Номер считывателя")
-    amount_of_rfid = models.IntegerField(default=0, verbose_name="Количество баллонов по rfid")
     amount_of_sensor = models.IntegerField(default=0, verbose_name="Количество баллонов по датчику")
     amount_of_ttn = models.IntegerField(
         default=0,
@@ -798,6 +797,26 @@ class BalloonsBatch(models.Model):
             + (self.amount_of_50_liters or 0)
         )
 
+    def rfid_balloon_count(self) -> int:
+        """
+        Число баллонов с RFID в партии: длина ``balloon_list``.
+
+        Если queryset уже аннотирован ``annotated_rfid_count``, берётся аннотация
+        без повторного COUNT.
+
+        Returns:
+            int: количество связанных баллонов.
+        """
+        annotated = self.__dict__.get('annotated_rfid_count')
+        if annotated is not None:
+            return annotated
+        return self.balloon_list.count()
+
+    @property
+    def amount_of_rfid(self) -> int:
+        """Совместимость с API/шаблонами: то же, что ``rfid_balloon_count()``."""
+        return self.rfid_balloon_count()
+
     def add_balloon(self, nfc_tag: str = None) -> dict:
         """
         Добавляет баллон в партию по NFC-метке либо учитывает проход оптического датчика.
@@ -835,8 +854,6 @@ class BalloonsBatch(models.Model):
 
             balloon = Balloon.objects.get(nfc_tag=nfc_tag)
             self.balloon_list.add(balloon)
-            self.amount_of_rfid = (self.amount_of_rfid or 0) + 1
-            self.save()
 
             result.update({
                 'success': True,
@@ -877,8 +894,6 @@ class BalloonsBatch(models.Model):
 
             balloon = Balloon.objects.get(nfc_tag=nfc_tag)
             self.balloon_list.remove(balloon)
-            self.amount_of_rfid = max((self.amount_of_rfid or 0) - 1, 0)
-            self.save()
 
             result.update({
                 'success': True,
@@ -933,8 +948,8 @@ class BalloonsBatch(models.Model):
         )
 
         stats = queryset.aggregate(
-            total_batches=Count('id'),
-            total_balloon_count_by_rfid=Coalesce(Sum('amount_of_rfid'), 0),
+            total_batches=Count('id', distinct=True),
+            total_balloon_count_by_rfid=Count('balloon_list'),
             total_balloon_count_by_ttn=Coalesce(Sum(ttn_amount), 0),
         )
         return {

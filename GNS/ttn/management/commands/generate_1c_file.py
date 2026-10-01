@@ -228,7 +228,7 @@ class Command(BaseCommand):
 
                 lines.append(f';'
                              f'Баллоны 50 л;'
-                             f'{(batch.amount_of_rfid or 0) + (batch.amount_of_50_liters or 0)};'
+                             f'{(batch.rfid_balloon_count() or 0) + (batch.amount_of_50_liters or 0)};'
                              f'0;'
                              f'0;')
                 lines.append(f';'
@@ -281,7 +281,7 @@ class Command(BaseCommand):
 
                 lines.append(f'СПБТ;'
                              f'Баллоны 50 л;'
-                             f'{(batch.amount_of_rfid or 0) + (batch.amount_of_50_liters or 0)};'
+                             f'{(batch.rfid_balloon_count() or 0) + (batch.amount_of_50_liters or 0)};'
                              f'{total_gas_weight};'
                              f'{total_balloon_weight};')
                 lines.append(f'СПБТ;'

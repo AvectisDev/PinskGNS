@@ -289,7 +289,10 @@ class BalloonBatchListView(DateRangeListFilterMixin, BalloonBatchTypeMixin, gene
         ).values('name')[:1]
         queryset = BalloonsBatch.objects.select_related(
             'truck', 'trailer', 'truck__type'
-        ).annotate(ttn_name=Subquery(ttn_name_sq))
+        ).annotate(
+            ttn_name=Subquery(ttn_name_sq),
+            annotated_rfid_count=Count('balloon_list', distinct=True),
+        )
         if batch_type:
             queryset = queryset.filter(batch_type=batch_type)
 
@@ -335,9 +338,11 @@ class BalloonBatchDetailView(BalloonBatchTypeMixin, generic.DetailView):
             Prefetch('balloon_list', queryset=Balloon.objects.order_by('nfc_tag'))
         ).annotate(
             ttn_name=Subquery(ttn_name_sq),
+            annotated_rfid_count=Count('balloon_list', distinct=True),
             defective_balloons_count=Count(
                 'balloon_list',
                 filter=Q(balloon_list__filling_status=False),
+                distinct=True,
             ),
         )
         batch_type = self.get_batch_type()

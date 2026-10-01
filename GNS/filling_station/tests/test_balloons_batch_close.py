@@ -104,9 +104,16 @@ class BalloonsBatchCloseTests(APITestCase):
         self.assertEqual(self.batch.status, BatchStatus.PAUSED)
 
     def test_rfid_amount_returns_three_counters(self):
-        self.batch.amount_of_rfid = 4
+        extras = [
+            Balloon.objects.create(nfc_tag='rfidcnt0001e0'),
+            Balloon.objects.create(nfc_tag='rfidcnt0002e0'),
+            Balloon.objects.create(nfc_tag='rfidcnt0003e0'),
+        ]
+        self.batch.add_balloon(self.balloon.nfc_tag)
+        for balloon in extras:
+            self.batch.add_balloon(balloon.nfc_tag)
         self.batch.amount_of_sensor = 5
-        self.batch.save(update_fields=['amount_of_rfid', 'amount_of_sensor'])
+        self.batch.save(update_fields=['amount_of_sensor'])
         url = reverse('filling_station_api:balloons-loading-rfid-amount', args=[self.batch.id])
         response = self.client.get(url)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
@@ -120,7 +127,7 @@ class BalloonsBatchCloseTests(APITestCase):
         self.assertTrue(result['success'])
         mock_send.assert_not_called()
         self.batch.refresh_from_db()
-        self.assertEqual(self.batch.amount_of_rfid, 1)
+        self.assertEqual(self.batch.rfid_balloon_count(), 1)
         self.assertTrue(self.batch.balloon_list.filter(nfc_tag=self.balloon.nfc_tag).exists())
 
     def test_sensor_increments_active_batch(self):
@@ -293,7 +300,6 @@ class BalloonsBatchCloseTests(APITestCase):
 
     def test_amount_without_rfid_is_sum_of_liter_fields(self):
         self.batch.amount_of_sensor = 147
-        self.batch.amount_of_rfid = 147
         self.batch.amount_of_5_liters = 1
         self.batch.amount_of_12_liters = 2
         self.batch.amount_of_27_liters = 3
@@ -344,7 +350,7 @@ class BalloonsBatchCloseTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.batch.refresh_from_db()
         self.assertFalse(self.batch.balloon_list.filter(nfc_tag=self.balloon.nfc_tag).exists())
-        self.assertEqual(self.batch.amount_of_rfid, 0)
+        self.assertEqual(self.batch.rfid_balloon_count(), 0)
 
     def test_api_add_balloon_allowed_for_miriada_error(self):
         self.batch.status = BatchStatus.MIRIADA_ERROR
@@ -354,6 +360,7 @@ class BalloonsBatchCloseTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.batch.refresh_from_db()
         self.assertTrue(self.batch.balloon_list.filter(nfc_tag=self.balloon.nfc_tag).exists())
+        self.assertEqual(self.batch.rfid_balloon_count(), 1)
 
     def test_web_remove_balloon_for_active_paused_and_miriada_error(self):
         for batch_status in (BatchStatus.ACTIVE, BatchStatus.PAUSED, BatchStatus.MIRIADA_ERROR):
@@ -364,14 +371,14 @@ class BalloonsBatchCloseTests(APITestCase):
                 self.batch.add_balloon(balloon.nfc_tag)
                 self.batch.status = batch_status
                 self.batch.save(update_fields=['status', 'miriada_close_failed'])
-                amount_before = self.batch.amount_of_rfid
+                amount_before = self.batch.rfid_balloon_count()
 
                 url = reverse('filling_station:balloon_loading_batch_remove_balloon', args=[self.batch.id])
                 response = self.client.post(url, {'nfc': balloon.nfc_tag})
                 self.assertEqual(response.status_code, status.HTTP_302_FOUND)
                 self.batch.refresh_from_db()
                 self.assertFalse(self.batch.balloon_list.filter(nfc_tag=balloon.nfc_tag).exists())
-                self.assertEqual(self.batch.amount_of_rfid, max(amount_before - 1, 0))
+                self.assertEqual(self.batch.rfid_balloon_count(), max(amount_before - 1, 0))
 
     def test_web_remove_balloon_rejected_for_completed(self):
         self.batch.add_balloon(self.balloon.nfc_tag)
@@ -382,17 +389,22 @@ class BalloonsBatchCloseTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_302_FOUND)
         self.batch.refresh_from_db()
         self.assertTrue(self.batch.balloon_list.filter(nfc_tag=self.balloon.nfc_tag).exists())
-        self.assertEqual(self.batch.amount_of_rfid, 1)
+        self.assertEqual(self.batch.rfid_balloon_count(), 1)
 
-    def test_deleting_balloon_decrements_batch_rfid_count(self):
+    def test_deleting_balloon_updates_rfid_count_from_list(self):
         self.batch.add_balloon(self.balloon.nfc_tag)
         self.batch.refresh_from_db()
-        self.assertEqual(self.batch.amount_of_rfid, 1)
+        self.assertEqual(self.batch.rfid_balloon_count(), 1)
 
         self.balloon.delete()
         self.batch.refresh_from_db()
-        self.assertEqual(self.batch.amount_of_rfid, 0)
+        self.assertEqual(self.batch.rfid_balloon_count(), 0)
         self.assertEqual(self.batch.balloon_list.count(), 0)
+
+        url = reverse('filling_station_api:balloons-loading-rfid-amount', args=[self.batch.id])
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['amount_of_rfid'], 0)
 
     def test_balloon_operation_error_status_mapping(self):
         self.assertEqual(

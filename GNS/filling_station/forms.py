@@ -247,10 +247,6 @@ class BalloonsBatchForm(forms.ModelForm):
                 'class': 'form-control',
                 'placeholder': 'Введите номер считывателя'
             }),
-            'amount_of_rfid': forms.NumberInput(attrs={
-                'class': 'form-control',
-                'placeholder': 'Количество по RFID'
-            }),
             'amount_of_5_liters': forms.NumberInput(attrs={
                 'class': 'form-control',
                 'placeholder': '0'
