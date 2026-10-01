@@ -306,7 +306,7 @@ class BalloonBatchListView(DateRangeListFilterMixin, BalloonBatchTypeMixin, gene
                 Q(truck__registration_number__icontains=query)
                 | Q(ttn_id__in=ttn_ids)
             )
-        return queryset
+        return queryset.order_by('-started_at')
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
