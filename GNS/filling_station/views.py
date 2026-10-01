@@ -333,7 +333,13 @@ class BalloonBatchDetailView(BalloonBatchTypeMixin, generic.DetailView):
             'truck', 'trailer', 'truck__type'
         ).prefetch_related(
             Prefetch('balloon_list', queryset=Balloon.objects.order_by('nfc_tag'))
-        ).annotate(ttn_name=Subquery(ttn_name_sq))
+        ).annotate(
+            ttn_name=Subquery(ttn_name_sq),
+            defective_balloons_count=Count(
+                'balloon_list',
+                filter=Q(balloon_list__filling_status=False),
+            ),
+        )
         batch_type = self.get_batch_type()
         if batch_type:
             queryset = queryset.filter(batch_type=batch_type)
@@ -405,6 +411,28 @@ def balloon_batch_retry_close(request, pk):
         messages.error(request, error_payload['message'])
     elif error_payload:
         messages.error(request, error_payload)
+
+    return redirect_preserve_query(request, batch.get_absolute_url())
+
+
+#@login_required
+@require_POST
+def balloon_batch_remove_balloon(request, pk):
+    """Удаляет баллон из партии по NFC-метке и возвращает на карточку партии."""
+    path = request.path.lower()
+    batch_type = 'u' if 'unloading' in path else 'l'
+    batch = get_object_or_404(BalloonsBatch, pk=pk, batch_type=batch_type)
+
+    nfc = (request.POST.get('nfc') or '').strip()
+    if not nfc:
+        messages.error(request, 'Не указана NFC-метка баллона.')
+        return redirect_preserve_query(request, batch.get_absolute_url())
+
+    result = batch.remove_balloon(nfc)
+    if result.get('success'):
+        messages.success(request, f'Баллон {nfc} удалён из партии №{batch.id}.')
+    else:
+        messages.error(request, result.get('message') or 'Не удалось удалить баллон из партии.')
 
     return redirect_preserve_query(request, batch.get_absolute_url())
 

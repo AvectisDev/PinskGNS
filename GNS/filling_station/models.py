@@ -743,6 +743,10 @@ class BalloonsBatch(models.Model):
         """URL повторной попытки закрытия ТТН в Мириаде."""
         return reverse(f'filling_station:{self._batch_url_prefix()}_retry_close', args=[self.pk])
 
+    def get_remove_balloon_url(self):
+        """URL удаления баллона из партии по NFC."""
+        return reverse(f'filling_station:{self._batch_url_prefix()}_remove_balloon', args=[self.pk])
+
     def can_retry_miriada_close(self) -> bool:
         """Проверяет, можно ли повторить закрытие ТТН после ошибки Мириады."""
         return self.status == BatchStatus.MIRIADA_ERROR and bool(self.ttn_id)
@@ -752,8 +756,12 @@ class BalloonsBatch(models.Model):
         return self.status == BatchStatus.ACTIVE
 
     def accepts_manual_edits(self) -> bool:
-        """Допускает ли партия ручные правки состава (ACTIVE или PAUSED)."""
-        return self.status in (BatchStatus.ACTIVE, BatchStatus.PAUSED)
+        """Допускает ли партия ручные правки состава (ACTIVE, PAUSED или MIRIADA_ERROR)."""
+        return self.status in (
+            BatchStatus.ACTIVE,
+            BatchStatus.PAUSED,
+            BatchStatus.MIRIADA_ERROR,
+        )
 
     def save(self, *args, **kwargs):
         """

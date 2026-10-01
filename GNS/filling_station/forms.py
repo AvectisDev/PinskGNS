@@ -216,8 +216,9 @@ class BalloonsBatchForm(forms.ModelForm):
         self.fields['trailer'].empty_label = 'Выберите прицеп'
         configure_truck_field(self.fields['truck'])
         configure_trailer_field(self.fields['trailer'])
-        # Скрыть batch_type
         self.fields['batch_type'].widget = forms.HiddenInput()
+        self.fields['status'].widget.attrs.update({'class': 'form-control'})
+        self.order_fields(['status'] + [name for name in self.fields if name != 'status'])
 
     class Meta:
         """Конфигурация исключённых полей, виджетов и подписей формы партии."""
@@ -229,7 +230,6 @@ class BalloonsBatchForm(forms.ModelForm):
             'miriada_balloons_sent',
             'miriada_close_failed',
             'miriada_error_message',
-            'status',
         ]
         widgets = {
             'batch_type': forms.HiddenInput(),
@@ -279,5 +279,6 @@ class BalloonsBatchForm(forms.ModelForm):
         }
         labels = {
             'amount_of_ttn': 'Количество баллонов по электронной ТТН',
-            'batch_type': 'Тип партии'
+            'batch_type': 'Тип партии',
+            'status': 'Статус партии',
         }

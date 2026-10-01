@@ -219,7 +219,7 @@ def _api_error_payload(payload):
         summary='Добавить баллон в партию',
         description=(
             'Добавление баллона по NFC-метке. Статус в Мириаду отправляется при закрытии партии. '
-            'Доступно для статусов 1=ACTIVE и 2=PAUSED.'
+            'Доступно для статусов 1=ACTIVE, 2=PAUSED и 4=MIRIADA_ERROR.'
         ),
         request=inline_serializer(
             name='AddBalloonRequest',
@@ -247,7 +247,7 @@ def _api_error_payload(payload):
         summary='Удалить баллон из партии',
         description=(
             'Удаление баллона по NFC-метке. '
-            'Доступно для статусов 1=ACTIVE и 2=PAUSED.'
+            'Доступно для статусов 1=ACTIVE, 2=PAUSED и 4=MIRIADA_ERROR.'
         ),
         request=inline_serializer(
             name='RemoveBalloonRequest',
