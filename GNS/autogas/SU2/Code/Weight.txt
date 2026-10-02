@@ -1,0 +1,50 @@
+(*Раскладываем слова на байты*)
+(*Byte 1 - sign or space
+Byte 2 - space
+Byte 3÷4 - digit or space
+Byte 5÷9 - digit, decimal point or space
+Byte 10 - digit
+Byte 11 - space
+Byte 12 - k, l, c, p or space
+Byte 13 - g, b, t, c or %
+Byte 14 - space
+Byte 15 - CR
+Byte 16 - LF*)
+WTOB( TRUE , D50 , K16, D201);
+
+(* Во внешнем цикле проверям наличие цифр в байтах с 3-го по 10-й
+во внутреннем цикле определяем какое число записано в байте, где Н30 = 0...Н39=9 (HEX представление ASCII таблицы чисел) *)
+FOR iter1:=3 TO 10 DO 
+	Z0:=iter1;
+	IF D201Z0 < h30 OR D201Z0 > h39 THEN
+		byte_list[iter1] := 0;
+	ELSE
+		FOR iter2:=0 TO 9 DO
+				Z1:= iter2; 
+				IF D201Z0 = h30 + Z1 THEN
+					byte_list[iter1] := 0 + Z1;
+				END_IF;
+		END_FOR;
+	END_IF;
+END_FOR;
+
+(*Показание предыдущего значения веса обновляем раз в 2 сек*)
+periodic_2s_rtrig(_CLK:= SM413);
+IF periodic_2s_rtrig.Q THEN
+	vehicle_scale.previous_weight := vehicle_scale.current_weight;
+END_IF;
+
+(* Вес получаем путём умножения каждого цифрового значения на 10 в определённой степени 
+показатель степени получаем из индекса байта в массиве начиная с 10 байта в обратном порядке, т.е. для 10-го байта степень = 0, для 9-го - 1 и т.д. *)
+
+vehicle_scale.current_weight :=0.0;
+digit:=1;
+FOR iter1:=10 TO 3 BY -1 DO
+	byte_digit_in_double_word := INT_TO_DINT( byte_list[iter1]);
+	temp_double_word:=byte_digit_in_double_word * digit;
+	DFLT( TRUE , temp_double_word, digit_real );
+	vehicle_scale.current_weight:= vehicle_scale.current_weight+ digit_real;
+	digit:= digit * 10;
+END_FOR;
+
+vehicle_scale.current_weight:= vehicle_scale.current_weight/ 10.0;

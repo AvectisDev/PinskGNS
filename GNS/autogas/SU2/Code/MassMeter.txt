@@ -1,0 +1,34 @@
+(* Начальные параметры опроса расходомера. *)
+IF SM402 THEN
+	SM_1.SlaveAddress := 1;
+	SM_1.StartingAddress := 246;
+	SM_1.QuantityofRegisters := 18;
+	SM_1.CPRTCL_Number_of_prtcl := 1;
+END_IF;
+
+(* Запуск G_CPRTCL после готовности модуля. *)
+IF NOT SM_1.Busy AND X2D AND X2E THEN
+	SM_1.Busy:= TRUE;
+END_IF;
+
+G_CPRTCL( SM_1.Busy , H01 , 2 , 1 , D104 , D145.1);
+
+IF SM_1.Busy AND SM_1.CompletionFlag THEN
+	
+	FOR item := 0 TO 16 BY 2 DO 
+			Z0 := item ;
+			IF SM_1.ErrorCompletionFlag THEN
+				DMOV( TRUE , 0, D400Z0);	(*Обнуляем регистры данных если есть ошибка*)
+				mass_meter.CommError := TRUE;
+			ELSE
+				DMOV( TRUE , D123Z0, D400Z0);
+				mass_meter.CommError := FALSE;
+			END_IF;
+	END_FOR;
+	
+	IF SM_1.ErrorCompletionFlag AND X1F THEN (*Если есть ошибка передачи в модуле*)
+		Y1F := TRUE; (*Сбрасываем ошибку модуля*)	
+	END_IF;
+	
+	SM_1.Busy := FALSE;
+END_IF;

@@ -82,7 +82,14 @@
                         <dd class="col-sm-6">{{ batch.amount_of_ttn|default:"-" }}</dd>
 
                         <dt class="col-sm-6">Баллонов с RFID:</dt>
-                        <dd class="col-sm-6">{{ batch.amount_of_rfid|default:"-" }}</dd>
+                        <dd class="col-sm-6">
+                            {{ batch.amount_of_rfid|default:"-" }}
+                            {% if batch.defective_balloons_count %}
+                            <span class="text-danger">
+                                из них {{ batch.defective_balloons_count }} шт - неисправны
+                            </span>
+                            {% endif %}
+                        </dd>
 
                         <dt class="col-sm-6">Баллонов по оптическому датчику:</dt>
                         <dd class="col-sm-6">{{ batch.amount_of_sensor|default:"-" }}</dd>
@@ -136,11 +143,14 @@
                             <th>Вес брутто</th>
                             <th>Статус</th>
                             <th>Готов к наполнению</th>
+                            {% if batch.accepts_manual_edits %}
+                            <th>Действия</th>
+                            {% endif %}
                         </tr>
                         </thead>
                         <tbody>
                         {% for balloon in balloons %}
-                        <tr>
+                        <tr{% if not balloon.filling_status %} class="table-danger"{% endif %}>
                             <td>
                                 <a href="{% url_with_query balloon.get_absolute_url %}" class="custom-link fw-bold">
                                     {{ balloon.nfc_tag|default:"-" }}
@@ -155,13 +165,29 @@
                                 {% if balloon.filling_status %}
                                 <span class="badge bg-success">Да</span>
                                 {% else %}
-                                <span class="badge bg-secondary">Нет</span>
+                                <span class="badge bg-danger">Нет</span>
                                 {% endif %}
                             </td>
+                            {% if batch.accepts_manual_edits %}
+                            <td>
+                                <div class="action-buttons">
+                                    <form method="post"
+                                          action="{% url_with_query batch.get_remove_balloon_url %}"
+                                          class="d-inline"
+                                          onsubmit="return confirm('Удалить баллон {{ balloon.nfc_tag }} из партии?');">
+                                        {% csrf_token %}
+                                        <input type="hidden" name="nfc" value="{{ balloon.nfc_tag }}">
+                                        <button type="submit" class="btn-icon btn-delete" title="Удалить из партии">
+                                            <i class="bi bi-trash"></i>
+                                        </button>
+                                    </form>
+                                </div>
+                            </td>
+                            {% endif %}
                         </tr>
                         {% empty %}
                         <tr>
-                            <td colspan="7" class="text-center py-4 text-muted">В партии нет баллонов с RFID</td>
+                            <td colspan="{% if batch.accepts_manual_edits %}8{% else %}7{% endif %}" class="text-center py-4 text-muted">В партии нет баллонов с RFID</td>
                         </tr>
                         {% endfor %}
                         </tbody>

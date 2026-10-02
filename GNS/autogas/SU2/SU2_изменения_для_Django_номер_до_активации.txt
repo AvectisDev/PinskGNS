@@ -1,0 +1,59 @@
+﻿Изменения в обмене Django с контроллером SU2
+
+1. Переименованы глобальные экземпляры структур:
+- batch заменён на vehicle_batch;
+- batch_settings заменён на vehicle_batch_settings;
+- MassMeter заменён на mass_meter;
+- vehicle_scale и vehicle_select сохраняют свои имена.
+
+2. Изменён порядок запуска автомобильной партии:
+- vehicle_batch.start_batch больше не означает, что партия уже создана и активна;
+- команда start_batch запускает предварительный запрос распознавания и выбора автомобиля;
+- ПЛК устанавливает vehicle_batch.request_number_identification = TRUE и vehicle_batch.process_step = 1;
+- на шаге 1 vehicle_batch.is_active остаётся FALSE;
+- Django должен распознать номер, передать предложенный номер и список автомобилей через vehicle_select;
+- оператор подтверждает предложенный номер либо выбирает строку списка и устанавливает vehicle_select.operator_confirm;
+- только после успешного создания партии Django устанавливает vehicle_batch.response_number_detect = TRUE;
+- ПЛК активирует партию только при request_number_identification = TRUE, response_number_detect = TRUE и vehicle_scale.is_stable = TRUE;
+- после этого ПЛК устанавливает vehicle_batch.is_active = TRUE и переходит на process_step = 2.
+
+3. Новая расшифровка vehicle_batch.process_step:
+- 0 — партия не активна, выбор типа партии и газа;
+- 1 — распознавание, выбор и подтверждение автомобиля; партия ещё не активна;
+- 2 — партия создана и активна, ожидание выезда автомобиля с весов;
+- 3 — приёмка или отгрузка газа;
+- 4 — повторное взвешивание автомобиля;
+- 5 — ожидание сохранения завершённой партии.
+
+4. Обязанности Django до активации партии:
+- по фронту vehicle_batch.request_number_identification начать распознавание номера и сформировать список автомобилей;
+- записать vehicle_select.proposed_truck_number и vehicle_select.proposed_trailer_number;
+- установить vehicle_select.proposed_ready после подготовки предложенного номера;
+- заполнить vehicle_select.vehicle_list_0...vehicle_list_9;
+- обработать vehicle_select.operator_confirm и vehicle_select.selected_vehicle_index;
+- создать партию в Django только после подтверждения номера оператором;
+- после успешного создания партии установить vehicle_batch.response_number_detect = TRUE.
+
+5. Django не должен создавать партию непосредственно по vehicle_batch.start_batch или только по request_number_identification. Эти сигналы означают начало предварительного выбора автомобиля.
+
+6. После активации партии обмен остаётся прежним:
+- vehicle_batch.is_active = TRUE означает, что партия создана и выполняется;
+- vehicle_batch.request_batch_complete запрашивает сохранение результатов;
+- после успешного сохранения Django устанавливает vehicle_batch.response_batch_complete = TRUE.
+
+7. Данные весов находятся в vehicle_scale:
+- vehicle_scale.current_weight;
+- vehicle_scale.previous_weight;
+- vehicle_scale.is_stable;
+- vehicle_scale.start_stabilization_timer.
+
+8. Учёт по расходомеру остаётся объёмным:
+- vehicle_batch.initial_mass_meter содержит начальное значение mass_meter.Volume_total;
+- vehicle_batch.final_mass_meter содержит конечное значение mass_meter.Volume_total;
+- vehicle_batch.gas_amount содержит разность конечного и начального объёмных сумматоров.
+
+9. Формат одной строки списка автомобилей (для передачи в теги vehicle_list_0...9):
+1    AH1245-1    F5679U-2
+где первый символ это порядковый номер строки, они начанаются не с 0 как индексы в тегах, а с 1.
+второй блок символов - это номер автомобиля,
+третий блок символов - это номер прицепа.

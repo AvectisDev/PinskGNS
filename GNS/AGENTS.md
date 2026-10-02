@@ -26,6 +26,7 @@ PinskGNS is an industrial system for gas cylinder processing, filling, tracking,
 - `transport`
 - `ttn`
 - `mobile`
+- `opcua`
 
 ## Purpose of This File
 
@@ -95,6 +96,7 @@ Use this map to select the initial analysis area:
 - Waybills and shipment documents: `ttn`
 - Mobile API: `mobile`
 - Autogas functionality: `autogas`
+- OPC UA bridge (subscriptions, tag writes): `opcua`
 - Shared project functionality: `core`
 
 This map defines the starting point, not the complete impact area. Check connected applications and integrations when the workflow crosses domain boundaries.
@@ -105,7 +107,7 @@ The project integrates with:
 
 - Miriada
 - Intellect
-- OPC Server
+- OPC Server (Melsoft MX OPC UA → приложение `opcua`, библиотека `asyncua`)
 - RFID equipment
 - Carousel equipment
 

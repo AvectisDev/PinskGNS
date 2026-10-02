@@ -39,10 +39,10 @@
                                 {{ batch.id }}
                             </a>
                         </td>
-                        <td>{{ batch.begin_date|date:"d.m.Y H:i"|default:"-" }}</td>
+                        <td>{{ batch.started_at|date:"d.m.Y H:i"|default:"-" }}</td>
                         <td>
-                            {% if batch.end_date %}
-                            {{ batch.end_date|date:"d.m.Y H:i" }}
+                            {% if batch.completed_at %}
+                            {{ batch.completed_at|date:"d.m.Y H:i" }}
                             {% else %}
                             <span class="text-muted">-</span>
                             {% endif %}

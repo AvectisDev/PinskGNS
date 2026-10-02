@@ -4,6 +4,8 @@ from pathlib import Path
 from dotenv import load_dotenv
 from celery.schedules import crontab
 
+from .logging_config import build_logging_config
+
 load_dotenv()
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
@@ -60,6 +62,7 @@ INSTALLED_APPS = [
     'railway_service.apps.RailwayServiceConfig',
     'autogas.apps.AutogasConfig',
     'transport.apps.TransportConfig',
+    'opcua.apps.OpcuaConfig',
     'drf_spectacular',
     'import_export',
     'rest_framework',
@@ -257,20 +260,6 @@ CELERY_WORKER_HIJACK_ROOT_LOGGER = False
 CELERY_WORKER_PREFETCH_MULTIPLIER = 1
 CELERY_TASK_IGNORE_RESULT = True
 CELERY_BEAT_SCHEDULE = {
-    'railway_tank_processing': {
-        'task': 'railway_service.tasks.railway_tank_processing',
-        'schedule': 10.0,  # каждые 10 сек
-        'options': {'expires': 9},
-    },
-    'railway_batch_processing': {
-        'task': 'railway_service.tasks.railway_batch_processing',
-        'schedule': crontab(minute='*/20'),  # задача выполняется каждые 20 минут, начиная с 0 минут каждого часа
-    },
-    'auto_gas_processing': {
-        'task': 'autogas.tasks.auto_gas_processing',
-        'schedule': 10.0,
-        'options': {'expires': 9},
-    },
     'kpp_processing': {
         'task': 'transport.tasks.kpp_processing',
         'schedule': 60.0,
@@ -288,145 +277,7 @@ CELERY_BEAT_SCHEDULE = {
     },
 }
 
-LOGGING = {
-    'version': 1,
-    'disable_existing_loggers': False,
-    'formatters': {
-        'verbose': {
-            'style': '{',
-            'format': '{asctime} - {levelname} - {module}:{lineno} - {message}',
-            'datefmt': '%Y-%m-%d %H:%M:%S',
-        },
-        'with_msecs': {
-            'format': '%(asctime)s.%(msecs)03d - %(levelname)s - %(module)s:%(lineno)d - %(message)s',
-            'datefmt': '%Y-%m-%d %H:%M:%S',
-        },
-    },
-    'handlers': {
-        'filling_station_file': {
-            'level': 'DEBUG',
-            'class': 'concurrent_log_handler.ConcurrentRotatingFileHandler',
-            'filename': os.path.join(LOGS_DIR, 'filling_station/filling_station.log'),
-            'maxBytes': 50 * 1024 * 1024,  # 50MB
-            'backupCount': 30,
-            'formatter': 'verbose',
-            'encoding': 'utf-8',
-            'delay': True,
-            'use_gzip': False,
-        },
-        'carousel_file': {
-            'level': 'DEBUG',
-            'class': 'logging.handlers.TimedRotatingFileHandler',
-            'filename': os.path.join(LOGS_DIR, 'carousel/carousel.log'),
-            'when': 'midnight',
-            'backupCount': 30,
-            'formatter': 'with_msecs',
-            'encoding': 'utf-8',
-            'delay': True,
-        },
-        'rfid_file': {
-            'level': 'DEBUG',
-            'class': 'concurrent_log_handler.ConcurrentRotatingFileHandler',
-            'filename': os.path.join(LOGS_DIR, 'rfid/rfid.log'),
-            'maxBytes': 10 * 1024 * 1024,  # 10MB
-            'backupCount': 30,
-            'formatter': 'verbose',
-            'encoding': 'utf-8',
-            'delay': True,
-            'use_gzip': False,
-        },
-        'celery_file': {
-            'level': 'DEBUG',
-            'class': 'concurrent_log_handler.ConcurrentRotatingFileHandler',
-            'filename': os.path.join(LOGS_DIR, 'celery/celery.log'),
-            'maxBytes': 10 * 1024 * 1024,  # 10MB
-            'backupCount': 30,
-            'formatter': 'verbose',
-            'encoding': 'utf-8',
-            'delay': True,
-            'use_gzip': False,
-        },
-        'railway_file': {
-            'level': 'DEBUG',
-            'class': 'concurrent_log_handler.ConcurrentRotatingFileHandler',
-            'filename': os.path.join(LOGS_DIR, 'railway/railway.log'),
-            'maxBytes': 10 * 1024 * 1024,  # 10MB
-            'backupCount': 30,
-            'formatter': 'verbose',
-            'encoding': 'utf-8',
-            'delay': True,
-            'use_gzip': False,
-        },
-        'autogas_file': {
-            'level': 'DEBUG',
-            'class': 'concurrent_log_handler.ConcurrentRotatingFileHandler',
-            'filename': os.path.join(LOGS_DIR, 'autogas/autogas.log'),
-            'maxBytes': 10 * 1024 * 1024,  # 10MB
-            'backupCount': 30,
-            'formatter': 'verbose',
-            'encoding': 'utf-8',
-            'delay': True,
-            'use_gzip': False,
-        },
-        'kpp_file': {
-            'level': 'DEBUG',
-            'class': 'concurrent_log_handler.ConcurrentRotatingFileHandler',
-            'filename': os.path.join(LOGS_DIR, 'transport/kpp.log'),
-            'maxBytes': 10 * 1024 * 1024,  # 10MB
-            'backupCount': 30,
-            'formatter': 'verbose',
-            'encoding': 'utf-8',
-            'delay': True,
-            'use_gzip': False,
-        },
-    },
-    'loggers': {
-        'filling_station': {
-            'handlers': ['filling_station_file'],
-            'level': 'DEBUG',
-            'propagate': False,
-        },
-        'carousel': {
-            'handlers': ['carousel_file'],
-            'level': 'DEBUG',
-            'propagate': False,
-        },
-        'rfid': {
-            'handlers': ['rfid_file'],
-            'level': 'INFO',
-            'propagate': False,
-        },
-        'celery': {
-            'handlers': ['celery_file'],
-            'level': 'INFO',
-            'propagate': False,
-        },
-        'railway': {
-            'handlers': ['railway_file'],
-            'level': 'DEBUG',
-            'propagate': False,
-        },
-        'autogas': {
-            'handlers': ['autogas_file'],
-            'level': 'DEBUG',
-            'propagate': False,
-        },
-        'kpp': {
-            'handlers': ['kpp_file'],
-            'level': 'DEBUG',
-            'propagate': False,
-        },
-    },
-}
-
-# создаёт родительские каталоги при загрузке settings
-for _handler_cfg in LOGGING.get('handlers', {}).values():
-    _filename = _handler_cfg.get('filename')
-    if not _filename:
-        continue
-    _log_dir = os.path.dirname(_filename)
-    if _log_dir:
-        os.makedirs(_log_dir, exist_ok=True)
+LOGGING = build_logging_config(LOGS_DIR)
 
 # OPC_SERVER_URL = "opc.tcp://host.docker.internal:4841"
 OPC_SERVER_URL = "opc.tcp://localhost:4841"
@@ -441,6 +292,10 @@ DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL')
 
 # Intellect
 INTELLECT_SERVER_ADDRESS = os.environ.get('INTELLECT_SERVER_ADDRESS')
+
+# ocryp — параллельное распознавание номеров ж/д цистерн (пустое = выключено)
+OCRYP_URL = os.environ.get('OCRYP_URL', '')
+OCRYP_TIMEOUT = float(os.environ.get('OCRYP_TIMEOUT', '30'))
 
 # ITGas
 MIRIADA_API_URL = os.environ.get('MIRIADA_API_URL')

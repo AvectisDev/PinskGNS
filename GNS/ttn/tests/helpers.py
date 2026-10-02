@@ -19,7 +19,7 @@ class TtnFixturesMixin:
             )
         self.truck_type = TruckType.objects.create(type='Цистерна')
         self.truck = Truck.objects.create(
-            registration_number='1111AA-1',
+            registration_number='AI 0008-1',
             type=self.truck_type,
             car_brand='МАЗ',
         )

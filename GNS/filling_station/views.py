@@ -289,7 +289,10 @@ class BalloonBatchListView(DateRangeListFilterMixin, BalloonBatchTypeMixin, gene
         ).values('name')[:1]
         queryset = BalloonsBatch.objects.select_related(
             'truck', 'trailer', 'truck__type'
-        ).annotate(ttn_name=Subquery(ttn_name_sq))
+        ).annotate(
+            ttn_name=Subquery(ttn_name_sq),
+            annotated_rfid_count=Count('balloon_list', distinct=True),
+        )
         if batch_type:
             queryset = queryset.filter(batch_type=batch_type)
 
@@ -303,7 +306,7 @@ class BalloonBatchListView(DateRangeListFilterMixin, BalloonBatchTypeMixin, gene
                 Q(truck__registration_number__icontains=query)
                 | Q(ttn_id__in=ttn_ids)
             )
-        return queryset
+        return queryset.order_by('-started_at')
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -333,7 +336,15 @@ class BalloonBatchDetailView(BalloonBatchTypeMixin, generic.DetailView):
             'truck', 'trailer', 'truck__type'
         ).prefetch_related(
             Prefetch('balloon_list', queryset=Balloon.objects.order_by('nfc_tag'))
-        ).annotate(ttn_name=Subquery(ttn_name_sq))
+        ).annotate(
+            ttn_name=Subquery(ttn_name_sq),
+            annotated_rfid_count=Count('balloon_list', distinct=True),
+            defective_balloons_count=Count(
+                'balloon_list',
+                filter=Q(balloon_list__filling_status=False),
+                distinct=True,
+            ),
+        )
         batch_type = self.get_batch_type()
         if batch_type:
             queryset = queryset.filter(batch_type=batch_type)
@@ -409,6 +420,28 @@ def balloon_batch_retry_close(request, pk):
     return redirect_preserve_query(request, batch.get_absolute_url())
 
 
+#@login_required
+@require_POST
+def balloon_batch_remove_balloon(request, pk):
+    """Удаляет баллон из партии по NFC-метке и возвращает на карточку партии."""
+    path = request.path.lower()
+    batch_type = 'u' if 'unloading' in path else 'l'
+    batch = get_object_or_404(BalloonsBatch, pk=pk, batch_type=batch_type)
+
+    nfc = (request.POST.get('nfc') or '').strip()
+    if not nfc:
+        messages.error(request, 'Не указана NFC-метка баллона.')
+        return redirect_preserve_query(request, batch.get_absolute_url())
+
+    result = batch.remove_balloon(nfc)
+    if result.get('success'):
+        messages.success(request, f'Баллон {nfc} удалён из партии №{batch.id}.')
+    else:
+        messages.error(request, result.get('message') or 'Не удалось удалить баллон из партии.')
+
+    return redirect_preserve_query(request, batch.get_absolute_url())
+
+
 class BalloonBatchDeleteView(BalloonBatchTypeMixin, ModalDeleteMixin, PreserveListQueryMixin, generic.DeleteView):
     """Универсальное удаление партии баллонов"""
     model = BalloonsBatch
@@ -464,7 +497,11 @@ class TruckView(generic.ListView):
         Returns:
             QuerySet: Тягачи с ``select_related('type')``.
         """
-        queryset = super().get_queryset().select_related('type')
+        queryset = (
+            super().get_queryset()
+            .select_related('type')
+            .exclude(car_brand__iexact='Самовывоз')
+        )
         query = self.request.GET.get('query', '').strip()
         if query:
             queryset = queryset.filter(

@@ -33,10 +33,11 @@ class RailwayTankAdmin(admin.ModelAdmin):
 class RailwayBatchAdmin(admin.ModelAdmin):
     list_display = [
         'id',
-        'begin_date',
-        'end_date',
+        'started_at',
+        'completed_at',
+        'batch_type',
         'gas_amount_spbt',
         'gas_amount_pba',
         'is_active'
     ]
-    list_filter = ['begin_date', 'end_date', 'is_active']
+    list_filter = ['started_at', 'completed_at', 'batch_type', 'is_active']

@@ -108,6 +108,7 @@ class TruckSerializer(serializers.ModelSerializer):
             'empty_weight',
             'full_weight',
             'is_on_station',
+            'is_active',
             'entry_at',
             'departure_at',
             'trailer'
@@ -163,6 +164,7 @@ class TrailerSerializer(serializers.ModelSerializer):
             'empty_weight',
             'full_weight',
             'is_on_station',
+            'is_active',
             'entry_at',
             'departure_at'
         ]
@@ -195,6 +197,7 @@ class BalloonsBatchSerializer(serializers.ModelSerializer):
     miriada_close_failed = serializers.BooleanField(read_only=True)
     miriada_error_message = serializers.CharField(read_only=True)
     amount_of_ttn = serializers.IntegerField(min_value=1)
+    amount_of_rfid = serializers.IntegerField(read_only=True)
 
     class Meta:
         """Метаданные сериализатора BalloonsBatch."""
@@ -271,6 +274,7 @@ class ActiveBatchSerializer(serializers.ModelSerializer):
     status = BatchStatusApiField(read_only=True)
     miriada_close_failed = serializers.BooleanField(read_only=True)
     miriada_error_message = serializers.CharField(read_only=True)
+    amount_of_rfid = serializers.IntegerField(read_only=True)
 
     class Meta:
         """Метаданные сериализатора ActiveBatch."""
@@ -315,6 +319,8 @@ class ActiveBatchSerializer(serializers.ModelSerializer):
 
 class BalloonAmountSerializer(serializers.ModelSerializer):
     """Сериализатор счётчиков RFID/датчика/ТТН партии."""
+
+    amount_of_rfid = serializers.IntegerField(read_only=True)
 
     class Meta:
         """Метаданные сериализатора BalloonAmount."""

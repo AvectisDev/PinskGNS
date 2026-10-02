@@ -37,6 +37,8 @@ urlpatterns = [
          name="balloon_loading_batch_delete"),
     path('balloons/batch/loading/<pk>/retry-close/', views.balloon_batch_retry_close,
          name="balloon_loading_batch_retry_close"),
+    path('balloons/batch/loading/<pk>/remove-balloon/', views.balloon_batch_remove_balloon,
+         name="balloon_loading_batch_remove_balloon"),
 
     # Партии отгрузки баллонов
     path('balloons/batch/unloading/', views.BalloonBatchListView.as_view(extra_context={
@@ -56,6 +58,8 @@ urlpatterns = [
          name="balloon_unloading_batch_delete"),
     path('balloons/batch/unloading/<pk>/retry-close/', views.balloon_batch_retry_close,
          name="balloon_unloading_batch_retry_close"),
+    path('balloons/batch/unloading/<pk>/remove-balloon/', views.balloon_batch_remove_balloon,
+         name="balloon_unloading_batch_remove_balloon"),
 
     # Грузовики
     path('transport/trucks/', views.TruckView.as_view(), name="truck_list"),

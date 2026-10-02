@@ -1,0 +1,74 @@
+(*Обработка данных с жд весов*)
+(*Раскладываем слова на байты. Пример получаемых данных: ST,GS,1E,    0.00 t *)
+WTOB( TRUE , D50 , K20, D201);
+
+(*Byte 1÷2 - US (нестабильно) / ST (стабильно) /  OL (перегрузка)
+Byte 3 - запятая
+Byte 4÷5 - GS (вес БРУТТО) / NT (вес НЕТТО)
+Byte 6 - запятая
+Byte 7 - идентификационный номер индикатора
+Byte 8 - состояние указателей
+Byte 9 - запятая
+Byte 10÷17 - данные веса
+Byte 18 - пустой
+Byte 19÷20 - данные веса
+Byte 21 - CR
+Byte 22 - LF*)
+
+(* Преобразуем ASCII-цифры из байтов 10..17 в числовые значения. *)
+(* Во внешнем цикле проверям наличие цифр в байтах с 10-го по 17-й
+во внутреннем цикле определяем какое число записано в байте, где Н30 = 0...Н39=9 (HEX представление ASCII таблицы чисел) *)
+commaFlag := FALSE;
+FOR iter1:=10 TO 17 DO 
+	Z0:=iter1;
+	IF D201Z0 < h30 OR D201Z0 > h39 THEN
+		byte_list[iter1] := 0;	(*Если в байте нет цифр, присваиваем нулевое значение*)
+
+		IF commaFlag=FALSE THEN
+			IF D201Z0  = h2E THEN
+				comma_position := iter1;		(*Если в байте находится запятая, сохраняем индекс байта в локальную переменную*)
+				commaFlag:= TRUE;
+			END_IF;
+		END_IF;
+
+		IF commaFlag=FALSE THEN
+			comma_position := 0;		(*Если запятой нет, обнуляем локальную переменную*)
+		END_IF;
+			
+	ELSE
+		FOR iter2:=0 TO 9 DO
+				Z1:= iter2; 
+				IF D201Z0 = h30 + Z1 THEN
+					byte_list[iter1] := 0 + Z1;
+				END_IF;
+		END_FOR;
+	END_IF;
+END_FOR;
+
+(*Показание предыдущего значения веса обновляем раз в 1 сек*)
+sm412_rtrig(_CLK:= SM412);
+IF sm412_rtrig.Q THEN
+	railway_scale.previous_weight := railway_scale.current_weight;
+END_IF;
+
+(* Вес получаем путём умножения каждого цифрового значения на 10 в определённой степени 
+показатель степени получаем из индекса байта в массиве начиная с 17 байта в обратном порядке, т.е. для 17-го байта степень = 0, для 16-го - 1 и т.д. *)
+
+railway_scale.current_weight:=0.0;
+digit:=1;
+FOR iter1:=17 TO 10 BY -1 DO
+	IF iter1 <> comma_position THEN
+		byte_digit_in_double_word := INT_TO_DINT( byte_list[iter1]);
+		temp_double_word:=byte_digit_in_double_word * digit;
+		DFLT( TRUE , temp_double_word, digit_real );
+		railway_scale.current_weight:= railway_scale.current_weight+ digit_real;
+		digit:= digit * 10;
+	END_IF;
+END_FOR;
+
+IF comma_position > 0 THEN
+	railway_scale.current_weight:= railway_scale.current_weight / EXPT( 10.0 , 17 - comma_position ) ;
+END_IF;
+
+(* Разница веса используется для контроля движения цистерн и завершения партии. *)
+railway_scale.weight_difference := ABS(railway_scale.current_weight- railway_scale.previous_weight);

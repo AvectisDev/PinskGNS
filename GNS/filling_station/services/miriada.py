@@ -12,7 +12,6 @@ from requests.adapters import HTTPAdapter
 
 from filling_station.exceptions import MiriadaAPIError
 from filling_station.models import BalloonsBatch, BatchStatus
-from filling_station.services.transport import _format_registration_number
 
 logger = logging.getLogger('filling_station')
 
@@ -127,7 +126,7 @@ def _build_loading_payload(batch: BalloonsBatch) -> Dict[str, Any]:
     number_auto = batch.truck.registration_number
     data = {
         'fulness': 1,
-        'number_auto': _format_registration_number(number_auto),
+        'number_auto': number_auto,
     }
 
     if batch.truck.type and batch.truck.type.type:
@@ -377,13 +376,18 @@ def post_status_to_miriada(
                 )
 
                 response = session.send(prepared, timeout=settings.MIRIADA_TIMEOUT)
+                nfc_tag = payload.get('nfctag')
+                logger.info(
+                    f"Ответ Мириады ({send_type}), nfc={nfc_tag}: "
+                    f"Status: {response.status_code} {response.reason}, "
+                    f"Body: {response.text}"
+                )
                 if response.status_code == 200:
-                    nfc_tag = payload.get('nfctag')
                     logger.info(f"Статус по {send_type} успешно отправлен, nfc={nfc_tag}")
                     return
                 error_msg = (
                     f"Ошибка при отправке {send_type}! "
-                    f"Status: {response.status_code} {response.reason}, Ответ: {response.json()}"
+                    f"Status: {response.status_code} {response.reason}, Ответ: {response.text}"
                 )
                 logger.error(error_msg)
                 raise MiriadaAPIError(error_msg)
