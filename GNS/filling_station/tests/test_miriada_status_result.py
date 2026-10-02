@@ -33,10 +33,17 @@ class PostStatusToMiriadaResultTests(TestCase):
         self.payload = {'nfctag': 'ad259727ae201de0', 'id_ttn': 1}
         self.send_type = 'registering_in_warehouse'
 
-    def _mock_session(self, response):
+    def _mock_session(self, response=None, send_side_effect=None):
         session = MagicMock()
-        session.prepare_request.side_effect = lambda req: req
-        session.send.return_value = response
+        prepared = MagicMock()
+        prepared.url = self.url
+        prepared.headers = {}
+        prepared.body = b'{}'
+        session.prepare_request.return_value = prepared
+        if send_side_effect is not None:
+            session.send.side_effect = send_side_effect
+        else:
+            session.send.return_value = response
         return session
 
     def test_http_200_result_error_raises_without_retry(self):
@@ -89,9 +96,7 @@ class PostStatusToMiriadaResultTests(TestCase):
 
     @patch('filling_station.services.miriada.time.sleep')
     def test_timeout_is_retried(self, mock_sleep):
-        session = MagicMock()
-        session.prepare_request.side_effect = lambda req: req
-        session.send.side_effect = requests.Timeout('timed out')
+        session = self._mock_session(send_side_effect=requests.Timeout('timed out'))
 
         with self.assertRaises(MiriadaAPIError):
             post_status_to_miriada(self.url, self.payload, self.send_type, session=session)
