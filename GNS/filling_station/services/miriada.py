@@ -18,6 +18,43 @@ logger = logging.getLogger('filling_station')
 _thread_local = threading.local()
 
 
+def _is_miriada_status_success(data: Any) -> bool:
+    """
+    Успех POST-статуса: в теле есть result/Result со значением ok (без учёта регистра).
+
+    Args:
+        data: разобранный JSON ответа.
+
+    Returns:
+        bool: True, если статус принят Мириадой.
+    """
+    if not isinstance(data, dict):
+        return False
+    for key, value in data.items():
+        if key.lower() == 'result' and str(value).lower() == 'ok':
+            return True
+    return False
+
+
+def _miriada_status_error_message(data: Any, response_text: str) -> str:
+    """
+    Текст ошибки из тела ответа Мириады для статуса баллона.
+
+    Args:
+        data: разобранный JSON или иное.
+        response_text: сырое тело ответа.
+
+    Returns:
+        str: message/description или сырой текст.
+    """
+    if isinstance(data, dict):
+        for key in ('message', 'description', 'title'):
+            if key in data and data[key] is not None and data[key] != '':
+                return str(data[key])
+        return str(data)
+    return (response_text or '').strip() or 'Неизвестный ответ Мириады'
+
+
 def get_thread_miriada_session() -> requests.Session:
     """
     HTTP-сессия текущего потока: keep-alive без шаринга Session между потоками.
@@ -339,6 +376,9 @@ def post_status_to_miriada(
     """
     POST статуса в Мириаду. Сессия переиспользуется между попытками и вызовами.
 
+    Успех — HTTP 200 и Result/result = ok (без учёта регистра).
+    Повтор только при таймауте; бизнес-отказы Мириады не ретраятся.
+
     Args:
         url (str): endpoint Мириады.
         payload (dict): JSON-тело запроса.
@@ -383,8 +423,20 @@ def post_status_to_miriada(
                     f"Body: {response.text}"
                 )
                 if response.status_code == 200:
-                    logger.info(f"Статус по {send_type} успешно отправлен, nfc={nfc_tag}")
-                    return
+                    try:
+                        result = response.json()
+                    except ValueError:
+                        result = None
+                    if _is_miriada_status_success(result):
+                        logger.info(f"Статус по {send_type} успешно отправлен, nfc={nfc_tag}")
+                        return
+                    error_detail = _miriada_status_error_message(result, response.text)
+                    error_msg = (
+                        f"Ошибка при отправке {send_type}! "
+                        f"nfc={nfc_tag}, Ответ: {error_detail}"
+                    )
+                    logger.error(error_msg)
+                    raise MiriadaAPIError(error_detail)
                 error_msg = (
                     f"Ошибка при отправке {send_type}! "
                     f"Status: {response.status_code} {response.reason}, Ответ: {response.text}"
@@ -392,28 +444,25 @@ def post_status_to_miriada(
                 logger.error(error_msg)
                 raise MiriadaAPIError(error_msg)
             except MiriadaAPIError:
+                raise
+            except requests.exceptions.Timeout as e:
                 if attempt < settings.MIRIADA_REQUEST_RETRIES:
                     logger.warning(
-                        f"Отправка статуса в Мириаду ({send_type}) неуспешна, "
-                        f"повтор {attempt + 2}/{settings.MIRIADA_REQUEST_RETRIES + 1}"
-                    )
-                    time.sleep(settings.MIRIADA_RETRY_DELAY_SECONDS)
-                else:
-                    raise
-            except requests.exceptions.RequestException as e:
-                if attempt < settings.MIRIADA_REQUEST_RETRIES:
-                    logger.warning(
-                        f"Запрос к Мириаде ({send_type}) неуспешен, "
+                        f"Таймаут запроса к Мириаде ({send_type}), "
                         f"повтор {attempt + 2}/{settings.MIRIADA_REQUEST_RETRIES + 1}: {e}"
                     )
                     time.sleep(settings.MIRIADA_RETRY_DELAY_SECONDS)
                 else:
                     error_msg = (
-                        f'Ошибка при отправке статуса баллона в Мириаду после '
+                        f'Таймаут при отправке статуса баллона в Мириаду после '
                         f'{settings.MIRIADA_REQUEST_RETRIES + 1} попыток: {e}'
                     )
                     logger.error(error_msg)
                     raise MiriadaAPIError(error_msg) from e
+            except requests.exceptions.RequestException as e:
+                error_msg = f'Ошибка при отправке статуса баллона в Мириаду: {e}'
+                logger.error(error_msg)
+                raise MiriadaAPIError(error_msg) from e
     finally:
         if own_session:
             session.close()

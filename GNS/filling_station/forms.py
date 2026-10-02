@@ -230,6 +230,7 @@ class BalloonsBatchForm(forms.ModelForm):
             'miriada_balloons_sent',
             'miriada_close_failed',
             'miriada_error_message',
+            'miriada_status_errors',
         ]
         widgets = {
             'batch_type': forms.HiddenInput(),

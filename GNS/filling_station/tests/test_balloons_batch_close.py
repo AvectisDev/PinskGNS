@@ -197,6 +197,76 @@ class BalloonsBatchCloseTests(APITestCase):
         self.batch.refresh_from_db()
         self.assertEqual(self.batch.status, BatchStatus.MIRIADA_ERROR)
         self.assertFalse(self.batch.miriada_balloons_sent)
+        self.assertEqual(self.batch.miriada_status_errors, {self.balloon.nfc_tag: 'miriada down'})
+        self.assertIn('Мириада отклонила 1 баллонов', self.batch.miriada_error_message)
+
+    @patch('ttn.services.close_ttn_in_miriada')
+    @patch('filling_station.services.batches.post_status_to_miriada')
+    def test_close_collects_all_status_errors_and_skips_closettn(self, mock_send, mock_close):
+        ok_balloon = Balloon.objects.create(nfc_tag='okballon0001e0')
+        bad_a = Balloon.objects.create(nfc_tag='badballon0001e0')
+        bad_b = Balloon.objects.create(nfc_tag='badballon0002e0')
+        self.batch.add_balloon(ok_balloon.nfc_tag)
+        self.batch.add_balloon(bad_a.nfc_tag)
+        self.batch.add_balloon(bad_b.nfc_tag)
+        self.batch.amount_of_ttn = 3
+        self.batch.save(update_fields=['amount_of_ttn'])
+
+        def _send(url, payload, send_type, session=None):
+            nfc = payload['nfctag']
+            if nfc == ok_balloon.nfc_tag:
+                return
+            raise MiriadaAPIError('-8')
+
+        mock_send.side_effect = _send
+
+        success, error, _data = save_and_close_balloons_batch(self.batch)
+        self.assertFalse(success)
+        mock_close.assert_not_called()
+        self.assertEqual(mock_send.call_count, 3)
+        self.batch.refresh_from_db()
+        self.assertEqual(self.batch.status, BatchStatus.MIRIADA_ERROR)
+        self.assertFalse(self.batch.miriada_balloons_sent)
+        self.assertEqual(
+            self.batch.miriada_status_errors,
+            {bad_a.nfc_tag: '-8', bad_b.nfc_tag: '-8'},
+        )
+        self.assertTrue(self.batch.balloon_list.filter(nfc_tag=ok_balloon.nfc_tag).exists())
+        self.assertTrue(self.batch.balloon_list.filter(nfc_tag=bad_a.nfc_tag).exists())
+
+    @patch('ttn.services.close_ttn_in_miriada')
+    @patch('filling_station.services.batches.post_status_to_miriada')
+    def test_retry_clears_status_error_after_success(self, mock_send, mock_close):
+        mock_close.return_value = (True, None)
+        self.batch.add_balloon(self.balloon.nfc_tag)
+        self.batch.miriada_status_errors = {self.balloon.nfc_tag: '-8'}
+        self.batch.miriada_balloons_sent = False
+        self.batch.status = BatchStatus.MIRIADA_ERROR
+        self.batch.save(update_fields=[
+            'miriada_status_errors',
+            'miriada_balloons_sent',
+            'status',
+            'miriada_close_failed',
+        ])
+
+        success, error, _data = save_and_close_balloons_batch(self.batch)
+        self.assertTrue(success)
+        self.assertIsNone(error)
+        mock_close.assert_called_once()
+        self.batch.refresh_from_db()
+        self.assertEqual(self.batch.miriada_status_errors, {})
+        self.assertTrue(self.batch.miriada_balloons_sent)
+        self.assertEqual(self.batch.status, BatchStatus.COMPLETED)
+
+    def test_remove_balloon_clears_miriada_status_error(self):
+        self.batch.add_balloon(self.balloon.nfc_tag)
+        self.batch.miriada_status_errors = {self.balloon.nfc_tag: '-8'}
+        self.batch.save(update_fields=['miriada_status_errors'])
+
+        result = self.batch.remove_balloon(self.balloon.nfc_tag)
+        self.assertTrue(result['success'])
+        self.batch.refresh_from_db()
+        self.assertEqual(self.batch.miriada_status_errors, {})
 
     @patch('ttn.services.close_ttn_in_miriada')
     @patch('filling_station.services.batches.post_status_to_miriada')
@@ -284,6 +354,7 @@ class BalloonsBatchCloseTests(APITestCase):
         self.batch.refresh_from_db()
         self.assertEqual(self.batch.status, BatchStatus.MIRIADA_ERROR)
         self.assertFalse(self.batch.miriada_balloons_sent)
+        self.assertEqual(self.batch.miriada_status_errors, {self.balloon.nfc_tag: 'miriada down'})
 
     def test_pause_and_resume_batch(self):
         url_pause = reverse('filling_station_api:balloons-loading-pause', args=[self.batch.id])

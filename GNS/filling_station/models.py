@@ -702,6 +702,12 @@ class BalloonsBatch(models.Model):
         default=False,
         verbose_name="Статусы баллонов отправлены в Мириаду",
     )
+    miriada_status_errors = models.JSONField(
+        default=dict,
+        blank=True,
+        verbose_name="Ошибки отправки статусов баллонов в Мириаду",
+        help_text="Словарь NFC → текст ошибки из ответа Мириады",
+    )
     ttn_id = models.IntegerField(verbose_name="ID ТТН")
     balloons_type = models.CharField(choices=settings.BALLOON_TYPE_CHOICES, default='e', verbose_name="Пустой/полный")
     user = models.ForeignKey(
@@ -817,6 +823,22 @@ class BalloonsBatch(models.Model):
         """Совместимость с API/шаблонами: то же, что ``rfid_balloon_count()``."""
         return self.rfid_balloon_count()
 
+    @property
+    def miriada_status_error_count(self) -> int:
+        """Число баллонов с ошибкой отправки статуса в Мириаду."""
+        return len(self.miriada_status_errors or {})
+
+    @property
+    def miriada_status_errors_text(self) -> str:
+        """
+        Текст для поля на карточке: NFC и сообщение ошибки, по одной строке.
+
+        Returns:
+            str: строки вида ``nfc — message``.
+        """
+        errors = self.miriada_status_errors or {}
+        return '\n'.join(f'{nfc} — {message}' for nfc, message in sorted(errors.items()))
+
     def add_balloon(self, nfc_tag: str = None) -> dict:
         """
         Добавляет баллон в партию по NFC-метке либо учитывает проход оптического датчика.
@@ -894,6 +916,11 @@ class BalloonsBatch(models.Model):
 
             balloon = Balloon.objects.get(nfc_tag=nfc_tag)
             self.balloon_list.remove(balloon)
+            errors = dict(self.miriada_status_errors or {})
+            if nfc_tag in errors:
+                errors.pop(nfc_tag, None)
+                self.miriada_status_errors = errors
+                self.save(update_fields=['miriada_status_errors'])
 
             result.update({
                 'success': True,
