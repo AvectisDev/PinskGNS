@@ -5,6 +5,12 @@ from django.utils import timezone
 from django.conf import settings
 from .models import Balloon, Truck, Trailer, BalloonsBatch
 from .form_choices import configure_trailer_field, configure_truck_field
+from filling_station.services.transport import (
+    TRAILER_INPUT_HELP,
+    TRUCK_INPUT_HELP,
+    validate_trailer_input,
+    validate_truck_input,
+)
 from crispy_forms.helper import FormHelper
 from crispy_forms.layout import Submit
 
@@ -100,6 +106,13 @@ class TruckForm(forms.ModelForm):
         self.helper.add_input(Submit('cancel', 'Отмена', css_class='btn btn-secondary', formnovalidate='formnovalidate'))
         self.helper.form_method = 'POST'
 
+        reg_field = self.fields['registration_number']
+        reg_field.help_text = TRUCK_INPUT_HELP
+        reg_field.widget.attrs.setdefault('placeholder', 'AH 0193-1')
+
+    def clean_registration_number(self):
+        return validate_truck_input(self.cleaned_data.get('registration_number', ''))
+
     class Meta:
         """Конфигурация полей и виджетов формы грузовика."""
 
@@ -116,6 +129,7 @@ class TruckForm(forms.ModelForm):
             'empty_weight': forms.NumberInput(attrs={'class': 'form-control'}),
             'full_weight': forms.NumberInput(attrs={'class': 'form-control'}),
             'is_on_station': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+            'is_active': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
             'entry_at': forms.DateTimeInput(format='%Y-%m-%dT%H:%M', attrs={
                 'type': 'datetime-local',
                 'class': 'form-control'
@@ -144,6 +158,13 @@ class TrailerForm(forms.ModelForm):
         self.fields['truck'].empty_label = 'Выберите автомобиль'
         configure_truck_field(self.fields['truck'])
 
+        reg_field = self.fields['registration_number']
+        reg_field.help_text = TRAILER_INPUT_HELP
+        reg_field.widget.attrs.setdefault('placeholder', 'A 3779B-1')
+
+    def clean_registration_number(self):
+        return validate_trailer_input(self.cleaned_data.get('registration_number', ''))
+
     class Meta:
         """Конфигурация полей и виджетов формы прицепа."""
 
@@ -161,6 +182,7 @@ class TrailerForm(forms.ModelForm):
             'empty_weight': forms.NumberInput(attrs={'class': 'form-control'}),
             'full_weight': forms.NumberInput(attrs={'class': 'form-control'}),
             'is_on_station': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+            'is_active': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
             'entry_at': forms.DateTimeInput(format='%Y-%m-%dT%H:%M',attrs={
                 'type': 'datetime-local',
                 'class': 'form-control'
@@ -194,8 +216,9 @@ class BalloonsBatchForm(forms.ModelForm):
         self.fields['trailer'].empty_label = 'Выберите прицеп'
         configure_truck_field(self.fields['truck'])
         configure_trailer_field(self.fields['trailer'])
-        # Скрыть batch_type
         self.fields['batch_type'].widget = forms.HiddenInput()
+        self.fields['status'].widget.attrs.update({'class': 'form-control'})
+        self.order_fields(['status'] + [name for name in self.fields if name != 'status'])
 
     class Meta:
         """Конфигурация исключённых полей, виджетов и подписей формы партии."""
@@ -207,7 +230,7 @@ class BalloonsBatchForm(forms.ModelForm):
             'miriada_balloons_sent',
             'miriada_close_failed',
             'miriada_error_message',
-            'status',
+            'miriada_status_errors',
         ]
         widgets = {
             'batch_type': forms.HiddenInput(),
@@ -224,10 +247,6 @@ class BalloonsBatchForm(forms.ModelForm):
             'reader_number': forms.NumberInput(attrs={
                 'class': 'form-control',
                 'placeholder': 'Введите номер считывателя'
-            }),
-            'amount_of_rfid': forms.NumberInput(attrs={
-                'class': 'form-control',
-                'placeholder': 'Количество по RFID'
             }),
             'amount_of_5_liters': forms.NumberInput(attrs={
                 'class': 'form-control',
@@ -257,5 +276,6 @@ class BalloonsBatchForm(forms.ModelForm):
         }
         labels = {
             'amount_of_ttn': 'Количество баллонов по электронной ТТН',
-            'batch_type': 'Тип партии'
+            'batch_type': 'Тип партии',
+            'status': 'Статус партии',
         }

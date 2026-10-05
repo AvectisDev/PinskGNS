@@ -26,6 +26,7 @@ from filling_station.services import (
 )
 from filling_station.services.batches import OPEN_BATCH_STATUSES
 from core.api.schema import ApiErrorSerializer
+from django.db.models import Count
 from .serializers import (
     ActiveBatchSerializer,
     BalloonAmountSerializer,
@@ -69,6 +70,30 @@ _BATCH_STATUS_DOC = (
     '4=MIRIADA_ERROR — ошибка закрытия ТТН в Мириаде. '
     '0=UNSPECIFIED не используется.'
 )
+
+
+def _balloon_operation_error_status(message: str | None) -> int:
+    """
+    HTTP-статус для отказа add/remove balloon.
+
+    Бизнес-отказы не должны уходить как 500: иначе django.request
+    пишет Internal Server Error в stderr NSSM.
+
+    Args:
+        message: текст отказа из ``BalloonsBatch.add_balloon`` / ``remove_balloon``.
+
+    Returns:
+        int: 409 при дубликате в партии, 404 если метка не найдена,
+        500 только для непредвиденной ошибки сервера, иначе 400.
+    """
+    text = message or ''
+    if 'уже в партии' in text:
+        return status.HTTP_409_CONFLICT
+    if 'не найден' in text:
+        return status.HTTP_404_NOT_FOUND
+    if text.startswith('Ошибка сервера'):
+        return status.HTTP_500_INTERNAL_SERVER_ERROR
+    return status.HTTP_400_BAD_REQUEST
 
 
 def _api_error_payload(payload):
@@ -195,7 +220,7 @@ def _api_error_payload(payload):
         summary='Добавить баллон в партию',
         description=(
             'Добавление баллона по NFC-метке. Статус в Мириаду отправляется при закрытии партии. '
-            'Доступно для статусов 1=ACTIVE и 2=PAUSED.'
+            'Доступно для статусов 1=ACTIVE, 2=PAUSED и 4=MIRIADA_ERROR.'
         ),
         request=inline_serializer(
             name='AddBalloonRequest',
@@ -223,7 +248,7 @@ def _api_error_payload(payload):
         summary='Удалить баллон из партии',
         description=(
             'Удаление баллона по NFC-метке. '
-            'Доступно для статусов 1=ACTIVE и 2=PAUSED.'
+            'Доступно для статусов 1=ACTIVE, 2=PAUSED и 4=MIRIADA_ERROR.'
         ),
         request=inline_serializer(
             name='RemoveBalloonRequest',
@@ -355,7 +380,9 @@ class BalloonsBatchViewSet(viewsets.ViewSet):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        batches = BalloonsBatch.objects.select_related('truck', 'trailer', 'truck__type').filter(
+        batches = BalloonsBatch.objects.select_related('truck', 'trailer', 'truck__type').annotate(
+            annotated_rfid_count=Count('balloon_list', distinct=True),
+        ).filter(
             batch_type=batch_type,
             status__in=OPEN_BATCH_STATUSES,
         )
@@ -381,7 +408,9 @@ class BalloonsBatchViewSet(viewsets.ViewSet):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        batch = BalloonsBatch.objects.select_related('truck', 'trailer', 'truck__type').filter(
+        batch = BalloonsBatch.objects.select_related('truck', 'trailer', 'truck__type').annotate(
+            annotated_rfid_count=Count('balloon_list', distinct=True),
+        ).filter(
             batch_type=batch_type,
             status=BatchStatus.ACTIVE,
         ).first()
@@ -479,7 +508,7 @@ class BalloonsBatchViewSet(viewsets.ViewSet):
         if is_closing:
             logger.info(
                 f"API close batch: user={_api_user(request)}, batch_id={batch.id}, "
-                f"ttn_id={batch.ttn_id}, amount_of_rfid={batch.amount_of_rfid}, "
+                f"ttn_id={batch.ttn_id}, amount_of_rfid={batch.rfid_balloon_count()}, "
                 f"amount_of_ttn={batch.amount_of_ttn}, data={dict(request.data)}"
             )
             success, error_payload, response_data = save_and_close_balloons_batch(batch, request.data)
@@ -538,7 +567,7 @@ class BalloonsBatchViewSet(viewsets.ViewSet):
 
         logger.info(
             f"API retry-close: user={_api_user(request)}, batch_id={batch.id}, "
-            f"ttn_id={batch.ttn_id}, amount_of_rfid={batch.amount_of_rfid}, "
+            f"ttn_id={batch.ttn_id}, amount_of_rfid={batch.rfid_balloon_count()}, "
             f"amount_of_ttn={batch.amount_of_ttn}"
         )
         success, error_payload, response_data = save_and_close_balloons_batch(batch, request.data)
@@ -564,7 +593,7 @@ class BalloonsBatchViewSet(viewsets.ViewSet):
             pk: ID партии.
 
         Returns:
-            Response: результат операции или ошибка 400/500.
+            Response: результат операции или ошибка 400/404/409.
         """
         batch_type = self.get_batch_type(request)
         if not batch_type:
@@ -591,7 +620,7 @@ class BalloonsBatchViewSet(viewsets.ViewSet):
             batch.refresh_from_db()
             logger.info(
                 f"API add-balloon: user={_api_user(request)}, batch_id={batch.id}, "
-                f"nfc={nfc}, amount_of_rfid={batch.amount_of_rfid}"
+                f"nfc={nfc}, amount_of_rfid={batch.rfid_balloon_count()}"
             )
             return Response(result, status=status.HTTP_200_OK)
 
@@ -599,7 +628,10 @@ class BalloonsBatchViewSet(viewsets.ViewSet):
             f"API add-balloon failed: user={_api_user(request)}, batch_id={batch.id}, "
             f"nfc={nfc}, message={result.get('message')}"
         )
-        return Response({'message': result.get('message')}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        return Response(
+            {'message': result.get('message')},
+            status=_balloon_operation_error_status(result.get('message')),
+        )
 
     @action(detail=True, methods=['patch'], url_path='remove-balloon')
     def remove_balloon(self, request, pk=None):
@@ -611,7 +643,7 @@ class BalloonsBatchViewSet(viewsets.ViewSet):
             pk: ID партии.
 
         Returns:
-            Response: результат операции или ошибка 400/500.
+            Response: результат операции или ошибка 400/404.
         """
         batch_type = self.get_batch_type(request)
         if not batch_type:
@@ -638,7 +670,7 @@ class BalloonsBatchViewSet(viewsets.ViewSet):
             batch.refresh_from_db()
             logger.info(
                 f"API remove-balloon: user={_api_user(request)}, batch_id={batch.id}, "
-                f"nfc={nfc}, amount_of_rfid={batch.amount_of_rfid}"
+                f"nfc={nfc}, amount_of_rfid={batch.rfid_balloon_count()}"
             )
             return Response(result, status=status.HTTP_200_OK)
 
@@ -646,7 +678,10 @@ class BalloonsBatchViewSet(viewsets.ViewSet):
             f"API remove-balloon failed: user={_api_user(request)}, batch_id={batch.id}, "
             f"nfc={nfc}, message={result.get('message')}"
         )
-        return Response({'message': result.get('message')}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        return Response(
+            {'message': result.get('message')},
+            status=_balloon_operation_error_status(result.get('message')),
+        )
 
     @action(detail=True, methods=['post'], url_path='pause')
     def pause(self, request, pk=None):

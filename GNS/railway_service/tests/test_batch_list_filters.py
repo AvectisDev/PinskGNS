@@ -14,11 +14,11 @@ class RailwayBatchListFilterTests(RailwayFixturesMixin, TestCase):
         self.today = timezone.localdate()
         self.batch_today = self.make_batch()
         RailwayBatch.objects.filter(pk=self.batch_today.pk).update(
-            begin_date=timezone.make_aware(datetime.combine(self.today, datetime.min.time())),
+            started_at=timezone.make_aware(datetime.combine(self.today, datetime.min.time())),
         )
         self.batch_old = self.make_batch()
         RailwayBatch.objects.filter(pk=self.batch_old.pk).update(
-            begin_date=timezone.make_aware(datetime(2020, 1, 1, 10, 0)),
+            started_at=timezone.make_aware(datetime(2020, 1, 1, 10, 0)),
         )
 
     def _get_ids(self, **params):

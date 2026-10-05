@@ -1,9 +1,10 @@
-from datetime import timedelta
+from datetime import date, datetime, timedelta
 from decimal import Decimal
+from unittest.mock import patch
 
 from django.core.cache import cache
 from django.db import IntegrityError, transaction
-from django.test import TestCase, override_settings
+from django.test import SimpleTestCase, TestCase, override_settings
 from django.utils import timezone
 
 from autogas.models import AutoGasBatch
@@ -17,6 +18,8 @@ from autogas.services import (
     get_batch_statistic,
     get_today_active_batches,
     get_truck_capacity,
+    log_autogas_batch_status,
+    log_autogas_numbers_snapshot,
     resolve_batch_type,
     resolve_gas_type,
     with_completed_at_on_deactivate,
@@ -120,6 +123,9 @@ class StatisticServiceTests(AutoGasFixturesMixin, TestCase):
         self.assertNotIn('active_batch', data)
 
     def test_aggregates_month_and_today(self):
+        # Фиксируем «сегодня» серединой месяца, чтобы партия «раньше» оставалась
+        # в том же календарном месяце на любой дате прогона.
+        today = date(2026, 6, 15)
         today_batch = self.make_batch(
             batch_type='l',
             gas_type='ПБА',
@@ -131,11 +137,14 @@ class StatisticServiceTests(AutoGasFixturesMixin, TestCase):
             weight_gas_amount=Decimal('2000'),
             truck=self.tractor,
         )
+        AutoGasBatch.objects.filter(pk=today_batch.pk).update(
+            begin_at=timezone.make_aware(datetime(2026, 6, 15, 12, 0, 0)),
+        )
         AutoGasBatch.objects.filter(pk=earlier.pk).update(
-            begin_at=timezone.now() - timedelta(days=5),
+            begin_at=timezone.make_aware(datetime(2026, 6, 10, 12, 0, 0)),
         )
 
-        data = build_batch_statistic()
+        data = build_batch_statistic(today=today)
         pba = data['loading_batch']['ПБА']
         self.assertEqual(pba['today_loading_batches'], 1)
         self.assertEqual(pba['today_loading_weight'], Decimal('1000'))
@@ -203,3 +212,52 @@ class StatisticCacheTests(AutoGasFixturesMixin, TestCase):
             fresh['unloading_batch']['СПБТ']['today_unloading_batches'],
             1,
         )
+
+
+@override_settings(CACHES={
+    'default': {
+        'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+        'LOCATION': 'autogas-log-snapshot-tests',
+    }
+})
+class AutoGasLogSnapshotTests(SimpleTestCase):
+    def setUp(self):
+        cache.clear()
+
+    @patch('autogas.services.logger')
+    def test_batch_status_logged_only_when_changed(self, logger):
+        idle = {
+            'batch_type_code': 2,
+            'gas_type': 2,
+            'request_batch_create': False,
+            'request_batch_complete': False,
+        }
+        log_autogas_batch_status(idle)
+        log_autogas_batch_status(idle)
+        logger.debug.assert_called_once_with(
+            'Тип партии=2, Тип газа=2, Запрос создания=False, Запрос завершения=False'
+        )
+
+        creating = {**idle, 'request_batch_create': True}
+        log_autogas_batch_status(creating)
+        self.assertEqual(logger.debug.call_count, 2)
+        logger.debug.assert_called_with(
+            'Тип партии=2, Тип газа=2, Запрос создания=True, Запрос завершения=False'
+        )
+
+    @patch('autogas.services.logger')
+    def test_empty_and_unchanged_numbers_are_not_logged(self, logger):
+        log_autogas_numbers_snapshot([])
+        log_autogas_numbers_snapshot([])
+        logger.debug.assert_not_called()
+
+        log_autogas_numbers_snapshot(['AC17911', 'AP75311'])
+        log_autogas_numbers_snapshot(['AC17911', 'AP75311'])
+        logger.debug.assert_called_once_with(
+            "Список номеров: ['AC17911', 'AP75311']"
+        )
+
+        log_autogas_numbers_snapshot([])
+        self.assertEqual(logger.debug.call_count, 1)
+        log_autogas_numbers_snapshot(['AC17911', 'AP75311'])
+        self.assertEqual(logger.debug.call_count, 2)

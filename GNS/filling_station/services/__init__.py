@@ -31,9 +31,12 @@ from filling_station.services.rfid import (
     update_balloon_passport,
 )
 from filling_station.services.transport import (
-    _format_registration_number,
+    canonicalize_registration_number,
     find_transport_by_registration_number,
-    normalize_registration_number,
+    format_trailer_hmi,
+    format_truck_hmi,
+    validate_trailer_input,
+    validate_truck_input,
 )
 
 add_balloon_to_batch_with_miriada = add_balloon_to_batch_by_nfc
@@ -51,10 +54,12 @@ __all__ = [
     'add_balloon_to_reader_table',
     'add_sensor_count_to_batch',
     'attempt_close_balloons_batch',
+    'canonicalize_registration_number',
     'find_transport_by_registration_number',
+    'format_trailer_hmi',
+    'format_truck_hmi',
     'get_active_batch_for_reader',
     'get_balloon_data_from_miriada',
-    'normalize_registration_number',
     'pause_balloons_batch',
     'pause_other_active_batches_on_reader',
     'processing_request_with_nfc',
@@ -66,4 +71,6 @@ __all__ = [
     'should_defer_balloon_status_to_batch_close',
     'should_send_balloon_status_immediately',
     'update_balloon_passport',
+    'validate_trailer_input',
+    'validate_truck_input',
 ]

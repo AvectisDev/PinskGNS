@@ -14,7 +14,8 @@ def start_processes():
     python = sys.executable
     p1 = subprocess.Popen([python, '-m', 'filling_station.management.commands.rfid_utils.feig_protocol'])
     p2 = subprocess.Popen([python, '-m', 'carousel.management.commands.carousel.main'])
-    processes.extend([p1, p2])
+    p3 = subprocess.Popen([python, '-m', 'opcua.bridge'])
+    processes.extend([p1, p2, p3])
     print(f'Processes is started: {processes}')
 
 def stop_processes():

@@ -471,11 +471,26 @@ class Truck(models.Model):
         verbose_name="Вес полного т/с (по техпаспорту)"
         )
     is_on_station = models.BooleanField(default=False, verbose_name="Находится на станции")
+    is_active = models.BooleanField(default=True, verbose_name="Активен")
     entry_at = models.DateTimeField(null=True, blank=True, verbose_name="Дата и время въезда")
     departure_at = models.DateTimeField(null=True, blank=True, verbose_name="Дата и время выезда")
 
+    def clean(self):
+        """Нормализует регистрационный номер к канону display."""
+        super().clean()
+        if self.registration_number:
+            from filling_station.services.transport import canonicalize_registration_number
+            self.registration_number = canonicalize_registration_number(self.registration_number)
+
+    def save(self, *args, **kwargs):
+        """Сохраняет грузовик с каноническим регистрационным номером."""
+        if self.registration_number:
+            from filling_station.services.transport import canonicalize_registration_number
+            self.registration_number = canonicalize_registration_number(self.registration_number)
+        super().save(*args, **kwargs)
+
     def __str__(self):
-        """Возвращает регистрационный знак грузовика."""
+        """Регистрационный знак грузовика."""
         return self.registration_number
 
     class Meta:
@@ -576,11 +591,26 @@ class Trailer(models.Model):
         verbose_name="Вес полного т/с (по техпаспорту)"
         )
     is_on_station = models.BooleanField(default=False, verbose_name="Находится на станции")
+    is_active = models.BooleanField(default=True, verbose_name="Активен")
     entry_at = models.DateTimeField(null=True, blank=True, verbose_name="Дата и время въезда")
     departure_at = models.DateTimeField(null=True, blank=True, verbose_name="Дата и время выезда")
 
+    def clean(self):
+        """Нормализует регистрационный номер к канону display."""
+        super().clean()
+        if self.registration_number:
+            from filling_station.services.transport import canonicalize_registration_number
+            self.registration_number = canonicalize_registration_number(self.registration_number)
+
+    def save(self, *args, **kwargs):
+        """Сохраняет прицеп с каноническим регистрационным номером."""
+        if self.registration_number:
+            from filling_station.services.transport import canonicalize_registration_number
+            self.registration_number = canonicalize_registration_number(self.registration_number)
+        super().save(*args, **kwargs)
+
     def __str__(self):
-        """Возвращает регистрационный знак прицепа."""
+        """Регистрационный знак прицепа."""
         return self.registration_number
 
     class Meta:
@@ -636,7 +666,6 @@ class BalloonsBatch(models.Model):
         verbose_name="Прицеп"
     )
     reader_number = models.IntegerField(null=True, blank=True, verbose_name="Номер считывателя")
-    amount_of_rfid = models.IntegerField(default=0, verbose_name="Количество баллонов по rfid")
     amount_of_sensor = models.IntegerField(default=0, verbose_name="Количество баллонов по датчику")
     amount_of_ttn = models.IntegerField(
         default=0,
@@ -672,6 +701,12 @@ class BalloonsBatch(models.Model):
     miriada_balloons_sent = models.BooleanField(
         default=False,
         verbose_name="Статусы баллонов отправлены в Мириаду",
+    )
+    miriada_status_errors = models.JSONField(
+        default=dict,
+        blank=True,
+        verbose_name="Ошибки отправки статусов баллонов в Мириаду",
+        help_text="Словарь NFC → текст ошибки из ответа Мириады",
     )
     ttn_id = models.IntegerField(verbose_name="ID ТТН")
     balloons_type = models.CharField(choices=settings.BALLOON_TYPE_CHOICES, default='e', verbose_name="Пустой/полный")
@@ -713,6 +748,10 @@ class BalloonsBatch(models.Model):
         """URL повторной попытки закрытия ТТН в Мириаде."""
         return reverse(f'filling_station:{self._batch_url_prefix()}_retry_close', args=[self.pk])
 
+    def get_remove_balloon_url(self):
+        """URL удаления баллона из партии по NFC."""
+        return reverse(f'filling_station:{self._batch_url_prefix()}_remove_balloon', args=[self.pk])
+
     def can_retry_miriada_close(self) -> bool:
         """Проверяет, можно ли повторить закрытие ТТН после ошибки Мириады."""
         return self.status == BatchStatus.MIRIADA_ERROR and bool(self.ttn_id)
@@ -722,8 +761,12 @@ class BalloonsBatch(models.Model):
         return self.status == BatchStatus.ACTIVE
 
     def accepts_manual_edits(self) -> bool:
-        """Допускает ли партия ручные правки состава (ACTIVE или PAUSED)."""
-        return self.status in (BatchStatus.ACTIVE, BatchStatus.PAUSED)
+        """Допускает ли партия ручные правки состава (ACTIVE, PAUSED или MIRIADA_ERROR)."""
+        return self.status in (
+            BatchStatus.ACTIVE,
+            BatchStatus.PAUSED,
+            BatchStatus.MIRIADA_ERROR,
+        )
 
     def save(self, *args, **kwargs):
         """
@@ -759,6 +802,42 @@ class BalloonsBatch(models.Model):
             + (self.amount_of_27_liters or 0)
             + (self.amount_of_50_liters or 0)
         )
+
+    def rfid_balloon_count(self) -> int:
+        """
+        Число баллонов с RFID в партии: длина ``balloon_list``.
+
+        Если queryset уже аннотирован ``annotated_rfid_count``, берётся аннотация
+        без повторного COUNT.
+
+        Returns:
+            int: количество связанных баллонов.
+        """
+        annotated = self.__dict__.get('annotated_rfid_count')
+        if annotated is not None:
+            return annotated
+        return self.balloon_list.count()
+
+    @property
+    def amount_of_rfid(self) -> int:
+        """Совместимость с API/шаблонами: то же, что ``rfid_balloon_count()``."""
+        return self.rfid_balloon_count()
+
+    @property
+    def miriada_status_error_count(self) -> int:
+        """Число баллонов с ошибкой отправки статуса в Мириаду."""
+        return len(self.miriada_status_errors or {})
+
+    @property
+    def miriada_status_errors_text(self) -> str:
+        """
+        Текст для поля на карточке: NFC и сообщение ошибки, по одной строке.
+
+        Returns:
+            str: строки вида ``nfc — message``.
+        """
+        errors = self.miriada_status_errors or {}
+        return '\n'.join(f'{nfc} — {message}' for nfc, message in sorted(errors.items()))
 
     def add_balloon(self, nfc_tag: str = None) -> dict:
         """
@@ -797,8 +876,6 @@ class BalloonsBatch(models.Model):
 
             balloon = Balloon.objects.get(nfc_tag=nfc_tag)
             self.balloon_list.add(balloon)
-            self.amount_of_rfid = (self.amount_of_rfid or 0) + 1
-            self.save()
 
             result.update({
                 'success': True,
@@ -839,8 +916,11 @@ class BalloonsBatch(models.Model):
 
             balloon = Balloon.objects.get(nfc_tag=nfc_tag)
             self.balloon_list.remove(balloon)
-            self.amount_of_rfid = max((self.amount_of_rfid or 0) - 1, 0)
-            self.save()
+            errors = dict(self.miriada_status_errors or {})
+            if nfc_tag in errors:
+                errors.pop(nfc_tag, None)
+                self.miriada_status_errors = errors
+                self.save(update_fields=['miriada_status_errors'])
 
             result.update({
                 'success': True,
@@ -895,8 +975,8 @@ class BalloonsBatch(models.Model):
         )
 
         stats = queryset.aggregate(
-            total_batches=Count('id'),
-            total_balloon_count_by_rfid=Coalesce(Sum('amount_of_rfid'), 0),
+            total_batches=Count('id', distinct=True),
+            total_balloon_count_by_rfid=Count('balloon_list'),
             total_balloon_count_by_ttn=Coalesce(Sum(ttn_amount), 0),
         )
         return {

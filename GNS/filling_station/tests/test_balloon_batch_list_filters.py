@@ -14,12 +14,12 @@ class BalloonBatchListFilterTests(TestCase):
         self.user = User.objects.create_user(username='batch_filter_user', password='x')
         self.truck_type = TruckType.objects.create(type='Трал')
         self.truck = Truck.objects.create(
-            registration_number='AM5448-1',
+            registration_number='AM 5448-1',
             type=self.truck_type,
             car_brand='МАЗ',
         )
         self.other_truck = Truck.objects.create(
-            registration_number='BC1111-2',
+            registration_number='BC 1111-2',
             type=self.truck_type,
             car_brand='Volvo',
         )

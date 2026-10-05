@@ -2,6 +2,7 @@ from datetime import timedelta
 from decimal import Decimal
 from unittest.mock import MagicMock, patch
 
+import requests
 from django.test import TestCase
 from django.utils import timezone
 
@@ -161,9 +162,22 @@ class CloseTtnInMiriadaTests(TestCase):
     @patch('ttn.services.requests.Session')
     def test_timeout_is_retried(self, mock_session_cls, _log_batch, mock_sleep):
         session = mock_session_cls.return_value
-        session.send.side_effect = Exception('timed out')
+        session.send.side_effect = requests.Timeout('timed out')
 
         success, error = close_ttn_in_miriada(47900)
         self.assertFalse(success)
         self.assertEqual(session.send.call_count, 3)
         self.assertEqual(mock_sleep.call_count, 2)
+
+    @patch('ttn.services.time.sleep')
+    @patch('ttn.services._log_batch_balloons_on_ttn_close')
+    @patch('ttn.services.requests.Session')
+    def test_generic_exception_is_not_retried(self, mock_session_cls, _log_batch, mock_sleep):
+        session = mock_session_cls.return_value
+        session.send.side_effect = Exception('connection reset')
+
+        success, error = close_ttn_in_miriada(47900)
+        self.assertFalse(success)
+        self.assertEqual(error, 'connection reset')
+        self.assertEqual(session.send.call_count, 1)
+        mock_sleep.assert_not_called()

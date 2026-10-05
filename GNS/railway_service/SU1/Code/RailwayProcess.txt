@@ -1,0 +1,113 @@
+(*
+  Обработка железнодорожных весов, цистерн и партий.
+
+  Последовательность:
+  1. Определение стабильности текущего веса.
+  2. Фиксация стабильного веса и состояния цистерны.
+  3. Автоматический запуск партии по первой стабилизированной цистерне.
+  4. Определение типа партии в том же цикле:
+     1 - приёмка, прибыла полная цистерна;
+     2 - отгрузка, прибыла пустая цистерна.
+  5. Управление камерой распознавания номера.
+  6. Контроль движения цистерн и автоматического завершения партии.
+
+  Ручная команда stop_batch имеет приоритет над ручным и автоматическим
+  запуском партии.
+*)
+
+(* -------------------------------------------------------------------------- *)
+(* Определение стабильности веса с учётом погрешности.                        *)
+(* -------------------------------------------------------------------------- *)
+min_weight := railway_scale.previous_weight - railway_tank.weight_stability_tolerance;
+max_weight := railway_scale.previous_weight + railway_tank.weight_stability_tolerance;
+
+IF (railway_scale.current_weight > railway_tank.min_weight_on_scale) AND (railway_scale.current_weight >= min_weight) AND (railway_scale.current_weight <= max_weight) THEN
+  start_stabilization_timer := TRUE;
+ELSE
+  start_stabilization_timer := FALSE;
+END_IF;
+
+weight_stabilization_timer(IN := start_stabilization_timer, PT := WORD_TO_TIME(railway_tank.stabilization_time_seconds) * 1000, Q := railway_scale.is_stable, ET := stabilization_timer_ET);
+weight_is_stable_rtrig(_CLK := railway_scale.is_stable);
+
+(* -------------------------------------------------------------------------- *)
+(* Управление партией.                                                         *)
+(* -------------------------------------------------------------------------- *)
+
+IF railway_batch.stop_batch THEN
+  (* Ручная остановка имеет наивысший приоритет. *)
+  railway_batch.active := FALSE;
+  railway_batch.batch_type := 0;
+  railway_batch.completion_timer_active := FALSE;
+  railway_batch.weight_change_detected := FALSE;
+  railway_batch.stop_batch := FALSE;
+  railway_batch.start_batch := FALSE;
+
+ELSE
+  (* Резервная команда ручного запуска партии. *)
+  IF railway_batch.start_batch THEN
+    railway_batch.active := TRUE;
+    railway_batch.weight_change_detected := FALSE;
+    railway_batch.completion_timer_active := FALSE;
+    railway_batch.start_batch := FALSE;
+  END_IF;
+
+  (*
+    По фронту стабильного веса фиксируем цистерну. Если партия не активна, то первая стабилизированная цистерна запускает партию и сразу определяет
+    её тип. Последующие цистерны не изменяют тип уже активной партии.
+  *)
+  IF weight_is_stable_rtrig.Q THEN
+    railway_tank.stable_weight := railway_scale.current_weight;
+    railway_tank.on_station := railway_tank.stable_weight >= railway_tank.min_weight_of_full_tank;
+
+    IF NOT railway_batch.active THEN
+      railway_batch.active := TRUE;
+      railway_batch.weight_change_detected := TRUE;
+      railway_batch.completion_timer_active := FALSE;
+
+      IF railway_tank.on_station THEN
+        railway_batch.batch_type := 1;
+      ELSE
+        railway_batch.batch_type := 2;
+      END_IF;
+    END_IF;
+  END_IF;
+
+  (* После начала партии запоминаем факт присутствия или движения цистерны. *)
+  IF railway_batch.active AND ((railway_scale.current_weight > railway_tank.min_weight_on_scale) OR (railway_scale.weight_difference > railway_tank.weight_stability_tolerance)) THEN
+    railway_batch.weight_change_detected := TRUE;
+  END_IF;
+
+  (*Отсчёт завершения выполняется после прохода хотя бы одной цистерны, когда весовая свободна и изменение веса не превышает допуска*)
+  railway_batch.completion_timer_active := 
+  railway_batch.active AND 
+  railway_batch.weight_change_detected AND 
+  (railway_scale.current_weight <= railway_tank.min_weight_on_scale) AND 
+  (railway_scale.weight_difference <= railway_tank.weight_stability_tolerance);
+END_IF;
+
+(* -------------------------------------------------------------------------- *)
+(* Автоматическое завершение партии.                                           *)
+(* -------------------------------------------------------------------------- *)
+
+batch_complete_timer(IN := railway_batch.completion_timer_active, PT := WORD_TO_TIME(railway_batch.completion_time_minutes) * 60 * 1000, ET := complete_timer_ET);
+
+IF batch_complete_timer.Q THEN
+  railway_batch.active := FALSE;
+  railway_batch.batch_type := 0;
+  railway_batch.completion_timer_active := FALSE;
+  railway_batch.weight_change_detected := FALSE;
+END_IF;
+
+(* -------------------------------------------------------------------------- *)
+(* Управление камерой.                                                         *)
+(* -------------------------------------------------------------------------- *)
+
+camera_timer(IN := railway_scale.is_stable, PT := WORD_TO_TIME(railway_tank.camera_on_time_seconds) * 1000, Q := yCamera_2_on, ET := camera_timer_ET);
+yLamp_camera_work := yCamera_2_on;
+
+(* Django сбрасывает railway_tank.camera_worked после обработки запроса. *)
+camera_work_ftrig(_CLK := yCamera_2_on);
+IF camera_work_ftrig.Q THEN
+  railway_tank.camera_worked := TRUE;
+END_IF;

@@ -71,8 +71,18 @@ class RailwayTankHistory(models.Model):
 
 
 class RailwayBatch(models.Model):
-    begin_date = models.DateTimeField(auto_now_add=True, verbose_name="Дата начала приёмки")
-    end_date = models.DateTimeField(null=True, blank=True, verbose_name="Дата окончания приёмки")
+    class BatchType(models.IntegerChoices):
+        UNKNOWN = 0, 'Не определён'
+        LOADING = 1, 'Приёмка'
+        UNLOADING = 2, 'Отгрузка'
+
+    started_at = models.DateTimeField(auto_now_add=True, verbose_name="Дата и время начала")
+    completed_at = models.DateTimeField(null=True, blank=True, verbose_name="Дата и время окончания")
+    batch_type = models.PositiveSmallIntegerField(
+        choices=BatchType.choices,
+        default=BatchType.UNKNOWN,
+        verbose_name="Тип партии",
+    )
     gas_amount_spbt = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True, verbose_name="Количество принятого СПБТ газа")
     gas_amount_pba = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True, verbose_name="Количество принятого ПБА газа")
     railway_tank_list = models.ManyToManyField(
@@ -92,7 +102,7 @@ class RailwayBatch(models.Model):
     class Meta:
         verbose_name = "Партия приёмки жд цистерн"
         verbose_name_plural = "Партии приёмки жд цистерн"
-        ordering = ['-begin_date']
+        ordering = ['-started_at']
 
     def get_absolute_url(self):
         return reverse('railway_service:railway_batch_detail', args=[self.pk])
@@ -135,8 +145,8 @@ class RailwayBatch(models.Model):
             queryset=RailwayTankHistory.objects.order_by('-arrival_at'),
         )
         queryset = cls.objects.filter(
-            begin_date__date__gte=start_date,
-            begin_date__date__lte=end_date,
+            started_at__date__gte=start_date,
+            started_at__date__lte=end_date,
         ).prefetch_related(
             Prefetch(
                 'railway_tank_list',
@@ -145,7 +155,7 @@ class RailwayBatch(models.Model):
         )
 
         aggregate_stats = queryset.aggregate(
-            total_batches=Count('id'),
+            total_batches=Count('id', distinct=True),
             total_tanks=Count('railway_tank_list', distinct=True),
         )
 

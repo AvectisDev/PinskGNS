@@ -82,10 +82,32 @@
                         <dd class="col-sm-6">{{ batch.amount_of_ttn|default:"-" }}</dd>
 
                         <dt class="col-sm-6">Баллонов с RFID:</dt>
-                        <dd class="col-sm-6">{{ batch.amount_of_rfid|default:"-" }}</dd>
+                        <dd class="col-sm-6">
+                            {{ batch.amount_of_rfid|default:"-" }}
+                            {% if batch.defective_balloons_count %}
+                            <span class="text-danger">
+                                из них {{ batch.defective_balloons_count }} шт - неисправны
+                            </span>
+                            {% endif %}
+                            {% if batch.miriada_status_error_count %}
+                            <span class="text-danger">
+                                из них {{ batch.miriada_status_error_count }} с ошибкой отправки в Мириаду
+                            </span>
+                            {% endif %}
+                        </dd>
 
                         <dt class="col-sm-6">Баллонов по оптическому датчику:</dt>
                         <dd class="col-sm-6">{{ batch.amount_of_sensor|default:"-" }}</dd>
+
+                        {% if batch.miriada_status_error_count %}
+                        <dt class="col-sm-6">Ошибки отправки в Мириаду:</dt>
+                        <dd class="col-sm-6">
+                            <textarea class="form-control form-control-sm font-monospace"
+                                      rows="{{ batch.miriada_status_error_count|default:3 }}"
+                                      readonly
+                                      aria-label="NFC баллонов с ошибкой отправки в Мириаду">{{ batch.miriada_status_errors_text }}</textarea>
+                        </dd>
+                        {% endif %}
                     </dl>
                 </div>
 
@@ -136,11 +158,15 @@
                             <th>Вес брутто</th>
                             <th>Статус</th>
                             <th>Готов к наполнению</th>
+                            {% if batch.accepts_manual_edits %}
+                            <th>Действия</th>
+                            {% endif %}
                         </tr>
                         </thead>
                         <tbody>
                         {% for balloon in balloons %}
-                        <tr>
+                        {% with miriada_err=batch.miriada_status_errors|get_item:balloon.nfc_tag %}
+                        <tr class="{% if not balloon.filling_status %}table-danger{% elif miriada_err %}table-warning{% endif %}">
                             <td>
                                 <a href="{% url_with_query balloon.get_absolute_url %}" class="custom-link fw-bold">
                                     {{ balloon.nfc_tag|default:"-" }}
@@ -150,18 +176,43 @@
                             <td>{{ balloon.size|default:"-" }} л</td>
                             <td>{{ balloon.netto|float_format|default:"-" }} кг</td>
                             <td>{{ balloon.brutto|float_format|default:"-" }} кг</td>
-                            <td>{{ balloon.status|default:"-" }}</td>
+                            <td>
+                                {{ balloon.status|default:"-" }}
+                                {% if miriada_err %}
+                                <span class="badge bg-warning text-dark ms-1"
+                                      title="Ошибка отправки в Мириаду">
+                                    {{ miriada_err }}
+                                </span>
+                                {% endif %}
+                            </td>
                             <td>
                                 {% if balloon.filling_status %}
                                 <span class="badge bg-success">Да</span>
                                 {% else %}
-                                <span class="badge bg-secondary">Нет</span>
+                                <span class="badge bg-danger">Нет</span>
                                 {% endif %}
                             </td>
+                            {% if batch.accepts_manual_edits %}
+                            <td>
+                                <div class="action-buttons">
+                                    <form method="post"
+                                          action="{% url_with_query batch.get_remove_balloon_url %}"
+                                          class="d-inline"
+                                          onsubmit="return confirm('Удалить баллон {{ balloon.nfc_tag }} из партии?');">
+                                        {% csrf_token %}
+                                        <input type="hidden" name="nfc" value="{{ balloon.nfc_tag }}">
+                                        <button type="submit" class="btn-icon btn-delete" title="Удалить из партии">
+                                            <i class="bi bi-trash"></i>
+                                        </button>
+                                    </form>
+                                </div>
+                            </td>
+                            {% endif %}
                         </tr>
+                        {% endwith %}
                         {% empty %}
                         <tr>
-                            <td colspan="7" class="text-center py-4 text-muted">В партии нет баллонов с RFID</td>
+                            <td colspan="{% if batch.accepts_manual_edits %}8{% else %}7{% endif %}" class="text-center py-4 text-muted">В партии нет баллонов с RFID</td>
                         </tr>
                         {% endfor %}
                         </tbody>

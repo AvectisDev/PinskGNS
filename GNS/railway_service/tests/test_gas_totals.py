@@ -121,7 +121,7 @@ class GetPeriodStatsTests(RailwayFixturesMixin, TestCase):
         response = self.client.get(reverse('filling_station:statistic'))
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, '36.76')
+        self.assertContains(response, '36,76')
         self.assertContains(response, 'text-danger')
         self.assertContains(response, 'data-bs-toggle="tooltip"')
         self.assertContains(response, 'data-bs-title="Данные получены не со всех цистерн, требуется уточнение"')

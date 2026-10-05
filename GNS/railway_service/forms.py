@@ -84,16 +84,18 @@ class RailwayBatchForm(forms.ModelForm):
     class Meta:
         model = RailwayBatch
         fields = [
-            'end_date',
+            'completed_at',
+            'batch_type',
             'gas_amount_spbt',
             'gas_amount_pba',
             'is_active'
         ]
         widgets = {
-            'end_date': forms.DateTimeInput(format='%Y-%m-%dT%H:%M', attrs={
+            'completed_at': forms.DateTimeInput(format='%Y-%m-%dT%H:%M', attrs={
                 'type': 'datetime-local',
                 'class': 'form-control'
             }),
+            'batch_type': forms.Select(attrs={'class': 'form-control'}),
             'gas_amount_spbt': forms.NumberInput(attrs={
                 'class': 'form-control',
                 'placeholder': 'Введите количество газа СПБТ',

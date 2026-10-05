@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from datetime import date
 from typing import Any, Mapping, Optional
 
@@ -12,7 +13,11 @@ from django.utils import timezone
 from filling_station.models import Trailer, Truck
 from autogas.models import AutoGasBatch
 
+logger = logging.getLogger('autogas')
+
 STATISTIC_CACHE_KEY = 'auto_gas_batch_statistic'
+BATCH_STATUS_LOG_CACHE_KEY = 'autogas:last_logged_batch_status'
+NUMBERS_SNAPSHOT_CACHE_KEY = 'autogas:last_logged_numbers'
 
 GAS_TYPE_BY_OPC_CODE = {
     2: 'СПБТ',
@@ -28,6 +33,33 @@ BATCH_TYPE_LABELS = {
     'l': 'Приёмка',
     'u': 'Отгрузка',
 }
+
+
+def log_autogas_batch_status(opc_values: Mapping[str, Any]) -> None:
+    """Пишет статус партии в autogas.log только при изменении."""
+    message = (
+        f'Тип партии={opc_values.get("batch_type_code")}, '
+        f'Тип газа={opc_values.get("gas_type")}, '
+        f'Запрос создания={opc_values.get("request_batch_create")}, '
+        f'Запрос завершения={opc_values.get("request_batch_complete")}'
+    )
+    if cache.get(BATCH_STATUS_LOG_CACHE_KEY) == message:
+        return
+    logger.debug(message)
+    cache.set(BATCH_STATUS_LOG_CACHE_KEY, message, timeout=None)
+
+
+def log_autogas_numbers_snapshot(numbers: list[Any]) -> None:
+    """
+    Пишет список номеров только при изменении.
+    Пустой список не логируется, но сохраняется в кеш.
+    """
+    snapshot = list(numbers)
+    if cache.get(NUMBERS_SNAPSHOT_CACHE_KEY) == snapshot:
+        return
+    if snapshot:
+        logger.debug(f'Список номеров: {snapshot}')
+    cache.set(NUMBERS_SNAPSHOT_CACHE_KEY, snapshot, timeout=None)
 
 
 class AutoGasBatchError(Exception):

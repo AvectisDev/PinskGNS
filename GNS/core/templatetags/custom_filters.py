@@ -17,6 +17,24 @@ def default_dash(value):
         return '-'
     return value
 
+
+@register.filter
+def get_item(mapping, key):
+    """
+    Возвращает значение по ключу из словаря (для шаблонов).
+
+    Args:
+        mapping: словарь или None.
+        key: ключ для поиска.
+
+    Returns:
+        значение или None, если ключа нет.
+    """
+    if not mapping:
+        return None
+    return mapping.get(key)
+
+
 @register.simple_tag
 def get_post_correction(settings, post_num):
     """

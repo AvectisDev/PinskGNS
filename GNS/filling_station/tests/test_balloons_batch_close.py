@@ -7,6 +7,7 @@ from rest_framework.test import APITestCase
 
 from filling_station.exceptions import MiriadaAPIError
 from filling_station.models import Balloon, BalloonsBatch, BatchStatus, ReaderSettings, Truck, TruckType
+from filling_station.api.balloon_batches import _balloon_operation_error_status
 from filling_station.api.batch_status import STATUS_TO_API
 from filling_station.services import (
     add_balloon_to_batch_by_nfc,
@@ -28,7 +29,7 @@ class BalloonsBatchCloseTests(APITestCase):
 
         self.truck_type = TruckType.objects.create(type='Трал')
         self.truck = Truck.objects.create(
-            registration_number='2222BB-1',
+            registration_number='BB 2222-1',
             type=self.truck_type,
             car_brand='МАЗ',
         )
@@ -103,9 +104,16 @@ class BalloonsBatchCloseTests(APITestCase):
         self.assertEqual(self.batch.status, BatchStatus.PAUSED)
 
     def test_rfid_amount_returns_three_counters(self):
-        self.batch.amount_of_rfid = 4
+        extras = [
+            Balloon.objects.create(nfc_tag='rfidcnt0001e0'),
+            Balloon.objects.create(nfc_tag='rfidcnt0002e0'),
+            Balloon.objects.create(nfc_tag='rfidcnt0003e0'),
+        ]
+        self.batch.add_balloon(self.balloon.nfc_tag)
+        for balloon in extras:
+            self.batch.add_balloon(balloon.nfc_tag)
         self.batch.amount_of_sensor = 5
-        self.batch.save(update_fields=['amount_of_rfid', 'amount_of_sensor'])
+        self.batch.save(update_fields=['amount_of_sensor'])
         url = reverse('filling_station_api:balloons-loading-rfid-amount', args=[self.batch.id])
         response = self.client.get(url)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
@@ -119,7 +127,7 @@ class BalloonsBatchCloseTests(APITestCase):
         self.assertTrue(result['success'])
         mock_send.assert_not_called()
         self.batch.refresh_from_db()
-        self.assertEqual(self.batch.amount_of_rfid, 1)
+        self.assertEqual(self.batch.rfid_balloon_count(), 1)
         self.assertTrue(self.batch.balloon_list.filter(nfc_tag=self.balloon.nfc_tag).exists())
 
     def test_sensor_increments_active_batch(self):
@@ -189,10 +197,80 @@ class BalloonsBatchCloseTests(APITestCase):
         self.batch.refresh_from_db()
         self.assertEqual(self.batch.status, BatchStatus.MIRIADA_ERROR)
         self.assertFalse(self.batch.miriada_balloons_sent)
+        self.assertEqual(self.batch.miriada_status_errors, {self.balloon.nfc_tag: 'miriada down'})
+        self.assertIn('Мириада отклонила 1 баллонов', self.batch.miriada_error_message)
 
     @patch('ttn.services.close_ttn_in_miriada')
     @patch('filling_station.services.batches.post_status_to_miriada')
-    def test_retry_does_not_resend_balloons(self, mock_send, mock_close):
+    def test_close_collects_all_status_errors_and_skips_closettn(self, mock_send, mock_close):
+        ok_balloon = Balloon.objects.create(nfc_tag='okballon0001e0')
+        bad_a = Balloon.objects.create(nfc_tag='badballon0001e0')
+        bad_b = Balloon.objects.create(nfc_tag='badballon0002e0')
+        self.batch.add_balloon(ok_balloon.nfc_tag)
+        self.batch.add_balloon(bad_a.nfc_tag)
+        self.batch.add_balloon(bad_b.nfc_tag)
+        self.batch.amount_of_ttn = 3
+        self.batch.save(update_fields=['amount_of_ttn'])
+
+        def _send(url, payload, send_type, session=None):
+            nfc = payload['nfctag']
+            if nfc == ok_balloon.nfc_tag:
+                return
+            raise MiriadaAPIError('-8')
+
+        mock_send.side_effect = _send
+
+        success, error, _data = save_and_close_balloons_batch(self.batch)
+        self.assertFalse(success)
+        mock_close.assert_not_called()
+        self.assertEqual(mock_send.call_count, 3)
+        self.batch.refresh_from_db()
+        self.assertEqual(self.batch.status, BatchStatus.MIRIADA_ERROR)
+        self.assertFalse(self.batch.miriada_balloons_sent)
+        self.assertEqual(
+            self.batch.miriada_status_errors,
+            {bad_a.nfc_tag: '-8', bad_b.nfc_tag: '-8'},
+        )
+        self.assertTrue(self.batch.balloon_list.filter(nfc_tag=ok_balloon.nfc_tag).exists())
+        self.assertTrue(self.batch.balloon_list.filter(nfc_tag=bad_a.nfc_tag).exists())
+
+    @patch('ttn.services.close_ttn_in_miriada')
+    @patch('filling_station.services.batches.post_status_to_miriada')
+    def test_retry_clears_status_error_after_success(self, mock_send, mock_close):
+        mock_close.return_value = (True, None)
+        self.batch.add_balloon(self.balloon.nfc_tag)
+        self.batch.miriada_status_errors = {self.balloon.nfc_tag: '-8'}
+        self.batch.miriada_balloons_sent = False
+        self.batch.status = BatchStatus.MIRIADA_ERROR
+        self.batch.save(update_fields=[
+            'miriada_status_errors',
+            'miriada_balloons_sent',
+            'status',
+            'miriada_close_failed',
+        ])
+
+        success, error, _data = save_and_close_balloons_batch(self.batch)
+        self.assertTrue(success)
+        self.assertIsNone(error)
+        mock_close.assert_called_once()
+        self.batch.refresh_from_db()
+        self.assertEqual(self.batch.miriada_status_errors, {})
+        self.assertTrue(self.batch.miriada_balloons_sent)
+        self.assertEqual(self.batch.status, BatchStatus.COMPLETED)
+
+    def test_remove_balloon_clears_miriada_status_error(self):
+        self.batch.add_balloon(self.balloon.nfc_tag)
+        self.batch.miriada_status_errors = {self.balloon.nfc_tag: '-8'}
+        self.batch.save(update_fields=['miriada_status_errors'])
+
+        result = self.batch.remove_balloon(self.balloon.nfc_tag)
+        self.assertTrue(result['success'])
+        self.batch.refresh_from_db()
+        self.assertEqual(self.batch.miriada_status_errors, {})
+
+    @patch('ttn.services.close_ttn_in_miriada')
+    @patch('filling_station.services.batches.post_status_to_miriada')
+    def test_retry_resends_balloons_before_closettn(self, mock_send, mock_close):
         mock_close.return_value = (True, None)
         self.batch.add_balloon(self.balloon.nfc_tag)
         self.batch.miriada_balloons_sent = True
@@ -202,7 +280,32 @@ class BalloonsBatchCloseTests(APITestCase):
         success, error, _data = save_and_close_balloons_batch(self.batch)
         self.assertTrue(success)
         self.assertIsNone(error)
-        mock_send.assert_not_called()
+        mock_send.assert_called_once()
+        self.assertEqual(mock_send.call_args.args[1]['nfctag'], self.balloon.nfc_tag)
+        mock_close.assert_called_once()
+        self.batch.refresh_from_db()
+        self.assertTrue(self.batch.miriada_balloons_sent)
+
+    @patch('ttn.services.close_ttn_in_miriada')
+    @patch('filling_station.services.batches.post_status_to_miriada')
+    def test_retry_resends_all_current_balloons(self, mock_send, mock_close):
+        mock_close.return_value = (True, None)
+        self.batch.add_balloon(self.balloon.nfc_tag)
+        self.batch.miriada_balloons_sent = True
+        self.batch.status = BatchStatus.PAUSED
+        self.batch.save(update_fields=['miriada_balloons_sent', 'status', 'miriada_close_failed'])
+        extra = Balloon.objects.create(nfc_tag='bbccddeeffe0')
+        self.batch.add_balloon(extra.nfc_tag)
+        self.batch.amount_of_ttn = 2
+        self.batch.status = BatchStatus.MIRIADA_ERROR
+        self.batch.save(update_fields=['amount_of_ttn', 'status', 'miriada_close_failed'])
+
+        success, error, _data = save_and_close_balloons_batch(self.batch)
+        self.assertTrue(success)
+        self.assertIsNone(error)
+        self.assertEqual(mock_send.call_count, 2)
+        sent_tags = {call.args[1]['nfctag'] for call in mock_send.call_args_list}
+        self.assertEqual(sent_tags, {self.balloon.nfc_tag, extra.nfc_tag})
         mock_close.assert_called_once()
 
     @patch('ttn.services.close_ttn_in_miriada')
@@ -251,6 +354,7 @@ class BalloonsBatchCloseTests(APITestCase):
         self.batch.refresh_from_db()
         self.assertEqual(self.batch.status, BatchStatus.MIRIADA_ERROR)
         self.assertFalse(self.batch.miriada_balloons_sent)
+        self.assertEqual(self.batch.miriada_status_errors, {self.balloon.nfc_tag: 'miriada down'})
 
     def test_pause_and_resume_batch(self):
         url_pause = reverse('filling_station_api:balloons-loading-pause', args=[self.batch.id])
@@ -267,7 +371,6 @@ class BalloonsBatchCloseTests(APITestCase):
 
     def test_amount_without_rfid_is_sum_of_liter_fields(self):
         self.batch.amount_of_sensor = 147
-        self.batch.amount_of_rfid = 147
         self.batch.amount_of_5_liters = 1
         self.batch.amount_of_12_liters = 2
         self.batch.amount_of_27_liters = 3
@@ -290,3 +393,104 @@ class BalloonsBatchCloseTests(APITestCase):
         url = reverse('filling_station_api:balloons-loading-add-balloon', args=[self.batch.id])
         response = self.client.patch(url, {'nfc': self.balloon.nfc_tag}, format='json')
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_api_add_balloon_conflict_when_already_in_batch(self):
+        url = reverse('filling_station_api:balloons-loading-add-balloon', args=[self.batch.id])
+        first = self.client.patch(url, {'nfc': self.balloon.nfc_tag}, format='json')
+        self.assertEqual(first.status_code, status.HTTP_200_OK)
+        response = self.client.patch(url, {'nfc': self.balloon.nfc_tag}, format='json')
+        self.assertEqual(response.status_code, status.HTTP_409_CONFLICT)
+        self.assertIn('уже в партии', response.data['message'])
+
+    def test_api_add_balloon_not_found(self):
+        url = reverse('filling_station_api:balloons-loading-add-balloon', args=[self.batch.id])
+        response = self.client.patch(url, {'nfc': 'missingnfc0001'}, format='json')
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_api_remove_balloon_not_in_batch(self):
+        url = reverse('filling_station_api:balloons-loading-remove-balloon', args=[self.batch.id])
+        response = self.client.patch(url, {'nfc': self.balloon.nfc_tag}, format='json')
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_api_remove_balloon_allowed_for_miriada_error(self):
+        self.batch.add_balloon(self.balloon.nfc_tag)
+        self.batch.status = BatchStatus.MIRIADA_ERROR
+        self.batch.save(update_fields=['status', 'miriada_close_failed'])
+        url = reverse('filling_station_api:balloons-loading-remove-balloon', args=[self.batch.id])
+        response = self.client.patch(url, {'nfc': self.balloon.nfc_tag}, format='json')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.batch.refresh_from_db()
+        self.assertFalse(self.batch.balloon_list.filter(nfc_tag=self.balloon.nfc_tag).exists())
+        self.assertEqual(self.batch.rfid_balloon_count(), 0)
+
+    def test_api_add_balloon_allowed_for_miriada_error(self):
+        self.batch.status = BatchStatus.MIRIADA_ERROR
+        self.batch.save(update_fields=['status', 'miriada_close_failed'])
+        url = reverse('filling_station_api:balloons-loading-add-balloon', args=[self.batch.id])
+        response = self.client.patch(url, {'nfc': self.balloon.nfc_tag}, format='json')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.batch.refresh_from_db()
+        self.assertTrue(self.batch.balloon_list.filter(nfc_tag=self.balloon.nfc_tag).exists())
+        self.assertEqual(self.batch.rfid_balloon_count(), 1)
+
+    def test_web_remove_balloon_for_active_paused_and_miriada_error(self):
+        for batch_status in (BatchStatus.ACTIVE, BatchStatus.PAUSED, BatchStatus.MIRIADA_ERROR):
+            with self.subTest(status=batch_status):
+                balloon = Balloon.objects.create(nfc_tag=f'remove{batch_status.value[:6]}e0')
+                self.batch.status = BatchStatus.ACTIVE
+                self.batch.save(update_fields=['status', 'miriada_close_failed'])
+                self.batch.add_balloon(balloon.nfc_tag)
+                self.batch.status = batch_status
+                self.batch.save(update_fields=['status', 'miriada_close_failed'])
+                amount_before = self.batch.rfid_balloon_count()
+
+                url = reverse('filling_station:balloon_loading_batch_remove_balloon', args=[self.batch.id])
+                response = self.client.post(url, {'nfc': balloon.nfc_tag})
+                self.assertEqual(response.status_code, status.HTTP_302_FOUND)
+                self.batch.refresh_from_db()
+                self.assertFalse(self.batch.balloon_list.filter(nfc_tag=balloon.nfc_tag).exists())
+                self.assertEqual(self.batch.rfid_balloon_count(), max(amount_before - 1, 0))
+
+    def test_web_remove_balloon_rejected_for_completed(self):
+        self.batch.add_balloon(self.balloon.nfc_tag)
+        self.batch.status = BatchStatus.COMPLETED
+        self.batch.save(update_fields=['status', 'miriada_close_failed'])
+        url = reverse('filling_station:balloon_loading_batch_remove_balloon', args=[self.batch.id])
+        response = self.client.post(url, {'nfc': self.balloon.nfc_tag})
+        self.assertEqual(response.status_code, status.HTTP_302_FOUND)
+        self.batch.refresh_from_db()
+        self.assertTrue(self.batch.balloon_list.filter(nfc_tag=self.balloon.nfc_tag).exists())
+        self.assertEqual(self.batch.rfid_balloon_count(), 1)
+
+    def test_deleting_balloon_updates_rfid_count_from_list(self):
+        self.batch.add_balloon(self.balloon.nfc_tag)
+        self.batch.refresh_from_db()
+        self.assertEqual(self.batch.rfid_balloon_count(), 1)
+
+        self.balloon.delete()
+        self.batch.refresh_from_db()
+        self.assertEqual(self.batch.rfid_balloon_count(), 0)
+        self.assertEqual(self.batch.balloon_list.count(), 0)
+
+        url = reverse('filling_station_api:balloons-loading-rfid-amount', args=[self.batch.id])
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['amount_of_rfid'], 0)
+
+    def test_balloon_operation_error_status_mapping(self):
+        self.assertEqual(
+            _balloon_operation_error_status('Баллон с меткой x уже в партии'),
+            status.HTTP_409_CONFLICT,
+        )
+        self.assertEqual(
+            _balloon_operation_error_status('Баллон с меткой x не найден в партии'),
+            status.HTTP_404_NOT_FOUND,
+        )
+        self.assertEqual(
+            _balloon_operation_error_status('Партия не принимает изменения в текущем статусе'),
+            status.HTTP_400_BAD_REQUEST,
+        )
+        self.assertEqual(
+            _balloon_operation_error_status('Ошибка сервера: boom'),
+            status.HTTP_500_INTERNAL_SERVER_ERROR,
+        )
