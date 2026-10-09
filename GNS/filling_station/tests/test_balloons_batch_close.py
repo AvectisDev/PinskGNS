@@ -462,6 +462,34 @@ class BalloonsBatchCloseTests(APITestCase):
         self.assertTrue(self.batch.balloon_list.filter(nfc_tag=self.balloon.nfc_tag).exists())
         self.assertEqual(self.batch.rfid_balloon_count(), 1)
 
+    def test_web_remove_multiple_balloons(self):
+        extra = Balloon.objects.create(nfc_tag='multirem0001e0')
+        self.batch.add_balloon(self.balloon.nfc_tag)
+        self.batch.add_balloon(extra.nfc_tag)
+        self.batch.miriada_status_errors = {
+            self.balloon.nfc_tag: '-8',
+            extra.nfc_tag: '-8',
+        }
+        self.batch.save(update_fields=['miriada_status_errors'])
+
+        url = reverse('filling_station:balloon_loading_batch_remove_balloon', args=[self.batch.id])
+        response = self.client.post(url, {'nfc': [self.balloon.nfc_tag, extra.nfc_tag]})
+        self.assertEqual(response.status_code, status.HTTP_302_FOUND)
+        self.batch.refresh_from_db()
+        self.assertFalse(self.batch.balloon_list.filter(nfc_tag=self.balloon.nfc_tag).exists())
+        self.assertFalse(self.batch.balloon_list.filter(nfc_tag=extra.nfc_tag).exists())
+        self.assertEqual(self.batch.rfid_balloon_count(), 0)
+        self.assertEqual(self.batch.miriada_status_errors, {})
+
+    def test_web_remove_balloons_empty_nfc_list(self):
+        self.batch.add_balloon(self.balloon.nfc_tag)
+        url = reverse('filling_station:balloon_loading_batch_remove_balloon', args=[self.batch.id])
+        response = self.client.post(url, {})
+        self.assertEqual(response.status_code, status.HTTP_302_FOUND)
+        self.batch.refresh_from_db()
+        self.assertTrue(self.batch.balloon_list.filter(nfc_tag=self.balloon.nfc_tag).exists())
+        self.assertEqual(self.batch.rfid_balloon_count(), 1)
+
     def test_deleting_balloon_updates_rfid_count_from_list(self):
         self.batch.add_balloon(self.balloon.nfc_tag)
         self.batch.refresh_from_db()

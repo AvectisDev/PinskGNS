@@ -423,21 +423,42 @@ def balloon_batch_retry_close(request, pk):
 #@login_required
 @require_POST
 def balloon_batch_remove_balloon(request, pk):
-    """Удаляет баллон из партии по NFC-метке и возвращает на карточку партии."""
+    """Удаляет один или несколько баллонов из партии и возвращает на карточку."""
     path = request.path.lower()
     batch_type = 'u' if 'unloading' in path else 'l'
     batch = get_object_or_404(BalloonsBatch, pk=pk, batch_type=batch_type)
 
-    nfc = (request.POST.get('nfc') or '').strip()
-    if not nfc:
+    nfc_tags = [
+        (tag or '').strip()
+        for tag in request.POST.getlist('nfc')
+        if (tag or '').strip()
+    ]
+    if not nfc_tags:
         messages.error(request, 'Не указана NFC-метка баллона.')
         return redirect_preserve_query(request, batch.get_absolute_url())
 
-    result = batch.remove_balloon(nfc)
-    if result.get('success'):
-        messages.success(request, f'Баллон {nfc} удалён из партии №{batch.id}.')
+    removed = []
+    errors = []
+    for nfc in nfc_tags:
+        result = batch.remove_balloon(nfc)
+        if result.get('success'):
+            removed.append(nfc)
+        else:
+            errors.append(result.get('message') or f'Не удалось удалить баллон {nfc}.')
+
+    if len(nfc_tags) == 1:
+        if removed:
+            messages.success(request, f'Баллон {removed[0]} удалён из партии №{batch.id}.')
+        else:
+            messages.error(request, errors[0] if errors else 'Не удалось удалить баллон из партии.')
     else:
-        messages.error(request, result.get('message') or 'Не удалось удалить баллон из партии.')
+        if removed:
+            messages.success(
+                request,
+                f'Удалено баллонов из партии №{batch.id}: {len(removed)}.',
+            )
+        if errors:
+            messages.error(request, '; '.join(errors))
 
     return redirect_preserve_query(request, batch.get_absolute_url())
 

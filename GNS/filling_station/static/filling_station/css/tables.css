@@ -230,6 +230,22 @@ ul.pagination.pagination-custom > .active > .page-link:focus {
     text-align: right;
 }
 
+/* Чекбоксы списка баллонов партии — цвет кнопок btn-custom */
+#batch-balloon-list .form-check-input:checked {
+    background-color: #3CBBD9;
+    border-color: #3CBBD9;
+}
+
+#batch-balloon-list .form-check-input:focus {
+    border-color: #3CBBD9;
+    box-shadow: 0 0 0 0.25rem rgba(60, 187, 217, 0.25);
+}
+
+#batch-balloon-list .form-check-input:indeterminate {
+    background-color: #3CBBD9;
+    border-color: #3CBBD9;
+}
+
 /* Batch list filter toolbar: title + filters on one line */
 .batch-list-toolbar {
     flex-wrap: nowrap;
