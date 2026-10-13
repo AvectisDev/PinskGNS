@@ -18,15 +18,26 @@ class TriggerDef:
     task: str
     condition: Condition
     snapshot_keys: Sequence[str]
-    idempotency_ttl: int = 30
+    # None — без cache-idempotency (достаточно фронта условия в диспетчере).
+    idempotency_ttl: int | None = 30
 
 
 def _truthy(value: Any) -> bool:
     return bool(value)
 
 
+def _railway_batch_type_known(snapshot: Snapshot) -> bool:
+    """ПЛК: 1 — приёмка, 2 — отгрузка; 0 ещё не определён."""
+    try:
+        batch_type = int(snapshot.get('railway.batch_type'))
+    except (TypeError, ValueError):
+        return False
+    return batch_type in (1, 2)
+
+
 def _railway_batch_active(snapshot: Snapshot) -> bool:
-    return _truthy(snapshot.get('railway.active'))
+    """Старт партии только когда active и известен batch_type (гонка OPC datachange)."""
+    return _truthy(snapshot.get('railway.active')) and _railway_batch_type_known(snapshot)
 
 
 def _railway_batch_inactive(snapshot: Snapshot) -> bool:
@@ -95,7 +106,7 @@ TRIGGERS: tuple[TriggerDef, ...] = (
             'railway.camera_worked',
             'railway.on_station',
         ),
-        idempotency_ttl=30,
+        idempotency_ttl=None,
     ),
     TriggerDef(
         name='autogas_batch_create',

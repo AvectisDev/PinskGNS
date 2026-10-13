@@ -74,10 +74,12 @@ class TriggerDispatcher:
         elif not force_pending:
             return False
 
-        cache_key = f'{IDEMPOTENCY_KEY_PREFIX}{trigger.name}'
-        if not cache.add(cache_key, True, timeout=trigger.idempotency_ttl):
-            logger.debug('Триггер %s пропущен (idempotency)', trigger.name)
-            return False
+        cache_key = None
+        if trigger.idempotency_ttl is not None:
+            cache_key = f'{IDEMPOTENCY_KEY_PREFIX}{trigger.name}'
+            if not cache.add(cache_key, True, timeout=trigger.idempotency_ttl):
+                logger.debug('Триггер %s пропущен (idempotency)', trigger.name)
+                return False
 
         payload = build_payload(trigger, current)
         try:
@@ -85,7 +87,8 @@ class TriggerDispatcher:
             logger.info('Триггер %s → %s payload=%s', trigger.name, trigger.task, payload)
             return True
         except Exception as error:
-            cache.delete(cache_key)
+            if cache_key is not None:
+                cache.delete(cache_key)
             logger.error(
                 'Не удалось поставить задачу %s: %s',
                 trigger.task,

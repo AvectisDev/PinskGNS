@@ -71,6 +71,59 @@ class TriggerDispatcherTests(SimpleTestCase):
         )
 
     @patch('opcua.bridge.dispatcher.current_app')
+    def test_railway_batch_waits_for_batch_type_after_active(self, current_app):
+        """OPC шлёт active и batch_type разными datachange — ждём тип 1/2."""
+        self.dispatcher.on_snapshot({
+            'railway.active': False,
+            'railway.batch_type': 0,
+        })
+        fired_active = self.dispatcher.on_snapshot({
+            'railway.active': True,
+            'railway.batch_type': 0,
+        })
+        self.assertEqual(fired_active, [])
+        current_app.send_task.assert_not_called()
+
+        fired_type = self.dispatcher.on_snapshot({
+            'railway.active': True,
+            'railway.batch_type': 2,
+        })
+        self.assertEqual(fired_type, ['railway_batch_started'])
+        payload = current_app.send_task.call_args.kwargs['args'][0]
+        self.assertEqual(payload['batch_type'], 2)
+
+    @patch('opcua.bridge.dispatcher.current_app')
+    def test_railway_camera_two_edges_within_30s_both_fire(self, current_app):
+        """Без idempotency: две цистерны через 24 с — две задачи."""
+        idle = {
+            'railway.stable_weight': 37.7,
+            'railway.camera_worked': False,
+            'railway.on_station': False,
+            'railway.active': True,
+            'railway.batch_type': 2,
+        }
+        self.dispatcher.on_snapshot(idle)
+
+        first = self.dispatcher.on_snapshot({
+            **idle,
+            'railway.camera_worked': True,
+            'railway.stable_weight': 37.7,
+        })
+        self.assertEqual(first, ['railway_camera_worked'])
+
+        self.dispatcher.on_snapshot({
+            **idle,
+            'railway.camera_worked': False,
+        })
+        second = self.dispatcher.on_snapshot({
+            **idle,
+            'railway.camera_worked': True,
+            'railway.stable_weight': 36.82,
+        })
+        self.assertEqual(second, ['railway_camera_worked'])
+        self.assertEqual(current_app.send_task.call_count, 2)
+
+    @patch('opcua.bridge.dispatcher.current_app')
     def test_no_refire_while_condition_active(self, current_app):
         snapshot = {
             'railway.stable_weight': 35.0,

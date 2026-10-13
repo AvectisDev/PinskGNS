@@ -48,8 +48,7 @@ class RailwayTankEventTests(SimpleTestCase):
 
     @patch('railway_service.services.tank_events.write_tag')
     @patch('railway_service.services.tank_events.fetch_railway_tank_data')
-    @patch('railway_service.services.tank_events.time.sleep')
-    def test_skips_when_opc_incomplete(self, _sleep, fetch_data, write_tag):
+    def test_skips_when_opc_incomplete(self, fetch_data, write_tag):
         process_railway_tank_event({
             'stable_weight': None,
             'camera_worked': True,
@@ -62,10 +61,8 @@ class RailwayTankEventTests(SimpleTestCase):
     @patch('railway_service.services.tank_events.tank_process')
     @patch('railway_service.services.tank_events.write_tag')
     @patch('railway_service.services.tank_events.fetch_railway_tank_data')
-    @patch('railway_service.services.tank_events.time.sleep')
     def test_processes_camera_event(
         self,
-        _sleep,
         fetch_data,
         write_tag,
         tank_process,
@@ -84,6 +81,29 @@ class RailwayTankEventTests(SimpleTestCase):
         write_tag.assert_called_once_with('railway.camera_worked', False)
         tank_process.assert_called_once()
         batch_process_mock.assert_called_once_with(tank)
+
+    @patch('railway_service.services.tank_events.batch_process')
+    @patch('railway_service.services.tank_events.tank_process')
+    @patch('railway_service.services.tank_events.write_tag')
+    @patch('railway_service.services.tank_events.fetch_railway_tank_data')
+    def test_resets_camera_worked_when_number_missing(
+        self,
+        fetch_data,
+        write_tag,
+        tank_process,
+        batch_process_mock,
+    ):
+        fetch_data.return_value = (None, None)
+
+        process_railway_tank_event({
+            'stable_weight': 36.24,
+            'camera_worked': True,
+            'on_station': False,
+        })
+
+        write_tag.assert_called_once_with('railway.camera_worked', False)
+        tank_process.assert_not_called()
+        batch_process_mock.assert_not_called()
 
 
 class RailwayBatchEventTests(RailwayFixturesMixin, TestCase):
