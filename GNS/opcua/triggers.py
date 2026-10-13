@@ -77,6 +77,10 @@ def _autogas_complete_pending(snapshot: Snapshot) -> bool:
     )
 
 
+def _autogas_stop_batch(snapshot: Snapshot) -> bool:
+    return _truthy(snapshot.get('autogas.stop_batch'))
+
+
 TRIGGERS: tuple[TriggerDef, ...] = (
     TriggerDef(
         name='railway_batch_started',
@@ -120,7 +124,7 @@ TRIGGERS: tuple[TriggerDef, ...] = (
             'autogas.vehicle_select.proposed_ready',
             'autogas.vehicle_select.vehicle_list_0',
         ),
-        idempotency_ttl=30,
+        idempotency_ttl=None,
     ),
     TriggerDef(
         name='autogas_operator_confirm',
@@ -148,7 +152,7 @@ TRIGGERS: tuple[TriggerDef, ...] = (
             'autogas.vehicle_select.vehicle_list_8',
             'autogas.vehicle_select.vehicle_list_9',
         ),
-        idempotency_ttl=30,
+        idempotency_ttl=None,
     ),
     TriggerDef(
         name='autogas_batch_complete',
@@ -164,7 +168,16 @@ TRIGGERS: tuple[TriggerDef, ...] = (
             'autogas.request_batch_complete',
             'autogas.response_batch_complete',
         ),
-        idempotency_ttl=30,
+        idempotency_ttl=None,
+    ),
+    TriggerDef(
+        name='autogas_batch_stopped',
+        task='autogas.tasks.process_autogas_batch_stopped',
+        condition=_autogas_stop_batch,
+        snapshot_keys=(
+            'autogas.stop_batch',
+        ),
+        idempotency_ttl=None,
     ),
 )
 

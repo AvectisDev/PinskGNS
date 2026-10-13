@@ -8,6 +8,7 @@ from autogas.batch_events import (
     parse_vehicle_list_line,
     process_autogas_batch_complete,
     process_autogas_batch_create,
+    process_autogas_batch_stopped,
     process_autogas_operator_confirm,
     VehicleCombo,
 )
@@ -236,13 +237,30 @@ class AutoGasBatchEventTests(AutoGasFixturesMixin, TestCase):
         write_tag.assert_called_once_with('autogas.response_batch_complete', True)
 
     @patch('autogas.batch_events.write_tag')
-    def test_complete_without_active_does_not_ack(self, write_tag):
+    def test_complete_without_active_still_acks(self, write_tag):
         process_autogas_batch_complete({
             'gas_amount': 1,
             'request_batch_complete': True,
             'response_batch_complete': False,
         })
-        write_tag.assert_not_called()
+        write_tag.assert_called_once_with('autogas.response_batch_complete', True)
+
+    def test_stop_closes_active_batch(self):
+        batch = self.make_batch(is_active=True)
+        process_autogas_batch_stopped({'stop_batch': True})
+        batch.refresh_from_db()
+        self.assertFalse(batch.is_active)
+        self.assertIsNotNone(batch.completed_at)
+
+    def test_stop_without_active_is_noop(self):
+        process_autogas_batch_stopped({'stop_batch': True})
+        self.assertEqual(AutoGasBatch.objects.filter(is_active=True).count(), 0)
+
+    def test_stop_false_is_ignored(self):
+        batch = self.make_batch(is_active=True)
+        process_autogas_batch_stopped({'stop_batch': False})
+        batch.refresh_from_db()
+        self.assertTrue(batch.is_active)
 
     def test_parse_vehicle_list_line(self):
         self.assertEqual(

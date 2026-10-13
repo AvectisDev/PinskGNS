@@ -202,6 +202,26 @@ class TriggerDispatcherTests(SimpleTestCase):
             'autogas.tasks.process_autogas_operator_confirm',
         )
 
+    @patch('opcua.bridge.dispatcher.current_app')
+    def test_autogas_stop_batch_fires(self, current_app):
+        self.dispatcher.on_snapshot({'autogas.stop_batch': False})
+        fired = self.dispatcher.on_snapshot({'autogas.stop_batch': True})
+        self.assertEqual(fired, ['autogas_batch_stopped'])
+        self.assertEqual(
+            current_app.send_task.call_args[0][0],
+            'autogas.tasks.process_autogas_batch_stopped',
+        )
+
+    def test_autogas_triggers_have_no_idempotency_ttl(self):
+        for name in (
+            'autogas_batch_create',
+            'autogas_operator_confirm',
+            'autogas_batch_complete',
+            'autogas_batch_stopped',
+        ):
+            trigger = next(t for t in TRIGGERS if t.name == name)
+            self.assertIsNone(trigger.idempotency_ttl, name)
+
     def test_build_payload_strips_domain_prefix(self):
         trigger = next(t for t in TRIGGERS if t.name == 'railway_camera_worked')
         payload = build_payload(trigger, {

@@ -112,7 +112,12 @@ class OpcBridgeClient:
             raise
         written = variant.Value
         self.dispatcher.update_tag(name, written)
-        logger.debug('OPC write %s=%s', name, value)
+        logger.debug(
+            'OPC write %s=%s (VariantType=%s)',
+            name,
+            value,
+            variant.VariantType,
+        )
 
     @staticmethod
     def _fixed_string_bytes(value: Any, length: int = PLC_STRING_FIXED_LEN) -> bytes:

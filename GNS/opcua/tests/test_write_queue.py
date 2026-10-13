@@ -157,3 +157,32 @@ class OpcWriteDataValueTests(SimpleTestCase):
         self.assertEqual(len(written), 32)
         self.assertTrue(written.startswith(b'AI0008-1'))
         self.assertTrue(written.endswith(b'\x00'))
+
+    def test_write_byte_array_pads_to_32(self):
+        """Melsoft STRING[32] иногда отдаёт VariantType.Byte + массив."""
+        dispatcher = TriggerDispatcher()
+        bridge = OpcBridgeClient(url='opc.tcp://example', dispatcher=dispatcher)
+        node = AsyncMock()
+        node.read_data_type_as_variant_type = AsyncMock(
+            return_value=ua.VariantType.Byte,
+        )
+        node.read_data_value = AsyncMock(
+            return_value=ua.DataValue(
+                ua.Variant([0] * 32, ua.VariantType.Byte, is_array=True),
+            ),
+        )
+        node.write_value = AsyncMock()
+        bridge._nodes_by_name = {
+            'autogas.vehicle_select.proposed_truck_number': node,
+        }
+
+        async_to_sync(bridge.write_tag)(
+            'autogas.vehicle_select.proposed_truck_number',
+            'AH0193-1',
+        )
+
+        datavalue = node.write_value.call_args.args[0]
+        self.assertEqual(datavalue.Value.VariantType, ua.VariantType.Byte)
+        written = bytes(datavalue.Value.Value)
+        self.assertEqual(len(written), 32)
+        self.assertTrue(written.startswith(b'AH0193-1'))
