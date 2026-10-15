@@ -9,7 +9,7 @@ from django.utils import timezone
 from django.core.exceptions import ValidationError
 from django.contrib.auth.models import User
 from django.urls import reverse
-from django.db.models import Q, F, Sum, Count, Case, When, IntegerField
+from django.db.models import F, Sum, Count
 from django.db.models.functions import Coalesce
 from django.conf import settings
 from typing import Dict, Any, Optional, List
@@ -978,7 +978,7 @@ class BalloonsBatch(models.Model):
     ) -> Dict[str, int]:
         """
         Собирает статистику по партиям за период:
-        кол-во партий, баллонов с RFID и по ТТН (датчик или сумма объёмов).
+        кол-во партий, баллонов с RFID и сумма ``amount_of_ttn``.
 
         Args:
             start_date: Начало периода по дате ``started_at``; вместе с ``end_date``.
@@ -998,26 +998,16 @@ class BalloonsBatch(models.Model):
         if batch_type:
             queryset = queryset.filter(batch_type=batch_type)
 
-        ttn_amount = Case(
-            When(amount_of_sensor__gt=0, then=F('amount_of_sensor')),
-            default=(
-                Coalesce(F('amount_of_5_liters'), 0)
-                + Coalesce(F('amount_of_12_liters'), 0)
-                + Coalesce(F('amount_of_27_liters'), 0)
-                + Coalesce(F('amount_of_50_liters'), 0)
-            ),
-            output_field=IntegerField(),
-        )
-
-        stats = queryset.aggregate(
-            total_batches=Count('id', distinct=True),
-            total_balloon_count_by_rfid=Count('balloon_list'),
-            total_balloon_count_by_ttn=Coalesce(Sum(ttn_amount), 0),
-        )
+        # RFID и ТТН считаем отдельно: Count(M2M) в одном aggregate с Sum
+        # размножает строки JOIN'ом и завышает сумму по ТТН.
         return {
-            'total_batches': stats['total_batches'] or 0,
-            'total_balloon_count_by_rfid': stats['total_balloon_count_by_rfid'] or 0,
-            'total_balloon_count_by_ttn': stats['total_balloon_count_by_ttn'] or 0,
+            'total_batches': queryset.count(),
+            'total_balloon_count_by_rfid': (
+                queryset.aggregate(total=Count('balloon_list'))['total'] or 0
+            ),
+            'total_balloon_count_by_ttn': (
+                queryset.aggregate(total=Coalesce(Sum('amount_of_ttn'), 0))['total'] or 0
+            ),
         }
 
     @classmethod
