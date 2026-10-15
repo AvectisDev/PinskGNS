@@ -21,6 +21,7 @@
                     <thead class="table-light">
                     <tr>
                         <th>Номер партии</th>
+                        <th>Тип</th>
                         <th>Дата начала</th>
                         <th>Дата окончания</th>
                         <th>Кол-во цистерн</th>
@@ -38,6 +39,15 @@
                             <a href="{% url_with_query batch.get_absolute_url %}" class="custom-link fw-bold">
                                 {{ batch.id }}
                             </a>
+                        </td>
+                        <td>
+                            {% if batch.batch_type == 1 %}
+                                <span class="badge bg-primary">Приёмка</span>
+                            {% elif batch.batch_type == 2 %}
+                                <span class="badge bg-warning text-dark">Отгрузка</span>
+                            {% else %}
+                                <span class="badge bg-secondary">Не определён</span>
+                            {% endif %}
                         </td>
                         <td>{{ batch.started_at|date:"d.m.Y H:i"|default:"-" }}</td>
                         <td>
@@ -73,7 +83,7 @@
                     {% endwith %}
                     {% empty %}
                     <tr>
-                        <td colspan="8" class="text-center py-4 text-muted">Нет данных о партиях</td>
+                        <td colspan="9" class="text-center py-4 text-muted">Нет данных о партиях</td>
                     </tr>
                     {% endfor %}
                     </tbody>
