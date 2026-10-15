@@ -317,13 +317,41 @@ class ActiveBatchSerializer(serializers.ModelSerializer):
         return obj.get_ttn_name()
 
 
+class BalloonStatusErrorSerializer(serializers.Serializer):
+    """Краткий сериализатор баллона с ошибкой отправки статуса в Мириаду."""
+
+    nfc_tag = serializers.CharField()
+    serial_number = serializers.CharField(allow_null=True, allow_blank=True)
+    miriada_status_error = serializers.CharField()
+
+
 class BalloonAmountSerializer(serializers.ModelSerializer):
-    """Сериализатор счётчиков RFID/датчика/ТТН партии."""
+    """Сериализатор счётчиков RFID/датчика/ТТН партии и баллонов с ошибкой Мириады."""
 
     amount_of_rfid = serializers.IntegerField(read_only=True)
+    error_balloons = serializers.SerializerMethodField()
 
     class Meta:
         """Метаданные сериализатора BalloonAmount."""
 
         model = BalloonsBatch
-        fields = ['id', 'amount_of_rfid', 'amount_of_sensor', 'amount_of_ttn']
+        fields = [
+            'id',
+            'amount_of_rfid',
+            'amount_of_sensor',
+            'amount_of_ttn',
+            'error_balloons',
+        ]
+
+    def get_error_balloons(self, obj):
+        """
+        Баллоны партии с непустой ошибкой отправки статуса в Мириаду.
+
+        Args:
+            obj (BalloonsBatch): партия баллонов.
+
+        Returns:
+            list[dict]: nfc_tag, serial_number, miriada_status_error.
+        """
+        balloons = obj.balloon_list.exclude(miriada_status_error='').order_by('nfc_tag')
+        return BalloonStatusErrorSerializer(balloons, many=True).data

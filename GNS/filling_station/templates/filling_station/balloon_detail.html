@@ -38,6 +38,15 @@
 
                         <dt class="col-sm-6">Статус:</dt>
                         <dd class="col-sm-6">{{ balloon.status|default:"-" }}</dd>
+
+                        <dt class="col-sm-6">Ошибка отправки в Мириаду:</dt>
+                        <dd class="col-sm-6">
+                            {% if balloon.miriada_status_error %}
+                            <span class="text-danger">{{ balloon.miriada_status_error }}</span>
+                            {% else %}
+                            -
+                            {% endif %}
+                        </dd>
                     </dl>
                 </div>
 

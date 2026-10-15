@@ -9,7 +9,7 @@ from django.db import transaction
 from django.utils import timezone
 
 from filling_station.exceptions import MiriadaAPIError
-from filling_station.models import BalloonsBatch, BatchStatus
+from filling_station.models import Balloon, BalloonsBatch, BatchStatus
 from filling_station.services.miriada import (
     _prepare_payload_for_miriada,
     get_thread_miriada_session,
@@ -213,18 +213,31 @@ def _mark_batch_close_failed(batch: BalloonsBatch, error_message: Optional[str])
     ])
 
 
+def _sync_balloon_status_errors(nfc_tags: list, status_errors: Dict[str, str]) -> None:
+    """
+    Пишет ошибки отправки на баллоны и очищает поле у успешно принятых меток.
+
+    Args:
+        nfc_tags: NFC меток, которые уходили в Мириаду.
+        status_errors: словарь NFC → текст ошибки.
+    """
+    if not nfc_tags:
+        return
+    balloons = list(Balloon.objects.filter(nfc_tag__in=nfc_tags))
+    for balloon in balloons:
+        new_error = status_errors.get(balloon.nfc_tag, '')
+        if balloon.miriada_status_error != new_error:
+            balloon.miriada_status_error = new_error
+            balloon.save(update_fields=['miriada_status_error'])
+
+
 def send_batch_balloon_statuses_to_miriada(batch: BalloonsBatch) -> Tuple[bool, Optional[str]]:
     """
-    Отправляет в Мириаду статусы всех баллонов партии тем же методом,
-    что раньше вызывался в момент сканирования на рамке.
+    Отправляет в Мириаду статусы всех баллонов партии.
 
-    Вызывается при каждом закрытии партии, включая повтор после ошибки
-    closettn: актуальный состав balloon_list уходит заново.
-
-    HTTP идёт параллельно (лимит потоков MIRIADA_BATCH_SEND_WORKERS),
-    у каждого потока своя keep-alive сессия. Payload готовится заранее,
-    чтобы не ходить в ORM из воркеров. Отказы Result=Error собираются
-    по всем меткам; closettn вызывающий код не должен запускать при ошибках.
+    HTTP идёт параллельно (лимит потоков MIRIADA_BATCH_SEND_WORKERS).
+    Отказы Result=Error собираются по всем меткам и пишутся на баллоны
+    и в ``miriada_status_errors`` партии. ``closettn`` здесь не вызывается.
 
     Args:
         batch (BalloonsBatch): партия, статусы баллонов которой отправляются.
@@ -234,6 +247,9 @@ def send_batch_balloon_statuses_to_miriada(batch: BalloonsBatch) -> Tuple[bool, 
     """
     reader_number = batch.reader_number
     if reader_number not in MIRIADA_BATCH_STATUS_READERS:
+        batch.miriada_balloons_sent = True
+        batch.miriada_status_errors = {}
+        batch.save(update_fields=['miriada_balloons_sent', 'miriada_status_errors'])
         return True, None
 
     prepared_batch = BalloonsBatch.objects.select_related(
@@ -307,6 +323,7 @@ def send_batch_balloon_statuses_to_miriada(batch: BalloonsBatch) -> Tuple[bool, 
             previous_errors.pop(nfc_tag, None)
     previous_errors.update(status_errors)
     batch.miriada_status_errors = previous_errors
+    _sync_balloon_status_errors(nfc_tags, status_errors)
 
     if status_errors:
         batch.miriada_balloons_sent = False
@@ -323,11 +340,43 @@ def send_batch_balloon_statuses_to_miriada(batch: BalloonsBatch) -> Tuple[bool, 
     return True, None
 
 
+def check_batch_balloons(batch: BalloonsBatch) -> Tuple[bool, Optional[str]]:
+    """
+    Проверяет баллоны партии в Мириаде (только отправка статусов).
+
+    Не вызывает closettn и не завершает партию.
+
+    Args:
+        batch (BalloonsBatch): партия для проверки.
+
+    Returns:
+        tuple[bool, str | None]: успех (нет отклонений) и текст ошибки.
+    """
+    if batch.status not in OPEN_BATCH_STATUSES:
+        return False, 'Партия не принимает проверку баллонов в текущем статусе'
+
+    ok, error = send_batch_balloon_statuses_to_miriada(batch)
+    batch.refresh_from_db()
+    if not ok and error:
+        batch.miriada_error_message = _truncate_batch_error_message(error)
+        batch.save(update_fields=['miriada_error_message'])
+    elif ok:
+        batch.miriada_error_message = None
+        batch.save(update_fields=['miriada_error_message'])
+    return ok, error
+
+
+def _batch_has_balloon_status_errors(batch: BalloonsBatch) -> bool:
+    """Есть ли у баллонов партии непустой miriada_status_error."""
+    return batch.balloon_list.exclude(miriada_status_error='').exists()
+
+
 def attempt_close_balloons_batch(batch: BalloonsBatch) -> Tuple[bool, Optional[str]]:
     """
-    Закрывает партию баллонов.
+    Закрывает партию: только closettn, без повторной отправки статусов.
 
-    Сначала отправляет статусы всех баллонов партии в Мириаду, затем закрывает ТТН.
+    Требует совпадения RFID с ТТН, успешной проверки состава
+    (``miriada_balloons_sent``) и отсутствия ошибок на баллонах.
 
     Args:
         batch (BalloonsBatch): партия для закрытия.
@@ -341,10 +390,11 @@ def attempt_close_balloons_batch(batch: BalloonsBatch) -> Tuple[bool, Optional[s
         if batch.rfid_balloon_count() != batch.amount_of_ttn:
             return False, _count_mismatch_payload(batch)['message']
 
-    statuses_ok, statuses_error = send_batch_balloon_statuses_to_miriada(batch)
-    if not statuses_ok:
-        _mark_batch_close_failed(batch, statuses_error)
-        return False, statuses_error
+    if not batch.miriada_balloons_sent:
+        return False, 'Сначала проверьте баллоны в Мириаде'
+
+    if _batch_has_balloon_status_errors(batch):
+        return False, 'В партии есть баллоны с ошибкой отправки в Мириаду'
 
     should_send = bool(batch.ttn_id)
     if should_send:
@@ -430,14 +480,27 @@ def save_and_close_balloons_batch(batch: BalloonsBatch, data=None):
     if batch.amount_of_ttn and batch.rfid_balloon_count() != batch.amount_of_ttn:
         return False, _count_mismatch_payload(batch), None
 
+    if not batch.miriada_balloons_sent:
+        return False, {
+            'message': 'Сначала проверьте баллоны в Мириаде',
+            'check_required': True,
+            'id': batch.id,
+            'status': batch.status,
+        }, None
+
+    if _batch_has_balloon_status_errors(batch):
+        return False, {
+            'message': 'В партии есть баллоны с ошибкой отправки в Мириаду',
+            'balloon_status_errors': True,
+            'id': batch.id,
+            'status': batch.status,
+        }, None
+
     success, error_message = attempt_close_balloons_batch(batch)
     batch.refresh_from_db()
 
     if success:
         return True, None, BalloonsBatchSerializer(batch).data
-
-    if batch.status in (BatchStatus.ACTIVE, BatchStatus.PAUSED):
-        return False, _count_mismatch_payload(batch), None
 
     return False, {
         'message': error_message,

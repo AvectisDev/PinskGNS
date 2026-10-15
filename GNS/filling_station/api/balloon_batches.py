@@ -20,6 +20,7 @@ from filling_station.models import BalloonsBatch, BatchStatus
 from filling_station.api.batch_status import batch_status_to_api, is_api_close_request
 from filling_station.services import (
     add_balloon_to_batch_by_nfc,
+    check_batch_balloons,
     pause_balloons_batch,
     resume_balloons_batch,
     save_and_close_balloons_batch,
@@ -158,7 +159,10 @@ def _api_error_payload(payload):
     rfid_amount=extend_schema(
         tags=['Партии баллонов'],
         summary='Количество баллонов по RFID',
-        description='Количество баллонов в партии: RFID, оптический датчик и электронная ТТН',
+        description=(
+            'Количество баллонов в партии: RFID, оптический датчик и электронная ТТН. '
+            'Также возвращает `error_balloons` — баллоны с ошибкой отправки статуса в Мириаду.'
+        ),
         parameters=[
             OpenApiParameter(
                 name='id',
@@ -171,6 +175,30 @@ def _api_error_payload(payload):
             200: BalloonAmountSerializer,
             404: ApiErrorSerializer
         }
+    ),
+    check_balloons=extend_schema(
+        tags=['Партии баллонов'],
+        summary='Проверить баллоны в Мириаде',
+        description=(
+            'Отправляет статусы всех баллонов партии в Мириаду. '
+            'Не закрывает ТТН и не завершает партию. '
+            'Доступно для статусов 1=ACTIVE, 2=PAUSED и 4=MIRIADA_ERROR. '
+            'Список отклоненных баллонов — в GET .../rfid-amount/ (`error_balloons`).'
+        ),
+        parameters=[
+            OpenApiParameter(
+                name='id',
+                type=OpenApiTypes.INT,
+                location=OpenApiParameter.PATH,
+                description='ID партии',
+            ),
+        ],
+        request=None,
+        responses={
+            200: BalloonsBatchSerializer,
+            400: ApiErrorSerializer,
+            404: ApiErrorSerializer,
+        },
     ),
     create=extend_schema(
         tags=['Партии баллонов'],
@@ -193,9 +221,11 @@ def _api_error_payload(payload):
         description=(
             'Частичное обновление полей партии (счётчики, транспорт, ТТН и т.д.).\n\n'
             '**Завершение партии:** передайте `"status": 3` (COMPLETED). '
-            'Отправляются статусы баллонов в Мириаду и закрывается ТТН. '
-            'Доступно для статусов 1=ACTIVE и 2=PAUSED. '
-            'При ошибке Мириады партия переходит в 4=MIRIADA_ERROR (ответ HTTP 502).\n\n'
+            'Вызывается только закрытие ТТН (`closettn`). '
+            'Перед этим нужна успешная проверка баллонов (`POST .../check-balloons/`), '
+            'совпадение RFID с ТТН и отсутствие ошибок на баллонах. '
+            'Доступно для статусов 1=ACTIVE, 2=PAUSED и 4=MIRIADA_ERROR. '
+            'При ошибке closettn партия переходит в 4=MIRIADA_ERROR (ответ HTTP 502).\n\n'
             'Устаревший способ (обратная совместимость): `"is_active": false`. '
             'Поле `is_active` удалено из модели — используйте `status`.'
         ),
@@ -274,9 +304,9 @@ def _api_error_payload(payload):
         tags=['Партии баллонов'],
         summary='Повторно завершить партию',
         description=(
-            'Сохраняет данные партии, отправляет статусы баллонов в Мириаду '
-            'и закрывает ТТН. Завершение возможно только если количество RFID '
-            'совпадает с количеством по электронной ТТН. '
+            'Сохраняет данные партии и закрывает ТТН (`closettn`) без повторной '
+            'отправки статусов баллонов. Нужна успешная проверка (`check-balloons`), '
+            'совпадение RFID с ТТН и отсутствие ошибок на баллонах. '
             'Доступно для статусов 1=ACTIVE, 2=PAUSED и 4=MIRIADA_ERROR '
             '(повтор после ошибки Мириады).'
         ),
@@ -445,6 +475,56 @@ class BalloonsBatchViewSet(viewsets.ViewSet):
         serializer = BalloonAmountSerializer(batch)
         return Response(serializer.data)
 
+    @action(detail=True, methods=['post'], url_path='check-balloons')
+    def check_balloons(self, request, pk=None):
+        """
+        Отправляет статусы баллонов партии в Мириаду без закрытия ТТН.
+
+        Args:
+            request: HTTP-запрос DRF.
+            pk: ID партии.
+
+        Returns:
+            Response: данные партии или 400 при недопустимом статусе/ошибке отправки.
+        """
+        batch_type = self.get_batch_type(request)
+        if not batch_type:
+            return Response(
+                {"message": "Параметр batch_type обязателен (l для приёмки, u для отгрузки)"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        batch = get_object_or_404(BalloonsBatch, id=pk, batch_type=batch_type)
+        if batch.status not in OPEN_BATCH_STATUSES:
+            return Response(
+                {"message": "Партия не принимает проверку баллонов в текущем статусе"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        logger.info(
+            f"API check-balloons: user={_api_user(request)}, batch_id={batch.id}, "
+            f"ttn_id={batch.ttn_id}, amount_of_rfid={batch.rfid_balloon_count()}"
+        )
+        ok, error = check_batch_balloons(batch)
+        batch.refresh_from_db()
+        response = BalloonsBatchSerializer(batch).data
+        if not ok:
+            logger.warning(
+                f"API check-balloons failed: user={_api_user(request)}, "
+                f"batch_id={batch.id}, error={error}"
+            )
+            return Response(
+                {
+                    'message': error,
+                    'id': batch.id,
+                    'status': batch_status_to_api(batch.status),
+                    'miriada_balloons_sent': batch.miriada_balloons_sent,
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        logger.info(f"API check-balloons ok: user={_api_user(request)}, batch_id={batch.id}")
+        return Response(response)
+
     def create(self, request):
         """
         Создаёт новую партию указанного типа.
@@ -499,7 +579,11 @@ class BalloonsBatchViewSet(viewsets.ViewSet):
         batch = get_object_or_404(BalloonsBatch, id=pk, batch_type=batch_type)
 
         is_closing = (
-            batch.status in (BatchStatus.ACTIVE, BatchStatus.PAUSED)
+            batch.status in (
+                BatchStatus.ACTIVE,
+                BatchStatus.PAUSED,
+                BatchStatus.MIRIADA_ERROR,
+            )
             and (
                 is_api_close_request(request.data)
                 or ('is_active' in request.data and not request.data.get('is_active', True))

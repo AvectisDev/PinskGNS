@@ -72,7 +72,7 @@ class BalloonForm(forms.ModelForm):
         """Конфигурация модели, исключённых полей и виджетов формы баллона."""
 
         model = Balloon
-        exclude = ['user', 'change_date']
+        exclude = ['user', 'change_date', 'miriada_status_error']
         widgets = {
             'nfc_tag': forms.TextInput(attrs={'class': 'form-control'}),
             'serial_number': forms.TextInput(attrs={'class': 'form-control'}),

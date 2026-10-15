@@ -98,9 +98,10 @@ class PostStatusToMiriadaResultTests(TestCase):
     def test_timeout_is_retried(self, mock_sleep):
         session = self._mock_session(send_side_effect=requests.Timeout('timed out'))
 
-        with self.assertRaises(MiriadaAPIError):
+        with self.assertRaises(MiriadaAPIError) as ctx:
             post_status_to_miriada(self.url, self.payload, self.send_type, session=session)
 
+        self.assertEqual(str(ctx.exception), 'Таймаут связи с Мириадой')
         expected_attempts = settings.MIRIADA_REQUEST_RETRIES + 1
         self.assertEqual(session.send.call_count, expected_attempts)
         self.assertEqual(mock_sleep.call_count, settings.MIRIADA_REQUEST_RETRIES)

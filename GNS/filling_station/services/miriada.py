@@ -453,16 +453,14 @@ def post_status_to_miriada(
                     )
                     time.sleep(settings.MIRIADA_RETRY_DELAY_SECONDS)
                 else:
-                    error_msg = (
+                    logger.error(
                         f'Таймаут при отправке статуса баллона в Мириаду после '
-                        f'{settings.MIRIADA_REQUEST_RETRIES + 1} попыток: {e}'
+                        f'{settings.MIRIADA_REQUEST_RETRIES + 1} попыток ({send_type}): {e}'
                     )
-                    logger.error(error_msg)
-                    raise MiriadaAPIError(error_msg) from e
+                    raise MiriadaAPIError('Таймаут связи с Мириадой') from e
             except requests.exceptions.RequestException as e:
-                error_msg = f'Ошибка при отправке статуса баллона в Мириаду: {e}'
-                logger.error(error_msg)
-                raise MiriadaAPIError(error_msg) from e
+                logger.error(f'Ошибка при отправке статуса баллона в Мириаду ({send_type}): {e}')
+                raise MiriadaAPIError('Ошибка связи с Мириадой') from e
     finally:
         if own_session:
             session.close()

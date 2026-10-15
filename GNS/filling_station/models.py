@@ -17,11 +17,12 @@ from datetime import datetime, date, time
 import pghistory
 
 
-@pghistory.track(exclude=['filling_status', 'update_passport_required'])
+@pghistory.track(exclude=['filling_status', 'update_passport_required', 'miriada_status_error'])
 class Balloon(models.Model):
     """
     Модель для хранения информации о газовых баллонах.
-    Отслеживает историю изменений через django-pghistory (исключая filling_status и update_passport_required).
+    Отслеживает историю изменений через django-pghistory (исключая filling_status,
+    update_passport_required и miriada_status_error).
     Содержит полные технические характеристики и текущий статус баллона.
     """
     nfc_tag = models.CharField(primary_key=True,max_length=30, db_index=True, verbose_name="Номер метки")
@@ -39,6 +40,12 @@ class Balloon(models.Model):
     wall_thickness = models.FloatField(null=True, blank=True, verbose_name="Толщина стенок")
     filling_status = models.BooleanField(default=False, verbose_name="Готов к наполнению")
     update_passport_required = models.BooleanField(default=True, verbose_name="Требуется обновление паспорта")
+    miriada_status_error = models.TextField(
+        blank=True,
+        default='',
+        verbose_name="Ошибка отправки статуса в Мириаду",
+        help_text="Текст message из ответа Мириады при последней проверке партии",
+    )
     change_date = models.DateTimeField(auto_now=True, verbose_name="Дата изменений")
     user = models.ForeignKey(
         User,
@@ -748,13 +755,29 @@ class BalloonsBatch(models.Model):
         """URL повторной попытки закрытия ТТН в Мириаде."""
         return reverse(f'filling_station:{self._batch_url_prefix()}_retry_close', args=[self.pk])
 
+    def get_check_balloons_url(self):
+        """URL проверки статусов баллонов партии в Мириаде."""
+        return reverse(f'filling_station:{self._batch_url_prefix()}_check_balloons', args=[self.pk])
+
     def get_remove_balloon_url(self):
         """URL удаления баллона из партии по NFC."""
         return reverse(f'filling_station:{self._batch_url_prefix()}_remove_balloon', args=[self.pk])
 
+    def can_check_balloons(self) -> bool:
+        """Доступна ли проверка статусов баллонов в Мириаде."""
+        return self.status in (
+            BatchStatus.ACTIVE,
+            BatchStatus.PAUSED,
+            BatchStatus.MIRIADA_ERROR,
+        )
+
     def can_retry_miriada_close(self) -> bool:
-        """Проверяет, можно ли повторить закрытие ТТН после ошибки Мириады."""
-        return self.status == BatchStatus.MIRIADA_ERROR and bool(self.ttn_id)
+        """Проверяет, можно ли закрыть ТТН после успешной проверки состава."""
+        return self.status in (
+            BatchStatus.ACTIVE,
+            BatchStatus.PAUSED,
+            BatchStatus.MIRIADA_ERROR,
+        ) and bool(self.ttn_id)
 
     def accepts_rfid(self) -> bool:
         """Принимает ли партия RFID-метки и показания датчика (только ACTIVE)."""
@@ -876,6 +899,9 @@ class BalloonsBatch(models.Model):
 
             balloon = Balloon.objects.get(nfc_tag=nfc_tag)
             self.balloon_list.add(balloon)
+            if self.miriada_balloons_sent:
+                self.miriada_balloons_sent = False
+                self.save(update_fields=['miriada_balloons_sent'])
 
             result.update({
                 'success': True,
@@ -916,11 +942,20 @@ class BalloonsBatch(models.Model):
 
             balloon = Balloon.objects.get(nfc_tag=nfc_tag)
             self.balloon_list.remove(balloon)
+            update_fields = []
             errors = dict(self.miriada_status_errors or {})
             if nfc_tag in errors:
                 errors.pop(nfc_tag, None)
                 self.miriada_status_errors = errors
-                self.save(update_fields=['miriada_status_errors'])
+                update_fields.append('miriada_status_errors')
+            if self.miriada_balloons_sent:
+                self.miriada_balloons_sent = False
+                update_fields.append('miriada_balloons_sent')
+            if update_fields:
+                self.save(update_fields=update_fields)
+            if balloon.miriada_status_error:
+                balloon.miriada_status_error = ''
+                balloon.save(update_fields=['miriada_status_error'])
 
             result.update({
                 'success': True,
