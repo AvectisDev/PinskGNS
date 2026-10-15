@@ -9,10 +9,12 @@ from django.utils import timezone
 
 from autogas.models import AutoGasBatch
 from autogas.services import (
+    ACTIVE_BATCH_CONSTRAINT,
     ActiveBatchExistsError,
     NoActiveBatchError,
     STATISTIC_CACHE_KEY,
     build_batch_statistic,
+    cancel_active_batch,
     complete_active_batch,
     create_active_batch,
     get_batch_statistic,
@@ -104,6 +106,41 @@ class ActiveBatchServiceTests(AutoGasFixturesMixin, TestCase):
     def test_complete_without_active_batch(self):
         with self.assertRaises(NoActiveBatchError):
             complete_active_batch({'gas_amount': 1})
+
+    def test_cancel_active_batch(self):
+        batch = self.make_batch(is_active=True)
+        cancelled = cancel_active_batch()
+        batch.refresh_from_db()
+        self.assertEqual(cancelled.pk, batch.pk)
+        self.assertFalse(batch.is_active)
+        self.assertIsNotNone(batch.completed_at)
+
+    def test_cancel_without_active_returns_none(self):
+        self.assertIsNone(cancel_active_batch())
+
+    def test_integrity_error_without_active_constraint_propagates(self):
+        with patch(
+            'autogas.services.AutoGasBatch.objects.create',
+            side_effect=IntegrityError('fk_user_id'),
+        ):
+            with self.assertRaises(IntegrityError):
+                create_active_batch(
+                    batch_type='l',
+                    gas_type='ПБА',
+                    truck=self.truck,
+                )
+
+    def test_integrity_error_active_constraint_maps_to_active_exists(self):
+        with patch(
+            'autogas.services.AutoGasBatch.objects.create',
+            side_effect=IntegrityError(ACTIVE_BATCH_CONSTRAINT),
+        ):
+            with self.assertRaises(ActiveBatchExistsError):
+                create_active_batch(
+                    batch_type='l',
+                    gas_type='ПБА',
+                    truck=self.truck,
+                )
 
     def test_deactivate_payload_sets_completed_at(self):
         payload = with_completed_at_on_deactivate({'is_active': False, 'gas_amount': 1})

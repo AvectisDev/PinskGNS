@@ -3,13 +3,11 @@
 from __future__ import annotations
 
 import logging
-import time
 from datetime import datetime
 from decimal import Decimal
 from typing import Any, Mapping, Optional
 
 from django.conf import settings
-from django.core.cache import cache
 from django.core.files.base import ContentFile
 
 from opcua.api import write_tag
@@ -23,9 +21,6 @@ from railway_service.services.ocryp import log_number_comparison
 from railway_service.services.status_log import log_railway_tank_status
 
 logger = logging.getLogger('railway')
-
-LAST_TANK_NUMBER_CACHE_KEY = 'last_tank_number'
-INTELLECT_DELAY_SECONDS = 2
 
 
 def fetch_railway_tank_data() -> tuple[Optional[int], Optional[bytes]]:
@@ -227,39 +222,35 @@ def process_railway_tank_event(payload: Mapping[str, Any]) -> None:
         stable_weight,
         on_station,
     )
-    write_tag('railway.camera_worked', False)
 
-    time.sleep(INTELLECT_DELAY_SECONDS)
+    try:
+        registration_number, image_data = fetch_railway_tank_data()
+        if not registration_number:
+            logger.error('ЖД цистерна не определена — пропуск обработки')
+            return
 
-    registration_number, image_data = fetch_railway_tank_data()
-    if not registration_number:
-        logger.error('ЖД цистерна не определена — пропуск обработки')
-        return
+        if getattr(settings, 'OCRYP_URL', ''):
+            try:
+                log_number_comparison(registration_number, image_data)
+            except Exception as error:
+                logger.error(
+                    'OCR сравнение завершилось ошибкой: %s',
+                    error,
+                    exc_info=True,
+                )
 
-    if registration_number == cache.get(LAST_TANK_NUMBER_CACHE_KEY):
-        logger.warning(
-            'ЖД цистерна с номером %s уже обрабатывалась — пропуск',
+        railway_tank = tank_process(
             registration_number,
+            image_data,
+            bool(on_station),
+            stable_weight,
         )
-        return
-
-    cache.set(LAST_TANK_NUMBER_CACHE_KEY, registration_number)
-
-    if getattr(settings, 'OCRYP_URL', ''):
-        try:
-            log_number_comparison(registration_number, image_data)
-        except Exception as error:
-            logger.error('OCR сравнение завершилось ошибкой: %s', error, exc_info=True)
-
-    railway_tank = tank_process(
-        registration_number,
-        image_data,
-        bool(on_station),
-        stable_weight,
-    )
-    if railway_tank:
-        batch_process(railway_tank)
-        logger.info(
-            'ЖД весовая. Обработка цистерны № %s успешно завершена',
-            registration_number,
-        )
+        if railway_tank:
+            batch_process(railway_tank)
+            logger.info(
+                'ЖД весовая. Обработка цистерны № %s успешно завершена',
+                registration_number,
+            )
+    finally:
+        # ПЛК ждёт сброс от Django после каждого цикла камеры.
+        write_tag('railway.camera_worked', False)

@@ -22,6 +22,7 @@ from autogas.management.commands.intellect import (
 from autogas.services import (
     ActiveBatchExistsError,
     NoActiveBatchError,
+    cancel_active_batch,
     complete_active_batch,
     create_active_batch,
     get_truck_capacity,
@@ -477,8 +478,21 @@ def process_autogas_batch_complete(payload: Mapping[str, Any]) -> None:
     })
     try:
         complete_active_batch(payload)
-        write_tag('autogas.response_batch_complete', True)
     except NoActiveBatchError:
-        logger.error('Нет активной партии для завершения')
+        # ПЛК на шаге 5 ждёт response; без ack цикл не сбрасывается.
+        logger.error('Нет активной партии для завершения — всё равно ACK')
     except Exception as error:
         logger.error('Ошибка при завершении партии: %s', error, exc_info=True)
+        return
+    write_tag('autogas.response_batch_complete', True)
+
+
+def process_autogas_batch_stopped(payload: Mapping[str, Any]) -> None:
+    """Stop на шкафу: закрыть активную партию Django без весов."""
+    if not payload.get('stop_batch'):
+        return
+    batch = cancel_active_batch()
+    if batch is None:
+        logger.debug('Stop: активной партии Django нет')
+        return
+    logger.info('Stop: закрыта активная партия %s без весов', batch.pk)

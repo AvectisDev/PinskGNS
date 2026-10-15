@@ -98,6 +98,9 @@ def get_truck_capacity(truck: Truck, trailer: Optional[Trailer] = None) -> Any:
     return None
 
 
+ACTIVE_BATCH_CONSTRAINT = 'uniq_one_active_autogas_batch'
+
+
 def create_active_batch(
     *,
     batch_type: str,
@@ -123,7 +126,9 @@ def create_active_batch(
                 is_active=True,
             )
         except IntegrityError as exc:
-            raise ActiveBatchExistsError('Уже есть активная партия') from exc
+            if ACTIVE_BATCH_CONSTRAINT in str(exc):
+                raise ActiveBatchExistsError('Уже есть активная партия') from exc
+            raise
 
 
 def complete_active_batch(batch_data: Mapping[str, Any]) -> AutoGasBatch:
@@ -152,6 +157,24 @@ def complete_active_batch(batch_data: Mapping[str, Any]) -> AutoGasBatch:
             'is_active',
             'completed_at',
         ])
+        return batch
+
+
+def cancel_active_batch() -> Optional[AutoGasBatch]:
+    """Закрывает активную партию без весов (Stop на шкафу)."""
+    with transaction.atomic():
+        batch = (
+            AutoGasBatch.objects
+            .select_for_update()
+            .filter(is_active=True)
+            .order_by('-begin_at', '-pk')
+            .first()
+        )
+        if batch is None:
+            return None
+        batch.is_active = False
+        batch.completed_at = timezone.now()
+        batch.save(update_fields=['is_active', 'completed_at'])
         return batch
 
 

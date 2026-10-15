@@ -64,6 +64,9 @@ class OpcWriteDataValueTests(SimpleTestCase):
         node.read_data_type_as_variant_type = AsyncMock(
             return_value=ua.VariantType.Boolean,
         )
+        node.read_data_value = AsyncMock(
+            return_value=ua.DataValue(ua.Variant(False, ua.VariantType.Boolean)),
+        )
         node.write_value = AsyncMock()
         bridge._nodes_by_name = {'railway.camera_worked': node}
 
@@ -76,3 +79,110 @@ class OpcWriteDataValueTests(SimpleTestCase):
         self.assertIsNone(datavalue.ServerTimestamp)
         self.assertFalse(datavalue.Value.Value)
         self.assertEqual(dispatcher.snapshot.get('railway.camera_worked'), False)
+
+    def test_write_string_uses_live_string_variant(self):
+        dispatcher = TriggerDispatcher()
+        bridge = OpcBridgeClient(url='opc.tcp://example', dispatcher=dispatcher)
+        node = AsyncMock()
+        # Data type node может врать; живое значение — String.
+        node.read_data_type_as_variant_type = AsyncMock(
+            return_value=ua.VariantType.Byte,
+        )
+        node.read_data_value = AsyncMock(
+            return_value=ua.DataValue(ua.Variant('', ua.VariantType.String)),
+        )
+        node.write_value = AsyncMock()
+        bridge._nodes_by_name = {
+            'autogas.vehicle_select.vehicle_list_0': node,
+        }
+
+        async_to_sync(bridge.write_tag)(
+            'autogas.vehicle_select.vehicle_list_0',
+            '1    AI0008-1',
+        )
+
+        datavalue = node.write_value.call_args.args[0]
+        self.assertEqual(datavalue.Value.VariantType, ua.VariantType.String)
+        self.assertEqual(datavalue.Value.Value, '1    AI0008-1')
+
+    def test_write_empty_string_is_not_null(self):
+        dispatcher = TriggerDispatcher()
+        bridge = OpcBridgeClient(url='opc.tcp://example', dispatcher=dispatcher)
+        node = AsyncMock()
+        node.read_data_type_as_variant_type = AsyncMock(
+            return_value=ua.VariantType.String,
+        )
+        node.read_data_value = AsyncMock(
+            return_value=ua.DataValue(ua.Variant('x', ua.VariantType.String)),
+        )
+        node.write_value = AsyncMock()
+        bridge._nodes_by_name = {
+            'autogas.vehicle_select.proposed_truck_number': node,
+        }
+
+        async_to_sync(bridge.write_tag)(
+            'autogas.vehicle_select.proposed_truck_number',
+            '',
+        )
+
+        datavalue = node.write_value.call_args.args[0]
+        self.assertEqual(datavalue.Value.VariantType, ua.VariantType.String)
+        self.assertEqual(datavalue.Value.Value, '')
+
+    def test_write_bytestring_pads_to_32(self):
+        dispatcher = TriggerDispatcher()
+        bridge = OpcBridgeClient(url='opc.tcp://example', dispatcher=dispatcher)
+        node = AsyncMock()
+        node.read_data_type_as_variant_type = AsyncMock(
+            return_value=ua.VariantType.ByteString,
+        )
+        node.read_data_value = AsyncMock(
+            return_value=ua.DataValue(
+                ua.Variant(b'\x00' * 32, ua.VariantType.ByteString),
+            ),
+        )
+        node.write_value = AsyncMock()
+        bridge._nodes_by_name = {
+            'autogas.vehicle_select.vehicle_list_0': node,
+        }
+
+        async_to_sync(bridge.write_tag)(
+            'autogas.vehicle_select.vehicle_list_0',
+            'AI0008-1',
+        )
+
+        datavalue = node.write_value.call_args.args[0]
+        self.assertEqual(datavalue.Value.VariantType, ua.VariantType.ByteString)
+        written = datavalue.Value.Value
+        self.assertEqual(len(written), 32)
+        self.assertTrue(written.startswith(b'AI0008-1'))
+        self.assertTrue(written.endswith(b'\x00'))
+
+    def test_write_byte_array_pads_to_32(self):
+        """Melsoft STRING[32] иногда отдаёт VariantType.Byte + массив."""
+        dispatcher = TriggerDispatcher()
+        bridge = OpcBridgeClient(url='opc.tcp://example', dispatcher=dispatcher)
+        node = AsyncMock()
+        node.read_data_type_as_variant_type = AsyncMock(
+            return_value=ua.VariantType.Byte,
+        )
+        node.read_data_value = AsyncMock(
+            return_value=ua.DataValue(
+                ua.Variant([0] * 32, ua.VariantType.Byte, is_array=True),
+            ),
+        )
+        node.write_value = AsyncMock()
+        bridge._nodes_by_name = {
+            'autogas.vehicle_select.proposed_truck_number': node,
+        }
+
+        async_to_sync(bridge.write_tag)(
+            'autogas.vehicle_select.proposed_truck_number',
+            'AH0193-1',
+        )
+
+        datavalue = node.write_value.call_args.args[0]
+        self.assertEqual(datavalue.Value.VariantType, ua.VariantType.Byte)
+        written = bytes(datavalue.Value.Value)
+        self.assertEqual(len(written), 32)
+        self.assertTrue(written.startswith(b'AH0193-1'))

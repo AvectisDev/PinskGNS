@@ -18,15 +18,26 @@ class TriggerDef:
     task: str
     condition: Condition
     snapshot_keys: Sequence[str]
-    idempotency_ttl: int = 30
+    # None — без cache-idempotency (достаточно фронта условия в диспетчере).
+    idempotency_ttl: int | None = 30
 
 
 def _truthy(value: Any) -> bool:
     return bool(value)
 
 
+def _railway_batch_type_known(snapshot: Snapshot) -> bool:
+    """ПЛК: 1 — приёмка, 2 — отгрузка; 0 ещё не определён."""
+    try:
+        batch_type = int(snapshot.get('railway.batch_type'))
+    except (TypeError, ValueError):
+        return False
+    return batch_type in (1, 2)
+
+
 def _railway_batch_active(snapshot: Snapshot) -> bool:
-    return _truthy(snapshot.get('railway.active'))
+    """Старт партии только когда active и известен batch_type (гонка OPC datachange)."""
+    return _truthy(snapshot.get('railway.active')) and _railway_batch_type_known(snapshot)
 
 
 def _railway_batch_inactive(snapshot: Snapshot) -> bool:
@@ -66,6 +77,10 @@ def _autogas_complete_pending(snapshot: Snapshot) -> bool:
     )
 
 
+def _autogas_stop_batch(snapshot: Snapshot) -> bool:
+    return _truthy(snapshot.get('autogas.stop_batch'))
+
+
 TRIGGERS: tuple[TriggerDef, ...] = (
     TriggerDef(
         name='railway_batch_started',
@@ -95,7 +110,7 @@ TRIGGERS: tuple[TriggerDef, ...] = (
             'railway.camera_worked',
             'railway.on_station',
         ),
-        idempotency_ttl=30,
+        idempotency_ttl=None,
     ),
     TriggerDef(
         name='autogas_batch_create',
@@ -109,7 +124,7 @@ TRIGGERS: tuple[TriggerDef, ...] = (
             'autogas.vehicle_select.proposed_ready',
             'autogas.vehicle_select.vehicle_list_0',
         ),
-        idempotency_ttl=30,
+        idempotency_ttl=None,
     ),
     TriggerDef(
         name='autogas_operator_confirm',
@@ -137,7 +152,7 @@ TRIGGERS: tuple[TriggerDef, ...] = (
             'autogas.vehicle_select.vehicle_list_8',
             'autogas.vehicle_select.vehicle_list_9',
         ),
-        idempotency_ttl=30,
+        idempotency_ttl=None,
     ),
     TriggerDef(
         name='autogas_batch_complete',
@@ -153,7 +168,16 @@ TRIGGERS: tuple[TriggerDef, ...] = (
             'autogas.request_batch_complete',
             'autogas.response_batch_complete',
         ),
-        idempotency_ttl=30,
+        idempotency_ttl=None,
+    ),
+    TriggerDef(
+        name='autogas_batch_stopped',
+        task='autogas.tasks.process_autogas_batch_stopped',
+        condition=_autogas_stop_batch,
+        snapshot_keys=(
+            'autogas.stop_batch',
+        ),
+        idempotency_ttl=None,
     ),
 )
 
