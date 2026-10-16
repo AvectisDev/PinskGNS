@@ -103,10 +103,12 @@ class EmailRecipientAdmin(admin.ModelAdmin):
 class MiriadaTtnAdmin(admin.ModelAdmin):
     list_display = [
         'name',
+        'operation_name',
         'auto',
         'date',
+        'status',
         'ttn_id',
-        'updated_at'
+        'updated_at',
     ]
-    search_fields = ['ttn_id', 'name', 'auto']
-    list_filter = ['date']
+    search_fields = ['ttn_id', 'name', 'auto', 'operation_name']
+    list_filter = ['date', 'status']

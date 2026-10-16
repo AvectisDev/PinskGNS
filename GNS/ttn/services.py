@@ -27,6 +27,7 @@ def get_current_ttn_from_miriada() -> Optional[list]:
             'ttn_id': int,
             'name': str,
             'auto': str,
+            'operation_name': str,
             'date': datetime
         },
         ...
@@ -67,6 +68,7 @@ def get_current_ttn_from_miriada() -> Optional[list]:
                         'ttn_id': ttn.get('id'),
                         'name': ttn.get('name', ''),
                         'auto': ttn.get('car_plate', ''),
+                        'operation_name': ttn.get('operation_name', '') or '',
                         'date': date_obj,
                     }
 
@@ -121,11 +123,13 @@ def sync_current_ttn_from_miriada() -> int:
             continue
 
         try:
+            # status не трогаем — его меняет только close_ttn_in_miriada
             MiriadaTtn.objects.update_or_create(
                 ttn_id=ttn_id,
                 defaults={
                     'name': ttn_data.get('name', ''),
                     'auto': ttn_data.get('auto', ''),
+                    'operation_name': ttn_data.get('operation_name', '') or '',
                     'date': ttn_data.get('date'),
                 },
             )
@@ -190,6 +194,15 @@ def _is_miriada_success_response(data: dict) -> bool:
     return False
 
 
+def _set_miriada_ttn_status(ttn_id: int, status: str) -> None:
+    """Обновляет статус локальной записи MiriadaTtn, если она есть."""
+    from ttn.models import MiriadaTtn
+
+    updated = MiriadaTtn.objects.filter(ttn_id=ttn_id).update(status=status)
+    if updated:
+        logger.info(f"Статус MiriadaTtn ttn_id={ttn_id} → {status}")
+
+
 def close_ttn_in_miriada(
     ttn_id: int,
     batch: Optional['BalloonsBatch'] = None,
@@ -203,6 +216,8 @@ def close_ttn_in_miriada(
     Returns:
         tuple[bool, str | None]: успех и текст ошибки из ответа Мириады
     """
+    from ttn.models import MiriadaTtnStatus
+
     _log_batch_balloons_on_ttn_close(ttn_id, batch=batch)
     last_error: Optional[str] = None
 
@@ -248,6 +263,7 @@ def close_ttn_in_miriada(
                 result = response.json()
                 if isinstance(result, dict) and _is_miriada_success_response(result):
                     logger.info(f"ТТН {ttn_id} успешно закрыта в Мириаде")
+                    _set_miriada_ttn_status(ttn_id, MiriadaTtnStatus.CLOSED)
                     return True, None
                 last_error = (
                     result.get('description')
@@ -272,6 +288,7 @@ def close_ttn_in_miriada(
             logger.error(f'Ошибка при закрытии ТТН {ttn_id} в Мириаде: {error}')
 
         if not timed_out:
+            _set_miriada_ttn_status(ttn_id, MiriadaTtnStatus.ERROR)
             return False, last_error
 
         if attempt < settings.MIRIADA_REQUEST_RETRIES:
@@ -280,6 +297,7 @@ def close_ttn_in_miriada(
             )
             time.sleep(settings.MIRIADA_RETRY_DELAY_SECONDS)
 
+    _set_miriada_ttn_status(ttn_id, MiriadaTtnStatus.ERROR)
     return False, last_error
 
 

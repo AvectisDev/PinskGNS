@@ -25,7 +25,11 @@ logger = logging.getLogger('filling_station')
     get_current_ttn=extend_schema(
         tags=['ТТН из Мириады'],
         summary='Получить список текущих ТТН',
-        description='Получение списка текущих ТТН из системы Мириада',
+        description=(
+            'Получение списка текущих ТТН из системы Мириада. '
+            'Поля: name, auto, operation_name, date, ttn_id, status '
+            '(1=не обрабатывалась, 2=ошибка, 3=закрыта).'
+        ),
         responses={
             200: MiriadaTtnSerializer(many=True),
             500: ApiErrorSerializer,
@@ -38,13 +42,17 @@ logger = logging.getLogger('filling_station')
                         "ttn_id": 14769,
                         "name": "ТТН №0324344",
                         "auto": "AM 9621-1",
-                        "date": "2025-12-18"
+                        "operation_name": "Поступление от ПУ/РГС",
+                        "date": "2025-12-18",
+                        "status": 1,
                     },
                     {
                         "ttn_id": 14796,
                         "name": "0324576",
                         "auto": "АН 5514-1",
-                        "date": "2025-12-18"
+                        "operation_name": "Отпуск в ПУ/РГС",
+                        "date": "2025-12-18",
+                        "status": 3,
                     },
                 ],
                 response_only=True
@@ -75,7 +83,7 @@ class MiriadaTtnViewSet(viewsets.ViewSet):
         Получение списка текущих ТТН из системы Мириада, сохранение в БД и возврат.
 
         Returns:
-            Response: Список ТТН с полями id, name, auto, date
+            Response: Список ТТН с полями ttn_id, name, auto, operation_name, date, status
         """
         try:
             services.sync_current_ttn_from_miriada()
@@ -83,6 +91,6 @@ class MiriadaTtnViewSet(viewsets.ViewSet):
             logger.error(f"Ошибка при синхронизации ТТН из Мириады: {e}")
 
         start_date = timezone.localdate() - timedelta(days=5)
-        local_ttn = MiriadaTtn.objects.filter(date__gte=start_date)
+        local_ttn = MiriadaTtn.objects.filter(date__gte=start_date).order_by('-date', '-ttn_id')
         serializer = MiriadaTtnSerializer(local_ttn, many=True)
         return Response(serializer.data)

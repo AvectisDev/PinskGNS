@@ -257,6 +257,14 @@ class EmailRecipient(models.Model):
         return f"{self.email} ({'активен' if self.active else 'неактивен'})"
 
 
+class MiriadaTtnStatus(models.TextChoices):
+    """Статус обработки ТТН из Мириады на стороне ГНС."""
+
+    NOT_PROCESSED = 'not_processed', 'Не обрабатывалась'
+    ERROR = 'error', 'Ошибка при обработке'
+    CLOSED = 'closed', 'Закрыта'
+
+
 class MiriadaTtn(models.Model):
     """
     Модель для хранения ТТН из системы Мириада.
@@ -265,7 +273,20 @@ class MiriadaTtn(models.Model):
     ttn_id = models.IntegerField(unique=True, verbose_name="ID ТТН в Мириаде")
     name = models.CharField(max_length=100, verbose_name="Номер ТТН")
     auto = models.CharField(max_length=50, verbose_name="Номер автомобиля")
+    operation_name = models.CharField(
+        max_length=100,
+        blank=True,
+        default='',
+        verbose_name="Операция",
+    )
     date = models.DateField(null=True, blank=True, verbose_name="Дата ТТН")
+    status = models.CharField(
+        max_length=20,
+        choices=MiriadaTtnStatus.choices,
+        default=MiriadaTtnStatus.NOT_PROCESSED,
+        verbose_name="Статус",
+        db_index=True,
+    )
     updated_at = models.DateTimeField(auto_now=True, verbose_name="Дата обновления записи")
 
     def __str__(self):

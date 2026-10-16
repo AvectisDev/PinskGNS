@@ -1,0 +1,57 @@
+{% extends 'base.html' %}
+{% load custom_filters navigation %}
+
+{% block title %}ТТН из Мириады{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h4 class="mb-0">ТТН из Мириады</h4>
+    </div>
+
+    <div class="card shadow-sm">
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-hover align-middle">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Номер ТТН</th>
+                            <th>Операция</th>
+                            <th>Автомобиль</th>
+                            <th>Дата</th>
+                            <th>Статус</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for ttn in page_obj.object_list %}
+                        <tr>
+                            <td class="fw-bold">{{ ttn.name|default:"-" }}</td>
+                            <td>{{ ttn.operation_name|default:"-" }}</td>
+                            <td>{{ ttn.auto|default:"-" }}</td>
+                            <td>{{ ttn.date|date:"d.m.Y"|default:"-" }}</td>
+                            <td>
+                                {% if ttn.status == 'closed' %}
+                                    <span class="badge bg-success">{{ ttn.get_status_display }}</span>
+                                {% elif ttn.status == 'error' %}
+                                    <span class="badge bg-danger">{{ ttn.get_status_display }}</span>
+                                {% else %}
+                                    <span class="badge bg-secondary">{{ ttn.get_status_display }}</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="5" class="text-center py-4 text-muted">Нет данных о ТТН из Мириады</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="mt-4">
+                {% include 'core/_paginator.html' %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

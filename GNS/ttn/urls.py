@@ -7,6 +7,9 @@ urlpatterns = [
     # Установка параметра источника веса для ТТН
     path('auto/update-weight-source/', views.update_weight_source, name="update_weight_source"),
 
+    # ТТН из Мириады
+    path('miriada/', views.MiriadaTtnView.as_view(), name="miriada_ttn_list"),
+
     # ТТН для баллонов
     path('balloons/', views.TTNView.as_view(), name="ttn_list"),
     path('balloons/create/', views.TTNCreateView.as_view(extra_context={
