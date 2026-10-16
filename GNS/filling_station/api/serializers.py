@@ -82,8 +82,10 @@ class BalloonSerializer(serializers.ModelSerializer):
             'manufacturer',
             'wall_thickness',
             'filling_status',
-            'update_passport_required'
+            'update_passport_required',
+            'miriada_status_error',
         ]
+        read_only_fields = ['miriada_status_error']
 
 
 class TruckSerializer(serializers.ModelSerializer):
