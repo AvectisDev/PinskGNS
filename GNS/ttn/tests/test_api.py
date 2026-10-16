@@ -57,3 +57,32 @@ class MiriadaTtnAPITests(APITestCase):
         self.assertEqual(item['name'], '0567005')
         self.assertEqual(item['auto'], 'AH 8918-1')
 
+    @patch('ttn.api.views.services.sync_current_ttn_from_miriada')
+    def test_closed_ttn_is_excluded(self, mock_sync):
+        today = timezone.localdate()
+        MiriadaTtn.objects.create(
+            ttn_id=1,
+            name='open',
+            auto='A',
+            date=today,
+            status=MiriadaTtnStatus.NOT_PROCESSED,
+        )
+        MiriadaTtn.objects.create(
+            ttn_id=2,
+            name='failed',
+            auto='B',
+            date=today,
+            status=MiriadaTtnStatus.ERROR,
+        )
+        MiriadaTtn.objects.create(
+            ttn_id=3,
+            name='closed',
+            auto='C',
+            date=today,
+            status=MiriadaTtnStatus.CLOSED,
+        )
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        ids = {item['ttn_id'] for item in response.data}
+        self.assertEqual(ids, {1, 2})
+

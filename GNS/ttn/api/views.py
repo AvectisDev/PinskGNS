@@ -13,7 +13,7 @@ from drf_spectacular.utils import (
     OpenApiExample
 )
 from ttn import services
-from ttn.models import MiriadaTtn
+from ttn.models import MiriadaTtn, MiriadaTtnStatus
 from ttn.api.serializers import MiriadaTtnSerializer
 from core.api.schema import ApiErrorSerializer
 
@@ -27,8 +27,9 @@ logger = logging.getLogger('filling_station')
         summary='Получить список текущих ТТН',
         description=(
             'Получение списка текущих ТТН из системы Мириада. '
+            'В ответ попадают только незакрытые ТТН (status 1 или 2) за последние 5 дней. '
             'Поля: name, auto, operation_name, date, ttn_id, status '
-            '(1=не обрабатывалась, 2=ошибка, 3=закрыта).'
+            '(1=не обрабатывалась, 2=ошибка, 3=закрыта — в этот список не попадает).'
         ),
         responses={
             200: MiriadaTtnSerializer(many=True),
@@ -83,7 +84,7 @@ class MiriadaTtnViewSet(viewsets.ViewSet):
         Получение списка текущих ТТН из системы Мириада, сохранение в БД и возврат.
 
         Returns:
-            Response: Список ТТН с полями ttn_id, name, auto, operation_name, date, status
+            Response: Незакрытые ТТН (status != closed) с полями ttn_id, name, auto, operation_name, date, status
         """
         try:
             services.sync_current_ttn_from_miriada()
@@ -91,6 +92,10 @@ class MiriadaTtnViewSet(viewsets.ViewSet):
             logger.error(f"Ошибка при синхронизации ТТН из Мириады: {e}")
 
         start_date = timezone.localdate() - timedelta(days=5)
-        local_ttn = MiriadaTtn.objects.filter(date__gte=start_date).order_by('-date', '-ttn_id')
+        local_ttn = (
+            MiriadaTtn.objects.filter(date__gte=start_date)
+            .exclude(status=MiriadaTtnStatus.CLOSED)
+            .order_by('-date', '-ttn_id')
+        )
         serializer = MiriadaTtnSerializer(local_ttn, many=True)
         return Response(serializer.data)
