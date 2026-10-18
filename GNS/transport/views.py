@@ -25,9 +25,7 @@ class TruckView(generic.ListView):
         query = self.request.GET.get('query', '').strip()
         if query:
             queryset = queryset.filter(
-                Q(registration_number__icontains=query)
-                | Q(car_brand__icontains=query)
-                | Q(driver__full_name__icontains=query)
+                Q(registration_number__icontains=query) | Q(car_brand__icontains=query)
             )
         return queryset
 

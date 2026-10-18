@@ -35,7 +35,7 @@ def available_drivers_queryset(truck=None):
         queryset = Driver.objects.filter(
             Q(pk=truck.driver_id) | Q(is_active=True, truck__isnull=True)
         )
-    return queryset.order_by('full_name')
+    return queryset.order_by('last_name', 'first_name')
 
 
 def configure_driver_field(field, truck=None):

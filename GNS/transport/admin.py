@@ -48,9 +48,17 @@ class TrailerAdminForm(forms.ModelForm):
 class DriverAdmin(admin.ModelAdmin):
     """Админка справочника водителей."""
 
-    list_display = ['id', 'full_name', 'comment', 'is_active']
+    list_display = [
+        'id',
+        'last_name',
+        'first_name',
+        'middle_name',
+        'phone',
+        'comment',
+        'is_active',
+    ]
     list_filter = ['is_active']
-    search_fields = ['full_name', 'comment']
+    search_fields = ['last_name', 'first_name', 'middle_name', 'phone', 'comment']
 
 
 @admin.register(Truck)
@@ -80,7 +88,9 @@ class TruckAdmin(admin.ModelAdmin):
         'car_brand',
         'registration_number',
         'type__type',
-        'driver__full_name',
+        'driver__last_name',
+        'driver__first_name',
+        'driver__middle_name',
     ]
 
 

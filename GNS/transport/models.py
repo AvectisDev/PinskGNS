@@ -1,7 +1,21 @@
 """Модели грузовиков и прицепов."""
 
+import re
+
+from django.core.exceptions import ValidationError
 from django.db import models
 from django.urls import reverse
+
+BELARUS_MOBILE_PHONE_RE = re.compile(r'^\+375\((25|29|33|44)\)\d{3}-\d{2}-\d{2}$')
+BELARUS_MOBILE_PHONE_HELP = 'Формат: +375(29)123-45-78. Код оператора: 25, 29, 33 или 44.'
+
+
+def validate_belarus_mobile_phone(value: str) -> None:
+    """Проверяет белорусский мобильный номер; пустое значение допустимо."""
+    if not value:
+        return
+    if not BELARUS_MOBILE_PHONE_RE.fullmatch(value):
+        raise ValidationError(BELARUS_MOBILE_PHONE_HELP)
 
 
 class TruckType(models.Model):
@@ -21,19 +35,32 @@ class TruckType(models.Model):
 class Driver(models.Model):
     """Справочник водителей. Заполняется в админке, выбирается у грузовика."""
 
-    full_name = models.CharField(max_length=150, verbose_name="ФИО")
+    last_name = models.CharField(max_length=50, verbose_name="Фамилия")
+    first_name = models.CharField(max_length=50, verbose_name="Имя")
+    middle_name = models.CharField(max_length=50, blank=True, default="", verbose_name="Отчество")
+    phone = models.CharField(
+        max_length=17,
+        blank=True,
+        default="",
+        verbose_name="Телефон",
+        help_text=BELARUS_MOBILE_PHONE_HELP,
+        validators=[validate_belarus_mobile_phone],
+    )
     comment = models.TextField(blank=True, default="", verbose_name="Комментарий")
     is_active = models.BooleanField(default=True, verbose_name="Активен")
 
     def __str__(self):
         """Возвращает ФИО водителя."""
-        return self.full_name
+        parts = [self.last_name, self.first_name]
+        if self.middle_name:
+            parts.append(self.middle_name)
+        return ' '.join(parts)
 
     class Meta:
         """Метаданные справочника водителей."""
         verbose_name = "Водитель"
         verbose_name_plural = "Водители"
-        ordering = ["full_name"]
+        ordering = ["last_name", "first_name"]
 
 
 class Truck(models.Model):

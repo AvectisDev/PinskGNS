@@ -8,7 +8,7 @@
     <div class="batch-list-toolbar d-flex align-items-center mb-4">
         <h4 class="mb-0 text-nowrap">Грузовики</h4>
         <div class="d-flex align-items-center ms-auto gap-3">
-            {% include 'core/_text_query_filter.html' with query_placeholder='Гос. номер, марка или ФИО' filter_width_class='list-filter-query--transport' %}
+            {% include 'core/_text_query_filter.html' with query_placeholder='Гос. номер или марка' filter_width_class='list-filter-query--transport' %}
             <a href="{% url 'transport:truck_create' %}" class="btn btn-custom text-nowrap">
                 <i class="bi bi-plus-circle"></i> Добавить грузовик
             </a>
@@ -41,7 +41,7 @@
                                 </a>
                             </td>
                             <td>{{ truck.type|default:"-" }}</td>
-                            <td>{{ truck.driver|default:"-" }}</td>
+                            <td>{{ truck.driver.last_name|default:"-" }}</td>
                             <td>
                                 {% if truck.is_on_station %}
                                     <span class="badge bg-success">На станции</span>

@@ -27,6 +27,15 @@
                         <dt class="col-sm-6">Водитель:</dt>
                         <dd class="col-sm-6">{{ truck.driver|default:"-" }}</dd>
 
+                        <dt class="col-sm-6">Телефон водителя:</dt>
+                        <dd class="col-sm-6">
+                            {% if truck.driver and truck.driver.phone %}
+                                {{ truck.driver.phone }}
+                            {% else %}
+                                -
+                            {% endif %}
+                        </dd>
+
                         <dt class="col-sm-6">Тип:</dt>
                         <dd class="col-sm-6">{{ truck.type|default:"-" }}</dd>
 

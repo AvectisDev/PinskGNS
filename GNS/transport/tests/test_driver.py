@@ -1,16 +1,51 @@
-from django.test import TestCase
+from django.core.exceptions import ValidationError
+from django.test import SimpleTestCase, TestCase
 
 from transport.form_choices import available_drivers_queryset
 from transport.forms import TruckForm
-from transport.models import Driver, Truck, TruckType
+from transport.models import Driver, Truck, TruckType, validate_belarus_mobile_phone
+
+
+class BelarusMobilePhoneValidationTests(SimpleTestCase):
+    def test_accepts_valid_number(self):
+        validate_belarus_mobile_phone('+375(29)123-45-78')
+        validate_belarus_mobile_phone('+375(25)999-00-11')
+        validate_belarus_mobile_phone('+375(33)111-22-33')
+        validate_belarus_mobile_phone('+375(44)555-66-77')
+
+    def test_allows_empty(self):
+        validate_belarus_mobile_phone('')
+
+    def test_rejects_without_plus_375(self):
+        with self.assertRaises(ValidationError):
+            validate_belarus_mobile_phone('375(29)123-45-78')
+        with self.assertRaises(ValidationError):
+            validate_belarus_mobile_phone('+7(29)123-45-78')
+
+    def test_rejects_unknown_operator_code(self):
+        with self.assertRaises(ValidationError):
+            validate_belarus_mobile_phone('+375(17)123-45-78')
+
+    def test_rejects_without_parentheses_or_dashes(self):
+        with self.assertRaises(ValidationError):
+            validate_belarus_mobile_phone('+375291234567')
+        with self.assertRaises(ValidationError):
+            validate_belarus_mobile_phone('+375(29)1234567')
 
 
 class DriverAssignmentTests(TestCase):
     def setUp(self):
         self.truck_type = TruckType.objects.create(type='Цистерна')
-        self.driver = Driver.objects.create(full_name='Иванов Иван Иванович')
+        self.driver = Driver.objects.create(
+            last_name='Иванов',
+            first_name='Иван',
+            middle_name='Иванович',
+            phone='+375(29)123-45-78',
+        )
         self.inactive_driver = Driver.objects.create(
-            full_name='Петров Пётр Петрович',
+            last_name='Петров',
+            first_name='Пётр',
+            middle_name='Петрович',
             is_active=False,
         )
         self.truck = Truck.objects.create(
@@ -18,6 +53,9 @@ class DriverAssignmentTests(TestCase):
             type=self.truck_type,
             car_brand='МАЗ',
         )
+
+    def test_driver_str_includes_full_name(self):
+        self.assertEqual(str(self.driver), 'Иванов Иван Иванович')
 
     def test_truck_form_saves_without_driver(self):
         form = TruckForm(data={
@@ -99,3 +137,12 @@ class DriverAssignmentTests(TestCase):
         choice_ids = {value for value, _ in form.fields['driver'].choices if value}
         self.assertIn(self.driver.pk, choice_ids)
         self.assertNotIn(self.inactive_driver.pk, choice_ids)
+
+    def test_driver_model_rejects_invalid_phone(self):
+        driver = Driver(
+            last_name='Сидоров',
+            first_name='Сидор',
+            phone='+375291234567',
+        )
+        with self.assertRaises(ValidationError):
+            driver.full_clean()
