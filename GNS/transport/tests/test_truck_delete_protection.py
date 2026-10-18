@@ -3,7 +3,8 @@ from django.contrib.messages import get_messages
 from django.test import TestCase
 from django.urls import reverse
 
-from filling_station.models import BalloonsBatch, BatchStatus, Truck, TruckType
+from filling_station.models import BalloonsBatch, BatchStatus
+from transport.models import Truck, TruckType
 
 
 class TruckDeleteProtectionTests(TestCase):
@@ -27,7 +28,7 @@ class TruckDeleteProtectionTests(TestCase):
         )
 
     def test_delete_truck_with_batch_shows_error_and_keeps_truck(self):
-        url = reverse('filling_station:truck_delete', args=[self.truck.pk])
+        url = reverse('transport:truck_delete', args=[self.truck.pk])
         response = self.client.post(url, follow=False)
 
         self.assertEqual(response.status_code, 302)
@@ -46,7 +47,7 @@ class TruckDeleteProtectionTests(TestCase):
             type=self.truck_type,
             car_brand='МАЗ',
         )
-        url = reverse('filling_station:truck_delete', args=[free_truck.pk])
+        url = reverse('transport:truck_delete', args=[free_truck.pk])
         response = self.client.post(url)
 
         self.assertEqual(response.status_code, 302)

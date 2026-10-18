@@ -1,8 +1,8 @@
 from django.test import TestCase
 
-from filling_station.form_choices import format_trailer_choice, format_truck_choice
-from filling_station.forms import TrailerForm
-from filling_station.models import Trailer, TrailerType, Truck, TruckType
+from transport.form_choices import format_trailer_choice, format_truck_choice
+from transport.forms import TrailerForm
+from transport.models import Trailer, TrailerType, Truck, TruckType
 
 
 class TransportChoiceLabelTests(TestCase):

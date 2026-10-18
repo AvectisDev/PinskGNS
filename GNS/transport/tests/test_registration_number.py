@@ -1,9 +1,9 @@
 from django.core.exceptions import ValidationError
 from django.test import SimpleTestCase, TestCase
 
-from filling_station.forms import TrailerForm, TruckForm
-from filling_station.models import Trailer, TrailerType, Truck, TruckType
-from filling_station.services.transport import (
+from transport.forms import TrailerForm, TruckForm
+from transport.models import Trailer, TrailerType, Truck, TruckType
+from transport.registration import (
     canonicalize_registration_number,
     find_transport_by_registration_number,
     format_trailer_hmi,

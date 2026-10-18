@@ -1,7 +1,7 @@
 from django.test import TestCase
 from django.urls import reverse
 
-from filling_station.models import Truck, TruckType
+from transport.models import Truck, TruckType
 
 
 class SamovyvozListTests(TestCase):
@@ -19,7 +19,7 @@ class SamovyvozListTests(TestCase):
         )
 
     def test_truck_list_hides_samovyvoz(self):
-        response = self.client.get(reverse('filling_station:truck_list'))
+        response = self.client.get(reverse('transport:truck_list'))
         self.assertEqual(response.status_code, 200)
         brands = [t.car_brand for t in response.context['object_list']]
         self.assertIn('МАЗ', brands)

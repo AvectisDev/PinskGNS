@@ -3,20 +3,17 @@ from django.contrib.auth.models import User
 from django.urls import reverse
 from django.db.models import Q, Sum, Count
 from django.conf import settings
-from filling_station.models import Truck, Trailer
-
-
 class AutoGasBatch(models.Model):
     batch_type = models.CharField(choices=settings.BATCH_TYPE_CHOICES, default='u', verbose_name="Тип партии")
     begin_at = models.DateTimeField(auto_now_add=True, verbose_name="Дата и время начала")
     completed_at = models.DateTimeField(null=True, blank=True, verbose_name="Дата и время окончания")
     truck = models.ForeignKey(
-        Truck,
+        'transport.Truck',
         on_delete=models.PROTECT,
         verbose_name="Автомобиль"
     )
     trailer = models.ForeignKey(
-        Trailer,
+        'transport.Trailer',
         on_delete=models.PROTECT,
         null=True,
         blank=True,

@@ -8,8 +8,8 @@ from typing import Any, Mapping, Optional, Sequence, Tuple
 
 from django.db.models import Case, IntegerField, Q, Value, When
 
-from filling_station.models import Trailer, Truck
-from filling_station.services.transport import (
+from transport.models import Trailer, Truck
+from transport.registration import (
     canonicalize_registration_number,
     format_trailer_hmi,
     format_truck_hmi,

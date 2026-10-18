@@ -6,8 +6,8 @@ from typing import Any, Mapping, Optional, Union
 from django.core.cache import cache
 from django.utils import timezone
 
-from filling_station.models import Trailer, Truck
-from filling_station.services.transport import (
+from transport.models import Trailer, Truck
+from transport.registration import (
     canonicalize_registration_number,
     compact_registration_number,
 )

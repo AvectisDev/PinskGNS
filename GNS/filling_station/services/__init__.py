@@ -31,7 +31,7 @@ from filling_station.services.rfid import (
     processing_request_without_nfc,
     update_balloon_passport,
 )
-from filling_station.services.transport import (
+from transport.registration import (
     canonicalize_registration_number,
     find_transport_by_registration_number,
     format_trailer_hmi,

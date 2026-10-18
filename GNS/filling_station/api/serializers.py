@@ -2,10 +2,9 @@
 
 from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
+from transport.models import Truck
 from ..models import (
     Balloon,
-    Truck,
-    Trailer,
     BalloonsBatch,
     BatchStatus,
 )
@@ -86,102 +85,6 @@ class BalloonSerializer(serializers.ModelSerializer):
             'miriada_status_error',
         ]
         read_only_fields = ['miriada_status_error']
-
-
-class TruckSerializer(serializers.ModelSerializer):
-    """Сериализатор грузовика с типом и прицепом."""
-
-    type = serializers.SerializerMethodField()
-    trailer = serializers.SerializerMethodField()
-
-    class Meta:
-        """Метаданные сериализатора Truck."""
-
-        model = Truck
-        fields = [
-            'id',
-            'car_brand',
-            'registration_number',
-            'type',
-            'capacity_cylinders',
-            'max_weight_of_transported_cylinders',
-            'max_mass_of_transported_gas',
-            'max_gas_volume',
-            'empty_weight',
-            'full_weight',
-            'is_on_station',
-            'is_active',
-            'entry_at',
-            'departure_at',
-            'trailer'
-        ]
-
-    def get_type(self, obj):
-        """
-        Возвращает название типа грузовика.
-
-        Args:
-            obj (Truck): экземпляр грузовика.
-
-        Returns:
-            str: строковое имя типа транспорта.
-        """
-        return obj.type.type
-
-    def get_trailer(self, obj):
-        """
-        Возвращает сериализованный прицеп грузовика, если он есть.
-
-        Args:
-            obj (Truck): экземпляр грузовика.
-
-        Returns:
-            dict | None: данные прицепа или None.
-        """
-        trailer = obj.trailer.first()
-        if trailer:
-            return TrailerSerializer(trailer).data
-        return None
-
-
-class TrailerSerializer(serializers.ModelSerializer):
-    """Сериализатор прицепа с типом транспорта."""
-
-    type = serializers.SerializerMethodField()
-
-    class Meta:
-        """Метаданные сериализатора Trailer."""
-
-        model = Trailer
-        fields = [
-            'id',
-            'truck',
-            'trailer_brand',
-            'registration_number',
-            'type',
-            'capacity_cylinders',
-            'max_weight_of_transported_cylinders',
-            'max_mass_of_transported_gas',
-            'max_gas_volume',
-            'empty_weight',
-            'full_weight',
-            'is_on_station',
-            'is_active',
-            'entry_at',
-            'departure_at'
-        ]
-
-    def get_type(self, obj):
-        """
-        Возвращает название типа прицепа.
-
-        Args:
-            obj (Trailer): экземпляр прицепа.
-
-        Returns:
-            str: строковое имя типа транспорта.
-        """
-        return obj.type.type
 
 
 class BalloonsBatchSerializer(serializers.ModelSerializer):

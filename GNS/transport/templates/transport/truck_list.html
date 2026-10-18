@@ -1,16 +1,16 @@
 {% extends 'base.html' %}
 {% load custom_filters navigation %}
 
-{% block title %}Список прицепов{% endblock %}
+{% block title %}Список грузовиков{% endblock %}
 
 {% block content %}
 <div class="container mt-4">
     <div class="batch-list-toolbar d-flex align-items-center mb-4">
-        <h4 class="mb-0 text-nowrap">Прицепы</h4>
+        <h4 class="mb-0 text-nowrap">Грузовики</h4>
         <div class="d-flex align-items-center ms-auto gap-3">
             {% include 'core/_text_query_filter.html' with query_placeholder='Гос. номер или марка' filter_width_class='list-filter-query--transport' %}
-            <a href="{% url 'filling_station:trailer_create' %}" class="btn btn-custom text-nowrap">
-                <i class="bi bi-plus-circle"></i> Добавить прицеп
+            <a href="{% url 'transport:truck_create' %}" class="btn btn-custom text-nowrap">
+                <i class="bi bi-plus-circle"></i> Добавить грузовик
             </a>
         </div>
     </div>
@@ -19,12 +19,11 @@
         <div class="card-body">
             <div class="table-responsive">
                 <table class="table table-hover align-middle">
-                    <thead class="table-light">
+                    <thead class="table-header-custom">
                         <tr>
                             <th>Марка</th>
                             <th>Гос. номер</th>
                             <th>Тип</th>
-                            <th>Грузовик</th>
                             <th>Статус</th>
                             <th>Дата и время въезда</th>
                             <th>Дата и время выезда</th>
@@ -32,51 +31,50 @@
                         </tr>
                     </thead>
                     <tbody>
-                        {% for trailer in page_obj.object_list %}
+                        {% for truck in page_obj.object_list %}
                         <tr>
-                            <td>{{ trailer.trailer_brand|default:"-" }}</td>
+                            <td>{{ truck.car_brand|default:"-" }}</td>
                             <td>
-                                <a href="{% url_with_query trailer.get_absolute_url %}" class="custom-link fw-bold">
-                                    {{ trailer }}
+                                <a href="{% url_with_query truck.get_absolute_url %}" class="custom-link fw-bold">
+                                    {{ truck }}
                                 </a>
                             </td>
-                            <td>{{ trailer.type|default:"-" }}</td>
-                            <td>{{ trailer.truck|default:"-" }}</td>
+                            <td>{{ truck.type|default:"-" }}</td>
                             <td>
-                                {% if trailer.is_on_station %}
+                                {% if truck.is_on_station %}
                                     <span class="badge bg-success">На станции</span>
                                 {% else %}
                                     <span class="badge bg-secondary">Отсутствует</span>
                                 {% endif %}
                             </td>
                             <td>
-                                {% if trailer.entry_at %}
-                                <div>{{ trailer.entry_at|date:"d.m.Y" }}</div>
-                                <small class="text-muted">{{ trailer.entry_at|time:"H:i" }}</small>
+                                {% if truck.entry_at %}
+                                <div>{{ truck.entry_at|date:"d.m.Y" }}</div>
+                                <small class="text-muted">{{ truck.entry_at|time:"H:i" }}</small>
                                 {% else %}
                                 -
                                 {% endif %}
                             </td>
                             <td>
-                                {% if trailer.departure_at %}
-                                <div>{{ trailer.departure_at|date:"d.m.Y" }}</div>
-                                <small class="text-muted">{{ trailer.departure_at|time:"H:i" }}</small>
+                                {% if truck.departure_at %}
+                                <div>{{ truck.departure_at|date:"d.m.Y" }}</div>
+                                <small class="text-muted">{{ truck.departure_at|time:"H:i" }}</small>
                                 {% else %}
                                 -
                                 {% endif %}
                             </td>
                             <td>
                                 <div class="action-buttons">
-                                    <a href="{% url_with_query trailer.get_update_url %}" class="btn-icon btn-edit" title="Редактировать">
+                                    <a href="{% url_with_query truck.get_update_url %}" class="btn-icon btn-edit" title="Редактировать">
                                         <i class="bi bi-pencil"></i>
                                     </a>
-                                    {% include 'core/_delete_trigger.html' with url=trailer.get_delete_url message="Вы уверены, что хотите удалить прицеп?" icon_only=True %}
+                                    {% include 'core/_delete_trigger.html' with url=truck.get_delete_url message="Вы уверены, что хотите удалить грузовик?" icon_only=True %}
                                 </div>
                             </td>
                         </tr>
                         {% empty %}
                         <tr>
-                            <td colspan="8" class="text-center py-4 text-muted">Нет данных о прицепах</td>
+                            <td colspan="7" class="text-center py-4 text-muted">Нет данных о грузовиках</td>
                         </tr>
                         {% endfor %}
                     </tbody>

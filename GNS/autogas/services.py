@@ -10,7 +10,7 @@ from django.db import IntegrityError, transaction
 from django.db.models import Count, Q, QuerySet, Sum
 from django.utils import timezone
 
-from filling_station.models import Trailer, Truck
+from transport.models import Trailer, Truck
 from autogas.models import AutoGasBatch
 
 logger = logging.getLogger('autogas')

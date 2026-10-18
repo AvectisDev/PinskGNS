@@ -5,7 +5,7 @@ from django.core.cache import cache
 from django.test import SimpleTestCase, TestCase, override_settings
 from django.utils import timezone
 
-from filling_station.models import Truck
+from transport.models import Truck
 from transport.management.commands.intellect import get_start_time
 from transport.services import (
     close_all_on_station,

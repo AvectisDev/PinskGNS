@@ -6,9 +6,9 @@ from rest_framework import generics, status, viewsets
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
-from ..models import Truck, Trailer
 from core.api.schema import ApiErrorSerializer
-from .serializers import TruckSerializer, TrailerSerializer
+from transport.api.serializers import TrailerSerializer, TruckSerializer
+from transport.models import Trailer, Truck
 
 
 @extend_schema_view(

@@ -5,7 +5,8 @@ from django.test import TestCase
 from django.urls import reverse
 from django.utils import timezone
 
-from filling_station.models import BalloonsBatch, Truck, TruckType
+from filling_station.models import BalloonsBatch
+from transport.models import Truck, TruckType
 from ttn.models import MiriadaTtn
 
 
@@ -69,14 +70,14 @@ class BalloonBatchListFilterTests(TestCase):
         self.assertNotIn(self.batch_old.id, ids)
 
     def test_filters_by_truck_number_without_date_filter(self):
-        ids = self._get_ids(query='AM5448')
+        ids = self._get_ids(query='AM 5448')
         self.assertEqual(ids, {self.batch_today.id})
 
     def test_filters_by_truck_number(self):
         ids = self._get_ids(
             start_date='2020-01-01',
             end_date=self.today.isoformat(),
-            query='AM5448',
+            query='AM 5448',
         )
         self.assertEqual(ids, {self.batch_today.id})
 
@@ -99,7 +100,7 @@ class BalloonBatchListFilterTests(TestCase):
     def test_query_filter_label_for_truck(self):
         response = self.client.get(
             reverse('filling_station:balloon_loading_batch_list'),
-            {'query': 'AM5448'},
+            {'query': 'AM 5448'},
         )
         self.assertEqual(response.context['query_filter']['label'], 'Фильтр по номеру грузовика')
-        self.assertEqual(response.context['query_filter']['value'], 'AM5448')
+        self.assertEqual(response.context['query_filter']['value'], 'AM 5448')

@@ -13,7 +13,7 @@ from autogas.batch_events import (
     VehicleCombo,
 )
 from autogas.models import AutoGasBatch
-from filling_station.models import Trailer
+from transport.models import Trailer
 from .helpers import AutoGasFixturesMixin
 
 

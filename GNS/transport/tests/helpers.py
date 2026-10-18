@@ -1,4 +1,4 @@
-from filling_station.models import Trailer, TrailerType, Truck, TruckType
+from transport.models import Trailer, TrailerType, Truck, TruckType
 
 
 class TransportFixturesMixin:

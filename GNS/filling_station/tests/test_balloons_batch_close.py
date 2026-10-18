@@ -6,7 +6,8 @@ from rest_framework import status
 from rest_framework.test import APITestCase
 
 from filling_station.exceptions import MiriadaAPIError
-from filling_station.models import Balloon, BalloonsBatch, BatchStatus, ReaderSettings, Truck, TruckType
+from filling_station.models import Balloon, BalloonsBatch, BatchStatus, ReaderSettings
+from transport.models import Truck, TruckType
 from filling_station.api.balloon_batches import _balloon_operation_error_status
 from filling_station.api.batch_status import STATUS_TO_API
 from filling_station.services import (

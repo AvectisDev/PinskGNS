@@ -1,55 +1,14 @@
 """Регистрация моделей filling_station в Django Admin."""
 
-from django import forms
 from django.contrib import admin
 from import_export import resources
 from .models import (
     Balloon,
-    Truck,
-    TruckType,
-    Trailer,
-    TrailerType,
     BalloonsBatch,
     ReaderSettings,
     TotalReadersCounter,
     DailyReaderCounter,
 )
-from filling_station.services.transport import (
-    TRAILER_INPUT_HELP,
-    TRUCK_INPUT_HELP,
-    validate_trailer_input,
-    validate_truck_input,
-)
-
-
-class TruckAdminForm(forms.ModelForm):
-    """Admin-форма грузовика со строгой валидацией номера."""
-
-    class Meta:
-        model = Truck
-        fields = '__all__'
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.fields['registration_number'].help_text = TRUCK_INPUT_HELP
-
-    def clean_registration_number(self):
-        return validate_truck_input(self.cleaned_data.get('registration_number', ''))
-
-
-class TrailerAdminForm(forms.ModelForm):
-    """Admin-форма прицепа со строгой валидацией номера."""
-
-    class Meta:
-        model = Trailer
-        fields = '__all__'
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.fields['registration_number'].help_text = TRAILER_INPUT_HELP
-
-    def clean_registration_number(self):
-        return validate_trailer_input(self.cleaned_data.get('registration_number', ''))
 
 
 class BalloonResources(resources.ModelResource):
@@ -118,79 +77,6 @@ class ReaderSettingsAdmin(admin.ModelAdmin):
     ]
 
 
-@admin.register(Truck)
-class TruckAdmin(admin.ModelAdmin):
-    """Админка грузовиков, используемых на ГНС."""
-
-    form = TruckAdminForm
-    list_display = [
-        'id',
-        'car_brand',
-        'registration_number',
-        'type',
-        'capacity_cylinders',
-        'max_weight_of_transported_cylinders',
-        'max_mass_of_transported_gas',
-        'max_gas_volume',
-        'empty_weight',
-        'full_weight',
-        'is_on_station',
-        'is_active',
-        'entry_at',
-        'departure_at'
-    ]
-    list_filter = ['is_on_station', 'is_active', 'type']
-    search_fields = [
-        'car_brand',
-        'registration_number',
-        'type__type',
-    ]
-
-
-@admin.register(TruckType)
-class TruckTypeAdmin(admin.ModelAdmin):
-    """Админка справочника типов грузовиков."""
-
-    list_display = ['id', 'type']
-
-
-@admin.register(Trailer)
-class TrailerAdmin(admin.ModelAdmin):
-    """Админка прицепов, используемых на ГНС."""
-
-    form = TrailerAdminForm
-    list_display = [
-        'id',
-        'truck',
-        'trailer_brand',
-        'registration_number',
-        'type',
-        'capacity_cylinders',
-        'max_weight_of_transported_cylinders',
-        'max_mass_of_transported_gas',
-        'max_gas_volume',
-        'empty_weight',
-        'full_weight',
-        'is_on_station',
-        'is_active',
-        'entry_at',
-        'departure_at'
-    ]
-    list_filter = ['is_on_station', 'is_active', 'type']
-    search_fields = [
-        'trailer_brand',
-        'registration_number',
-        'type__type',
-    ]
-
-
-@admin.register(TrailerType)
-class TrailerTypeAdmin(admin.ModelAdmin):
-    """Админка справочника типов прицепов."""
-
-    list_display = ['id', 'type']
-
-
 @admin.register(BalloonsBatch)
 class BalloonsBatchAdmin(admin.ModelAdmin):
     """Админка партий приёмки и отгрузки баллонов."""
@@ -221,28 +107,10 @@ class BalloonsBatchAdmin(admin.ModelAdmin):
 
     @admin.display(description='Баллонов по RFID')
     def display_rfid_count(self, obj):
-        """
-        Число связанных баллонов партии для колонки списка.
-
-        Args:
-            obj (BalloonsBatch): Экземпляр партии.
-
-        Returns:
-            int: количество баллонов с RFID.
-        """
         return obj.amount_of_rfid
 
     @admin.display(description='Номер ТТН')
     def display_ttn_name(self, obj):
-        """
-        Возвращает номер связанной ТТН для колонки списка.
-
-        Args:
-            obj (BalloonsBatch): Экземпляр партии.
-
-        Returns:
-            str: Номер ТТН или «—», если номер отсутствует.
-        """
         return obj.get_ttn_name() or '—'
 
 
@@ -253,15 +121,6 @@ class TotalsReaderCounterAdmin(admin.ModelAdmin):
     list_display = ['total_empty', 'total_full', 'changed_at']
 
     def has_add_permission(self, request):
-        """
-        Разрешает создание записи только если счётчик ещё не существует.
-
-        Args:
-            request: HTTP-запрос админки.
-
-        Returns:
-            bool: ``True``, если записей ещё нет.
-        """
         return not TotalReadersCounter.objects.exists()
 
 

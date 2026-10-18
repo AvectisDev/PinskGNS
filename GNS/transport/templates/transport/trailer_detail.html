@@ -78,7 +78,7 @@
 
         <div class="card-footer bg-light">
             <div class="d-flex justify-content-between">
-                {% url 'filling_station:trailer_list' as list_url %}
+                {% url 'transport:trailer_list' as list_url %}
                 {% include 'core/_back_to_list.html' with list_url=list_url %}
                 <div>
                     <a href="{% url_with_query trailer.get_update_url %}" class="btn btn-custom me-2">

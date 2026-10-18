@@ -1,6 +1,6 @@
 from django.contrib.auth.models import User
 
-from filling_station.models import Truck, TruckType
+from transport.models import Truck, TruckType
 from autogas.models import AutoGasBatch
 from railway_service.models import RailwayTank
 from ttn.models import City, Contractor
