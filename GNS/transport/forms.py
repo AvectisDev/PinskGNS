@@ -4,7 +4,7 @@ from django import forms
 from crispy_forms.helper import FormHelper
 from crispy_forms.layout import Submit
 
-from transport.form_choices import configure_truck_field
+from transport.form_choices import configure_driver_field, configure_truck_field
 from transport.models import Truck, Trailer
 from transport.registration import (
     TRAILER_INPUT_HELP,
@@ -31,6 +31,8 @@ class TruckForm(forms.ModelForm):
         reg_field.help_text = TRUCK_INPUT_HELP
         reg_field.widget.attrs.setdefault('placeholder', 'AH 0193-1')
 
+        configure_driver_field(self.fields['driver'], truck=self.instance)
+
     def clean_registration_number(self):
         return validate_truck_input(self.cleaned_data.get('registration_number', ''))
 
@@ -41,6 +43,7 @@ class TruckForm(forms.ModelForm):
             'car_brand': forms.TextInput(attrs={'class': 'form-control'}),
             'registration_number': forms.TextInput(attrs={'class': 'form-control'}),
             'type': forms.Select(attrs={'class': 'form-control'}),
+            'driver': forms.Select(attrs={'class': 'form-control'}),
             'capacity_cylinders': forms.NumberInput(attrs={'class': 'form-control'}),
             'max_weight_of_transported_cylinders': forms.NumberInput(attrs={'class': 'form-control'}),
             'max_mass_of_transported_gas': forms.NumberInput(attrs={'class': 'form-control'}),

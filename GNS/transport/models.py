@@ -18,6 +18,24 @@ class TruckType(models.Model):
         verbose_name_plural = "Типы грузовиков"
 
 
+class Driver(models.Model):
+    """Справочник водителей. Заполняется в админке, выбирается у грузовика."""
+
+    full_name = models.CharField(max_length=150, verbose_name="ФИО")
+    comment = models.TextField(blank=True, default="", verbose_name="Комментарий")
+    is_active = models.BooleanField(default=True, verbose_name="Активен")
+
+    def __str__(self):
+        """Возвращает ФИО водителя."""
+        return self.full_name
+
+    class Meta:
+        """Метаданные справочника водителей."""
+        verbose_name = "Водитель"
+        verbose_name_plural = "Водители"
+        ordering = ["full_name"]
+
+
 class Truck(models.Model):
     """
     Модель грузового автомобиля для перевозки газовых баллонов.
@@ -34,6 +52,14 @@ class Truck(models.Model):
         on_delete=models.PROTECT,
         verbose_name="Тип",
         default=1
+    )
+    driver = models.OneToOneField(
+        Driver,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="truck",
+        verbose_name="Водитель",
     )
     capacity_cylinders = models.IntegerField(null=True, blank=True, verbose_name="Максимальная вместимость баллонов")
     max_weight_of_transported_cylinders = models.DecimalField(

@@ -1,6 +1,8 @@
 """Форматирование вариантов выбора грузовиков и прицепов в формах."""
 
-from transport.models import Truck, Trailer
+from django.db.models import Q
+
+from transport.models import Driver, Trailer, Truck
 
 
 def format_truck_choice(truck: Truck) -> str:
@@ -19,6 +21,28 @@ def format_trailer_choice(trailer: Trailer) -> str:
         f'Марка: {trailer.trailer_brand or "---"} | '
         f'Тип: {trailer.type}'
     )
+
+
+def available_drivers_queryset(truck=None):
+    """
+    Активные водители, не занятые другим грузовиком.
+
+    Текущий водитель переданного грузовика остаётся в списке,
+    даже если он уже помечен неактивным.
+    """
+    queryset = Driver.objects.filter(is_active=True, truck__isnull=True)
+    if truck is not None and truck.pk and truck.driver_id:
+        queryset = Driver.objects.filter(
+            Q(pk=truck.driver_id) | Q(is_active=True, truck__isnull=True)
+        )
+    return queryset.order_by('full_name')
+
+
+def configure_driver_field(field, truck=None):
+    """Настраивает ModelChoiceField для выбора водителя у грузовика."""
+    field.queryset = available_drivers_queryset(truck)
+    field.empty_label = 'Не выбран'
+    field.required = False
 
 
 def configure_truck_field(field, queryset=None):

@@ -3,7 +3,8 @@
 from django import forms
 from django.contrib import admin
 
-from transport.models import Trailer, TrailerType, Truck, TruckType
+from transport.form_choices import configure_driver_field
+from transport.models import Driver, Trailer, TrailerType, Truck, TruckType
 from transport.registration import (
     TRAILER_INPUT_HELP,
     TRUCK_INPUT_HELP,
@@ -22,6 +23,7 @@ class TruckAdminForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields['registration_number'].help_text = TRUCK_INPUT_HELP
+        configure_driver_field(self.fields['driver'], truck=self.instance)
 
     def clean_registration_number(self):
         return validate_truck_input(self.cleaned_data.get('registration_number', ''))
@@ -42,6 +44,15 @@ class TrailerAdminForm(forms.ModelForm):
         return validate_trailer_input(self.cleaned_data.get('registration_number', ''))
 
 
+@admin.register(Driver)
+class DriverAdmin(admin.ModelAdmin):
+    """Админка справочника водителей."""
+
+    list_display = ['id', 'full_name', 'comment', 'is_active']
+    list_filter = ['is_active']
+    search_fields = ['full_name', 'comment']
+
+
 @admin.register(Truck)
 class TruckAdmin(admin.ModelAdmin):
     """Админка грузовиков."""
@@ -52,6 +63,7 @@ class TruckAdmin(admin.ModelAdmin):
         'car_brand',
         'registration_number',
         'type',
+        'driver',
         'capacity_cylinders',
         'max_weight_of_transported_cylinders',
         'max_mass_of_transported_gas',
@@ -63,11 +75,12 @@ class TruckAdmin(admin.ModelAdmin):
         'entry_at',
         'departure_at',
     ]
-    list_filter = ['is_on_station', 'is_active', 'type']
+    list_filter = ['is_on_station', 'is_active', 'type', 'driver']
     search_fields = [
         'car_brand',
         'registration_number',
         'type__type',
+        'driver__full_name',
     ]
 
 

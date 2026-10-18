@@ -19,13 +19,15 @@ class TruckView(generic.ListView):
     def get_queryset(self):
         queryset = (
             super().get_queryset()
-            .select_related('type')
+            .select_related('type', 'driver')
             .exclude(car_brand__iexact='Самовывоз')
         )
         query = self.request.GET.get('query', '').strip()
         if query:
             queryset = queryset.filter(
-                Q(registration_number__icontains=query) | Q(car_brand__icontains=query)
+                Q(registration_number__icontains=query)
+                | Q(car_brand__icontains=query)
+                | Q(driver__full_name__icontains=query)
             )
         return queryset
 
@@ -35,6 +37,9 @@ class TruckDetailView(generic.DetailView):
 
     model = Truck
     template_name = 'transport/truck_detail.html'
+
+    def get_queryset(self):
+        return super().get_queryset().select_related('type', 'driver')
 
 
 class TruckCreateView(CancelFormMixin, PreserveListQueryMixin, generic.CreateView):
