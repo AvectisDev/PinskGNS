@@ -1,4 +1,4 @@
-"""Готовые hex-кадры команд FEIG (лампа, буфер, входы) и учётные данные ридера."""
+"""Готовые hex-кадры команд FEIG (лампа, буфер, входы)."""
 
 # Команды, посылаемые на считыватель
 COMMANDS = {
@@ -8,10 +8,6 @@ COMMANDS = {
     'read_last_item_from_buffer': '02 000A FF 2B 00 FFFF 4914',
     'clean_buffer': '02 0007 FF 32 5447'  # команда очистки буфера
 }
-
-# Аутентификация
-USERNAME = "reader"
-PASSWORD = "rfid-device"
 
 
 def command_frame(name: str) -> bytes:

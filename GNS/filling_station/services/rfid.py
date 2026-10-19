@@ -3,6 +3,8 @@
 import logging
 from typing import Optional, Dict, Any, Tuple
 
+from django.conf import settings
+from django.contrib.auth.models import User
 from django.core.exceptions import ObjectDoesNotExist
 from django.utils import timezone
 
@@ -21,6 +23,24 @@ from filling_station.services.batches import add_balloon_to_batch_by_nfc
 from filling_station.services.miriada import get_balloon_data_from_miriada
 
 logger = logging.getLogger('filling_station')
+
+
+def get_rfid_event_user() -> Optional[User]:
+    """
+    Пользователь для атрибуции событий RFID-сканирования.
+
+    Returns:
+        User | None: пользователь с username из RFID_EVENT_USERNAME или None.
+    """
+    username = getattr(settings, 'RFID_EVENT_USERNAME', 'reader')
+    try:
+        return User.objects.get(username=username)
+    except User.DoesNotExist:
+        logger.warning(
+            'Пользователь RFID-событий "%s" не найден — Balloon.user не меняется',
+            username,
+        )
+        return None
 
 
 def processing_request_without_nfc(reader_number: int) -> Optional[ReaderSettings]:
@@ -81,11 +101,14 @@ def processing_request_with_nfc(nfc_tag: str, reader_number: int) -> Optional[Tu
     try:
         reader = ReaderSettings.objects.get(number=reader_number)
 
+        defaults: Dict[str, Any] = {'status': reader.status}
+        event_user = get_rfid_event_user()
+        if event_user is not None:
+            defaults['user'] = event_user
+
         balloon, created = Balloon.objects.update_or_create(
             nfc_tag=nfc_tag,
-            defaults={
-                'status': reader.status
-            }
+            defaults=defaults,
         )
         logger.info(f"Ридер {reader.number}: Сохранение баллона с меткой {nfc_tag} успешно")
 

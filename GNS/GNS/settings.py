@@ -299,8 +299,7 @@ CELERY_BEAT_SCHEDULE = {
 
 LOGGING = build_logging_config(LOGS_DIR)
 
-# OPC_SERVER_URL = "opc.tcp://host.docker.internal:4841"
-OPC_SERVER_URL = "opc.tcp://localhost:4841"
+OPC_SERVER_URL = os.environ.get('OPC_SERVER_URL')
 
 # Настройки почты
 EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
@@ -323,11 +322,14 @@ MIRIADA_API_POST_URL = os.environ.get('MIRIADA_API_POST_URL')
 MIRIADA_AUTH_LOGIN = os.environ.get('MIRIADA_AUTH_LOGIN')
 MIRIADA_AUTH_PASSWORD = os.environ.get('MIRIADA_AUTH_PASSWORD')
 # Количество повторов неуспешного запроса к API Мириады (всего попыток = MIRIADA_REQUEST_RETRIES + 1)
-MIRIADA_REQUEST_RETRIES = 2
-MIRIADA_RETRY_DELAY_SECONDS = 1
-MIRIADA_TIMEOUT = 30
+MIRIADA_REQUEST_RETRIES = int(os.environ.get('MIRIADA_REQUEST_RETRIES', '2'))
+MIRIADA_RETRY_DELAY_SECONDS = float(os.environ.get('MIRIADA_RETRY_DELAY_SECONDS', '1'))
+MIRIADA_TIMEOUT = float(os.environ.get('MIRIADA_TIMEOUT', '30'))
 # Параллельная отправка статусов баллонов при закрытии партии (один Session на поток).
-MIRIADA_BATCH_SEND_WORKERS = 8
+MIRIADA_BATCH_SEND_WORKERS = int(os.environ.get('MIRIADA_BATCH_SEND_WORKERS', '8'))
+
+# Username пользователя Django, на которого пишутся события RFID-сканирования.
+RFID_EVENT_USERNAME = os.environ.get('RFID_EVENT_USERNAME')
 
 GAS_TYPE_CHOICES = [
     ('СПБТ', 'СПБТ'),
