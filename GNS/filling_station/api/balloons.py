@@ -26,14 +26,15 @@ from filling_station.models import (
     ReaderSettings,
 )
 from .serializers import BalloonSerializer
-from core.api.schema import ApiErrorSerializer
+from core.api.schema import (
+    FIELD_ERRORS_RESPONSE,
+    ErrorFieldSerializer,
+    MessageErrorSerializer,
+)
 
 
 logger = logging.getLogger('filling_station')
 
-
-# Схемы для Swagger
-ErrorResponseSerializer = ApiErrorSerializer
 
 UpdateByReaderResponseSerializer = inline_serializer(
     name='UpdateByReaderResponse',
@@ -64,7 +65,7 @@ UpdateByReaderResponseSerializer = inline_serializer(
         ],
         responses={
             200: BalloonSerializer,
-            404: ErrorResponseSerializer
+            404: MessageErrorSerializer,
         },
         examples=[
             OpenApiExample(
@@ -79,7 +80,13 @@ UpdateByReaderResponseSerializer = inline_serializer(
                     "filling_status": True
                 },
                 response_only=True
-            )
+            ),
+            OpenApiExample(
+                'Не найден',
+                value={"message": "Баллон с NFC-тегом 1234567890ABCDEF не найден"},
+                response_only=True,
+                status_codes=['404'],
+            ),
         ]
     ),
     get_by_serial_number=extend_schema(
@@ -102,7 +109,7 @@ UpdateByReaderResponseSerializer = inline_serializer(
         ],
         responses={
             200: BalloonSerializer(many=True),
-            404: ErrorResponseSerializer
+            404: MessageErrorSerializer,
         },
         examples=[
             OpenApiExample(
@@ -117,23 +124,24 @@ UpdateByReaderResponseSerializer = inline_serializer(
                     "filling_status": True
                 }],
                 response_only=True
-            )
+            ),
+            OpenApiExample(
+                'Не найден',
+                value={"message": "Баллон с серийным номером B12345 не найден"},
+                response_only=True,
+                status_codes=['404'],
+            ),
         ]
     ),
-    create = extend_schema(
+    create=extend_schema(
         tags=['Баллоны'],
         summary='Создать новый баллон',
         description='Создание нового баллона с проверкой уникальности NFC метки',
         request=BalloonSerializer,
         responses={
             201: BalloonSerializer,
-            400: inline_serializer(
-                name='BalloonCreateError',
-                fields={
-                    'errors': serializers.DictField()
-                }
-            ),
-            409: ApiErrorSerializer
+            400: FIELD_ERRORS_RESPONSE,
+            409: MessageErrorSerializer,
         },
         examples=[
             OpenApiExample(
@@ -165,10 +173,8 @@ UpdateByReaderResponseSerializer = inline_serializer(
             OpenApiExample(
                 'Ошибка валидации',
                 value={
-                    "errors": {
-                        "size": ["Обязательное поле."],
-                        "netto": ["Введите число."]
-                    }
+                    "size": ["Обязательное поле."],
+                    "netto": ["Введите число."]
                 },
                 response_only=True,
                 status_codes=['400']
@@ -176,7 +182,7 @@ UpdateByReaderResponseSerializer = inline_serializer(
             OpenApiExample(
                 'Конфликт NFC метки',
                 value={
-                    "detail": "Баллон с такой NFC меткой уже существует"
+                    "message": "Баллон с такой NFC меткой уже существует"
                 },
                 response_only=True,
                 status_codes=['409']
@@ -213,13 +219,8 @@ UpdateByReaderResponseSerializer = inline_serializer(
         ],
         responses={
             200: BalloonSerializer,
-            400: inline_serializer(
-                name='BalloonUpdateError',
-                fields={
-                    'errors': serializers.DictField()
-                }
-            ),
-            404: ApiErrorSerializer
+            400: FIELD_ERRORS_RESPONSE,
+            404: MessageErrorSerializer,
         },
         examples=[
             OpenApiExample(
@@ -242,7 +243,13 @@ UpdateByReaderResponseSerializer = inline_serializer(
                 },
                 response_only=True,
                 status_codes=['200']
-            )
+            ),
+            OpenApiExample(
+                'Не найден',
+                value={"message": "Баллон с NFC-тегом 1234567890ABCDEF не найден"},
+                response_only=True,
+                status_codes=['404'],
+            ),
         ]
     )
 )
@@ -568,7 +575,7 @@ class ManualTotalReadersCounterResponseSerializer(serializers.Serializer):
     request=ManualTotalReadersCounterRequestSerializer,
     responses={
         200: ManualTotalReadersCounterResponseSerializer,
-        400: ErrorResponseSerializer,
+        400: ErrorFieldSerializer,
     },
     examples=[
         OpenApiExample(

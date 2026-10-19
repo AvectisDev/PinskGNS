@@ -11,7 +11,7 @@ from drf_spectacular.utils import (
 )
 from carousel.models import CarouselSettings
 from .serializers import CarouselSettingsSerializer
-from core.api.schema import ApiErrorSerializer
+from core.api.schema import DetailErrorSerializer, FIELD_ERRORS_RESPONSE
 
 
 @extend_schema_view(
@@ -30,7 +30,7 @@ from core.api.schema import ApiErrorSerializer
         ],
         responses={
             200: CarouselSettingsSerializer,
-            404: ApiErrorSerializer
+            404: DetailErrorSerializer,
         }
     ),
     partial_update=extend_schema(
@@ -40,8 +40,8 @@ from core.api.schema import ApiErrorSerializer
         request=CarouselSettingsSerializer,
         responses={
             200: CarouselSettingsSerializer,
-            400: ApiErrorSerializer,
-            404: ApiErrorSerializer
+            400: FIELD_ERRORS_RESPONSE,
+            404: DetailErrorSerializer,
         },
         parameters=[
             OpenApiParameter(

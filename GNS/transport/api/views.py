@@ -6,7 +6,11 @@ from rest_framework import generics, status, viewsets
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
-from core.api.schema import ApiErrorSerializer
+from core.api.schema import (
+    DetailErrorSerializer,
+    ErrorFieldSerializer,
+    FIELD_ERRORS_RESPONSE,
+)
 from transport.api.serializers import TrailerSerializer, TruckSerializer
 from transport.models import Trailer, Truck
 
@@ -46,8 +50,7 @@ from transport.models import Trailer, Truck
         ],
         responses={
             200: TruckSerializer(many=True),
-            404: ApiErrorSerializer,
-            400: ApiErrorSerializer
+            404: DetailErrorSerializer,
         },
         examples=[
             OpenApiExample(
@@ -82,7 +85,7 @@ from transport.models import Trailer, Truck
         request=TruckSerializer,
         responses={
             201: TruckSerializer,
-            400: ApiErrorSerializer
+            400: FIELD_ERRORS_RESPONSE,
         },
         examples=[
             OpenApiExample(
@@ -110,8 +113,8 @@ from transport.models import Trailer, Truck
         request=TruckSerializer,
         responses={
             200: TruckSerializer,
-            400: ApiErrorSerializer,
-            404: ApiErrorSerializer
+            400: ErrorFieldSerializer,
+            404: DetailErrorSerializer,
         },
         examples=[
             OpenApiExample(
@@ -246,8 +249,7 @@ class TruckView(APIView):
         ],
         responses={
             200: TrailerSerializer(many=True),
-            404: ApiErrorSerializer,
-            400: ApiErrorSerializer
+            404: DetailErrorSerializer,
         },
         examples=[
             OpenApiExample(
@@ -279,7 +281,7 @@ class TruckView(APIView):
         request=TrailerSerializer,
         responses={
             201: TrailerSerializer,
-            400: ApiErrorSerializer
+            400: FIELD_ERRORS_RESPONSE,
         },
         examples=[
             OpenApiExample(
@@ -308,8 +310,8 @@ class TruckView(APIView):
         request=TrailerSerializer,
         responses={
             200: TrailerSerializer,
-            400: ApiErrorSerializer,
-            404: ApiErrorSerializer
+            400: ErrorFieldSerializer,
+            404: DetailErrorSerializer,
         },
         examples=[
             OpenApiExample(

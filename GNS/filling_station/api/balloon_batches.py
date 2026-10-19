@@ -18,7 +18,7 @@ from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
-from core.api.schema import ApiErrorSerializer
+from core.api.schema import FIELD_ERRORS_RESPONSE, MessageErrorSerializer
 from filling_station.api.batch_status import batch_status_to_api, is_api_close_request
 from filling_station.models import BalloonsBatch, BatchStatus
 from filling_station.services.batches import (
@@ -37,6 +37,30 @@ from .serializers import (
 
 logger = logging.getLogger('filling_station')
 
+BatchCloseMismatchErrorSerializer = inline_serializer(
+    name='BatchCloseMismatchError',
+    fields={
+        'message': serializers.CharField(),
+        'count_mismatch': serializers.BooleanField(),
+        'amount_of_ttn': serializers.IntegerField(),
+        'amount_of_rfid': serializers.IntegerField(),
+        'amount_of_sensor': serializers.IntegerField(),
+        'id': serializers.IntegerField(),
+    },
+)
+
+BatchCloseMiriadaFailedSerializer = inline_serializer(
+    name='BatchCloseMiriadaFailed',
+    fields={
+        'message': serializers.CharField(),
+        'miriada_close_failed': serializers.BooleanField(),
+        'miriada_error_message': serializers.CharField(allow_null=True),
+        'id': serializers.IntegerField(),
+        'status': serializers.IntegerField(
+            help_text='API-enum: обычно 4=MIRIADA_ERROR',
+        ),
+    },
+)
 
 def _api_user(request) -> str:
     """
@@ -60,7 +84,7 @@ BalloonOperationResponse = inline_serializer(
         'success': serializers.BooleanField(),
         'balloon_id': serializers.CharField(allow_null=True),
         'new_count': serializers.IntegerField(),
-        'error': serializers.CharField()
+        'message': serializers.CharField(required=False),
     }
 )
 
@@ -195,7 +219,7 @@ def _close_batch_response(batch: BalloonsBatch, data, *, log_prefix: str, api_us
         ],
         responses={
             200: ActiveBatchSerializer(many=True),
-            400: ApiErrorSerializer,
+            400: MessageErrorSerializer,
         }
     ),
     last_active=extend_schema(
@@ -216,7 +240,7 @@ def _close_batch_response(batch: BalloonsBatch, data, *, log_prefix: str, api_us
         ],
         responses={
             200: BalloonsBatchSerializer,
-            404: ApiErrorSerializer
+            404: MessageErrorSerializer,
         }
     ),
     rfid_amount=extend_schema(
@@ -236,7 +260,7 @@ def _close_batch_response(batch: BalloonsBatch, data, *, log_prefix: str, api_us
         ],
         responses={
             200: BalloonAmountSerializer,
-            404: ApiErrorSerializer
+            404: MessageErrorSerializer,
         }
     ),
     create=extend_schema(
@@ -251,7 +275,7 @@ def _close_batch_response(batch: BalloonsBatch, data, *, log_prefix: str, api_us
         request=BalloonsBatchSerializer,
         responses={
             201: BalloonsBatchSerializer,
-            400: ApiErrorSerializer
+            400: FIELD_ERRORS_RESPONSE,
         }
     ),
     partial_update=extend_schema(
@@ -266,7 +290,9 @@ def _close_batch_response(batch: BalloonsBatch, data, *, log_prefix: str, api_us
             'Доступно для статусов 1=ACTIVE, 2=PAUSED и 4=MIRIADA_ERROR. '
             'При ошибке closettn партия переходит в 4=MIRIADA_ERROR (ответ HTTP 502).\n\n'
             'Устаревший способ (обратная совместимость): `"is_active": false`. '
-            'Поле `is_active` удалено из модели — используйте `status`.'
+            'Поле `is_active` удалено из модели — используйте `status`.\n\n'
+            '**400 при закрытии** может быть: ошибки валидации полей, '
+            '`count_mismatch`, `balloon_status_errors` или `{"message": "..."}`.'
         ),
         parameters=[
             OpenApiParameter(
@@ -279,9 +305,9 @@ def _close_batch_response(batch: BalloonsBatch, data, *, log_prefix: str, api_us
         request=BalloonsBatchSerializer,
         responses={
             200: BalloonsBatchSerializer,
-            400: ApiErrorSerializer,
-            404: ApiErrorSerializer,
-            502: ApiErrorSerializer,
+            400: BatchCloseMismatchErrorSerializer,
+            404: MessageErrorSerializer,
+            502: BatchCloseMiriadaFailedSerializer,
         }
     ),
     add_balloon=extend_schema(
@@ -309,9 +335,9 @@ def _close_batch_response(batch: BalloonsBatch, data, *, log_prefix: str, api_us
         ],
         responses={
             200: BalloonOperationResponse,
-            400: BalloonOperationResponse,
-            404: BalloonOperationResponse,
-            409: BalloonOperationResponse
+            400: MessageErrorSerializer,
+            404: MessageErrorSerializer,
+            409: MessageErrorSerializer,
         }
     ),
     remove_balloon=extend_schema(
@@ -337,8 +363,8 @@ def _close_batch_response(batch: BalloonsBatch, data, *, log_prefix: str, api_us
         ],
         responses={
             200: BalloonOperationResponse,
-            400: BalloonOperationResponse,
-            404: BalloonOperationResponse
+            400: MessageErrorSerializer,
+            404: MessageErrorSerializer,
         }
     ),
     retry_close=extend_schema(
@@ -361,9 +387,9 @@ def _close_batch_response(batch: BalloonsBatch, data, *, log_prefix: str, api_us
         ],
         responses={
             200: BalloonsBatchSerializer,
-            400: ApiErrorSerializer,
-            404: ApiErrorSerializer,
-            502: ApiErrorSerializer,
+            400: BatchCloseMismatchErrorSerializer,
+            404: MessageErrorSerializer,
+            502: BatchCloseMiriadaFailedSerializer,
         }
     ),
     pause=extend_schema(
@@ -384,8 +410,8 @@ def _close_batch_response(batch: BalloonsBatch, data, *, log_prefix: str, api_us
         ],
         responses={
             200: BalloonsBatchSerializer,
-            400: ApiErrorSerializer,
-            404: ApiErrorSerializer,
+            400: MessageErrorSerializer,
+            404: MessageErrorSerializer,
         }
     ),
     resume=extend_schema(
@@ -406,8 +432,8 @@ def _close_batch_response(batch: BalloonsBatch, data, *, log_prefix: str, api_us
         ],
         responses={
             200: BalloonsBatchSerializer,
-            400: ApiErrorSerializer,
-            404: ApiErrorSerializer,
+            400: MessageErrorSerializer,
+            404: MessageErrorSerializer,
         }
     ),
 )

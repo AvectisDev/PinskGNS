@@ -15,9 +15,6 @@ from drf_spectacular.utils import (
 from ttn import services
 from ttn.models import MiriadaTtn, MiriadaTtnStatus
 from ttn.api.serializers import MiriadaTtnSerializer
-from core.api.schema import ApiErrorSerializer
-
-
 logger = logging.getLogger('filling_station')
 
 
@@ -29,11 +26,11 @@ logger = logging.getLogger('filling_station')
             'Получение списка текущих ТТН из системы Мириада. '
             'В ответ попадают только незакрытые ТТН (status 1 или 2) за последние 5 дней. '
             'Поля: name, auto, operation_name, date, ttn_id, status '
-            '(1=не обрабатывалась, 2=ошибка, 3=закрыта — в этот список не попадает).'
+            '(1=не обрабатывалась, 2=ошибка, 3=закрыта — в этот список не попадает). '
+            'Ошибки синхронизации с Мириадой логируются; endpoint всегда отвечает HTTP 200.'
         ),
         responses={
             200: MiriadaTtnSerializer(many=True),
-            500: ApiErrorSerializer,
         },
         examples=[
             OpenApiExample(
@@ -58,14 +55,6 @@ logger = logging.getLogger('filling_station')
                 ],
                 response_only=True
             ),
-            OpenApiExample(
-                'Пример ошибки',
-                value={
-                    'error': 'Не удалось получить список ТТН из Мириады'
-                },
-                response_only=True,
-                status_codes=['500']
-            )
         ]
     )
 )

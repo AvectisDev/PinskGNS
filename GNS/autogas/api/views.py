@@ -20,7 +20,7 @@ from autogas.services import (
     with_completed_at_on_deactivate,
 )
 from .serializers import AutoGasBatchSerializer
-from core.api.schema import ApiErrorSerializer
+from core.api.schema import DetailErrorSerializer, FIELD_ERRORS_RESPONSE
 
 
 @extend_schema_view(
@@ -85,7 +85,6 @@ from core.api.schema import ApiErrorSerializer
         description='Получение списка активных партий автоцистерн за сегодня',
         responses={
             200: AutoGasBatchSerializer(many=True),
-            404: ApiErrorSerializer
         }
     ),
     create=extend_schema(
@@ -95,7 +94,7 @@ from core.api.schema import ApiErrorSerializer
         request=AutoGasBatchSerializer,
         responses={
             201: AutoGasBatchSerializer,
-            400: ApiErrorSerializer
+            400: FIELD_ERRORS_RESPONSE,
         }
     ),
     partial_update=extend_schema(
@@ -113,8 +112,8 @@ from core.api.schema import ApiErrorSerializer
         ],
         responses={
             200: AutoGasBatchSerializer,
-            400: ApiErrorSerializer,
-            404: ApiErrorSerializer
+            400: FIELD_ERRORS_RESPONSE,
+            404: DetailErrorSerializer,
         }
     )
 )
