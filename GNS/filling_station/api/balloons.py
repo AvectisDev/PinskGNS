@@ -413,20 +413,21 @@ class BalloonViewSet(viewsets.ViewSet):
                 status=status.HTTP_404_NOT_FOUND
             )
 
-        new_tag = request.data.get('nfc_tag', None)
-
-        if pk != new_tag:  # Процедура смены метки
+        # Смена метки только если nfc_tag явно передан и отличается от pk.
+        # Без этого PATCH {"status": "..."} ошибочно удалял баллон (new_tag=None).
+        new_tag = request.data.get('nfc_tag', serializers.empty)
+        if new_tag is not serializers.empty and new_tag not in (None, '') and new_tag != pk:
             if Balloon.objects.filter(nfc_tag=new_tag).exists():
                 return Response(
                     {"message": f"Баллон с NFC-тегом {new_tag} уже существует"},
-                    status=status.HTTP_400_BAD_REQUEST
-                    )
-            else:
-                balloon.delete()
-                serializer = BalloonSerializer(data=request.data, partial=True)
-                if serializer.is_valid():
-                    serializer.save()
-                    return Response(serializer.data)
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            balloon.delete()
+            create_data = {**dict(request.data), 'nfc_tag': new_tag}
+            serializer = BalloonSerializer(data=create_data)
+            if serializer.is_valid():
+                serializer.save()
+                return Response(serializer.data)
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
         serializer = BalloonSerializer(balloon, data=request.data, partial=True)
