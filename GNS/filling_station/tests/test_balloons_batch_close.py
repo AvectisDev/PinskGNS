@@ -10,13 +10,13 @@ from filling_station.models import Balloon, BalloonsBatch, BatchStatus, ReaderSe
 from transport.models import Truck, TruckType
 from filling_station.api.balloon_batches import _balloon_operation_error_status
 from filling_station.api.batch_status import STATUS_TO_API
-from filling_station.services import (
+from filling_station.services.batches import (
     add_balloon_to_batch_by_nfc,
     pause_balloons_batch,
-    processing_request_without_nfc,
     save_and_close_balloons_batch,
     should_send_balloon_status_immediately,
 )
+from filling_station.services.rfid import processing_request_without_nfc
 
 
 class BalloonsBatchCloseTests(APITestCase):
@@ -186,22 +186,21 @@ class BalloonsBatchCloseTests(APITestCase):
         add_balloon_to_batch_by_nfc(self.batch, self.balloon.nfc_tag)
         mock_send.reset_mock()
 
-        success, close_error, data = save_and_close_balloons_batch(self.batch)
+        success, close_error = save_and_close_balloons_batch(self.batch)
         self.assertTrue(success)
         self.assertIsNone(close_error)
         mock_send.assert_not_called()
         mock_close.assert_called_once()
         self.batch.refresh_from_db()
         self.assertEqual(self.batch.status, BatchStatus.COMPLETED)
-        self.assertEqual(data['amount_of_ttn'], 1)
+        self.assertEqual(self.batch.amount_of_ttn, 1)
 
     @patch('ttn.services.close_ttn_in_miriada')
     @patch('filling_station.services.batches.post_status_to_miriada')
     def test_close_rejected_when_rfid_does_not_match_ttn(self, mock_send, mock_close):
-        success, error, data = save_and_close_balloons_batch(self.batch)
+        success, error = save_and_close_balloons_batch(self.batch)
         self.assertFalse(success)
         self.assertTrue(error['count_mismatch'])
-        self.assertIsNone(data)
         mock_send.assert_not_called()
         mock_close.assert_not_called()
         self.batch.refresh_from_db()
@@ -228,7 +227,7 @@ class BalloonsBatchCloseTests(APITestCase):
         mock_send.reset_mock()
         mock_send.side_effect = None
 
-        success, close_error, _data = save_and_close_balloons_batch(self.batch)
+        success, close_error = save_and_close_balloons_batch(self.batch)
         self.assertTrue(success)
         self.assertIsNone(close_error)
         mock_send.assert_called_once()
@@ -247,10 +246,9 @@ class BalloonsBatchCloseTests(APITestCase):
         mock_send.reset_mock()
         mock_send.side_effect = MiriadaAPIError('-8')
 
-        success, error, data = save_and_close_balloons_batch(self.batch)
+        success, error = save_and_close_balloons_batch(self.batch)
         self.assertFalse(success)
         self.assertTrue(error['balloon_status_errors'])
-        self.assertIsNone(data)
         mock_send.assert_called_once()
         mock_close.assert_not_called()
         self.batch.refresh_from_db()
@@ -270,7 +268,7 @@ class BalloonsBatchCloseTests(APITestCase):
         mock_send.reset_mock()
         mock_send.side_effect = None
 
-        success, close_error, _data = save_and_close_balloons_batch(self.batch)
+        success, close_error = save_and_close_balloons_batch(self.batch)
         self.assertTrue(success)
         self.assertIsNone(close_error)
         mock_send.assert_called_once()
@@ -307,7 +305,7 @@ class BalloonsBatchCloseTests(APITestCase):
         self.batch.save(update_fields=['status', 'miriada_close_failed'])
         mock_send.reset_mock()
 
-        success, error, _data = save_and_close_balloons_batch(self.batch)
+        success, error = save_and_close_balloons_batch(self.batch)
         self.assertTrue(success)
         self.assertIsNone(error)
         mock_send.assert_not_called()

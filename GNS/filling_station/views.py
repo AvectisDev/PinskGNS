@@ -21,7 +21,7 @@ from .forms import (
     BalloonForm,
     BalloonsBatchForm
 )
-from .services import save_and_close_balloons_batch
+from filling_station.services.batches import save_and_close_balloons_batch
 from datetime import datetime, time, timedelta
 
 
@@ -411,7 +411,7 @@ def balloon_batch_retry_close(request, pk):
         messages.error(request, 'Партия уже завершена.')
         return redirect_preserve_query(request, batch.get_absolute_url())
 
-    success, error_payload, _ = save_and_close_balloons_batch(batch, request.POST)
+    success, error_payload = save_and_close_balloons_batch(batch)
     if success:
         messages.success(request, f'Партия №{batch.id} успешно завершена. ТТН закрыта в Мириаде.')
     elif isinstance(error_payload, dict) and error_payload.get('message'):

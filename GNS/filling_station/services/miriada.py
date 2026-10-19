@@ -292,7 +292,7 @@ def _get_send_urls() -> Dict[str, str]:
     }
 
 
-def _prepare_payload_for_miriada(
+def prepare_payload_for_miriada(
     reader: int,
     nfc_tag: str,
     batch: Optional[BalloonsBatch] = None,
@@ -358,7 +358,7 @@ def send_status_to_miriada(
         MiriadaAPIError: при ошибке подготовки данных или HTTP-запроса.
     """
     try:
-        url, payload, send_type = _prepare_payload_for_miriada(reader, nfc_tag, batch=batch)
+        url, payload, send_type = prepare_payload_for_miriada(reader, nfc_tag, batch=batch)
     except ValueError as e:
         error_msg = f"Ошибка подготовки данных для отправки: {str(e)}"
         logger.error(error_msg)

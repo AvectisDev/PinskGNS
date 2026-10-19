@@ -4,7 +4,7 @@ from django.contrib.auth.models import User
 from django.test import TestCase
 
 from filling_station.models import DailyReaderCounter, ReaderSettings, TotalReadersCounter
-from filling_station.services import (
+from filling_station.services.rfid import (
     processing_request_with_nfc,
     processing_request_without_nfc,
 )

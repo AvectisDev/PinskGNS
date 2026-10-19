@@ -1,12 +1,11 @@
 """API ViewSet партий приёмки/отгрузки баллонов и endpoint для SCADA."""
 
+import logging
+
+from django.db.models import Count
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
-from rest_framework import serializers, status, viewsets
-from rest_framework.decorators import action, api_view, permission_classes
-from rest_framework.permissions import IsAuthenticated
-from rest_framework.response import Response
 from drf_spectacular.utils import (
     extend_schema,
     extend_schema_view,
@@ -14,19 +13,22 @@ from drf_spectacular.utils import (
     OpenApiParameter,
     OpenApiTypes,
 )
-import logging
+from rest_framework import serializers, status, viewsets
+from rest_framework.decorators import action, api_view, permission_classes
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
 
-from filling_station.models import BalloonsBatch, BatchStatus
+from core.api.schema import ApiErrorSerializer
 from filling_station.api.batch_status import batch_status_to_api, is_api_close_request
-from filling_station.services import (
+from filling_station.models import BalloonsBatch, BatchStatus
+from filling_station.services.batches import (
+    BATCH_CLOSE_WRITABLE_FIELDS,
+    OPEN_BATCH_STATUSES,
     add_balloon_to_batch_by_nfc,
     pause_balloons_batch,
     resume_balloons_batch,
     save_and_close_balloons_batch,
 )
-from filling_station.services.batches import OPEN_BATCH_STATUSES
-from core.api.schema import ApiErrorSerializer
-from django.db.models import Count
 from .serializers import (
     ActiveBatchSerializer,
     BalloonAmountSerializer,
@@ -109,6 +111,68 @@ def _api_error_payload(payload):
     if isinstance(payload, dict) and 'status' in payload:
         return {**payload, 'status': batch_status_to_api(payload['status'])}
     return payload
+
+
+def _apply_batch_close_writable_fields(batch: BalloonsBatch, data) -> tuple[bool, object]:
+    """
+    Применяет writable-поля партии перед закрытием через сериализатор.
+
+    Args:
+        batch: партия для обновления.
+        data: тело запроса (dict-like).
+
+    Returns:
+        tuple: (успех, None) или (False, ошибки сериализатора).
+    """
+    payload = {
+        key: value
+        for key, value in (data or {}).items()
+        if key in BATCH_CLOSE_WRITABLE_FIELDS
+    }
+    if not payload:
+        return True, None
+    serializer = BalloonsBatchSerializer(batch, data=payload, partial=True)
+    if not serializer.is_valid():
+        return False, serializer.errors
+    serializer.save()
+    batch.refresh_from_db()
+    return True, None
+
+
+def _close_batch_response(batch: BalloonsBatch, data, *, log_prefix: str, api_user: str):
+    """
+    Применяет поля, закрывает партию и формирует HTTP-ответ.
+
+    Args:
+        batch: партия для закрытия.
+        data: тело запроса.
+        log_prefix: префикс для логов.
+        api_user: идентификатор пользователя API.
+
+    Returns:
+        Response: 200 с данными партии или 400/502 при ошибке.
+    """
+    fields_ok, field_errors = _apply_batch_close_writable_fields(batch, data)
+    if not fields_ok:
+        logger.warning(
+            f"{log_prefix} validation failed: user={api_user}, batch_id={batch.id}, "
+            f"errors={field_errors}"
+        )
+        return Response(field_errors, status=status.HTTP_400_BAD_REQUEST)
+
+    success, error_payload = save_and_close_balloons_batch(batch)
+    if not success:
+        logger.warning(
+            f"{log_prefix} failed: user={api_user}, batch_id={batch.id}, "
+            f"error={error_payload}"
+        )
+        error_payload = _api_error_payload(error_payload)
+        if isinstance(error_payload, dict) and error_payload.get('miriada_close_failed'):
+            return Response(error_payload, status=status.HTTP_502_BAD_GATEWAY)
+        return Response(error_payload, status=status.HTTP_400_BAD_REQUEST)
+
+    logger.info(f"{log_prefix} ok: user={api_user}, batch_id={batch.id}")
+    return Response(BalloonsBatchSerializer(batch).data)
 
 
 @extend_schema_view(
@@ -521,18 +585,12 @@ class BalloonsBatchViewSet(viewsets.ViewSet):
                 f"ttn_id={batch.ttn_id}, amount_of_rfid={batch.rfid_balloon_count()}, "
                 f"amount_of_ttn={batch.amount_of_ttn}, data={dict(request.data)}"
             )
-            success, error_payload, response_data = save_and_close_balloons_batch(batch, request.data)
-            if not success:
-                logger.warning(
-                    f"API close batch failed: user={_api_user(request)}, batch_id={batch.id}, "
-                    f"error={error_payload}"
-                )
-                error_payload = _api_error_payload(error_payload)
-                if isinstance(error_payload, dict) and error_payload.get('miriada_close_failed'):
-                    return Response(error_payload, status=status.HTTP_502_BAD_GATEWAY)
-                return Response(error_payload, status=status.HTTP_400_BAD_REQUEST)
-            logger.info(f"API close batch ok: user={_api_user(request)}, batch_id={batch.id}")
-            return Response(response_data)
+            return _close_batch_response(
+                batch,
+                request.data,
+                log_prefix='API close batch',
+                api_user=_api_user(request),
+            )
 
         serializer = BalloonsBatchSerializer(batch, data=request.data, partial=True)
         if serializer.is_valid():
@@ -580,18 +638,12 @@ class BalloonsBatchViewSet(viewsets.ViewSet):
             f"ttn_id={batch.ttn_id}, amount_of_rfid={batch.rfid_balloon_count()}, "
             f"amount_of_ttn={batch.amount_of_ttn}"
         )
-        success, error_payload, response_data = save_and_close_balloons_batch(batch, request.data)
-        if not success:
-            logger.warning(
-                f"API retry-close failed: user={_api_user(request)}, batch_id={batch.id}, "
-                f"error={error_payload}"
-            )
-            error_payload = _api_error_payload(error_payload)
-            if isinstance(error_payload, dict) and error_payload.get('miriada_close_failed'):
-                return Response(error_payload, status=status.HTTP_502_BAD_GATEWAY)
-            return Response(error_payload, status=status.HTTP_400_BAD_REQUEST)
-        logger.info(f"API retry-close ok: user={_api_user(request)}, batch_id={batch.id}")
-        return Response(response_data)
+        return _close_batch_response(
+            batch,
+            request.data,
+            log_prefix='API retry-close',
+            api_user=_api_user(request),
+        )
 
     @action(detail=True, methods=['patch'], url_path='add-balloon')
     def add_balloon(self, request, pk=None):

@@ -11,9 +11,9 @@ from django.utils import timezone
 from filling_station.exceptions import MiriadaAPIError
 from filling_station.models import Balloon, BalloonsBatch, BatchStatus
 from filling_station.services.miriada import (
-    _prepare_payload_for_miriada,
     get_thread_miriada_session,
     post_status_to_miriada,
+    prepare_payload_for_miriada,
 )
 
 logger = logging.getLogger('filling_station')
@@ -197,7 +197,7 @@ def add_balloon_to_batch_by_nfc(batch: BalloonsBatch, nfc_tag: str) -> dict:
         prepared_batch = BalloonsBatch.objects.select_related(
             'truck', 'truck__type', 'trailer'
         ).get(pk=batch.pk)
-        url, payload, send_type = _prepare_payload_for_miriada(
+        url, payload, send_type = prepare_payload_for_miriada(
             reader_number, nfc_tag, batch=prepared_batch
         )
         post_status_to_miriada(url, payload, send_type)
@@ -337,7 +337,7 @@ def send_batch_balloon_statuses_to_miriada(
     jobs = []
     for nfc_tag in tags_to_send:
         try:
-            url, payload, send_type = _prepare_payload_for_miriada(
+            url, payload, send_type = prepare_payload_for_miriada(
                 reader_number, nfc_tag, batch=prepared_batch
             )
         except ValueError as exc:
@@ -498,36 +498,20 @@ BATCH_CLOSE_WRITABLE_FIELDS = frozenset({
 })
 
 
-def save_and_close_balloons_batch(batch: BalloonsBatch, data=None):
+def save_and_close_balloons_batch(batch: BalloonsBatch):
     """
-    Сохраняет данные партии, повторяет ошибочные статусы и закрывает ТТН.
+    Повторяет ошибочные статусы баллонов и закрывает ТТН.
 
     Порядок: повтор только баллонов с ошибкой → сверка RFID с ТТН →
     отсутствие ошибок на баллонах → ``closettn``.
-    Пустое тело запроса допустимо: берутся текущие данные партии из БД.
+    Применение writable-полей партии — ответственность caller (API/views).
 
     Args:
-        batch (BalloonsBatch): партия для сохранения и закрытия.
-        data: частичные поля партии из запроса (или None).
+        batch (BalloonsBatch): партия для закрытия.
 
     Returns:
-        tuple: (успех, ошибка/payload, сериализованные данные или None).
+        tuple: (успех, ошибка/payload или None).
     """
-    from filling_station.api.serializers import BalloonsBatchSerializer
-
-    payload = {
-        key: value
-        for key, value in (data or {}).items()
-        if key in BATCH_CLOSE_WRITABLE_FIELDS
-    }
-
-    if payload:
-        serializer = BalloonsBatchSerializer(batch, data=payload, partial=True)
-        if not serializer.is_valid():
-            return False, serializer.errors, None
-        serializer.save()
-        batch.refresh_from_db()
-
     error_tags = _error_balloon_nfc_tags(batch)
     if error_tags:
         send_batch_balloon_statuses_to_miriada(batch, nfc_tags=error_tags)
@@ -538,10 +522,10 @@ def save_and_close_balloons_batch(batch: BalloonsBatch, data=None):
                 'balloon_status_errors': True,
                 'id': batch.id,
                 'status': batch.status,
-            }, None
+            }
 
     if batch.amount_of_ttn and batch.rfid_balloon_count() != batch.amount_of_ttn:
-        return False, _count_mismatch_payload(batch), None
+        return False, _count_mismatch_payload(batch)
 
     if _batch_has_balloon_status_errors(batch):
         return False, {
@@ -549,13 +533,13 @@ def save_and_close_balloons_batch(batch: BalloonsBatch, data=None):
             'balloon_status_errors': True,
             'id': batch.id,
             'status': batch.status,
-        }, None
+        }
 
     success, error_message = attempt_close_balloons_batch(batch)
     batch.refresh_from_db()
 
     if success:
-        return True, None, BalloonsBatchSerializer(batch).data
+        return True, None
 
     return False, {
         'message': error_message,
@@ -563,4 +547,4 @@ def save_and_close_balloons_batch(batch: BalloonsBatch, data=None):
         'miriada_error_message': batch.miriada_error_message,
         'id': batch.id,
         'status': batch.status,
-    }, None
+    }
