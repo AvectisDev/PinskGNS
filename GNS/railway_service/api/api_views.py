@@ -13,8 +13,9 @@ from drf_spectacular.utils import (
     extend_schema,
     extend_schema_view,
     inline_serializer,
+    OpenApiExample,
+    OpenApiParameter,
     OpenApiTypes,
-    OpenApiExample
 )
 from datetime import datetime, date
 from railway_service.models import RailwayTank, RailwayBatch, RailwayTankHistory
@@ -79,6 +80,14 @@ from core.api.schema import ApiErrorSerializer
         summary='Обновить партию',
         description='Частичное обновление данных железнодорожной партии',
         request=RailwayBatchSerializer,
+        parameters=[
+            OpenApiParameter(
+                name='id',
+                type=OpenApiTypes.INT,
+                location=OpenApiParameter.PATH,
+                description='ID железнодорожной партии',
+            ),
+        ],
         responses={
             200: RailwayBatchSerializer,
             400: ApiErrorSerializer,
@@ -88,6 +97,7 @@ from core.api.schema import ApiErrorSerializer
 )
 class RailwayBatchView(viewsets.ViewSet):
     permission_classes = [IsAuthenticated]
+    serializer_class = RailwayBatchSerializer
 
     @action(detail=False, methods=['get'], url_path='statistic')
     def railway_batch_statistic(self, request):

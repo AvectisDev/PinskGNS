@@ -11,14 +11,7 @@ from ..models import (
 from filling_station.api.batch_status import batch_status_from_api, batch_status_to_api
 from filling_station.services.batches import pause_other_active_batches_on_reader
 
-@extend_schema_field({
-    'type': 'integer',
-    'enum': [1, 2, 3, 4],
-    'description': (
-        'Числовой enum: 1=ACTIVE, 2=PAUSED, 3=COMPLETED, 4=MIRIADA_ERROR '
-        '(0=UNSPECIFIED не используется в запросах)'
-    ),
-})
+@extend_schema_field({'$ref': '#/components/schemas/BalloonBatchStatusApiEnum'})
 class BatchStatusApiField(serializers.Field):
     """
     API: числовой enum статуса партии.
@@ -132,6 +125,7 @@ class BalloonsBatchSerializer(serializers.ModelSerializer):
             'balloons_type',
         ]
 
+    @extend_schema_field(serializers.CharField(allow_null=True))
     def get_ttn_name(self, obj):
         """
         Возвращает человекочитаемое имя ТТН партии.
@@ -209,6 +203,7 @@ class ActiveBatchSerializer(serializers.ModelSerializer):
             'balloons_type',
         ]
 
+    @extend_schema_field(serializers.CharField(allow_null=True))
     def get_ttn_name(self, obj):
         """
         Возвращает человекочитаемое имя ТТН партии.
@@ -248,6 +243,7 @@ class BalloonAmountSerializer(serializers.ModelSerializer):
             'error_balloons',
         ]
 
+    @extend_schema_field(BalloonStatusErrorSerializer(many=True))
     def get_error_balloons(self, obj):
         """
         Баллоны партии с непустой ошибкой отправки статуса в Мириаду.

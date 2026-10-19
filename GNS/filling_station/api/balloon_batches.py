@@ -414,6 +414,7 @@ def _close_batch_response(batch: BalloonsBatch, data, *, log_prefix: str, api_us
 class BalloonsBatchViewSet(viewsets.ViewSet):
     """API партий приёмки/отгрузки баллонов. Состояние задаётся полем `status`."""
     permission_classes = [IsAuthenticated]
+    serializer_class = BalloonsBatchSerializer
 
     def get_batch_type(self, request):
         """

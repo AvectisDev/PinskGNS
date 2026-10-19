@@ -84,11 +84,15 @@ INTERNAL_IPS = [
 
 # Настройки drf-spectacular
 SPECTACULAR_SETTINGS = {
-    'TITLE': 'Balloon Management API',
-    'DESCRIPTION': 'API for managing gas balloons, loading/unloading batches and integration with Miriada system',
+    'TITLE': 'GNS API',
+    'DESCRIPTION': (
+        'API газонаполнительной станции: баллоны, партии приёмки/отгрузки, '
+        'транспорт, ТТН, карусель, автогаз, ж/д и интеграция с Мириадой.'
+    ),
     'VERSION': '1.0.0',
     'SERVE_INCLUDE_SCHEMA': False,
-    'SCHEMA_PATH_PREFIX': r'/api/v[0-9]',
+    # Префикс путей API (без /v1 — маршруты вида /api/...)
+    'SCHEMA_PATH_PREFIX': r'/api',
     'COMPONENT_SPLIT_REQUEST': True,
     'SERVERS': [
         {
@@ -110,6 +114,22 @@ SPECTACULAR_SETTINGS = {
                 'description': 'JWT access token from POST /api/token/',
             },
         },
+        'schemas': {
+            'BalloonBatchStatusApiEnum': {
+                'type': 'integer',
+                'enum': [1, 2, 3, 4],
+                'description': (
+                    'Статус партии баллонов: 1=ACTIVE, 2=PAUSED, 3=COMPLETED, 4=MIRIADA_ERROR'
+                ),
+            },
+            'MiriadaTtnStatusApiEnum': {
+                'type': 'integer',
+                'enum': [1, 2, 3],
+                'description': (
+                    'Статус ТТН Мириады: 1=NOT_PROCESSED, 2=ERROR, 3=CLOSED'
+                ),
+            },
+        },
     },
     'SECURITY': [{'bearerAuth': []}],
     'SWAGGER_UI_SETTINGS': {
@@ -124,6 +144,7 @@ SPECTACULAR_SETTINGS = {
     'TAGS_SORTER': 'alpha',
     'OPERATIONS_SORTER': 'alpha',
     'DEFAULT_TAG': 'Другое',
+    # ENUM_NAME_OVERRIDES заполняется ниже после определения CHOICES
 }
 
 REST_FRAMEWORK = {
@@ -329,3 +350,11 @@ BALLOON_SIZE_CHOICES = [
     (27, 27),
     (50, 50),
 ]
+
+# Именованные enum для OpenAPI (убирает автогенерацию BatchTypeB69Enum и т.п.).
+SPECTACULAR_SETTINGS['ENUM_NAME_OVERRIDES'] = {
+    'BatchTypeEnum': BATCH_TYPE_CHOICES,
+    'BalloonTypeEnum': BALLOON_TYPE_CHOICES,
+    'BalloonSizeEnum': BALLOON_SIZE_CHOICES,
+    'GasTypeEnum': GAS_TYPE_CHOICES,
+}

@@ -5,14 +5,7 @@ from ttn.api.status import miriada_ttn_status_to_api
 from ttn.models import MiriadaTtn
 
 
-@extend_schema_field({
-    'type': 'integer',
-    'enum': [1, 2, 3],
-    'description': (
-        'Числовой enum: 1=NOT_PROCESSED (не обрабатывалась), '
-        '2=ERROR (ошибка при обработке), 3=CLOSED (закрыта)'
-    ),
-})
+@extend_schema_field({'$ref': '#/components/schemas/MiriadaTtnStatusApiEnum'})
 class MiriadaTtnStatusApiField(serializers.Field):
     """API: числовой enum статуса ТТН из Мириады (только чтение)."""
 

@@ -45,16 +45,17 @@ from core.api.schema import ApiErrorSerializer
         },
         parameters=[
             OpenApiParameter(
-                name='pk',
+                name='id',
                 type=OpenApiTypes.INT,
                 location=OpenApiParameter.PATH,
-                description='Номер карусели (CarouselSettings.number)'
+                description='Номер карусели (CarouselSettings.number)',
             )
         ]
     ),
 )
 class CarouselViewSet(viewsets.ViewSet):
     permission_classes = [AllowAny]
+    serializer_class = CarouselSettingsSerializer
 
     @action(detail=False, methods=['get'], url_path='get-parameter')
     def get_parameter(self, request):

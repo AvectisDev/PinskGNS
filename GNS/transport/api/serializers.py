@@ -1,5 +1,6 @@
 """Сериализаторы API грузовиков и прицепов."""
 
+from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 
 from transport.models import Trailer, Truck
@@ -30,6 +31,7 @@ class TrailerSerializer(serializers.ModelSerializer):
             'departure_at',
         ]
 
+    @extend_schema_field(serializers.CharField())
     def get_type(self, obj):
         return obj.type.type
 
@@ -60,9 +62,11 @@ class TruckSerializer(serializers.ModelSerializer):
             'trailer',
         ]
 
+    @extend_schema_field(serializers.CharField())
     def get_type(self, obj):
         return obj.type.type
 
+    @extend_schema_field(TrailerSerializer)
     def get_trailer(self, obj):
         trailer = obj.trailer.first()
         if trailer:

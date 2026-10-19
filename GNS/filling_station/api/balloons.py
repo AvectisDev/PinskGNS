@@ -10,11 +10,12 @@ from rest_framework.decorators import api_view, action, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from drf_spectacular.utils import (
     extend_schema,
-    OpenApiParameter,
     OpenApiExample,
+    OpenApiParameter,
+    OpenApiResponse,
     OpenApiTypes,
     extend_schema_view,
-    inline_serializer
+    inline_serializer,
 )
 from filling_station.models import (
     Balloon,
@@ -186,6 +187,9 @@ UpdateByReaderResponseSerializer = inline_serializer(
         tags=['Баллоны'],
         summary='Получение статистики по ГНС',
         description='Получение статистики по ГНС',
+        responses={
+            200: OpenApiTypes.OBJECT,
+        },
     ),
     partial_update=extend_schema(
         tags=['Баллоны'],
@@ -249,6 +253,7 @@ class BalloonViewSet(viewsets.ViewSet):
     и обновлять данные при срабатывании RFID считывателей.
     """
     permission_classes = [IsAuthenticated]
+    serializer_class = BalloonSerializer
 
     def __init__(self, *args, **kwargs):
         """Инициализирует ViewSet и локальный логгер."""
@@ -437,6 +442,24 @@ class BalloonViewSet(viewsets.ViewSet):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
+@extend_schema(
+    tags=['Баллоны'],
+    summary='Список пользовательских статусов баллона',
+    description='Активные статусы из справочника BalloonUserStatus (JSON-массив строк).',
+    responses={
+        200: OpenApiResponse(
+            response={'type': 'array', 'items': {'type': 'string'}},
+            description='Массив названий статусов',
+        ),
+    },
+    examples=[
+        OpenApiExample(
+            'Пример ответа',
+            value=['Создание паспорта баллона', 'Покраска', 'Контрольное взвешивание'],
+            response_only=True,
+        ),
+    ],
+)
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def get_balloon_status_options(request):
@@ -452,6 +475,20 @@ def get_balloon_status_options(request):
     return Response(BalloonUserStatus.active_names())
 
 
+@extend_schema(
+    tags=['Баллоны'],
+    summary='Номера ридеров приёмки',
+    description='Список номеров RFID-считывателей с функцией приёмки (l).',
+    responses={
+        200: OpenApiResponse(
+            response={'type': 'array', 'items': {'type': 'integer'}},
+            description='Массив номеров ридеров',
+        ),
+    },
+    examples=[
+        OpenApiExample('Пример', value=[3, 4], response_only=True),
+    ],
+)
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def get_loading_balloon_reader_list(request):
@@ -467,6 +504,21 @@ def get_loading_balloon_reader_list(request):
     loading_readers = ReaderSettings.objects.filter(function='l').values_list('number', flat=True)
     return Response(list(loading_readers))
 
+
+@extend_schema(
+    tags=['Баллоны'],
+    summary='Номера ридеров отгрузки',
+    description='Список номеров RFID-считывателей с функцией отгрузки (u).',
+    responses={
+        200: OpenApiResponse(
+            response={'type': 'array', 'items': {'type': 'integer'}},
+            description='Массив номеров ридеров',
+        ),
+    },
+    examples=[
+        OpenApiExample('Пример', value=[6], response_only=True),
+    ],
+)
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def get_unloading_balloon_reader_list(request):

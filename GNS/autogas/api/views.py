@@ -8,8 +8,9 @@ from rest_framework.permissions import IsAuthenticated
 from drf_spectacular.utils import (
     extend_schema,
     extend_schema_view,
+    OpenApiExample,
+    OpenApiParameter,
     OpenApiTypes,
-    OpenApiExample
 )
 from autogas.models import AutoGasBatch
 from autogas.services import (
@@ -102,6 +103,14 @@ from core.api.schema import ApiErrorSerializer
         summary='Обновить партию',
         description='Частичное обновление данных партии автоцистерн',
         request=AutoGasBatchSerializer,
+        parameters=[
+            OpenApiParameter(
+                name='id',
+                type=OpenApiTypes.INT,
+                location=OpenApiParameter.PATH,
+                description='ID партии автоцистерн',
+            ),
+        ],
         responses={
             200: AutoGasBatchSerializer,
             400: ApiErrorSerializer,
@@ -111,6 +120,7 @@ from core.api.schema import ApiErrorSerializer
 )
 class AutoGasBatchView(viewsets.ViewSet):
     permission_classes = [IsAuthenticated]
+    serializer_class = AutoGasBatchSerializer
 
     @action(detail=False, methods=['get'], url_path='statistic', url_name='statistic')
     def auto_batch_statistic(self, request):
