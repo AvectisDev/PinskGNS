@@ -4,6 +4,7 @@ from django.contrib import admin
 from import_export import resources
 from .models import (
     Balloon,
+    BalloonUserStatus,
     BalloonsBatch,
     ReaderSettings,
     TotalReadersCounter,
@@ -27,6 +28,17 @@ class BalloonResources(resources.ModelResource):
             'filling_status',
             "change_date"
         ]
+
+
+@admin.register(BalloonUserStatus)
+class BalloonUserStatusAdmin(admin.ModelAdmin):
+    """Админка справочника пользовательских статусов баллона."""
+
+    list_display = ['name', 'is_active']
+    list_editable = ['is_active']
+    list_filter = ['is_active']
+    search_fields = ['name']
+    ordering = ['id']
 
 
 @admin.register(Balloon)

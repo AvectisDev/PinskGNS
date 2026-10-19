@@ -1,7 +1,5 @@
 """API баллонов: CRUD по NFC, статистика ГНС, списки ридеров и ручные счётчики."""
 
-"""API баллонов: CRUD по NFC, статистика ГНС, списки ридеров, ручные счётчики."""
-
 import logging
 from collections import defaultdict
 from django.http import JsonResponse
@@ -18,35 +16,19 @@ from drf_spectacular.utils import (
     extend_schema_view,
     inline_serializer
 )
-from filling_station.models import Balloon, BalloonsBatch, DailyReaderCounter, TotalReadersCounter, ReaderSettings
+from filling_station.models import (
+    Balloon,
+    BalloonUserStatus,
+    BalloonsBatch,
+    DailyReaderCounter,
+    TotalReadersCounter,
+    ReaderSettings,
+)
 from .serializers import BalloonSerializer
 from core.api.schema import ApiErrorSerializer
 
 
 logger = logging.getLogger('filling_station')
-
-USER_STATUS_LIST = [
-    'Создание паспорта баллона',
-    'Наполнение баллона сжиженным газом',
-    'Погрузка полного баллона в кассету',
-    'Погрузка полного баллона в трал',
-    'Погрузка пустого баллона в кассету',
-    'Погрузка пустого баллона в трал',
-    'Регистрация полного баллона на складе',
-    'Регистрация пустого баллона на складе',
-    'Снятие пустого баллона у потребителя',
-    'Установка баллона потребителю',
-    'Принятие баллона от другой организации',
-    'Снятие RFID метки',
-    'Установка новой RFID метки',
-    'Редактирование паспорта баллона',
-    'Покраска',
-    'Техническое освидетельствование',
-    'Выбраковка',
-    'Утечка газа',
-    'Опорожнение(слив) баллона',
-    'Контрольное взвешивание'
-]
 
 
 # Схемы для Swagger
@@ -464,9 +446,9 @@ def get_balloon_status_options(request):
         request: HTTP-запрос DRF.
 
     Returns:
-        Response: список строк USER_STATUS_LIST.
+        Response: список названий активных статусов из справочника.
     """
-    return Response(USER_STATUS_LIST)
+    return Response(BalloonUserStatus.active_names())
 
 
 @api_view(['GET'])

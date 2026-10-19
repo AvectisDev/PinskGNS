@@ -87,6 +87,40 @@ class Balloon(models.Model):
         if self.brutto and self.netto and self.brutto < self.netto:
             raise ValidationError("Вес наполненного баллона должен быть больше веса пустого баллона.")
 
+
+class BalloonUserStatus(models.Model):
+    """Справочник пользовательских статусов паспорта баллона."""
+
+    name = models.CharField(max_length=100, unique=True, verbose_name="Название")
+    is_active = models.BooleanField(default=True, verbose_name="Активен")
+
+    class Meta:
+        """Метаданные справочника статусов баллона."""
+
+        verbose_name = "Статус баллона"
+        verbose_name_plural = "Статусы баллонов"
+        ordering = ['id']
+
+    def __str__(self) -> str:
+        """Возвращает название статуса."""
+        return self.name
+
+    @classmethod
+    def active_queryset(cls):
+        """Активные статусы в порядке id."""
+        return cls.objects.filter(is_active=True).order_by('id')
+
+    @classmethod
+    def active_names(cls) -> List[str]:
+        """Список названий активных статусов для API."""
+        return list(cls.active_queryset().values_list('name', flat=True))
+
+    @classmethod
+    def active_choices(cls) -> List[tuple]:
+        """Choices для Django-форм: (name, name)."""
+        return [(name, name) for name in cls.active_names()]
+
+
 READER_FUNCTION_CHOICES = [
     ('l', 'Приёмка'),
     ('u', 'Отгрузка'),

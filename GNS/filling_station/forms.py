@@ -3,25 +3,10 @@
 from django import forms
 from django.utils import timezone
 from django.conf import settings
-from .models import Balloon, BalloonsBatch
+from .models import Balloon, BalloonUserStatus, BalloonsBatch
 from transport.form_choices import configure_trailer_field, configure_truck_field
 from crispy_forms.helper import FormHelper
 from crispy_forms.layout import Submit
-
-USER_STATUS_LIST = [
-    ('Создание паспорта баллона', 'Создание паспорта баллона'),
-    ('Наполнение баллона сжиженным газом', 'Наполнение баллона сжиженным газом'),
-    ('Погрузка пустого баллона в трал', 'Погрузка пустого баллона в трал'),
-    ('Снятие RFID метки', 'Снятие RFID метки'),
-    ('Установка новой RFID метки', 'Установка новой RFID метки'),
-    ('Редактирование паспорта баллона', 'Редактирование паспорта баллона'),
-    ('Покраска', 'Покраска'),
-    ('Техническое освидетельствование', 'Техническое освидетельствование'),
-    ('Выбраковка', 'Выбраковка'),
-    ('Утечка газа', 'Утечка газа'),
-    ('Опорожнение(слив) баллона', 'Опорожнение(слив) баллона'),
-    ('Контрольное взвешивание', 'Контрольное взвешивание'),
-]
 
 
 class GetBalloonsAmount(forms.Form):
@@ -61,6 +46,12 @@ class BalloonForm(forms.ModelForm):
         self.helper.add_input(Submit('save', 'Сохранить', css_class='btn btn-success'))
         self.helper.add_input(Submit('cancel', 'Отмена', css_class='btn btn-secondary', formnovalidate='formnovalidate'))
         self.helper.form_method = 'POST'
+        status_choices = [('', '---------')] + BalloonUserStatus.active_choices()
+        self.fields['status'].choices = status_choices
+        self.fields['status'].widget = forms.Select(
+            choices=status_choices,
+            attrs={'class': 'form-control'},
+        )
 
     class Meta:
         """Конфигурация модели, исключённых полей и виджетов формы баллона."""
@@ -78,7 +69,7 @@ class BalloonForm(forms.ModelForm):
             'next_examination_date': forms.DateInput(format='%Y-%m-%d', attrs={'type': 'date'}),
             'diagnostic_date': forms.DateInput(format='%Y-%m-%d', attrs={'type': 'date'}),
             'working_pressure': forms.NumberInput(attrs={'class': 'form-control'}),
-            'status': forms.Select(choices=USER_STATUS_LIST, attrs={'class': 'form-control'}),
+            'status': forms.Select(attrs={'class': 'form-control'}),
             'manufacturer': forms.TextInput(attrs={'class': 'form-control'}),
             'wall_thickness': forms.NumberInput(attrs={'class': 'form-control'}),
             'filling_status': forms.CheckboxInput(attrs={'class': 'form-control'}),

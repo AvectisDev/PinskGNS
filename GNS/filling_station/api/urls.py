@@ -24,7 +24,11 @@ balloons_router.register(
 
 urlpatterns = [
     path('', include(balloons_router.urls)),
-    path('balloon-status-options', balloons.get_balloon_status_options),
+    path(
+        'balloon-status-options',
+        balloons.get_balloon_status_options,
+        name='balloon-status-options',
+    ),
     path('loading-balloon-reader-list', balloons.get_loading_balloon_reader_list),
     path('unloading-balloon-reader-list', balloons.get_unloading_balloon_reader_list),
     path('get-active-balloon-batch', balloon_batches.get_active_balloon_batch),
