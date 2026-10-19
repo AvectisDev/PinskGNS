@@ -44,6 +44,107 @@ UpdateByReaderResponseSerializer = inline_serializer(
     }
 )
 
+# Гетерогенный массив: 8 элементов по ридерам + итоговый объект по складу.
+# Схема inline (без many=True serializer), чтобы пример не оборачивался лишним [].
+BALLOON_STATISTIC_RESPONSE = OpenApiResponse(
+    response={
+        'type': 'array',
+        'description': (
+            'Элементы с reader_id — статистика по считывателям (обычно 1–8); '
+            'последний элемент — filled/empty_balloons_on_station.'
+        ),
+        'items': {
+            'oneOf': [
+                {
+                    'type': 'object',
+                    'title': 'BalloonStatisticReaderItem',
+                    'properties': {
+                        'reader_id': {
+                            'type': 'integer',
+                            'description': 'Номер считывателя (1–8)',
+                        },
+                        'balloons_month': {
+                            'type': 'integer',
+                            'description': 'Всего баллонов за месяц',
+                        },
+                        'rfid_month': {
+                            'type': 'integer',
+                            'description': 'Баллонов с RFID за месяц',
+                        },
+                        'balloons_today': {
+                            'type': 'integer',
+                            'description': 'Всего баллонов за сегодня',
+                        },
+                        'rfid_today': {
+                            'type': 'integer',
+                            'description': 'Баллонов с RFID за сегодня',
+                        },
+                        'truck_month': {
+                            'type': 'integer',
+                            'description': 'Партий (грузовиков) за месяц',
+                        },
+                        'truck_today': {
+                            'type': 'integer',
+                            'description': 'Партий (грузовиков) за сегодня',
+                        },
+                    },
+                    'required': [
+                        'reader_id',
+                        'balloons_month',
+                        'rfid_month',
+                        'balloons_today',
+                        'rfid_today',
+                        'truck_month',
+                        'truck_today',
+                    ],
+                },
+                {
+                    'type': 'object',
+                    'title': 'BalloonStatisticStationItem',
+                    'properties': {
+                        'filled_balloons_on_station': {
+                            'type': 'integer',
+                            'description': 'Заполненных баллонов на станции',
+                        },
+                        'empty_balloons_on_station': {
+                            'type': 'integer',
+                            'description': 'Пустых баллонов на станции',
+                        },
+                    },
+                    'required': [
+                        'filled_balloons_on_station',
+                        'empty_balloons_on_station',
+                    ],
+                },
+            ],
+        },
+    },
+    description=(
+        'Массив: по одному объекту на считыватель (reader_id 1–8), '
+        'затем объект с filled/empty_balloons_on_station.'
+    ),
+    examples=[
+        OpenApiExample(
+            'Пример',
+            value=[
+                {
+                    'reader_id': 1,
+                    'balloons_month': 0,
+                    'rfid_month': 0,
+                    'balloons_today': 0,
+                    'rfid_today': 0,
+                    'truck_month': 0,
+                    'truck_today': 0,
+                },
+                {
+                    'filled_balloons_on_station': 2219,
+                    'empty_balloons_on_station': 503,
+                },
+            ],
+        ),
+    ],
+)
+
 @extend_schema_view(
     get_by_nfc=extend_schema(
         tags=['Баллоны'],
@@ -192,9 +293,14 @@ UpdateByReaderResponseSerializer = inline_serializer(
     get_statistic=extend_schema(
         tags=['Баллоны'],
         summary='Получение статистики по ГНС',
-        description='Получение статистики по ГНС',
+        description=(
+            'Сводная статистика по считывателям и складу. '
+            'Ответ кэшируется на 10 минут. Формат: массив из 8 объектов '
+            'по ридерам (reader_id, balloons_*, rfid_*, truck_*) и '
+            'последнего объекта filled/empty_balloons_on_station.'
+        ),
         responses={
-            200: OpenApiTypes.OBJECT,
+            200: BALLOON_STATISTIC_RESPONSE,
         },
     ),
     partial_update=extend_schema(

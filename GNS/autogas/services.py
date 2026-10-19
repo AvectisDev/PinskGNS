@@ -196,6 +196,40 @@ def clear_statistic_cache() -> None:
     cache.delete(STATISTIC_CACHE_KEY)
 
 
+def _empty_gas_type_bucket(gas_type: str, batch_type: str) -> dict[str, Any]:
+    """Нулевой шаблон статистики по типу газа для SCADA."""
+    if batch_type == 'l':
+        return {
+            'gas_type': gas_type,
+            'batch_type': 'l',
+            'last_month_loading_batches': 0,
+            'last_month_loading_weight': 0,
+            'today_loading_batches': 0,
+            'today_loading_weight': 0,
+        }
+    return {
+        'gas_type': gas_type,
+        'batch_type': 'u',
+        'last_month_unloading_batches': 0,
+        'last_month_unloading_weight': 0,
+        'today_unloading_batches': 0,
+        'today_unloading_weight': 0,
+    }
+
+
+def _seed_statistic_sections() -> dict[str, dict[str, Any]]:
+    """Всегда отдаём СПБТ и ПБА с нулями — SCADA читает фиксированные узлы."""
+    loading: dict[str, Any] = {}
+    unloading: dict[str, Any] = {}
+    for gas_type, _ in settings.GAS_TYPE_CHOICES:
+        loading[gas_type] = _empty_gas_type_bucket(gas_type, 'l')
+        unloading[gas_type] = _empty_gas_type_bucket(gas_type, 'u')
+    return {
+        'loading_batch': loading,
+        'unloading_batch': unloading,
+    }
+
+
 def get_batch_statistic(*, use_cache: bool = True) -> dict[str, Any]:
     if use_cache:
         cached = cache.get(STATISTIC_CACHE_KEY)
@@ -209,10 +243,7 @@ def get_batch_statistic(*, use_cache: bool = True) -> dict[str, Any]:
 def build_batch_statistic(today: Optional[date] = None) -> dict[str, Any]:
     today = today or timezone.localdate()
     first_day = today.replace(day=1)
-    response: dict[str, Any] = {
-        'loading_batch': {},
-        'unloading_batch': {},
-    }
+    response: dict[str, Any] = _seed_statistic_sections()
 
     period_specs = (
         (
@@ -250,8 +281,15 @@ def build_batch_statistic(today: Optional[date] = None) -> dict[str, Any]:
         for row in rows:
             section = 'loading_batch' if row['batch_type'] == 'l' else 'unloading_batch'
             gas_type = row['gas_type']
-            bucket = response[section].setdefault(gas_type, {})
-            bucket.update(row)
+            batch_type = row['batch_type']
+            bucket = response[section].setdefault(
+                gas_type,
+                _empty_gas_type_bucket(gas_type, batch_type),
+            )
+            bucket['gas_type'] = gas_type
+            bucket['batch_type'] = batch_type
+            bucket[count_name] = row[count_name] or 0
+            bucket[weight_name] = row[weight_name] or 0
 
     active_batch = (
         AutoGasBatch.objects

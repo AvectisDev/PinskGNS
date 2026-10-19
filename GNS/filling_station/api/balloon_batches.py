@@ -10,7 +10,9 @@ from drf_spectacular.utils import (
     extend_schema,
     extend_schema_view,
     inline_serializer,
+    OpenApiExample,
     OpenApiParameter,
+    OpenApiResponse,
     OpenApiTypes,
 )
 from rest_framework import serializers, status, viewsets
@@ -86,6 +88,51 @@ BalloonOperationResponse = inline_serializer(
         'new_count': serializers.IntegerField(),
         'message': serializers.CharField(required=False),
     }
+)
+
+ACTIVE_BALLOON_BATCH_SCADA_RESPONSE = OpenApiResponse(
+    response={
+        'type': 'array',
+        'items': {
+            'type': 'object',
+            'title': 'ActiveBalloonBatchScadaItem',
+            'properties': {
+                'reader_id': {
+                    'type': 'integer',
+                    'description': 'Номер считывателя',
+                },
+                'truck_registration_number': {
+                    'type': 'string',
+                    'description': 'Рег. номер грузовика',
+                },
+                'trailer_registration_number': {
+                    'type': 'string',
+                    'description': 'Рег. номер прицепа (пустая строка, если нет)',
+                },
+            },
+            'required': [
+                'reader_id',
+                'truck_registration_number',
+                'trailer_registration_number',
+            ],
+        },
+    },
+    description=(
+        'Массив активных партий (приёмка и отгрузка) за сегодня: '
+        'reader_id и рег. номера грузовика/прицепа.'
+    ),
+    examples=[
+                OpenApiExample(
+                    'Пример',
+                    value=[
+                        {
+                            'reader_id': 6,
+                            'truck_registration_number': 'AC 5512-1',
+                            'trailer_registration_number': 'A 5003K-1',
+                        },
+                    ],
+                ),
+    ],
 )
 
 _BATCH_STATUS_DOC = (
@@ -832,11 +879,11 @@ class BalloonsBatchViewSet(viewsets.ViewSet):
 @extend_schema(
     tags=['Партии баллонов'],
     summary='Активные партии для SCADA',
-        description=(
-            'Список партий со статусом 1=ACTIVE за сегодня для приёмки и отгрузки. '
-            'Используется SCADA: номер считывателя и регистрационные номера транспорта.'
-        ),
-    responses={200: OpenApiTypes.OBJECT},
+    description=(
+        'Список партий со статусом 1=ACTIVE за сегодня для приёмки и отгрузки. '
+        'Используется SCADA: номер считывателя и регистрационные номера транспорта.'
+    ),
+    responses={200: ACTIVE_BALLOON_BATCH_SCADA_RESPONSE},
 )
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])

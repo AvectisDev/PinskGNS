@@ -153,10 +153,31 @@ class ActiveBatchServiceTests(AutoGasFixturesMixin, TestCase):
 
 
 class StatisticServiceTests(AutoGasFixturesMixin, TestCase):
+    def _assert_zero_loading(self, bucket):
+        self.assertEqual(bucket['last_month_loading_batches'], 0)
+        self.assertEqual(bucket['last_month_loading_weight'], 0)
+        self.assertEqual(bucket['today_loading_batches'], 0)
+        self.assertEqual(bucket['today_loading_weight'], 0)
+
+    def _assert_zero_unloading(self, bucket):
+        self.assertEqual(bucket['last_month_unloading_batches'], 0)
+        self.assertEqual(bucket['last_month_unloading_weight'], 0)
+        self.assertEqual(bucket['today_unloading_batches'], 0)
+        self.assertEqual(bucket['today_unloading_weight'], 0)
+
     def test_empty_statistic(self):
         data = build_batch_statistic()
-        self.assertEqual(data['loading_batch'], {})
-        self.assertEqual(data['unloading_batch'], {})
+        self.assertEqual(set(data['loading_batch']), {'СПБТ', 'ПБА'})
+        self.assertEqual(set(data['unloading_batch']), {'СПБТ', 'ПБА'})
+        for gas_type in ('СПБТ', 'ПБА'):
+            loading = data['loading_batch'][gas_type]
+            unloading = data['unloading_batch'][gas_type]
+            self.assertEqual(loading['gas_type'], gas_type)
+            self.assertEqual(loading['batch_type'], 'l')
+            self._assert_zero_loading(loading)
+            self.assertEqual(unloading['gas_type'], gas_type)
+            self.assertEqual(unloading['batch_type'], 'u')
+            self._assert_zero_unloading(unloading)
         self.assertNotIn('active_batch', data)
 
     def test_aggregates_month_and_today(self):
@@ -188,6 +209,45 @@ class StatisticServiceTests(AutoGasFixturesMixin, TestCase):
         self.assertEqual(pba['last_month_loading_batches'], 2)
         self.assertEqual(pba['last_month_loading_weight'], Decimal('3000'))
         self.assertEqual(today_batch.gas_type, 'ПБА')
+
+    def test_partial_month_data_keeps_zero_fields(self):
+        """Партия только за прошлый день месяца: today_* и СПБТ/отгрузка = 0."""
+        today = date(2026, 6, 15)
+        earlier = self.make_batch(
+            batch_type='l',
+            gas_type='ПБА',
+            weight_gas_amount=Decimal('2000'),
+        )
+        AutoGasBatch.objects.filter(pk=earlier.pk).update(
+            begin_at=timezone.make_aware(datetime(2026, 6, 10, 12, 0, 0)),
+        )
+
+        data = build_batch_statistic(today=today)
+        pba = data['loading_batch']['ПБА']
+        self.assertEqual(pba['last_month_loading_batches'], 1)
+        self.assertEqual(pba['last_month_loading_weight'], Decimal('2000'))
+        self.assertEqual(pba['today_loading_batches'], 0)
+        self.assertEqual(pba['today_loading_weight'], 0)
+        self._assert_zero_loading(data['loading_batch']['СПБТ'])
+        self._assert_zero_unloading(data['unloading_batch']['ПБА'])
+        self._assert_zero_unloading(data['unloading_batch']['СПБТ'])
+
+    def test_null_weight_becomes_zero(self):
+        today = date(2026, 6, 15)
+        batch = self.make_batch(
+            batch_type='u',
+            gas_type='СПБТ',
+            weight_gas_amount=None,
+        )
+        AutoGasBatch.objects.filter(pk=batch.pk).update(
+            begin_at=timezone.make_aware(datetime(2026, 6, 15, 12, 0, 0)),
+        )
+
+        data = build_batch_statistic(today=today)
+        spbt = data['unloading_batch']['СПБТ']
+        self.assertEqual(spbt['today_unloading_batches'], 1)
+        self.assertEqual(spbt['today_unloading_weight'], 0)
+        self.assertIsNotNone(spbt['today_unloading_weight'])
 
     def test_active_batch_payload(self):
         self.make_batch(
