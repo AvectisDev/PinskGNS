@@ -54,7 +54,6 @@
                             <th>Начата</th>
                             <th>Завершена</th>
                             <th>Автомобиль</th>
-                            <th>Прицеп</th>
                             <th>Баллонов (RFID)</th>
                             <th>Баллонов (без RFID)</th>
                             <th>Номер ТТН</th>
@@ -87,7 +86,6 @@
                                 {% endif %}
                             </td>
                             <td>{{ batch.truck|default:"-" }}</td>
-                            <td>{{ batch.trailer|default:"-" }}</td>
                             <td>{{ batch.amount_of_rfid|default:"-" }}</td>
                             <td>{{ batch.get_amount_without_rfid|default:"-" }}</td>
                             <td>{{ batch.ttn_name|default:"-" }}</td>
@@ -113,7 +111,7 @@
                         </tr>
                         {% empty %}
                         <tr>
-                            <td colspan="10" class="text-center py-4 text-muted">Нет данных о партиях</td>
+                            <td colspan="9" class="text-center py-4 text-muted">Нет данных о партиях</td>
                         </tr>
                         {% endfor %}
                     </tbody>

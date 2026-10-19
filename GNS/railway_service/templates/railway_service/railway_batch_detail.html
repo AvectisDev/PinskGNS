@@ -32,10 +32,10 @@
                             {% endif %}
                         </dd>
 
-                        <dt class="col-sm-6">Дата начала:</dt>
+                        <dt class="col-sm-6">Начата:</dt>
                         <dd class="col-sm-6">{{ batch.started_at|date:"d.m.Y H:i"|default:"-" }}</dd>
 
-                        <dt class="col-sm-6">Дата окончания:</dt>
+                        <dt class="col-sm-6">Завершена:</dt>
                         <dd class="col-sm-6">
                             {% if batch.completed_at %}
                                 {{ batch.completed_at|date:"d.m.Y H:i" }}

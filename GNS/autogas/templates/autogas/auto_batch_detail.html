@@ -30,7 +30,7 @@
                             {% endif %}
                         </dd>
 
-                        <dt class="col-sm-6">Дата и время начала:</dt>
+                        <dt class="col-sm-6">Начата:</dt>
                         <dd class="col-sm-6">
                             {% if batch.begin_at %}
                             <div>{{ batch.begin_at|date:"d.m.Y" }}</div>
@@ -40,7 +40,7 @@
                             {% endif %}
                         </dd>
 
-                        <dt class="col-sm-6">Дата и время окончания:</dt>
+                        <dt class="col-sm-6">Завершена:</dt>
                         <dd class="col-sm-6">
                             {% if batch.completed_at %}
                             <div>{{ batch.completed_at|date:"d.m.Y" }}</div>
@@ -52,9 +52,6 @@
 
                         <dt class="col-sm-6">Автомобиль:</dt>
                         <dd class="col-sm-6">{{ batch.truck|default:"-" }}</dd>
-
-                        <dt class="col-sm-6">Прицеп:</dt>
-                        <dd class="col-sm-6">{{ batch.trailer|default:"-" }}</dd>
                     </dl>
                 </div>
 

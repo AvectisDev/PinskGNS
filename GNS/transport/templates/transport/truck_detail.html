@@ -61,7 +61,7 @@
                         <dt class="col-sm-6">Вес полного:</dt>
                         <dd class="col-sm-6">{{ truck.full_weight|float_format|default:"-" }} кг</dd>
 
-                        <dt class="col-sm-6">Дата и время въезда:</dt>
+                        <dt class="col-sm-6">Въезд:</dt>
                         <dd class="col-sm-6">
                             {% if truck.entry_at %}
                             <div>{{ truck.entry_at|date:"d.m.Y" }}</div>
@@ -71,7 +71,7 @@
                             {% endif %}
                         </dd>
 
-                        <dt class="col-sm-6">Дата и время выезда:</dt>
+                        <dt class="col-sm-6">Выезд:</dt>
                         <dd class="col-sm-6">
                             {% if truck.departure_at %}
                             <div>{{ truck.departure_at|date:"d.m.Y" }}</div>

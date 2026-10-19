@@ -48,7 +48,7 @@
                 <div class="col-md-6">
                     <dl class="row">
                         {% with last=object.tank_history.all.0 %}
-                        <dt class="col-sm-4">Дата въезда:</dt>
+                        <dt class="col-sm-4">Въезд:</dt>
                         <dd class="col-sm-8">
                             {% if last and last.arrival_at %}
                             <div>{{ last.arrival_at|date:"d.m.Y" }}</div>
@@ -58,7 +58,7 @@
                             {% endif %}
                         </dd>
 
-                        <dt class="col-sm-4">Дата выезда:</dt>
+                        <dt class="col-sm-4">Выезд:</dt>
                         <dd class="col-sm-8">
                             {% if last and last.departure_at %}
                             <div>{{ last.departure_at|date:"d.m.Y" }}</div>

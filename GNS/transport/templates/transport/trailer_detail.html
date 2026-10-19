@@ -52,7 +52,7 @@
                         <dt class="col-sm-6">Вес полного:</dt>
                         <dd class="col-sm-6">{{ trailer.full_weight|float_format|default:"-" }} кг</dd>
 
-                        <dt class="col-sm-6">Дата и время въезда:</dt>
+                        <dt class="col-sm-6">Въезд:</dt>
                         <dd class="col-sm-6">
                             {% if trailer.entry_at %}
                             <div>{{ trailer.entry_at|date:"d.m.Y" }}</div>
@@ -62,7 +62,7 @@
                             {% endif %}
                         </dd>
 
-                        <dt class="col-sm-6">Дата и время выезда:</dt>
+                        <dt class="col-sm-6">Выезд:</dt>
                         <dd class="col-sm-6">
                             {% if trailer.departure_at %}
                             <div>{{ trailer.departure_at|date:"d.m.Y" }}</div>
