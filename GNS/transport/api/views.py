@@ -60,6 +60,13 @@ from transport.models import Trailer, Truck
                     "car_brand": "МАЗ",
                     "registration_number": "АX12347",
                     "type": "Седельный тягач",
+                    "driver": {
+                        "id": 1,
+                        "last_name": "Иванов",
+                        "first_name": "Иван",
+                        "middle_name": "Иванович",
+                        "phone": "+375(29)123-45-78"
+                    },
                     "capacity_cylinders": 60,
                     "max_weight_of_transported_cylinders": 1500.5,
                     "max_mass_of_transported_gas": 1200.0,
@@ -155,7 +162,7 @@ class TruckView(APIView):
         on_station = request.query_params.get('on_station')
         registration_number = request.query_params.get('registration_number')
 
-        queryset = Truck.objects.all()
+        queryset = Truck.objects.select_related('type', 'driver').prefetch_related('trailer')
 
         if on_station is not None:
             # queryset = queryset.filter(is_on_station=on_station.lower() == 'true')
@@ -166,7 +173,10 @@ class TruckView(APIView):
                 )
 
         if registration_number:
-            truck = get_object_or_404(Truck, registration_number=registration_number)
+            truck = get_object_or_404(
+                Truck.objects.select_related('type', 'driver').prefetch_related('trailer'),
+                registration_number=registration_number,
+            )
             serializer = TruckSerializer(truck)
             return Response(serializer.data)
 

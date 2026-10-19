@@ -3,7 +3,21 @@
 from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 
-from transport.models import Trailer, Truck
+from transport.models import Driver, Trailer, Truck
+
+
+class DriverSerializer(serializers.ModelSerializer):
+    """Сериализатор водителя для вложенного вывода у грузовика."""
+
+    class Meta:
+        model = Driver
+        fields = [
+            'id',
+            'last_name',
+            'first_name',
+            'middle_name',
+            'phone',
+        ]
 
 
 class TrailerSerializer(serializers.ModelSerializer):
@@ -37,9 +51,10 @@ class TrailerSerializer(serializers.ModelSerializer):
 
 
 class TruckSerializer(serializers.ModelSerializer):
-    """Сериализатор грузовика с типом и прицепом."""
+    """Сериализатор грузовика с типом, водителем и прицепом."""
 
     type = serializers.SerializerMethodField()
+    driver = DriverSerializer(read_only=True)
     trailer = serializers.SerializerMethodField()
 
     class Meta:
@@ -49,6 +64,7 @@ class TruckSerializer(serializers.ModelSerializer):
             'car_brand',
             'registration_number',
             'type',
+            'driver',
             'capacity_cylinders',
             'max_weight_of_transported_cylinders',
             'max_mass_of_transported_gas',
