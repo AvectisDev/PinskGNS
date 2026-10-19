@@ -268,14 +268,6 @@
                 {% include 'core/_back_to_list.html' with list_url=list_url %}
 
                 <div>
-                    {% if batch.can_check_balloons %}
-                    <form method="post" action="{% url_with_query batch.get_check_balloons_url %}" class="d-inline me-2">
-                        {% csrf_token %}
-                        <button type="submit" class="btn btn-custom">
-                            <i class="bi bi-check2-square"></i> Проверить баллоны
-                        </button>
-                    </form>
-                    {% endif %}
                     {% if batch.can_retry_miriada_close %}
                     <form method="post" action="{% url_with_query batch.get_retry_close_url %}" class="d-inline me-2">
                         {% csrf_token %}

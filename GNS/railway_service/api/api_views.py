@@ -23,7 +23,7 @@ from core.api.schema import ApiErrorSerializer
 
 
 @extend_schema_view(
-    statistic=extend_schema(
+    railway_batch_statistic=extend_schema(
         tags=['Железнодорожные партии'],
         summary='Получить статистику по железнодорожным партиям',
         description='Получение сводной статистики по железнодорожным цистернам и партиям. '

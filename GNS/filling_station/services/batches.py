@@ -105,15 +105,14 @@ def resume_balloons_batch(batch: BalloonsBatch) -> Tuple[bool, str]:
 
 def should_defer_balloon_status_to_batch_close(reader_number: int) -> bool:
     """
-    Статусы баллонов рамки приёмки/отгрузки (3/4/6) отправляются в Мириаду
-    только при закрытии активной партии, а не в момент сканирования.
-    Наполнение (ридер 8) по-прежнему уходит сразу.
+    Для рамки 3/4/6 статус уходит при добавлении в партию, а не из FEIG-протокола.
+    Наполнение (ридер 8) по-прежнему шлётся сразу из FEIG.
 
     Args:
         reader_number (int): номер RFID-считывателя.
 
     Returns:
-        bool: True, если отправку статуса нужно отложить до закрытия партии.
+        bool: True, если FEIG не должен слать статус сам (отправка через партию).
     """
     if reader_number not in MIRIADA_BATCH_STATUS_READERS:
         return False
@@ -126,21 +125,57 @@ def should_defer_balloon_status_to_batch_close(reader_number: int) -> bool:
 
 def should_send_balloon_status_immediately(reader_number: int) -> bool:
     """
-    На лету в Мириаду уходит только наполнение (ридер 8). Рамка 3/4/6 — при закрытии.
+    Из FEIG на лету в Мириаду уходит только наполнение (ридер 8).
+    Рамка 3/4/6 отправляет статус при добавлении баллона в партию.
 
     Args:
         reader_number (int): номер RFID-считывателя.
 
     Returns:
-        bool: True, если статус нужно отправить сразу после сканирования.
+        bool: True, если статус нужно отправить сразу после сканирования в FEIG.
     """
     return reader_number in MIRIADA_FILLING_READERS
 
 
+def _set_balloon_status_error(batch: BalloonsBatch, nfc_tag: str, error_message: str) -> None:
+    """
+    Записывает ошибку отправки статуса на баллон и в ``miriada_status_errors`` партии.
+
+    Args:
+        batch: партия, в которой лежит баллон.
+        nfc_tag: NFC-метка баллона.
+        error_message: текст ошибки Мириады.
+    """
+    Balloon.objects.filter(nfc_tag=nfc_tag).update(miriada_status_error=error_message)
+    errors = dict(batch.miriada_status_errors or {})
+    errors[nfc_tag] = error_message
+    batch.miriada_status_errors = errors
+    batch.miriada_balloons_sent = False
+    batch.save(update_fields=['miriada_status_errors', 'miriada_balloons_sent'])
+
+
+def _clear_balloon_status_error(batch: BalloonsBatch, nfc_tag: str) -> None:
+    """
+    Очищает ошибку отправки статуса у баллона и в ``miriada_status_errors`` партии.
+
+    Args:
+        batch: партия, в которой лежит баллон.
+        nfc_tag: NFC-метка баллона.
+    """
+    Balloon.objects.filter(nfc_tag=nfc_tag).update(miriada_status_error='')
+    errors = dict(batch.miriada_status_errors or {})
+    if nfc_tag in errors:
+        errors.pop(nfc_tag, None)
+        batch.miriada_status_errors = errors
+        batch.save(update_fields=['miriada_status_errors'])
+
+
 def add_balloon_to_batch_by_nfc(batch: BalloonsBatch, nfc_tag: str) -> dict:
     """
-    Добавляет баллон в партию локально.
-    Отправка статуса в Мириаду выполняется при закрытии партии.
+    Добавляет баллон в партию и сразу отправляет его статус в Мириаду.
+
+    Добавление в партию считается успешным даже если Мириада отклонила баллон:
+    текст ошибки пишется на баллон и в ``miriada_status_errors`` партии.
 
     Args:
         batch (BalloonsBatch): целевая партия.
@@ -149,7 +184,36 @@ def add_balloon_to_batch_by_nfc(batch: BalloonsBatch, nfc_tag: str) -> dict:
     Returns:
         dict: результат ``batch.add_balloon`` (success, message и связанные поля).
     """
-    return batch.add_balloon(nfc_tag)
+    result = batch.add_balloon(nfc_tag)
+    if not result.get('success'):
+        return result
+
+    reader_number = batch.reader_number
+    if reader_number not in MIRIADA_BATCH_STATUS_READERS:
+        return result
+
+    batch.refresh_from_db()
+    try:
+        prepared_batch = BalloonsBatch.objects.select_related(
+            'truck', 'truck__type', 'trailer'
+        ).get(pk=batch.pk)
+        url, payload, send_type = _prepare_payload_for_miriada(
+            reader_number, nfc_tag, batch=prepared_batch
+        )
+        post_status_to_miriada(url, payload, send_type)
+        _clear_balloon_status_error(batch, nfc_tag)
+        logger.info(
+            f"Статус баллона {nfc_tag} отправлен в Мириаду при добавлении в партию {batch.id}"
+        )
+    except (MiriadaAPIError, ValueError) as exc:
+        error_text = str(exc)
+        _set_balloon_status_error(batch, nfc_tag, error_text)
+        logger.error(
+            f"Ошибка отправки статуса баллона {nfc_tag} в Мириаду "
+            f"при добавлении в партию {batch.id}: {exc}"
+        )
+
+    return result
 
 
 def _truncate_batch_error_message(error_message: Optional[str]) -> Optional[str]:
@@ -231,16 +295,20 @@ def _sync_balloon_status_errors(nfc_tags: list, status_errors: Dict[str, str]) -
             balloon.save(update_fields=['miriada_status_error'])
 
 
-def send_batch_balloon_statuses_to_miriada(batch: BalloonsBatch) -> Tuple[bool, Optional[str]]:
+def send_batch_balloon_statuses_to_miriada(
+    batch: BalloonsBatch,
+    nfc_tags: Optional[list] = None,
+) -> Tuple[bool, Optional[str]]:
     """
-    Отправляет в Мириаду статусы всех баллонов партии.
+    Отправляет в Мириаду статусы баллонов партии.
 
     HTTP идёт параллельно (лимит потоков MIRIADA_BATCH_SEND_WORKERS).
-    Отказы Result=Error собираются по всем меткам и пишутся на баллоны
+    Отказы Result=Error собираются по меткам и пишутся на баллоны
     и в ``miriada_status_errors`` партии. ``closettn`` здесь не вызывается.
 
     Args:
         batch (BalloonsBatch): партия, статусы баллонов которой отправляются.
+        nfc_tags: ограниченный список меток; ``None`` — все баллоны партии.
 
     Returns:
         tuple[bool, str | None]: успех и текст ошибки (или None).
@@ -255,15 +323,19 @@ def send_batch_balloon_statuses_to_miriada(batch: BalloonsBatch) -> Tuple[bool, 
     prepared_batch = BalloonsBatch.objects.select_related(
         'truck', 'truck__type', 'trailer'
     ).get(pk=batch.pk)
-    nfc_tags = list(prepared_batch.balloon_list.values_list('nfc_tag', flat=True))
-    if not nfc_tags:
-        batch.miriada_balloons_sent = True
-        batch.miriada_status_errors = {}
-        batch.save(update_fields=['miriada_balloons_sent', 'miriada_status_errors'])
+    if nfc_tags is None:
+        tags_to_send = list(prepared_batch.balloon_list.values_list('nfc_tag', flat=True))
+    else:
+        tags_to_send = list(nfc_tags)
+    if not tags_to_send:
+        if not _batch_has_balloon_status_errors(batch):
+            batch.miriada_balloons_sent = True
+            batch.miriada_status_errors = {}
+            batch.save(update_fields=['miriada_balloons_sent', 'miriada_status_errors'])
         return True, None
 
     jobs = []
-    for nfc_tag in nfc_tags:
+    for nfc_tag in tags_to_send:
         try:
             url, payload, send_type = _prepare_payload_for_miriada(
                 reader_number, nfc_tag, batch=prepared_batch
@@ -313,17 +385,13 @@ def send_batch_balloon_statuses_to_miriada(batch: BalloonsBatch) -> Tuple[bool, 
             except CancelledError:
                 continue
 
-    previous_errors = {
-        nfc: message
-        for nfc, message in (batch.miriada_status_errors or {}).items()
-        if nfc in nfc_tags
-    }
-    for nfc_tag in nfc_tags:
+    previous_errors = dict(batch.miriada_status_errors or {})
+    for nfc_tag in tags_to_send:
         if nfc_tag not in status_errors:
             previous_errors.pop(nfc_tag, None)
     previous_errors.update(status_errors)
     batch.miriada_status_errors = previous_errors
-    _sync_balloon_status_errors(nfc_tags, status_errors)
+    _sync_balloon_status_errors(tags_to_send, status_errors)
 
     if status_errors:
         batch.miriada_balloons_sent = False
@@ -332,38 +400,12 @@ def send_batch_balloon_statuses_to_miriada(batch: BalloonsBatch) -> Tuple[bool, 
         logger.error(f'Партия {batch.id}: {error_msg}')
         return False, error_msg
 
-    batch.miriada_balloons_sent = True
+    batch.miriada_balloons_sent = not bool(previous_errors)
     batch.save(update_fields=['miriada_balloons_sent', 'miriada_status_errors'])
     logger.info(
-        f"В Мириаду отправлены статусы {len(nfc_tags)} баллонов партии {batch.id}"
+        f"В Мириаду отправлены статусы {len(tags_to_send)} баллонов партии {batch.id}"
     )
     return True, None
-
-
-def check_batch_balloons(batch: BalloonsBatch) -> Tuple[bool, Optional[str]]:
-    """
-    Проверяет баллоны партии в Мириаде (только отправка статусов).
-
-    Не вызывает closettn и не завершает партию.
-
-    Args:
-        batch (BalloonsBatch): партия для проверки.
-
-    Returns:
-        tuple[bool, str | None]: успех (нет отклонений) и текст ошибки.
-    """
-    if batch.status not in OPEN_BATCH_STATUSES:
-        return False, 'Партия не принимает проверку баллонов в текущем статусе'
-
-    ok, error = send_batch_balloon_statuses_to_miriada(batch)
-    batch.refresh_from_db()
-    if not ok and error:
-        batch.miriada_error_message = _truncate_batch_error_message(error)
-        batch.save(update_fields=['miriada_error_message'])
-    elif ok:
-        batch.miriada_error_message = None
-        batch.save(update_fields=['miriada_error_message'])
-    return ok, error
 
 
 def _batch_has_balloon_status_errors(batch: BalloonsBatch) -> bool:
@@ -371,12 +413,19 @@ def _batch_has_balloon_status_errors(batch: BalloonsBatch) -> bool:
     return batch.balloon_list.exclude(miriada_status_error='').exists()
 
 
+def _error_balloon_nfc_tags(batch: BalloonsBatch) -> list:
+    """NFC-метки баллонов партии с непустой ошибкой отправки в Мириаду."""
+    return list(
+        batch.balloon_list.exclude(miriada_status_error='').values_list('nfc_tag', flat=True)
+    )
+
+
 def attempt_close_balloons_batch(batch: BalloonsBatch) -> Tuple[bool, Optional[str]]:
     """
-    Закрывает партию: только closettn, без повторной отправки статусов.
+    Закрывает партию через ``closettn``.
 
-    Требует совпадения RFID с ТТН, успешной проверки состава
-    (``miriada_balloons_sent``) и отсутствия ошибок на баллонах.
+    Перед вызовом ожидаются: совпадение RFID с ТТН и отсутствие ошибок на баллонах.
+    Повторная отправка статусов выполняется в ``save_and_close_balloons_batch``.
 
     Args:
         batch (BalloonsBatch): партия для закрытия.
@@ -389,9 +438,6 @@ def attempt_close_balloons_batch(batch: BalloonsBatch) -> Tuple[bool, Optional[s
     if batch.amount_of_ttn:
         if batch.rfid_balloon_count() != batch.amount_of_ttn:
             return False, _count_mismatch_payload(batch)['message']
-
-    if not batch.miriada_balloons_sent:
-        return False, 'Сначала проверьте баллоны в Мириаде'
 
     if _batch_has_balloon_status_errors(batch):
         return False, 'В партии есть баллоны с ошибкой отправки в Мириаду'
@@ -418,6 +464,7 @@ def attempt_close_balloons_batch(batch: BalloonsBatch) -> Tuple[bool, Optional[s
         batch.status = BatchStatus.COMPLETED
         batch.miriada_error_message = None
         batch.miriada_status_errors = {}
+        batch.miriada_balloons_sent = True
     else:
         batch.status = BatchStatus.MIRIADA_ERROR
         batch.miriada_error_message = _truncate_batch_error_message(error_message)
@@ -427,6 +474,7 @@ def attempt_close_balloons_batch(batch: BalloonsBatch) -> Tuple[bool, Optional[s
         'miriada_close_failed',
         'miriada_error_message',
         'miriada_status_errors',
+        'miriada_balloons_sent',
     ])
 
     if success:
@@ -452,7 +500,10 @@ BATCH_CLOSE_WRITABLE_FIELDS = frozenset({
 
 def save_and_close_balloons_batch(batch: BalloonsBatch, data=None):
     """
-    Сохраняет данные партии, отправляет статусы баллонов в Мириаду и закрывает ТТН.
+    Сохраняет данные партии, повторяет ошибочные статусы и закрывает ТТН.
+
+    Порядок: повтор только баллонов с ошибкой → сверка RFID с ТТН →
+    отсутствие ошибок на баллонах → ``closettn``.
     Пустое тело запроса допустимо: берутся текущие данные партии из БД.
 
     Args:
@@ -477,16 +528,20 @@ def save_and_close_balloons_batch(batch: BalloonsBatch, data=None):
         serializer.save()
         batch.refresh_from_db()
 
+    error_tags = _error_balloon_nfc_tags(batch)
+    if error_tags:
+        send_batch_balloon_statuses_to_miriada(batch, nfc_tags=error_tags)
+        batch.refresh_from_db()
+        if _batch_has_balloon_status_errors(batch):
+            return False, {
+                'message': 'В партии есть баллоны с ошибкой отправки в Мириаду',
+                'balloon_status_errors': True,
+                'id': batch.id,
+                'status': batch.status,
+            }, None
+
     if batch.amount_of_ttn and batch.rfid_balloon_count() != batch.amount_of_ttn:
         return False, _count_mismatch_payload(batch), None
-
-    if not batch.miriada_balloons_sent:
-        return False, {
-            'message': 'Сначала проверьте баллоны в Мириаде',
-            'check_required': True,
-            'id': batch.id,
-            'status': batch.status,
-        }, None
 
     if _batch_has_balloon_status_errors(batch):
         return False, {

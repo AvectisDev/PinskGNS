@@ -17,6 +17,7 @@ from filling_station.models import (
     DailyReaderCounter,
     TotalReadersCounter,
 )
+from filling_station.services.batches import add_balloon_to_batch_by_nfc
 from filling_station.services.miriada import get_balloon_data_from_miriada
 
 logger = logging.getLogger('filling_station')
@@ -204,7 +205,7 @@ def add_balloon_to_batch(reader: ReaderSettings, balloon: Optional[Balloon] = No
             logger.warning(f'Нет подходящей партии баллонов для ридера {reader.number}')
             return {'message': f'Нет подходящей партии баллонов'}
 
-        result = batch.add_balloon(balloon.nfc_tag)
+        result = add_balloon_to_batch_by_nfc(batch, balloon.nfc_tag)
         if result.get('success', False):
             logger.info(f"Баллон {balloon.nfc_tag} добавлен в партию {batch.id}")
         else:

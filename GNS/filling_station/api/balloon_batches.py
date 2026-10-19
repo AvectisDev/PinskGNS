@@ -20,7 +20,6 @@ from filling_station.models import BalloonsBatch, BatchStatus
 from filling_station.api.batch_status import batch_status_to_api, is_api_close_request
 from filling_station.services import (
     add_balloon_to_batch_by_nfc,
-    check_batch_balloons,
     pause_balloons_batch,
     resume_balloons_batch,
     save_and_close_balloons_batch,
@@ -176,30 +175,6 @@ def _api_error_payload(payload):
             404: ApiErrorSerializer
         }
     ),
-    check_balloons=extend_schema(
-        tags=['Партии баллонов'],
-        summary='Проверить баллоны в Мириаде',
-        description=(
-            'Отправляет статусы всех баллонов партии в Мириаду. '
-            'Не закрывает ТТН и не завершает партию. '
-            'Доступно для статусов 1=ACTIVE, 2=PAUSED и 4=MIRIADA_ERROR. '
-            'Список отклоненных баллонов — в GET .../rfid-amount/ (`error_balloons`).'
-        ),
-        parameters=[
-            OpenApiParameter(
-                name='id',
-                type=OpenApiTypes.INT,
-                location=OpenApiParameter.PATH,
-                description='ID партии',
-            ),
-        ],
-        request=None,
-        responses={
-            200: BalloonsBatchSerializer,
-            400: ApiErrorSerializer,
-            404: ApiErrorSerializer,
-        },
-    ),
     create=extend_schema(
         tags=['Партии баллонов'],
         summary='Создать новую партию',
@@ -221,9 +196,9 @@ def _api_error_payload(payload):
         description=(
             'Частичное обновление полей партии (счётчики, транспорт, ТТН и т.д.).\n\n'
             '**Завершение партии:** передайте `"status": 3` (COMPLETED). '
-            'Вызывается только закрытие ТТН (`closettn`). '
-            'Перед этим нужна успешная проверка баллонов (`POST .../check-balloons/`), '
-            'совпадение RFID с ТТН и отсутствие ошибок на баллонах. '
+            'Статусы баллонов с ошибками повторно отправляются в Мириаду, '
+            'затем проверяется совпадение RFID с ТТН и отсутствие ошибок, '
+            'после чего вызывается закрытие ТТН (`closettn`). '
             'Доступно для статусов 1=ACTIVE, 2=PAUSED и 4=MIRIADA_ERROR. '
             'При ошибке closettn партия переходит в 4=MIRIADA_ERROR (ответ HTTP 502).\n\n'
             'Устаревший способ (обратная совместимость): `"is_active": false`. '
@@ -249,7 +224,9 @@ def _api_error_payload(payload):
         tags=['Партии баллонов'],
         summary='Добавить баллон в партию',
         description=(
-            'Добавление баллона по NFC-метке. Статус в Мириаду отправляется при закрытии партии. '
+            'Добавление баллона по NFC-метке. Статус сразу отправляется в Мириаду. '
+            'Ошибки Мириады сохраняются на баллоне и доступны в GET .../rfid-amount/ '
+            '(`error_balloons`). Добавление в партию успешно даже при ошибке Мириады. '
             'Доступно для статусов 1=ACTIVE, 2=PAUSED и 4=MIRIADA_ERROR.'
         ),
         request=inline_serializer(
@@ -304,9 +281,8 @@ def _api_error_payload(payload):
         tags=['Партии баллонов'],
         summary='Повторно завершить партию',
         description=(
-            'Сохраняет данные партии и закрывает ТТН (`closettn`) без повторной '
-            'отправки статусов баллонов. Нужна успешная проверка (`check-balloons`), '
-            'совпадение RFID с ТТН и отсутствие ошибок на баллонах. '
+            'Сохраняет данные партии, повторно отправляет в Мириаду только баллоны '
+            'с ошибками, проверяет совпадение RFID с ТТН и закрывает ТТН (`closettn`). '
             'Доступно для статусов 1=ACTIVE, 2=PAUSED и 4=MIRIADA_ERROR '
             '(повтор после ошибки Мириады).'
         ),
@@ -474,56 +450,6 @@ class BalloonsBatchViewSet(viewsets.ViewSet):
         batch = get_object_or_404(BalloonsBatch, id=pk, batch_type=batch_type)
         serializer = BalloonAmountSerializer(batch)
         return Response(serializer.data)
-
-    @action(detail=True, methods=['post'], url_path='check-balloons')
-    def check_balloons(self, request, pk=None):
-        """
-        Отправляет статусы баллонов партии в Мириаду без закрытия ТТН.
-
-        Args:
-            request: HTTP-запрос DRF.
-            pk: ID партии.
-
-        Returns:
-            Response: данные партии или 400 при недопустимом статусе/ошибке отправки.
-        """
-        batch_type = self.get_batch_type(request)
-        if not batch_type:
-            return Response(
-                {"message": "Параметр batch_type обязателен (l для приёмки, u для отгрузки)"},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-
-        batch = get_object_or_404(BalloonsBatch, id=pk, batch_type=batch_type)
-        if batch.status not in OPEN_BATCH_STATUSES:
-            return Response(
-                {"message": "Партия не принимает проверку баллонов в текущем статусе"},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        logger.info(
-            f"API check-balloons: user={_api_user(request)}, batch_id={batch.id}, "
-            f"ttn_id={batch.ttn_id}, amount_of_rfid={batch.rfid_balloon_count()}"
-        )
-        ok, error = check_batch_balloons(batch)
-        batch.refresh_from_db()
-        response = BalloonsBatchSerializer(batch).data
-        if not ok:
-            logger.warning(
-                f"API check-balloons failed: user={_api_user(request)}, "
-                f"batch_id={batch.id}, error={error}"
-            )
-            return Response(
-                {
-                    'message': error,
-                    'id': batch.id,
-                    'status': batch_status_to_api(batch.status),
-                    'miriada_balloons_sent': batch.miriada_balloons_sent,
-                },
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-        logger.info(f"API check-balloons ok: user={_api_user(request)}, batch_id={batch.id}")
-        return Response(response)
 
     def create(self, request):
         """

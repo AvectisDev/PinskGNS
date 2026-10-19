@@ -21,7 +21,7 @@ from .forms import (
     BalloonForm,
     BalloonsBatchForm
 )
-from .services import check_batch_balloons, save_and_close_balloons_batch
+from .services import save_and_close_balloons_batch
 from datetime import datetime, time, timedelta
 
 
@@ -397,32 +397,8 @@ class BalloonBatchUpdateView(BalloonBatchTypeMixin, PreserveListQueryMixin, gene
 
 #@login_required
 @require_POST
-def balloon_batch_check_balloons(request, pk):
-    """Проверяет статусы баллонов партии в Мириаде без закрытия ТТН."""
-    path = request.path.lower()
-    batch_type = 'u' if 'unloading' in path else 'l'
-    batch = get_object_or_404(BalloonsBatch, pk=pk, batch_type=batch_type)
-
-    if not batch.can_check_balloons():
-        messages.error(request, 'Партия не принимает проверку баллонов в текущем статусе.')
-        return redirect_preserve_query(request, batch.get_absolute_url())
-
-    ok, error = check_batch_balloons(batch)
-    batch.refresh_from_db()
-    if ok:
-        messages.success(request, f'Проверка баллонов партии №{batch.id} прошла успешно.')
-    else:
-        messages.error(
-            request,
-            error or f'Мириада отклонила часть баллонов партии №{batch.id}.',
-        )
-    return redirect_preserve_query(request, batch.get_absolute_url())
-
-
-#@login_required
-@require_POST
 def balloon_batch_retry_close(request, pk):
-    """Завершить партию: закрыть ТТН в Мириаде после успешной проверки баллонов."""
+    """Завершить партию: повторить ошибочные статусы и закрыть ТТН в Мириаде."""
     path = request.path.lower()
     batch_type = 'u' if 'unloading' in path else 'l'
     batch = get_object_or_404(BalloonsBatch, pk=pk, batch_type=batch_type)
