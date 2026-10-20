@@ -357,6 +357,27 @@ class BalloonsBatchCloseTests(APITestCase):
         self.batch.refresh_from_db()
         self.assertEqual(self.batch.status, BatchStatus.MIRIADA_ERROR)
 
+    def test_retry_close_returns_400_on_count_mismatch(self):
+        url = reverse('filling_station_api:balloons-loading-retry-close', args=[self.batch.id])
+        response = self.client.post(url, {}, format='json')
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertTrue(response.data['count_mismatch'])
+        self.batch.refresh_from_db()
+        self.assertEqual(self.batch.status, BatchStatus.ACTIVE)
+
+    @patch('ttn.services.close_ttn_in_miriada')
+    @patch('filling_station.services.batches.post_status_to_miriada')
+    def test_retry_close_success_equivalent_to_patch_close(self, mock_send, mock_close):
+        mock_close.return_value = (True, None)
+        add_balloon_to_batch_by_nfc(self.batch, self.balloon.nfc_tag)
+        mock_send.reset_mock()
+        url = reverse('filling_station_api:balloons-loading-retry-close', args=[self.batch.id])
+        response = self.client.post(url, {}, format='json')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        mock_close.assert_called_once()
+        self.batch.refresh_from_db()
+        self.assertEqual(self.batch.status, BatchStatus.COMPLETED)
+
     def test_pause_and_resume_batch(self):
         url_pause = reverse('filling_station_api:balloons-loading-pause', args=[self.batch.id])
         response = self.client.post(url_pause, format='json')
