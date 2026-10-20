@@ -28,7 +28,7 @@ def build_logging_config(logs_dir: str) -> dict[str, Any]:
                 'level': 'DEBUG',
                 'class': 'concurrent_log_handler.ConcurrentRotatingFileHandler',
                 'filename': os.path.join(logs_dir, 'filling_station/filling_station.log'),
-                'maxBytes': 50 * 1024 * 1024,  # 50MB
+                'maxBytes': 10 * 1024 * 1024,  # 10MB
                 'backupCount': 30,
                 'formatter': 'verbose',
                 'encoding': 'utf-8',
@@ -71,7 +71,7 @@ def build_logging_config(logs_dir: str) -> dict[str, Any]:
                 'level': 'DEBUG',
                 'class': 'concurrent_log_handler.ConcurrentRotatingFileHandler',
                 'filename': os.path.join(logs_dir, 'railway/railway.log'),
-                'maxBytes': 10 * 1024 * 1024,  # 10MB
+                'maxBytes': 5 * 1024 * 1024,  # 5MB
                 'backupCount': 30,
                 'formatter': 'verbose',
                 'encoding': 'utf-8',
@@ -82,7 +82,7 @@ def build_logging_config(logs_dir: str) -> dict[str, Any]:
                 'level': 'INFO',
                 'class': 'concurrent_log_handler.ConcurrentRotatingFileHandler',
                 'filename': os.path.join(logs_dir, 'railway/ocr_compare.log'),
-                'maxBytes': 10 * 1024 * 1024,  # 10MB
+                'maxBytes': 1 * 1024 * 1024,  # 1MB
                 'backupCount': 30,
                 'formatter': 'ocr_compare',
                 'encoding': 'utf-8',
@@ -93,7 +93,7 @@ def build_logging_config(logs_dir: str) -> dict[str, Any]:
                 'level': 'DEBUG',
                 'class': 'concurrent_log_handler.ConcurrentRotatingFileHandler',
                 'filename': os.path.join(logs_dir, 'autogas/autogas.log'),
-                'maxBytes': 10 * 1024 * 1024,  # 10MB
+                'maxBytes': 5 * 1024 * 1024,  # 5MB
                 'backupCount': 30,
                 'formatter': 'verbose',
                 'encoding': 'utf-8',
@@ -104,7 +104,7 @@ def build_logging_config(logs_dir: str) -> dict[str, Any]:
                 'level': 'DEBUG',
                 'class': 'concurrent_log_handler.ConcurrentRotatingFileHandler',
                 'filename': os.path.join(logs_dir, 'opcua/opcua.log'),
-                'maxBytes': 10 * 1024 * 1024,  # 10MB
+                'maxBytes': 5 * 1024 * 1024,  # 5MB
                 'backupCount': 30,
                 'formatter': 'verbose',
                 'encoding': 'utf-8',
@@ -115,7 +115,7 @@ def build_logging_config(logs_dir: str) -> dict[str, Any]:
                 'level': 'DEBUG',
                 'class': 'concurrent_log_handler.ConcurrentRotatingFileHandler',
                 'filename': os.path.join(logs_dir, 'transport/kpp.log'),
-                'maxBytes': 10 * 1024 * 1024,  # 10MB
+                'maxBytes': 5 * 1024 * 1024,  # 5MB
                 'backupCount': 30,
                 'formatter': 'verbose',
                 'encoding': 'utf-8',

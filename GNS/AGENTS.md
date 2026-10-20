@@ -65,7 +65,6 @@ Before making changes:
 - Reuse existing code and follow established project patterns where practical.
 - Keep solutions readable, maintainable, and appropriately scoped.
 - Use type hints in new Python code where practical and consistent with the surrounding code.
-- Preserve backward compatibility unless the task explicitly requires a breaking change.
 - Do not remove production safeguards or validations without an explicit requirement and a clear understanding of the consequences.
 - Do not introduce new dependencies unless they are necessary.
 - Update or add tests when behavior changes.
