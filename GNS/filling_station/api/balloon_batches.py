@@ -1,6 +1,7 @@
 """API ViewSet партий приёмки/отгрузки баллонов и endpoint для SCADA."""
 
 import logging
+from datetime import timedelta
 
 from django.db.models import Count
 from django.http import JsonResponse
@@ -253,6 +254,8 @@ def _close_batch_response(batch: BalloonsBatch, data, *, log_prefix: str, api_us
         description=(
             'Список партий, которые ещё не завершены успешно: '
             'status ∈ {1=ACTIVE, 2=PAUSED, 4=MIRIADA_ERROR}. '
+            'Только партии с started_at за последние 5 дней, '
+            'сортировка от новых к старым (−started_at). '
             f'{_BATCH_STATUS_DOC}'
         ),
         parameters=[
@@ -511,6 +514,8 @@ class BalloonsBatchViewSet(viewsets.ViewSet):
         """
         Возвращает список незавершённых партий выбранного типа.
 
+        Только партии за последние 5 дней (по ``started_at``), от новых к старым.
+
         Args:
             request: HTTP-запрос DRF.
 
@@ -524,12 +529,14 @@ class BalloonsBatchViewSet(viewsets.ViewSet):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
+        since = timezone.now() - timedelta(days=5)
         batches = BalloonsBatch.objects.select_related('truck', 'trailer', 'truck__type').annotate(
             annotated_rfid_count=Count('balloon_list', distinct=True),
         ).filter(
             batch_type=batch_type,
             status__in=OPEN_BATCH_STATUSES,
-        )
+            started_at__gte=since,
+        ).order_by('-started_at')
 
         serializer = ActiveBatchSerializer(batches, many=True)
         return Response(serializer.data)
