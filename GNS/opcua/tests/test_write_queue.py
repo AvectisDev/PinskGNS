@@ -54,6 +54,63 @@ class OpcWriteEnqueueTests(SimpleTestCase):
         client.blpop.assert_not_called()
         client.brpop.assert_not_called()
 
+    @patch('opcua.api.time.sleep')
+    @patch('opcua.api._redis_client')
+    def test_write_tag_wait_success(self, redis_factory, _sleep):
+        client = redis_factory.return_value
+        client.get.return_value = '{"ok": true}'
+
+        from opcua.api import write_tag_wait
+
+        ok = write_tag_wait('autogas.vehicle_select.proposed_truck_number', 'AI0008-1')
+
+        self.assertTrue(ok)
+        client.lpush.assert_called_once()
+        payload = client.lpush.call_args.args[1]
+        self.assertIn('reply_to', payload)
+        client.get.assert_called()
+        client.delete.assert_called()
+
+    @patch('opcua.api.WRITE_WAIT_TIMEOUT_SECONDS', 0.01)
+    @patch('opcua.api.WRITE_WAIT_POLL_SECONDS', 0.001)
+    @patch('opcua.api.time.sleep')
+    @patch('opcua.api._redis_client')
+    def test_write_tag_wait_timeout(self, redis_factory, _sleep):
+        client = redis_factory.return_value
+        client.get.return_value = None
+
+        from opcua.api import write_tag_wait
+
+        ok = write_tag_wait(
+            'autogas.vehicle_select.proposed_truck_number',
+            'AI0008-1',
+            timeout=0.01,
+        )
+
+        self.assertFalse(ok)
+
+    @patch('opcua.api.write_tag_wait')
+    def test_write_tags_wait_stops_on_first_fail(self, write_tag_wait):
+        write_tag_wait.side_effect = [True, False]
+
+        from opcua.api import write_tags_wait
+
+        ok = write_tags_wait({
+            'autogas.vehicle_select.proposed_truck_number': 'A',
+            'autogas.vehicle_select.proposed_trailer_number': 'B',
+            'autogas.vehicle_select.vehicle_list_0': '',
+        })
+
+        self.assertFalse(ok)
+        self.assertEqual(write_tag_wait.call_count, 2)
+
+    @patch('opcua.api._redis_client')
+    def test_enqueue_unknown_tag(self, redis_factory):
+        from opcua.api import write_tag
+
+        self.assertFalse(write_tag('unknown.tag', 1))
+        redis_factory.return_value.lpush.assert_not_called()
+
 
 class OpcWriteDataValueTests(SimpleTestCase):
     def test_write_tag_sends_datavalue_without_source_timestamp(self):
@@ -186,3 +243,143 @@ class OpcWriteDataValueTests(SimpleTestCase):
         written = bytes(datavalue.Value.Value)
         self.assertEqual(len(written), 32)
         self.assertTrue(written.startswith(b'AH0193-1'))
+
+    def test_string_badtypemismatch_retries_bytestring(self):
+        """Прод 19.10: live String → BadTypeMismatch → ByteString OK."""
+        dispatcher = TriggerDispatcher()
+        bridge = OpcBridgeClient(url='opc.tcp://example', dispatcher=dispatcher)
+        node = AsyncMock()
+        node.read_data_type_as_variant_type = AsyncMock(
+            return_value=ua.VariantType.String,
+        )
+        node.read_data_value = AsyncMock(
+            return_value=ua.DataValue(ua.Variant('', ua.VariantType.String)),
+        )
+        node.write_value = AsyncMock(
+            side_effect=[
+                RuntimeError('BadTypeMismatch'),
+                None,
+            ],
+        )
+        bridge._nodes_by_name = {
+            'autogas.vehicle_select.proposed_truck_number': node,
+        }
+
+        async_to_sync(bridge.write_tag)(
+            'autogas.vehicle_select.proposed_truck_number',
+            'AH0193-1',
+        )
+
+        self.assertEqual(node.write_value.call_count, 2)
+        first = node.write_value.call_args_list[0].args[0]
+        second = node.write_value.call_args_list[1].args[0]
+        self.assertEqual(first.Value.VariantType, ua.VariantType.String)
+        self.assertEqual(second.Value.VariantType, ua.VariantType.ByteString)
+        self.assertEqual(
+            bridge._string_encoding_by_tag['autogas.vehicle_select.proposed_truck_number'],
+            'bytestring',
+        )
+
+    def test_string_badtypemismatch_retries_byte_array(self):
+        dispatcher = TriggerDispatcher()
+        bridge = OpcBridgeClient(url='opc.tcp://example', dispatcher=dispatcher)
+        node = AsyncMock()
+        node.read_data_type_as_variant_type = AsyncMock(
+            return_value=ua.VariantType.String,
+        )
+        node.read_data_value = AsyncMock(
+            return_value=ua.DataValue(ua.Variant('', ua.VariantType.String)),
+        )
+        node.write_value = AsyncMock(
+            side_effect=[
+                RuntimeError('BadTypeMismatch'),
+                RuntimeError('BadTypeMismatch'),
+                None,
+            ],
+        )
+        bridge._nodes_by_name = {
+            'autogas.vehicle_select.vehicle_list_0': node,
+        }
+
+        async_to_sync(bridge.write_tag)(
+            'autogas.vehicle_select.vehicle_list_0',
+            '1    AI0008-1',
+        )
+
+        third = node.write_value.call_args_list[2].args[0]
+        self.assertEqual(third.Value.VariantType, ua.VariantType.Byte)
+        self.assertEqual(len(third.Value.Value), 32)
+        self.assertEqual(
+            bridge._string_encoding_by_tag['autogas.vehicle_select.vehicle_list_0'],
+            'byte_array',
+        )
+
+    def test_string_encoding_cached_after_success(self):
+        dispatcher = TriggerDispatcher()
+        bridge = OpcBridgeClient(url='opc.tcp://example', dispatcher=dispatcher)
+        node = AsyncMock()
+        node.read_data_type_as_variant_type = AsyncMock(
+            return_value=ua.VariantType.String,
+        )
+        node.read_data_value = AsyncMock(
+            return_value=ua.DataValue(ua.Variant('', ua.VariantType.String)),
+        )
+        node.write_value = AsyncMock(
+            side_effect=[RuntimeError('BadTypeMismatch'), None, None],
+        )
+        tag = 'autogas.vehicle_select.proposed_trailer_number'
+        bridge._nodes_by_name = {tag: node}
+
+        async_to_sync(bridge.write_tag)(tag, 'A0608A-1')
+        async_to_sync(bridge.write_tag)(tag, 'A0000A-1')
+
+        # Первый цикл: String fail + ByteString ok; второй — сразу ByteString.
+        self.assertEqual(node.write_value.call_count, 3)
+        last = node.write_value.call_args_list[2].args[0]
+        self.assertEqual(last.Value.VariantType, ua.VariantType.ByteString)
+        node.read_data_value.assert_called_once()
+
+    def test_boolean_write_does_not_use_string_fallback(self):
+        dispatcher = TriggerDispatcher()
+        bridge = OpcBridgeClient(url='opc.tcp://example', dispatcher=dispatcher)
+        node = AsyncMock()
+        node.read_data_type_as_variant_type = AsyncMock(
+            return_value=ua.VariantType.Boolean,
+        )
+        node.read_data_value = AsyncMock(
+            return_value=ua.DataValue(ua.Variant(False, ua.VariantType.Boolean)),
+        )
+        node.write_value = AsyncMock(side_effect=RuntimeError('BadTypeMismatch'))
+        bridge._nodes_by_name = {'autogas.vehicle_select.proposed_ready': node}
+
+        with self.assertRaises(RuntimeError):
+            async_to_sync(bridge.write_tag)(
+                'autogas.vehicle_select.proposed_ready',
+                True,
+            )
+
+        node.write_value.assert_called_once()
+        self.assertEqual(bridge._string_encoding_by_tag, {})
+
+    def test_string_all_encodings_fail_raises(self):
+        dispatcher = TriggerDispatcher()
+        bridge = OpcBridgeClient(url='opc.tcp://example', dispatcher=dispatcher)
+        node = AsyncMock()
+        node.read_data_type_as_variant_type = AsyncMock(
+            return_value=ua.VariantType.String,
+        )
+        node.read_data_value = AsyncMock(
+            return_value=ua.DataValue(ua.Variant('', ua.VariantType.String)),
+        )
+        node.write_value = AsyncMock(side_effect=RuntimeError('BadTypeMismatch'))
+        bridge._nodes_by_name = {
+            'autogas.vehicle_select.vehicle_list_1': node,
+        }
+
+        with self.assertRaises(RuntimeError):
+            async_to_sync(bridge.write_tag)(
+                'autogas.vehicle_select.vehicle_list_1',
+                'x',
+            )
+
+        self.assertEqual(node.write_value.call_count, 3)

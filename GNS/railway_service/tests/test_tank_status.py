@@ -105,6 +105,35 @@ class RailwayTankEventTests(SimpleTestCase):
         tank_process.assert_not_called()
         batch_process_mock.assert_not_called()
 
+    @patch('railway_service.services.tank_events.batch_process')
+    @patch('railway_service.services.tank_events.tank_process')
+    @patch('railway_service.services.tank_events.log_number_comparison')
+    @patch('railway_service.services.tank_events.write_tag')
+    @patch('railway_service.services.tank_events.fetch_railway_tank_data')
+    @override_settings(OCRYP_URL='http://ocr.example')
+    def test_camera_clears_bit_on_ocr_connection_error(
+        self,
+        fetch_data,
+        write_tag,
+        log_compare,
+        tank_process,
+        batch_process_mock,
+    ):
+        fetch_data.return_value = (76615582, b'img')
+        tank = MagicMock()
+        tank_process.return_value = tank
+        log_compare.side_effect = ConnectionError('OCR down')
+
+        process_railway_tank_event({
+            'stable_weight': 37.7,
+            'camera_worked': True,
+            'on_station': True,
+        })
+
+        write_tag.assert_called_once_with('railway.camera_worked', False)
+        tank_process.assert_called_once()
+        batch_process_mock.assert_called_once_with(tank)
+
 
 class RailwayBatchEventTests(RailwayFixturesMixin, TestCase):
     def test_started_creates_batch_with_type(self):
@@ -135,6 +164,11 @@ class RailwayBatchEventTests(RailwayFixturesMixin, TestCase):
         batch.refresh_from_db()
         self.assertFalse(batch.is_active)
         self.assertIsNotNone(batch.completed_at)
+
+    def test_ended_without_active_is_noop(self):
+        """Reconnect Oct 15/19: active=False без партии в БД."""
+        process_railway_batch_ended({'active': False})
+        self.assertEqual(RailwayBatch.objects.count(), 0)
 
     def test_batch_process_adds_to_active_only(self):
         tank = self.make_tank(registration_number=111111)

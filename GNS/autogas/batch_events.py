@@ -14,7 +14,7 @@ from transport.registration import (
     format_trailer_hmi,
     format_truck_hmi,
 )
-from opcua.api import write_tag
+from opcua.api import write_tag, write_tags_wait
 from autogas.management.commands.intellect import (
     INTELLECT_SERVER_LIST,
     get_registration_number_list,
@@ -295,27 +295,45 @@ def combo_from_list_selection(payload: Mapping[str, Any]) -> Optional[VehicleCom
     return combo_from_numbers(truck_no, trailer_no)
 
 
-def _write_propose(combo: VehicleCombo) -> None:
-    write_tag(
-        'autogas.vehicle_select.proposed_truck_number',
-        format_truck_hmi(combo.truck.registration_number),
-    )
-    write_tag(
-        'autogas.vehicle_select.proposed_trailer_number',
-        format_trailer_hmi(combo.trailer.registration_number) if combo.trailer else '',
-    )
-    write_tag('autogas.vehicle_select.proposed_ready', True)
+def _write_propose(combo: VehicleCombo) -> bool:
+    """Пишет номера на ПЛК; proposed_ready только после ACK строк."""
+    strings = {
+        'autogas.vehicle_select.proposed_truck_number': format_truck_hmi(
+            combo.truck.registration_number,
+        ),
+        'autogas.vehicle_select.proposed_trailer_number': (
+            format_trailer_hmi(combo.trailer.registration_number)
+            if combo.trailer
+            else ''
+        ),
+    }
     for i in range(VEHICLE_LIST_SIZE):
-        write_tag(f'autogas.vehicle_select.vehicle_list_{i}', '')
+        strings[f'autogas.vehicle_select.vehicle_list_{i}'] = ''
+    if not write_tags_wait(strings):
+        logger.error(
+            'Не удалось записать proposed_* / vehicle_list на ПЛК — ready не ставим',
+        )
+        return False
+    write_tag('autogas.vehicle_select.proposed_ready', True)
+    return True
 
 
-def _write_manual_list(combos: Sequence[VehicleCombo]) -> None:
+def _write_manual_list(combos: Sequence[VehicleCombo]) -> bool:
+    """Пишет список на ПЛК; строки ждут ACK, ready=False — fire-and-forget."""
     write_tag('autogas.vehicle_select.proposed_ready', False)
-    write_tag('autogas.vehicle_select.proposed_truck_number', '')
-    write_tag('autogas.vehicle_select.proposed_trailer_number', '')
+    strings: dict[str, str] = {
+        'autogas.vehicle_select.proposed_truck_number': '',
+        'autogas.vehicle_select.proposed_trailer_number': '',
+    }
     for i in range(VEHICLE_LIST_SIZE):
         text = format_list_line(i, combos[i]) if i < len(combos) else ''
-        write_tag(f'autogas.vehicle_select.vehicle_list_{i}', text)
+        strings[f'autogas.vehicle_select.vehicle_list_{i}'] = text
+    if not write_tags_wait(strings):
+        logger.error(
+            'Не удалось записать vehicle_list_* на ПЛК — список не выгружен',
+        )
+        return False
+    return True
 
 
 def _clear_vehicle_select_ui(*, keep_propose: bool = False) -> None:

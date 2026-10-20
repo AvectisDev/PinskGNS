@@ -222,6 +222,49 @@ class TriggerDispatcherTests(SimpleTestCase):
             trigger = next(t for t in TRIGGERS if t.name == name)
             self.assertIsNone(trigger.idempotency_ttl, name)
 
+    @patch('opcua.bridge.dispatcher.current_app')
+    def test_resync_batch_type_0_to_2_without_request_does_not_fire_autogas(
+        self,
+        current_app,
+    ):
+        """Фантомный ресинк MX: batch_type/gas_type 0→2 без request."""
+        idle = {
+            'autogas.request_batch_create': False,
+            'autogas.response_batch_create': False,
+            'autogas.batch_type_code': 2,
+            'autogas.gas_type': 2,
+            'autogas.vehicle_select.proposed_ready': False,
+            'autogas.vehicle_select.vehicle_list_0': '',
+            'autogas.vehicle_select.selected_vehicle_index': -1,
+            'railway.active': False,
+            'railway.batch_type': 0,
+        }
+        self.dispatcher.on_snapshot(idle)
+        fired = self.dispatcher.on_snapshot({
+            **idle,
+            'autogas.batch_type_code': 0,
+            'autogas.gas_type': 0,
+            'autogas.vehicle_select.selected_vehicle_index': 0,
+        })
+        self.assertEqual(fired, [])
+        fired_restore = self.dispatcher.on_snapshot({
+            **idle,
+            'autogas.batch_type_code': 2,
+            'autogas.gas_type': 2,
+            'autogas.vehicle_select.selected_vehicle_index': -1,
+        })
+        self.assertEqual(fired_restore, [])
+        current_app.send_task.assert_not_called()
+
+    @patch('opcua.bridge.dispatcher.current_app')
+    def test_force_pending_active_false_fires_ended(self, current_app):
+        """Reconnect Oct 15/19: active=False → railway_batch_ended."""
+        fired = self.dispatcher.on_snapshot(
+            {'railway.active': False, 'railway.batch_type': 0},
+            force_pending=True,
+        )
+        self.assertEqual(fired, ['railway_batch_ended'])
+
     def test_build_payload_strips_domain_prefix(self):
         trigger = next(t for t in TRIGGERS if t.name == 'railway_camera_worked')
         payload = build_payload(trigger, {

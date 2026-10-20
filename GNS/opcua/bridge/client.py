@@ -18,6 +18,8 @@ SUBSCRIPTION_PERIOD_MS = 500
 INITIAL_READ_RETRY_SECONDS = 2.0
 # Melsoft / GX Works2 STRING[n] часто экспонируется как ByteString или Byte[n].
 PLC_STRING_FIXED_LEN = 32
+# Порядок fallback: живой тип часто String, но Melsoft отклоняет String-запись.
+STRING_WRITE_ENCODINGS = ('string', 'bytestring', 'byte_array')
 
 
 class OpcBridgeClient:
@@ -30,6 +32,8 @@ class OpcBridgeClient:
         self._nodes_by_name: dict[str, Node] = {}
         self._name_by_nodeid: dict[str, str] = node_id_to_name()
         self._subscription = None
+        # Успешный encoding Melsoft STRING[n] для тега (string|bytestring|byte_array).
+        self._string_encoding_by_tag: dict[str, str] = {}
 
     async def connect(self) -> None:
         self.client.connection_lost_callback = self._on_connection_lost
@@ -92,32 +96,9 @@ class OpcBridgeClient:
             )
             await asyncio.sleep(INITIAL_READ_RETRY_SECONDS)
 
-    async def write_tag(self, name: str, value: Any) -> None:
-        node = self._nodes_by_name.get(name)
-        if node is None:
-            raise KeyError(f'Unknown tag: {name}')
-        variant = await self._to_variant(node, value)
-        try:
-            # Melsoft MX OPC UA отклоняет запись со SourceTimestamp (BadWriteNotSupported).
-            # value_to_datavalue() всегда ставит timestamp — передаём DataValue без него.
-            await node.write_value(ua.DataValue(variant))
-        except Exception as error:
-            logger.error(
-                'OPC write %s=%r failed (VariantType=%s): %s',
-                name,
-                value,
-                variant.VariantType,
-                error,
-            )
-            raise
-        written = variant.Value
-        self.dispatcher.update_tag(name, written)
-        logger.debug(
-            'OPC write %s=%s (VariantType=%s)',
-            name,
-            value,
-            variant.VariantType,
-        )
+    @staticmethod
+    def _is_bad_type_mismatch(error: BaseException) -> bool:
+        return 'BadTypeMismatch' in str(error)
 
     @staticmethod
     def _fixed_string_bytes(value: Any, length: int = PLC_STRING_FIXED_LEN) -> bytes:
@@ -131,6 +112,123 @@ class OpcBridgeClient:
         if len(raw) > length:
             raw = raw[:length]
         return raw.ljust(length, b'\x00')
+
+    def _string_variant(self, encoding: str, value: Any) -> ua.Variant:
+        """Строит Variant для Melsoft STRING[n] в одном из кодирований."""
+        if encoding == 'string':
+            return ua.Variant(
+                '' if value is None else str(value),
+                ua.VariantType.String,
+            )
+        if encoding == 'bytestring':
+            return ua.Variant(
+                self._fixed_string_bytes(value),
+                ua.VariantType.ByteString,
+            )
+        if encoding == 'byte_array':
+            padded = self._fixed_string_bytes(value)
+            return ua.Variant(list(padded), ua.VariantType.Byte, is_array=True)
+        raise ValueError(f'Unknown string encoding: {encoding}')
+
+    async def _commit_write(
+        self,
+        node: Node,
+        name: str,
+        value: Any,
+        variant: ua.Variant,
+    ) -> None:
+        # Melsoft MX OPC UA отклоняет запись со SourceTimestamp (BadWriteNotSupported).
+        await node.write_value(ua.DataValue(variant))
+        written = variant.Value
+        self.dispatcher.update_tag(name, written)
+        logger.debug(
+            'OPC write %s=%s (VariantType=%s)',
+            name,
+            value,
+            variant.VariantType,
+        )
+
+    async def write_tag(self, name: str, value: Any) -> None:
+        node = self._nodes_by_name.get(name)
+        if node is None:
+            raise KeyError(f'Unknown tag: {name}')
+
+        cached = self._string_encoding_by_tag.get(name)
+        if cached is not None:
+            variant = self._string_variant(cached, value)
+            try:
+                await self._commit_write(node, name, value, variant)
+            except Exception as error:
+                logger.error(
+                    'OPC write %s=%r failed (VariantType=%s, encoding=%s): %s',
+                    name,
+                    value,
+                    variant.VariantType,
+                    cached,
+                    error,
+                )
+                raise
+            return
+
+        variant = await self._to_variant(node, value)
+        if variant.VariantType != ua.VariantType.String:
+            try:
+                await self._commit_write(node, name, value, variant)
+            except Exception as error:
+                logger.error(
+                    'OPC write %s=%r failed (VariantType=%s): %s',
+                    name,
+                    value,
+                    variant.VariantType,
+                    error,
+                )
+                raise
+            return
+
+        # Melsoft STRING[n]: сервер часто отдаёт live String, но принимает
+        # только ByteString / Byte[32]. Пробуем encodings по порядку.
+        last_error: BaseException | None = None
+        for encoding in STRING_WRITE_ENCODINGS:
+            variant = self._string_variant(encoding, value)
+            try:
+                await self._commit_write(node, name, value, variant)
+            except Exception as error:
+                last_error = error
+                if not self._is_bad_type_mismatch(error):
+                    logger.error(
+                        'OPC write %s=%r failed (VariantType=%s): %s',
+                        name,
+                        value,
+                        variant.VariantType,
+                        error,
+                    )
+                    raise
+                logger.warning(
+                    'OPC write %s=%r BadTypeMismatch as %s, пробуем следующий encoding',
+                    name,
+                    value,
+                    encoding,
+                )
+                continue
+
+            self._string_encoding_by_tag[name] = encoding
+            if name.startswith('autogas.vehicle_select.') or encoding != 'string':
+                logger.info(
+                    'OPC string encoding для %s: %s (VariantType=%s)',
+                    name,
+                    encoding,
+                    variant.VariantType,
+                )
+            return
+
+        assert last_error is not None
+        logger.error(
+            'OPC write %s=%r failed после всех string encodings: %s',
+            name,
+            value,
+            last_error,
+        )
+        raise last_error
 
     async def _resolve_variant_type(self, node: Node) -> tuple[ua.VariantType, Any]:
         """
@@ -217,7 +315,7 @@ class OpcBridgeClient:
                 if isinstance(event, DataChangeEvent):
                     await self._on_data_change(event)
                 elif isinstance(event, StatusChangeEvent):
-                    logger.warning('OPC subscription status: %s', event.notification)
+                    logger.info('OPC subscription status: %s', event.notification)
 
     async def _on_data_change(self, event: DataChangeEvent) -> None:
         name = self.resolve_tag_name(event.node)

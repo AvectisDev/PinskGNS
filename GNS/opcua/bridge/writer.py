@@ -78,9 +78,19 @@ async def run_write_loop(bridge: OpcBridgeClient, stop_event: asyncio.Event) -> 
 
         name = request.get('name', '')
         value = request.get('value')
+        reply_to = request.get('reply_to')
         try:
             await _write_with_retries(bridge, name, value)
-        except Exception:
+            if reply_to:
+                await asyncio.to_thread(opc_api.publish_write_ack, reply_to, True)
+        except Exception as error:
             # Уже залогировано в _write_with_retries; сообщение из Redis снято,
             # повторная постановка — ответственность домена при следующем событии.
+            if reply_to:
+                await asyncio.to_thread(
+                    opc_api.publish_write_ack,
+                    reply_to,
+                    False,
+                    str(error),
+                )
             continue
