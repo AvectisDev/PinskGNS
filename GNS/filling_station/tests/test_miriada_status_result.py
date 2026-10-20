@@ -86,12 +86,17 @@ class PostStatusToMiriadaResultTests(TestCase):
         response = MagicMock()
         response.status_code = 403
         response.reason = 'Forbidden'
-        response.text = 'Автомобиль не найден'
+        response.text = '{"title": "Error", "description": "Автомобиль не найден"}'
+        response.json.return_value = {
+            'title': 'Error',
+            'description': 'Автомобиль не найден',
+        }
         session = self._mock_session(response)
 
-        with self.assertRaises(MiriadaAPIError):
+        with self.assertRaises(MiriadaAPIError) as ctx:
             post_status_to_miriada(self.url, self.payload, self.send_type, session=session)
 
+        self.assertEqual(str(ctx.exception), 'Автомобиль не найден')
         self.assertEqual(session.send.call_count, 1)
 
     @patch('filling_station.services.miriada.time.sleep')

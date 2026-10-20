@@ -437,12 +437,18 @@ def post_status_to_miriada(
                     )
                     logger.error(error_msg)
                     raise MiriadaAPIError(error_detail)
+                try:
+                    error_body = response.json()
+                except ValueError:
+                    error_body = None
+                error_detail = _miriada_status_error_message(error_body, response.text)
                 error_msg = (
                     f"Ошибка при отправке {send_type}! "
-                    f"Status: {response.status_code} {response.reason}, Ответ: {response.text}"
+                    f"Status: {response.status_code} {response.reason}, Ответ: {error_detail}"
                 )
                 logger.error(error_msg)
-                raise MiriadaAPIError(error_msg)
+                # В API/на баллон пишем человекочитаемый текст (description), не сырой JSON.
+                raise MiriadaAPIError(error_detail)
             except MiriadaAPIError:
                 raise
             except requests.exceptions.Timeout as e:
