@@ -1,5 +1,3 @@
-"""Конфигурация приложения filling_station (газонаполнительная станция)."""
-
 from django.apps import AppConfig
 
 

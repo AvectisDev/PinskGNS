@@ -1,5 +1,3 @@
-"""URL-маршруты веб-интерфейса транспорта."""
-
 from django.urls import path
 
 from transport import views

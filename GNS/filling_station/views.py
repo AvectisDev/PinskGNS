@@ -1,5 +1,3 @@
-"""Представления веб-интерфейса АГНС: баллоны, партии, транспорт и статистика."""
-
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
 from core.mixins import CancelFormMixin, DateRangeListFilterMixin, ModalDeleteMixin, PreserveListQueryMixin

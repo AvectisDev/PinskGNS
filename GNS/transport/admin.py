@@ -1,5 +1,3 @@
-"""Регистрация моделей транспорта в Django Admin."""
-
 from django import forms
 from django.contrib import admin
 

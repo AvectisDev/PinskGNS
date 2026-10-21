@@ -1,8 +1,3 @@
-"""Модели газонаполнительной станции: баллоны, RFID-считыватели, транспорт и партии.
-
-Описывают учёт баллонов, показания считывателей, складские счётчики и операции приёмки/отгрузки.
-"""
-
 from collections import defaultdict
 from django.db import models
 from django.utils import timezone

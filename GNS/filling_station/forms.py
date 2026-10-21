@@ -1,5 +1,3 @@
-"""Формы Django для работы с баллонами, транспортом и партиями на ГНС."""
-
 from django import forms
 from django.utils import timezone
 from django.conf import settings

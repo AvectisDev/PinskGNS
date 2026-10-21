@@ -1,5 +1,3 @@
-"""Модели грузовиков и прицепов."""
-
 import re
 
 from django.core.exceptions import ValidationError

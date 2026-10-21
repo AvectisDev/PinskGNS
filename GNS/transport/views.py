@@ -1,5 +1,3 @@
-"""Веб-представления грузовиков и прицепов."""
-
 from django.db.models import Q
 from django.urls import reverse_lazy
 from django.views import generic
