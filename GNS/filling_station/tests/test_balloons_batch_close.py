@@ -296,6 +296,19 @@ class BalloonsBatchCloseTests(APITestCase):
         self.assertEqual(self.balloon.miriada_status_error, '')
         self.assertFalse(self.batch.miriada_balloons_sent)
 
+    def test_batch_error_count_follows_balloon_field_not_json_cache(self):
+        """Карточка партии должна видеть ошибку на баллоне даже при пустом JSON кэше."""
+        with patch('filling_station.services.batches.post_status_to_miriada'):
+            self.batch.add_balloon(self.balloon.nfc_tag)
+        self.batch.miriada_status_errors = {}
+        self.batch.save(update_fields=['miriada_status_errors'])
+        self.balloon.miriada_status_error = 'Автомобиль не найден'
+        self.balloon.save(update_fields=['miriada_status_error'])
+
+        self.assertEqual(self.batch.miriada_status_error_count, 1)
+        self.assertIn(self.balloon.nfc_tag, self.batch.miriada_status_errors_text)
+        self.assertIn('Автомобиль не найден', self.batch.miriada_status_errors_text)
+
     @patch('ttn.services.close_ttn_in_miriada')
     @patch('filling_station.services.batches.post_status_to_miriada')
     def test_close_from_miriada_error_without_balloon_errors(self, mock_send, mock_close):

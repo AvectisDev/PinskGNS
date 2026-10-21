@@ -641,19 +641,26 @@ class BalloonsBatch(models.Model):
 
     @property
     def miriada_status_error_count(self) -> int:
-        """Число баллонов с ошибкой отправки статуса в Мириаду."""
-        return len(self.miriada_status_errors or {})
+        """Число баллонов партии с непустым ``Balloon.miriada_status_error``."""
+        return self.balloon_list.exclude(miriada_status_error='').count()
 
     @property
     def miriada_status_errors_text(self) -> str:
         """
         Текст для поля на карточке: NFC и сообщение ошибки, по одной строке.
 
+        Берётся с баллонов партии (тот же источник, что и проверка закрытия),
+        а не из кэша ``miriada_status_errors`` на партии.
+
         Returns:
             str: строки вида ``nfc — message``.
         """
-        errors = self.miriada_status_errors or {}
-        return '\n'.join(f'{nfc} — {message}' for nfc, message in sorted(errors.items()))
+        rows = (
+            self.balloon_list.exclude(miriada_status_error='')
+            .order_by('nfc_tag')
+            .values_list('nfc_tag', 'miriada_status_error')
+        )
+        return '\n'.join(f'{nfc} — {message}' for nfc, message in rows)
 
     def add_balloon(self, nfc_tag: str = None) -> dict:
         """

@@ -191,7 +191,7 @@
                         </thead>
                         <tbody>
                         {% for balloon in balloons %}
-                        {% with miriada_err=batch.miriada_status_errors|get_item:balloon.nfc_tag %}
+                        {% with miriada_err=balloon.miriada_status_error %}
                         <tr class="{% if not balloon.filling_status %}table-danger{% elif miriada_err %}table-warning{% endif %}">
                             {% if batch.accepts_manual_edits %}
                             <td>
