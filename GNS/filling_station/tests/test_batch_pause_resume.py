@@ -46,14 +46,39 @@ class BatchPauseResumeEdgeTests(APITestCase):
         response = self.client.post(url, format='json')
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
-    def test_resume_rejects_non_paused(self):
+    def test_resume_rejects_active_and_completed(self):
         ok, message = resume_balloons_batch(self.batch)
         self.assertFalse(ok)
-        self.assertIn('не приостановлена', message)
+        self.assertIn('Приостановлена', message)
+        self.assertIn('Ошибка Мириады', message)
 
         url = reverse('filling_station_api:balloons-loading-resume', args=[self.batch.id])
-        response = self.client.post(url, format='json')
+        response = self.client.post(url, {})
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+        self.batch.status = BatchStatus.COMPLETED
+        self.batch.save(update_fields=['status'])
+        ok, message = resume_balloons_batch(self.batch)
+        self.assertFalse(ok)
+        self.assertIn('Приостановлена', message)
+
+    def test_resume_from_miriada_error(self):
+        self.batch.status = BatchStatus.MIRIADA_ERROR
+        self.batch.miriada_close_failed = True
+        self.batch.miriada_error_message = 'Количество не соответствует указанному в ТТН'
+        self.batch.save(
+            update_fields=['status', 'miriada_close_failed', 'miriada_error_message'],
+        )
+
+        url = reverse('filling_station_api:balloons-loading-resume', args=[self.batch.id])
+        response = self.client.post(url, {})
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['status'], 1)
+
+        self.batch.refresh_from_db()
+        self.assertEqual(self.batch.status, BatchStatus.ACTIVE)
+        self.assertFalse(self.batch.miriada_close_failed)
+        self.assertEqual(self.batch.miriada_error_message, '')
 
     def test_resume_pauses_other_active_on_same_reader(self):
         pause_balloons_batch(self.batch)

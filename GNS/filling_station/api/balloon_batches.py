@@ -448,8 +448,10 @@ def _close_batch_response(batch: BalloonsBatch, data, *, log_prefix: str, api_us
         description=(
             'Переводит партию из 1=ACTIVE в 2=PAUSED. '
             'RFID и датчик перестают добавлять баллоны; '
-            'ручное добавление и удаление остаётся доступным.'
+            'ручное добавление и удаление остаётся доступным. '
+            'Тело запроса не требуется и не обрабатывается.'
         ),
+        request=None,
         parameters=[
             OpenApiParameter(
                 name='id',
@@ -468,10 +470,12 @@ def _close_batch_response(batch: BalloonsBatch, data, *, log_prefix: str, api_us
         tags=['Партии баллонов'],
         summary='Возобновить партию',
         description=(
-            'Переводит партию из 2=PAUSED в 1=ACTIVE. '
+            'Переводит партию из 2=PAUSED или 4=MIRIADA_ERROR в 1=ACTIVE. '
             'Другие активные партии на том же считывателе за сегодня '
-            'автоматически переводятся в 2=PAUSED.'
+            'автоматически переводятся в 2=PAUSED. '
+            'Тело запроса не требуется и не обрабатывается.'
         ),
+        request=None,
         parameters=[
             OpenApiParameter(
                 name='id',
@@ -857,7 +861,7 @@ class BalloonsBatchViewSet(viewsets.ViewSet):
     @action(detail=True, methods=['post'], url_path='resume')
     def resume(self, request, pk=None):
         """
-        Возобновляет приостановленную партию (PAUSED → ACTIVE).
+        Возобновляет партию (PAUSED или MIRIADA_ERROR → ACTIVE).
 
         Args:
             request: HTTP-запрос DRF.

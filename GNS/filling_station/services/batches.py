@@ -86,7 +86,7 @@ def pause_balloons_batch(batch: BalloonsBatch) -> Tuple[bool, str]:
 @transaction.atomic
 def resume_balloons_batch(batch: BalloonsBatch) -> Tuple[bool, str]:
     """
-    Возобновляет приостановленную партию и ставит на паузу другие активные на ридере.
+    Возобновляет партию из PAUSED или MIRIADA_ERROR и ставит на паузу другие активные на ридере.
 
     Args:
         batch (BalloonsBatch): партия для возобновления.
@@ -94,11 +94,19 @@ def resume_balloons_batch(batch: BalloonsBatch) -> Tuple[bool, str]:
     Returns:
         tuple[bool, str]: успех и текст ошибки (пустая строка при успехе).
     """
-    if batch.status != BatchStatus.PAUSED:
-        return False, 'Партия не приостановлена'
+    if batch.status not in (BatchStatus.PAUSED, BatchStatus.MIRIADA_ERROR):
+        return (
+            False,
+            'Партию можно возобновить только из статусов «Приостановлена» или «Ошибка Мириады»',
+        )
     pause_other_active_batches_on_reader(batch)
     batch.status = BatchStatus.ACTIVE
-    batch.save(update_fields=['status'])
+    update_fields = ['status']
+    if batch.miriada_close_failed or batch.miriada_error_message:
+        batch.miriada_close_failed = False
+        batch.miriada_error_message = ''
+        update_fields.extend(['miriada_close_failed', 'miriada_error_message'])
+    batch.save(update_fields=update_fields)
     logger.info(f"Партия {batch.id} возобновлена")
     return True, ''
 
