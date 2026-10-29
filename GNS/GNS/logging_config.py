@@ -122,6 +122,17 @@ def build_logging_config(logs_dir: str) -> dict[str, Any]:
                 'delay': True,
                 'use_gzip': False,
             },
+            'intellect_file': {
+                'level': 'DEBUG',
+                'class': 'concurrent_log_handler.ConcurrentRotatingFileHandler',
+                'filename': os.path.join(logs_dir, 'intellect/intellect.log'),
+                'maxBytes': 5 * 1024 * 1024,  # 5MB
+                'backupCount': 30,
+                'formatter': 'verbose',
+                'encoding': 'utf-8',
+                'delay': True,
+                'use_gzip': False,
+            },
         },
         'loggers': {
             'filling_station': {
@@ -166,6 +177,11 @@ def build_logging_config(logs_dir: str) -> dict[str, Any]:
             },
             'kpp': {
                 'handlers': ['kpp_file'],
+                'level': 'DEBUG',
+                'propagate': False,
+            },
+            'intellect': {
+                'handlers': ['intellect_file'],
                 'level': 'DEBUG',
                 'propagate': False,
             },

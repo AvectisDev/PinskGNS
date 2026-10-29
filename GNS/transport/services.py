@@ -11,7 +11,7 @@ from transport.registration import (
     canonicalize_registration_number,
     compact_registration_number,
 )
-from transport.management.commands.intellect import check_on_station
+from core.intellect import check_on_station
 
 logger = logging.getLogger('kpp')
 

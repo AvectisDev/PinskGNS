@@ -11,8 +11,8 @@ from django.conf import settings
 from django.core.files.base import ContentFile
 
 from opcua.api import write_tag
-from railway_service.management.commands.intellect import (
-    INTELLECT_SERVER_LIST,
+from core.intellect import (
+    RAILWAY_CAMERA,
     get_plate_image,
     get_registration_number_list,
 )
@@ -26,7 +26,7 @@ logger = logging.getLogger('railway')
 def fetch_railway_tank_data() -> tuple[Optional[int], Optional[bytes]]:
     """Запрос в Интеллект: номер последней цистерны и фото."""
     logger.debug('Выполняется запрос к Интеллекту...')
-    railway_tank_list = get_registration_number_list(INTELLECT_SERVER_LIST[0])
+    railway_tank_list = get_registration_number_list(RAILWAY_CAMERA)
     if not railway_tank_list:
         logger.error('ЖД цистерна не определена')
         return None, None

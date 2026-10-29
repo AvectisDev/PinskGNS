@@ -6,7 +6,7 @@ from django.test import SimpleTestCase, TestCase, override_settings
 from django.utils import timezone
 
 from transport.models import Truck
-from transport.management.commands.intellect import get_start_time
+from core.intellect import get_start_time
 from transport.services import (
     close_all_on_station,
     find_vehicle,

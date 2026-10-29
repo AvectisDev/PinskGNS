@@ -15,10 +15,7 @@ from transport.registration import (
     format_truck_hmi,
 )
 from opcua.api import write_tag, write_tags_wait
-from autogas.management.commands.intellect import (
-    INTELLECT_SERVER_LIST,
-    get_registration_number_list,
-)
+from core.intellect import AUTOGAS_CAMERAS, get_registration_number_list
 from autogas.services import (
     ActiveBatchExistsError,
     NoActiveBatchError,
@@ -85,7 +82,7 @@ def parse_vehicle_list_line(line: Any) -> Tuple[Optional[str], Optional[str]]:
 def get_transport_numbers() -> list[str]:
     """Список номеров из Интеллекта для автовесовой (канон БД)."""
     try:
-        transport_list = get_registration_number_list(INTELLECT_SERVER_LIST[1])
+        transport_list = get_registration_number_list(AUTOGAS_CAMERAS)
         numbers = (
             [
                 canonicalize_registration_number(transport['number'])
