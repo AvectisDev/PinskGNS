@@ -57,3 +57,44 @@ class AutoGasBatchFormTests(AutoGasFixturesMixin, TestCase):
             'weight_gas_amount': '10',
         })
         self.assertTrue(form.is_valid(), form.errors)
+
+    def test_allows_resaving_current_active_batch(self):
+        batch = self.make_batch(is_active=True)
+        form = self._form(extra={'is_active': True}, instance=batch)
+        self.assertTrue(form.is_valid(), form.errors)
+
+    def test_accepts_completed_at_after_begin_at(self):
+        batch = self.make_batch()
+        later = timezone.localtime(batch.begin_at) + timedelta(hours=1)
+        form = self._form(
+            extra={'completed_at': later.strftime('%Y-%m-%dT%H:%M')},
+            instance=batch,
+        )
+        self.assertTrue(form.is_valid(), form.errors)
+
+    def test_skips_scale_check_when_only_one_weight(self):
+        form = self._form(extra={'scale_empty_weight': '10'})
+        self.assertTrue(form.is_valid(), form.errors)
+
+    def test_accepts_weight_delta_exactly_0_1(self):
+        form = self._form(extra={
+            'scale_empty_weight': '10',
+            'scale_full_weight': '20',
+            'weight_gas_amount': '10.1',
+        })
+        self.assertTrue(form.is_valid(), form.errors)
+
+    def test_rejects_weight_delta_over_0_1(self):
+        form = self._form(extra={
+            'scale_empty_weight': '10',
+            'scale_full_weight': '20',
+            'weight_gas_amount': '10.11',
+        })
+        self.assertFalse(form.is_valid())
+
+    def test_rejects_full_weight_less_than_empty(self):
+        form = self._form(extra={
+            'scale_empty_weight': '20',
+            'scale_full_weight': '10',
+        })
+        self.assertFalse(form.is_valid())

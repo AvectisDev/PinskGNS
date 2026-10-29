@@ -49,8 +49,14 @@ def _railway_camera_worked(snapshot: Snapshot) -> bool:
 
 
 def _vehicle_list_prepared(snapshot: Snapshot) -> bool:
+    """Список уже на ПЛК: непустая ASCII после распаковки WORD[17]."""
+    from opcua.melsoft_words import coerce_vehicle_select_text, is_empty_melsoft_buffer
+
     value = snapshot.get('autogas.vehicle_select.vehicle_list_0')
-    return bool(value and str(value).strip())
+    if is_empty_melsoft_buffer(value):
+        return False
+    text = coerce_vehicle_select_text(value)
+    return bool(text.strip())
 
 
 def _autogas_create_pending(snapshot: Snapshot) -> bool:
@@ -149,8 +155,6 @@ TRIGGERS: tuple[TriggerDef, ...] = (
             'autogas.vehicle_select.vehicle_list_5',
             'autogas.vehicle_select.vehicle_list_6',
             'autogas.vehicle_select.vehicle_list_7',
-            'autogas.vehicle_select.vehicle_list_8',
-            'autogas.vehicle_select.vehicle_list_9',
         ),
         idempotency_ttl=None,
     ),

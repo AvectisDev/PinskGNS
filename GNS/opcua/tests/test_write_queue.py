@@ -383,3 +383,34 @@ class OpcWriteDataValueTests(SimpleTestCase):
             )
 
         self.assertEqual(node.write_value.call_count, 3)
+
+    def test_write_uint16_word_array(self):
+        """SU2 vehicle_select: ARRAY [0..16] OF WORD → UInt16[17]."""
+        from opcua.melsoft_words import pack_melsoft_string
+
+        dispatcher = TriggerDispatcher()
+        bridge = OpcBridgeClient(url='opc.tcp://example', dispatcher=dispatcher)
+        node = AsyncMock()
+        node.read_data_type_as_variant_type = AsyncMock(
+            return_value=ua.VariantType.UInt16,
+        )
+        node.read_data_value = AsyncMock(
+            return_value=ua.DataValue(
+                ua.Variant([0] * 17, ua.VariantType.UInt16, is_array=True),
+            ),
+        )
+        node.write_value = AsyncMock()
+        bridge._nodes_by_name = {
+            'autogas.vehicle_select.proposed_truck_number': node,
+        }
+
+        words = pack_melsoft_string('A 7583-1')
+        async_to_sync(bridge.write_tag)(
+            'autogas.vehicle_select.proposed_truck_number',
+            words,
+        )
+
+        datavalue = node.write_value.call_args.args[0]
+        self.assertEqual(datavalue.Value.VariantType, ua.VariantType.UInt16)
+        self.assertEqual(list(datavalue.Value.Value)[:4], [8257, 13623, 13112, 12589])
+        self.assertEqual(len(datavalue.Value.Value), 17)

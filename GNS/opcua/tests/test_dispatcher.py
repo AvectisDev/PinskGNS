@@ -182,6 +182,37 @@ class TriggerDispatcherTests(SimpleTestCase):
         self.assertNotIn('autogas_batch_create', fired)
 
     @patch('opcua.bridge.dispatcher.current_app')
+    def test_autogas_create_not_skipped_when_vehicle_list_all_zeros(self, current_app):
+        """Очистка ПЛК: WORD[17] нулей — список ещё не выгружен."""
+        snapshot = {
+            'autogas.request_batch_create': True,
+            'autogas.response_batch_create': False,
+            'autogas.batch_type_code': 1,
+            'autogas.gas_type': 2,
+            'autogas.vehicle_select.proposed_ready': False,
+            'autogas.vehicle_select.vehicle_list_0': [0] * 17,
+        }
+        fired = self.dispatcher.on_snapshot(snapshot, force_pending=True)
+        self.assertIn('autogas_batch_create', fired)
+
+    @patch('opcua.bridge.dispatcher.current_app')
+    def test_autogas_create_skipped_when_vehicle_list_words_packed(self, current_app):
+        from opcua.melsoft_words import pack_melsoft_string
+
+        snapshot = {
+            'autogas.request_batch_create': True,
+            'autogas.response_batch_create': False,
+            'autogas.batch_type_code': 1,
+            'autogas.gas_type': 2,
+            'autogas.vehicle_select.proposed_ready': False,
+            'autogas.vehicle_select.vehicle_list_0': pack_melsoft_string(
+                '1    AI0008-1',
+            ),
+        }
+        fired = self.dispatcher.on_snapshot(snapshot, force_pending=True)
+        self.assertNotIn('autogas_batch_create', fired)
+
+    @patch('opcua.bridge.dispatcher.current_app')
     def test_operator_confirm_fires(self, current_app):
         snapshot = {
             'autogas.request_batch_create': True,

@@ -15,6 +15,7 @@ from autogas.services import (
     STATISTIC_CACHE_KEY,
     build_batch_statistic,
     cancel_active_batch,
+    clear_statistic_cache,
     complete_active_batch,
     create_active_batch,
     get_batch_statistic,
@@ -26,6 +27,8 @@ from autogas.services import (
     resolve_gas_type,
     with_completed_at_on_deactivate,
 )
+# Подключаем приёмники сброса кэша из API-модуля.
+import autogas.api.views  # noqa: F401
 from .helpers import AutoGasFixturesMixin
 
 
@@ -35,22 +38,33 @@ class ResolveTypeTests(AutoGasFixturesMixin, TestCase):
         self.assertEqual(resolve_gas_type(3), 'ПБА')
         self.assertIsNone(resolve_gas_type(1))
         self.assertIsNone(resolve_gas_type(None))
+        self.assertIsNone(resolve_gas_type('2'))
 
     def test_resolve_batch_type(self):
         self.assertEqual(resolve_batch_type(1), 'l')
         self.assertEqual(resolve_batch_type(2), 'u')
         self.assertIsNone(resolve_batch_type(0))
+        self.assertIsNone(resolve_batch_type('1'))
 
 
 class TruckCapacityTests(AutoGasFixturesMixin, TestCase):
     def test_cistern_uses_truck_mass(self):
         self.assertEqual(get_truck_capacity(self.truck), Decimal('20000'))
 
+    def test_cistern_ignores_passed_trailer(self):
+        self.assertEqual(
+            get_truck_capacity(self.truck, self.trailer),
+            Decimal('20000'),
+        )
+
     def test_tractor_uses_trailer_mass(self):
         self.assertEqual(
             get_truck_capacity(self.tractor, self.trailer),
             Decimal('18000'),
         )
+
+    def test_tractor_without_trailer_returns_none(self):
+        self.assertIsNone(get_truck_capacity(self.tractor))
 
     def test_unknown_type_returns_none(self):
         self.truck.type.type = 'Клетевоз'
@@ -67,6 +81,15 @@ class ActiveBatchServiceTests(AutoGasFixturesMixin, TestCase):
         self.assertTrue(batch.is_active)
         self.assertEqual(batch.gas_type, 'ПБА')
         self.assertEqual(batch.truck, self.truck)
+
+    def test_create_active_batch_with_trailer(self):
+        batch = create_active_batch(
+            batch_type='u',
+            gas_type='СПБТ',
+            truck=self.tractor,
+            trailer=self.trailer,
+        )
+        self.assertEqual(batch.trailer_id, self.trailer.pk)
 
     def test_create_rejects_second_active_batch(self):
         create_active_batch(
@@ -107,6 +130,22 @@ class ActiveBatchServiceTests(AutoGasFixturesMixin, TestCase):
         with self.assertRaises(NoActiveBatchError):
             complete_active_batch({'gas_amount': 1})
 
+    def test_complete_missing_weight_keys_null_out_existing(self):
+        batch = self.make_batch(
+            is_active=True,
+            gas_amount=Decimal('10'),
+            scale_empty_weight=Decimal('100'),
+            scale_full_weight=Decimal('200'),
+            weight_gas_amount=Decimal('100'),
+        )
+        complete_active_batch({})
+        batch.refresh_from_db()
+        self.assertFalse(batch.is_active)
+        self.assertIsNone(batch.gas_amount)
+        self.assertIsNone(batch.scale_empty_weight)
+        self.assertIsNone(batch.scale_full_weight)
+        self.assertIsNone(batch.weight_gas_amount)
+
     def test_cancel_active_batch(self):
         batch = self.make_batch(is_active=True)
         cancelled = cancel_active_batch()
@@ -114,6 +153,22 @@ class ActiveBatchServiceTests(AutoGasFixturesMixin, TestCase):
         self.assertEqual(cancelled.pk, batch.pk)
         self.assertFalse(batch.is_active)
         self.assertIsNotNone(batch.completed_at)
+
+    def test_cancel_preserves_weights(self):
+        batch = self.make_batch(
+            is_active=True,
+            gas_amount=Decimal('10'),
+            weight_gas_amount=Decimal('20'),
+            scale_empty_weight=Decimal('100'),
+            scale_full_weight=Decimal('120'),
+        )
+        cancel_active_batch()
+        batch.refresh_from_db()
+        self.assertFalse(batch.is_active)
+        self.assertEqual(batch.gas_amount, Decimal('10'))
+        self.assertEqual(batch.weight_gas_amount, Decimal('20'))
+        self.assertEqual(batch.scale_empty_weight, Decimal('100'))
+        self.assertEqual(batch.scale_full_weight, Decimal('120'))
 
     def test_cancel_without_active_returns_none(self):
         self.assertIsNone(cancel_active_batch())
@@ -147,8 +202,20 @@ class ActiveBatchServiceTests(AutoGasFixturesMixin, TestCase):
         self.assertFalse(payload['is_active'])
         self.assertIn('completed_at', payload)
 
+    def test_deactivate_payload_overrides_client_completed_at(self):
+        old = timezone.now() - timedelta(days=3)
+        payload = with_completed_at_on_deactivate({
+            'is_active': False,
+            'completed_at': old,
+        })
+        self.assertNotEqual(payload['completed_at'], old)
+
     def test_deactivate_payload_keeps_active_untouched(self):
         payload = with_completed_at_on_deactivate({'gas_amount': 1})
+        self.assertNotIn('completed_at', payload)
+
+    def test_deactivate_payload_true_does_not_set_completed_at(self):
+        payload = with_completed_at_on_deactivate({'is_active': True})
         self.assertNotIn('completed_at', payload)
 
 
@@ -274,6 +341,12 @@ class StatisticServiceTests(AutoGasFixturesMixin, TestCase):
         )
         self.assertEqual(list(get_today_active_batches()), [])
 
+    def test_today_active_batches_includes_today_active_only(self):
+        active = self.make_batch(is_active=True)
+        self.make_batch(is_active=False, truck=self.tractor)
+        ids = list(get_today_active_batches().values_list('pk', flat=True))
+        self.assertEqual(ids, [active.pk])
+
     def test_get_period_stats_returns_zeros(self):
         stats = AutoGasBatch.get_period_stats(
             start_date=timezone.localdate(),
@@ -281,6 +354,92 @@ class StatisticServiceTests(AutoGasFixturesMixin, TestCase):
         )
         self.assertEqual(stats['loading_batches'], 0)
         self.assertEqual(stats['total_gas_loading_by_weight'], 0)
+
+    def test_get_period_stats_sums_all_keys(self):
+        today = timezone.localdate()
+        loading = self.make_batch(
+            batch_type='l',
+            gas_amount=Decimal('10'),
+            weight_gas_amount=Decimal('11'),
+        )
+        unloading = self.make_batch(
+            batch_type='u',
+            truck=self.tractor,
+            gas_amount=Decimal('20'),
+            weight_gas_amount=Decimal('21'),
+        )
+        null_loading = self.make_batch(
+            batch_type='l',
+            gas_amount=None,
+            weight_gas_amount=None,
+        )
+        AutoGasBatch.objects.filter(
+            pk__in=[loading.pk, unloading.pk, null_loading.pk],
+        ).update(begin_at=timezone.now())
+
+        stats = AutoGasBatch.get_period_stats(start_date=today, end_date=today)
+        self.assertEqual(stats['loading_batches'], 2)
+        self.assertEqual(stats['unloading_batches'], 1)
+        self.assertEqual(stats['total_gas_loading_by_weight'], Decimal('11'))
+        self.assertEqual(stats['total_gas_loading_by_flowmeter'], Decimal('10'))
+        self.assertEqual(stats['total_gas_unloading_by_weight'], Decimal('21'))
+        self.assertEqual(stats['total_gas_unloading_by_flowmeter'], Decimal('20'))
+
+    def test_statistic_excludes_batch_before_month_start(self):
+        today = date(2026, 6, 15)
+        old = self.make_batch(
+            batch_type='l',
+            gas_type='ПБА',
+            weight_gas_amount=Decimal('999'),
+        )
+        AutoGasBatch.objects.filter(pk=old.pk).update(
+            begin_at=timezone.make_aware(datetime(2026, 5, 31, 12, 0, 0)),
+        )
+        data = build_batch_statistic(today=today)
+        self.assertEqual(data['loading_batch']['ПБА']['last_month_loading_batches'], 0)
+        self.assertEqual(data['loading_batch']['ПБА']['last_month_loading_weight'], 0)
+
+    def test_statistic_unloading_month_totals(self):
+        today = date(2026, 6, 15)
+        batch = self.make_batch(
+            batch_type='u',
+            gas_type='СПБТ',
+            weight_gas_amount=Decimal('1500'),
+        )
+        AutoGasBatch.objects.filter(pk=batch.pk).update(
+            begin_at=timezone.make_aware(datetime(2026, 6, 5, 12, 0, 0)),
+        )
+        data = build_batch_statistic(today=today)
+        spbt = data['unloading_batch']['СПБТ']
+        self.assertEqual(spbt['last_month_unloading_batches'], 1)
+        self.assertEqual(spbt['last_month_unloading_weight'], Decimal('1500'))
+        self.assertEqual(spbt['today_unloading_batches'], 0)
+
+    def test_active_batch_without_trailer_and_null_scales(self):
+        self.truck.max_mass_of_transported_gas = 0
+        self.truck.save(update_fields=['max_mass_of_transported_gas'])
+        self.make_batch(
+            is_active=True,
+            batch_type='u',
+            gas_type='СПБТ',
+            trailer=None,
+            scale_empty_weight=None,
+            scale_full_weight=None,
+        )
+        data = build_batch_statistic()
+        active = data['active_batch']
+        self.assertEqual(active['batch_type'], 'Отгрузка')
+        self.assertIsNone(active['trailer_number'])
+        self.assertEqual(active['truck_gas_capacity'], 0)
+        self.assertEqual(active['scale_empty_weight'], 0)
+        self.assertEqual(active['scale_full_weight'], 0)
+        self.assertEqual(active['car_brand'], 'МАЗ')
+
+    def test_active_batch_unknown_type_labeled_unloading(self):
+        batch = self.make_batch(is_active=True, batch_type='l')
+        AutoGasBatch.objects.filter(pk=batch.pk).update(batch_type='x')
+        data = build_batch_statistic()
+        self.assertEqual(data['active_batch']['batch_type'], 'Отгрузка')
 
 
 @override_settings(CACHES={
@@ -309,6 +468,35 @@ class StatisticCacheTests(AutoGasFixturesMixin, TestCase):
             fresh['unloading_batch']['СПБТ']['today_unloading_batches'],
             1,
         )
+
+    def test_statistic_use_cache_false_rebuilds(self):
+        self.make_batch(batch_type='u', gas_type='СПБТ', weight_gas_amount=5)
+        cache.set(
+            STATISTIC_CACHE_KEY,
+            {'loading_batch': {'cached': True}, 'unloading_batch': {}},
+        )
+        fresh = get_batch_statistic(use_cache=False)
+        self.assertNotEqual(fresh.get('loading_batch'), {'cached': True})
+        self.assertEqual(
+            fresh['unloading_batch']['СПБТ']['today_unloading_batches'],
+            1,
+        )
+
+    def test_save_clears_statistic_cache(self):
+        cache.set(STATISTIC_CACHE_KEY, {'x': 1})
+        self.make_batch()
+        self.assertIsNone(cache.get(STATISTIC_CACHE_KEY))
+
+    def test_delete_clears_statistic_cache(self):
+        batch = self.make_batch()
+        cache.set(STATISTIC_CACHE_KEY, {'x': 1})
+        batch.delete()
+        self.assertIsNone(cache.get(STATISTIC_CACHE_KEY))
+
+    def test_clear_statistic_cache_helper(self):
+        cache.set(STATISTIC_CACHE_KEY, {'x': 1})
+        clear_statistic_cache()
+        self.assertIsNone(cache.get(STATISTIC_CACHE_KEY))
 
 
 @override_settings(CACHES={

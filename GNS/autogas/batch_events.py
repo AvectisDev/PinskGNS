@@ -15,6 +15,11 @@ from transport.registration import (
     format_truck_hmi,
 )
 from opcua.api import write_tag, write_tags_wait
+from opcua.melsoft_words import (
+    coerce_vehicle_select_text,
+    empty_melsoft_words,
+    pack_melsoft_string,
+)
 from core.intellect import AUTOGAS_CAMERAS, get_registration_number_list
 from autogas.services import (
     ActiveBatchExistsError,
@@ -33,7 +38,7 @@ logger = logging.getLogger('autogas')
 
 TRUCK_TYPE_FILTER = Q(type__type='Цистерна') | Q(type__type='Седельный тягач')
 TRAILER_TYPE_NAME = 'Полуприцеп цистерна'
-VEHICLE_LIST_SIZE = 10
+VEHICLE_LIST_SIZE = 8
 DISPLAY_MAX_LEN = 32
 
 
@@ -67,9 +72,10 @@ def format_list_line(index: int, combo: VehicleCombo) -> str:
 
 def parse_vehicle_list_line(line: Any) -> Tuple[Optional[str], Optional[str]]:
     """Разбор строки списка → (truck_number, trailer_number|None) в каноне БД."""
-    if line is None:
+    text = coerce_vehicle_select_text(line)
+    if not text:
         return None, None
-    parts = str(line).split()
+    parts = text.split()
     if len(parts) < 2:
         return None, None
     truck_no = canonicalize_registration_number(parts[1]) or None
@@ -256,20 +262,14 @@ def combo_from_numbers(
     truck_number: Any,
     trailer_number: Any = None,
 ) -> Optional[VehicleCombo]:
-    """Резолв связки по предложенным номерам с HMI."""
-    truck_no = (
-        canonicalize_registration_number(str(truck_number))
-        if truck_number is not None
-        else ''
-    )
+    """Резолв связки по предложенным номерам с HMI (строка или WORD[17])."""
+    truck_text = coerce_vehicle_select_text(truck_number)
+    truck_no = canonicalize_registration_number(truck_text) if truck_text else ''
     if not truck_no:
         return None
     numbers = [truck_no]
-    trailer_no = (
-        canonicalize_registration_number(str(trailer_number))
-        if trailer_number is not None
-        else ''
-    )
+    trailer_text = coerce_vehicle_select_text(trailer_number)
+    trailer_no = canonicalize_registration_number(trailer_text) if trailer_text else ''
     if trailer_no:
         numbers.append(trailer_no)
     truck, trailer = find_transports(numbers)
@@ -293,20 +293,21 @@ def combo_from_list_selection(payload: Mapping[str, Any]) -> Optional[VehicleCom
 
 
 def _write_propose(combo: VehicleCombo) -> bool:
-    """Пишет номера на ПЛК; proposed_ready только после ACK строк."""
-    strings = {
-        'autogas.vehicle_select.proposed_truck_number': format_truck_hmi(
-            combo.truck.registration_number,
+    """Пишет номера на ПЛК как WORD[17]; proposed_ready только после ACK."""
+    words = {
+        'autogas.vehicle_select.proposed_truck_number': pack_melsoft_string(
+            format_truck_hmi(combo.truck.registration_number),
         ),
-        'autogas.vehicle_select.proposed_trailer_number': (
+        'autogas.vehicle_select.proposed_trailer_number': pack_melsoft_string(
             format_trailer_hmi(combo.trailer.registration_number)
             if combo.trailer
-            else ''
+            else '',
         ),
     }
+    empty = empty_melsoft_words()
     for i in range(VEHICLE_LIST_SIZE):
-        strings[f'autogas.vehicle_select.vehicle_list_{i}'] = ''
-    if not write_tags_wait(strings):
+        words[f'autogas.vehicle_select.vehicle_list_{i}'] = empty
+    if not write_tags_wait(words):
         logger.error(
             'Не удалось записать proposed_* / vehicle_list на ПЛК — ready не ставим',
         )
@@ -316,16 +317,16 @@ def _write_propose(combo: VehicleCombo) -> bool:
 
 
 def _write_manual_list(combos: Sequence[VehicleCombo]) -> bool:
-    """Пишет список на ПЛК; строки ждут ACK, ready=False — fire-and-forget."""
+    """Пишет список на ПЛК как WORD[17]; ready=False — fire-and-forget."""
     write_tag('autogas.vehicle_select.proposed_ready', False)
-    strings: dict[str, str] = {
-        'autogas.vehicle_select.proposed_truck_number': '',
-        'autogas.vehicle_select.proposed_trailer_number': '',
+    words = {
+        'autogas.vehicle_select.proposed_truck_number': empty_melsoft_words(),
+        'autogas.vehicle_select.proposed_trailer_number': empty_melsoft_words(),
     }
     for i in range(VEHICLE_LIST_SIZE):
         text = format_list_line(i, combos[i]) if i < len(combos) else ''
-        strings[f'autogas.vehicle_select.vehicle_list_{i}'] = text
-    if not write_tags_wait(strings):
+        words[f'autogas.vehicle_select.vehicle_list_{i}'] = pack_melsoft_string(text)
+    if not write_tags_wait(words):
         logger.error(
             'Не удалось записать vehicle_list_* на ПЛК — список не выгружен',
         )
@@ -339,10 +340,11 @@ def _clear_vehicle_select_ui(*, keep_propose: bool = False) -> None:
     if keep_propose:
         return
     write_tag('autogas.vehicle_select.proposed_ready', False)
-    write_tag('autogas.vehicle_select.proposed_truck_number', '')
-    write_tag('autogas.vehicle_select.proposed_trailer_number', '')
+    empty = empty_melsoft_words()
+    write_tag('autogas.vehicle_select.proposed_truck_number', empty)
+    write_tag('autogas.vehicle_select.proposed_trailer_number', empty)
     for i in range(VEHICLE_LIST_SIZE):
-        write_tag(f'autogas.vehicle_select.vehicle_list_{i}', '')
+        write_tag(f'autogas.vehicle_select.vehicle_list_{i}', empty)
 
 
 def _ack_batch_created(truck: Truck, trailer: Optional[Trailer]) -> None:

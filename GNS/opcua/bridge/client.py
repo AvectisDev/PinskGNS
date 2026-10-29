@@ -10,6 +10,10 @@ from asyncua import Client, Node, ua
 from asyncua.common.subscription import DataChangeEvent, StatusChangeEvent
 
 from opcua.bridge.dispatcher import TriggerDispatcher
+from opcua.melsoft_words import (
+    MELSOFT_STRING_WORD_COUNT,
+    looks_like_melsoft_word_array,
+)
 from opcua.registry import TAGS, node_id_to_name
 
 logger = logging.getLogger('opcua')
@@ -148,10 +152,36 @@ class OpcBridgeClient:
             variant.VariantType,
         )
 
+    @staticmethod
+    def _uint16_word_array_variant(value: Any) -> ua.Variant:
+        """ARRAY [0..16] OF WORD → UInt16[17] (pad/trunc до 17)."""
+        words = [int(item) & 0xFFFF for item in value]
+        if len(words) < MELSOFT_STRING_WORD_COUNT:
+            words.extend([0] * (MELSOFT_STRING_WORD_COUNT - len(words)))
+        elif len(words) > MELSOFT_STRING_WORD_COUNT:
+            words = words[:MELSOFT_STRING_WORD_COUNT]
+        return ua.Variant(words, ua.VariantType.UInt16, is_array=True)
+
     async def write_tag(self, name: str, value: Any) -> None:
         node = self._nodes_by_name.get(name)
         if node is None:
             raise KeyError(f'Unknown tag: {name}')
+
+        # vehicle_select WORD[17]: не String/Byte[] fallback.
+        if looks_like_melsoft_word_array(value):
+            variant = self._uint16_word_array_variant(value)
+            try:
+                await self._commit_write(node, name, value, variant)
+            except Exception as error:
+                logger.error(
+                    'OPC write %s=%r failed (VariantType=%s): %s',
+                    name,
+                    value,
+                    variant.VariantType,
+                    error,
+                )
+                raise
+            return
 
         cached = self._string_encoding_by_tag.get(name)
         if cached is not None:
@@ -271,9 +301,15 @@ class OpcBridgeClient:
             ua.VariantType.Int64,
             ua.VariantType.UInt64,
         ):
-            # STRING[n] как Byte[]: живое значение — список/массив байт.
-            if isinstance(live_value, (list, tuple)) and (
-                not live_value or isinstance(live_value[0], int)
+            # WORD[17] уже упакован вызывающим кодом.
+            if looks_like_melsoft_word_array(value):
+                return self._uint16_word_array_variant(value)
+            # Legacy STRING[n] как Byte[]: живое значение — список байт (не UInt16).
+            if (
+                variant_type == ua.VariantType.Byte
+                and isinstance(live_value, (list, tuple))
+                and (not live_value or isinstance(live_value[0], int))
+                and not looks_like_melsoft_word_array(live_value)
             ):
                 padded = self._fixed_string_bytes(value)
                 return ua.Variant(list(padded), ua.VariantType.Byte, is_array=True)

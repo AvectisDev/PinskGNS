@@ -184,16 +184,6 @@ TAGS: Mapping[str, TagDef] = {
         node_id='ns=4; s=Address Space.PLC_SU2.vehicle_select.vehicle_list_7',
         domain='autogas',
     ),
-    'autogas.vehicle_select.vehicle_list_8': TagDef(
-        name='autogas.vehicle_select.vehicle_list_8',
-        node_id='ns=4; s=Address Space.PLC_SU2.vehicle_select.vehicle_list_8',
-        domain='autogas',
-    ),
-    'autogas.vehicle_select.vehicle_list_9': TagDef(
-        name='autogas.vehicle_select.vehicle_list_9',
-        node_id='ns=4; s=Address Space.PLC_SU2.vehicle_select.vehicle_list_9',
-        domain='autogas',
-    ),
 }
 
 
