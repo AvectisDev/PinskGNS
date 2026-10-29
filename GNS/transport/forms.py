@@ -57,7 +57,8 @@ class TruckForm(forms.ModelForm):
             'departure_at': forms.DateTimeInput(format='%Y-%m-%dT%H:%M', attrs={
                 'type': 'datetime-local',
                 'class': 'form-control'
-                })
+                }),
+            'photo': forms.ClearableFileInput(attrs={'class': 'form-control'}),
         }
 
 

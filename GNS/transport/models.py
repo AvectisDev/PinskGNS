@@ -126,6 +126,12 @@ class Truck(models.Model):
     is_active = models.BooleanField(default=True, verbose_name="Активен")
     entry_at = models.DateTimeField(null=True, blank=True, verbose_name="Дата и время въезда")
     departure_at = models.DateTimeField(null=True, blank=True, verbose_name="Дата и время выезда")
+    photo = models.ImageField(
+        upload_to='trucks/',
+        null=True,
+        blank=True,
+        verbose_name='Фото',
+    )
 
     def clean(self):
         """Нормализует регистрационный номер к канону display."""
