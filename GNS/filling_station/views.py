@@ -396,7 +396,7 @@ class BalloonBatchUpdateView(BalloonBatchTypeMixin, PreserveListQueryMixin, gene
 #@login_required
 @require_POST
 def balloon_batch_retry_close(request, pk):
-    """Завершить партию: повторить ошибочные статусы и закрыть ТТН в Мириаде."""
+    """Завершить партию: повторно проверить все баллоны в Мириаде и закрыть ТТН."""
     path = request.path.lower()
     batch_type = 'u' if 'unloading' in path else 'l'
     batch = get_object_or_404(BalloonsBatch, pk=pk, batch_type=batch_type)

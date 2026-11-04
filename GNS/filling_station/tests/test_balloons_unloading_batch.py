@@ -115,6 +115,7 @@ class BalloonsUnloadingBatchTests(APITestCase):
             format='json',
         )
         self.assertEqual(response.status_code, status.HTTP_200_OK)
+        mock_send.assert_called_once()
         mock_close.assert_called_once()
         self.batch.refresh_from_db()
         self.assertEqual(self.batch.status, BatchStatus.COMPLETED)
@@ -138,5 +139,7 @@ class BalloonsUnloadingBatchTests(APITestCase):
         )
         self.assertEqual(response.status_code, status.HTTP_502_BAD_GATEWAY)
         self.assertTrue(response.data['miriada_close_failed'])
+        mock_send.assert_called_once()
+        mock_close.assert_called_once()
         self.batch.refresh_from_db()
         self.assertEqual(self.batch.status, BatchStatus.MIRIADA_ERROR)

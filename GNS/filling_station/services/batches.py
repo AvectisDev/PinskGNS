@@ -421,19 +421,12 @@ def _batch_has_balloon_status_errors(batch: BalloonsBatch) -> bool:
     return batch.balloon_list.exclude(miriada_status_error='').exists()
 
 
-def _error_balloon_nfc_tags(batch: BalloonsBatch) -> list:
-    """NFC-метки баллонов партии с непустой ошибкой отправки в Мириаду."""
-    return list(
-        batch.balloon_list.exclude(miriada_status_error='').values_list('nfc_tag', flat=True)
-    )
-
-
 def attempt_close_balloons_batch(batch: BalloonsBatch) -> Tuple[bool, Optional[str]]:
     """
     Закрывает партию через ``closettn``.
 
     Перед вызовом ожидаются: совпадение RFID с ТТН и отсутствие ошибок на баллонах.
-    Повторная отправка статусов выполняется в ``save_and_close_balloons_batch``.
+    Повторная проверка всех статусов выполняется в ``save_and_close_balloons_batch``.
 
     Args:
         batch (BalloonsBatch): партия для закрытия.
@@ -508,10 +501,10 @@ BATCH_CLOSE_WRITABLE_FIELDS = frozenset({
 
 def save_and_close_balloons_batch(batch: BalloonsBatch):
     """
-    Повторяет ошибочные статусы баллонов и закрывает ТТН.
+    Повторно проверяет все баллоны партии в Мириаде и закрывает ТТН.
 
-    Порядок: повтор только баллонов с ошибкой → сверка RFID с ТТН →
-    отсутствие ошибок на баллонах → ``closettn``.
+    Порядок: сверка RFID с ТТН → отправка статусов всех баллонов →
+    при любой ошибке остановка без ``closettn`` → иначе ``closettn``.
     Применение writable-полей партии — ответственность caller (API/views).
 
     Args:
@@ -520,22 +513,12 @@ def save_and_close_balloons_batch(batch: BalloonsBatch):
     Returns:
         tuple: (успех, ошибка/payload или None).
     """
-    error_tags = _error_balloon_nfc_tags(batch)
-    if error_tags:
-        send_batch_balloon_statuses_to_miriada(batch, nfc_tags=error_tags)
-        batch.refresh_from_db()
-        if _batch_has_balloon_status_errors(batch):
-            return False, {
-                'message': 'В партии есть баллоны с ошибкой отправки в Мириаду',
-                'balloon_status_errors': True,
-                'id': batch.id,
-                'status': batch.status,
-            }
-
     if batch.amount_of_ttn and batch.rfid_balloon_count() != batch.amount_of_ttn:
         return False, _count_mismatch_payload(batch)
 
-    if _batch_has_balloon_status_errors(batch):
+    send_ok, _send_error = send_batch_balloon_statuses_to_miriada(batch)
+    batch.refresh_from_db()
+    if not send_ok or _batch_has_balloon_status_errors(batch):
         return False, {
             'message': 'В партии есть баллоны с ошибкой отправки в Мириаду',
             'balloon_status_errors': True,
