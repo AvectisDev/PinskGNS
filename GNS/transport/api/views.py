@@ -173,10 +173,7 @@ class TruckView(APIView):
                 )
 
         if registration_number:
-            truck = get_object_or_404(
-                Truck.objects.select_related('type', 'driver').prefetch_related('trailer'),
-                registration_number=registration_number,
-            )
+            truck = get_object_or_404(queryset, registration_number=registration_number)
             serializer = TruckSerializer(truck)
             return Response(serializer.data)
 

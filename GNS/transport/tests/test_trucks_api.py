@@ -57,3 +57,17 @@ class TrucksOnStationApiTests(APITestCase):
             response.json(),
             {'detail': 'Грузовики с указанным фильтром не найдены'},
         )
+
+    def test_on_station_ignores_trailer_status(self):
+        """Прицеп на станции у тягача вне станции не попадает в on_station=true."""
+        Trailer.objects.create(
+            truck=self.off_station,
+            registration_number='A 6922I-1',
+            type=self.trailer_type,
+            is_on_station=True,
+        )
+        response = self.client.get('/api/trucks', {'on_station': 'true'})
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        numbers = {item['registration_number'] for item in response.json()}
+        self.assertEqual(numbers, {'AC 5512-1'})
+        self.assertNotIn('AP 1852-1', numbers)
