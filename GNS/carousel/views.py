@@ -9,72 +9,52 @@ from .admin import CarouselResources
 from .forms import CarouselSettingsForm, GetCarouselBalloonsAmount
 
 
+def _date_range_bounds(start_date, end_date):
+    date_start = datetime.combine(start_date, time.min)
+    date_end = datetime.combine(
+        start_date if start_date == end_date else end_date,
+        time.max,
+    )
+    return date_start, date_end
+
+
 def carousel_info(request, carousel_number=1):
     current_date = datetime.now().date()
+    size = None
 
     if request.method == "POST":
         form = GetCarouselBalloonsAmount(request.POST)
         if form.is_valid():
             start_date = form.cleaned_data['start_date']
             end_date = form.cleaned_data['end_date']
-            size = form.cleaned_data['size']
+            size = form.cleaned_data['size'] or None
         else:
             start_date = current_date
             end_date = current_date
-            size = None
-
-        # Диапазон по времени для одного дня
-        if start_date == end_date:
-            date_start = datetime.combine(start_date, time.min)
-            date_end = datetime.combine(start_date, time.max)
-        else:
-            date_start = datetime.combine(start_date, time.min)
-            date_end = datetime.combine(end_date, time.max)
-
-        action = request.POST.get('action')
-
-        if action == 'export':
-            queryset = Carousel.objects.filter(
-                carousel_number=carousel_number,
-                change_at__range=(date_start, date_end)
-            )
-            if size:
-                queryset = queryset.filter(size=size)
-            dataset = CarouselResources().export(queryset)
-            response = HttpResponse(dataset.xlsx, content_type='xlsx')
-            response['Content-Disposition'] = f'attachment; filename="Carousel_{carousel_number}_{start_date}-{end_date}.xlsx"'
-            return response
-
     else:
         form = GetCarouselBalloonsAmount()
         start_date = current_date
         end_date = current_date
-        size = None
 
-        if start_date == end_date:
-            date_start = datetime.combine(start_date, time.min)
-            date_end = datetime.combine(start_date, time.max)
-        else:
-            date_start = datetime.combine(start_date, time.min)
-            date_end = datetime.combine(end_date, time.max)
-
-    carousel_list = Carousel.objects.all()
-
+    date_start, date_end = _date_range_bounds(start_date, end_date)
+    queryset = Carousel.objects.filter(
+        carousel_number=carousel_number,
+        change_at__range=(date_start, date_end),
+    )
     if size:
-        total_count = carousel_list.filter(
-            carousel_number=carousel_number,
-            change_at__range=(date_start, date_end),
-            size=size
-        ).count()
-    else:
-        total_count = carousel_list.filter(
-            carousel_number=carousel_number,
-            change_at__range=(date_start, date_end)
-        ).count()
+        queryset = queryset.filter(size=size)
 
-    paginator = Paginator(carousel_list, 10)
-    page_num = request.GET.get('page', 1)
-    page_obj = paginator.get_page(page_num)
+    if request.method == "POST" and request.POST.get('action') == 'export':
+        dataset = CarouselResources().export(queryset)
+        response = HttpResponse(dataset.xlsx, content_type='xlsx')
+        response['Content-Disposition'] = (
+            f'attachment; filename="Carousel_{carousel_number}_{start_date}-{end_date}.xlsx"'
+        )
+        return response
+
+    total_count = queryset.count()
+    paginator = Paginator(queryset, 10)
+    page_obj = paginator.get_page(request.GET.get('page', 1))
 
     context = {
         "page_obj": page_obj,

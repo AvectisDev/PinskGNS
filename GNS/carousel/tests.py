@@ -1,5 +1,9 @@
+from datetime import datetime, timedelta
+
 from django.core.exceptions import ValidationError
 from django.test import SimpleTestCase, TestCase
+from django.urls import reverse
+from django.utils import timezone
 from unittest import IsolatedAsyncioTestCase
 from unittest.mock import AsyncMock, MagicMock, patch
 import asyncio
@@ -636,3 +640,74 @@ class ProcessCarouselDataTests(TestCase):
                 'request_type': 'unknown',
                 'post_number': 1,
             })
+
+
+class CarouselInfoViewTests(TestCase):
+    def _make_record(self, *, carousel_number, post_number, when):
+        record = Carousel.objects.create(
+            carousel_number=carousel_number,
+            post_number=post_number,
+            empty_weight=20.0,
+            full_weight=40.0,
+            size=50,
+        )
+        Carousel.objects.filter(pk=record.pk).update(change_at=when)
+        record.refresh_from_db()
+        return record
+
+    def test_get_lists_only_selected_carousel_for_today(self):
+        today = timezone.localtime()
+        old = today - timedelta(days=3)
+        current = self._make_record(
+            carousel_number=1, post_number=1, when=today,
+        )
+        self._make_record(carousel_number=1, post_number=2, when=old)
+        self._make_record(carousel_number=2, post_number=3, when=today)
+
+        response = self.client.get(
+            reverse('carousel:carousel_info', kwargs={'carousel_number': 1}),
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context['total_count'], 1)
+        ids = list(
+            response.context['page_obj'].object_list.values_list('id', flat=True)
+        )
+        self.assertEqual(ids, [current.pk])
+
+    def test_post_show_filters_by_date_range(self):
+        day = timezone.make_aware(datetime(2026, 10, 20, 12, 0))
+        other = timezone.make_aware(datetime(2026, 10, 19, 12, 0))
+        matched = self._make_record(
+            carousel_number=1, post_number=5, when=day,
+        )
+        self._make_record(carousel_number=1, post_number=6, when=other)
+
+        response = self.client.post(
+            reverse('carousel:carousel_info', kwargs={'carousel_number': 1}),
+            {
+                'start_date': '2026-10-20',
+                'end_date': '2026-10-20',
+                'size': '',
+                'action': 'show',
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context['total_count'], 1)
+        ids = list(
+            response.context['page_obj'].object_list.values_list('id', flat=True)
+        )
+        self.assertEqual(ids, [matched.pk])
+
+    def test_empty_period_shows_no_rows(self):
+        old = timezone.localtime() - timedelta(days=5)
+        self._make_record(carousel_number=1, post_number=1, when=old)
+
+        response = self.client.get(
+            reverse('carousel:carousel_info', kwargs={'carousel_number': 1}),
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context['total_count'], 0)
+        self.assertEqual(len(response.context['page_obj'].object_list), 0)
