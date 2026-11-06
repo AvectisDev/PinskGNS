@@ -1,4 +1,8 @@
+from datetime import timedelta
+
 from django.test import TestCase
+from django.utils import timezone
+
 from filling_station.models import TotalReadersCounter
 
 
@@ -43,6 +47,12 @@ class TotalReadersCounterTests(TestCase):
         self.assertEqual(self.obj.total_full, 7)
 
     def test_changed_at_updates(self):
+        # Явно отодвигаем метку, иначе на быстрой машине update может
+        # попасть в ту же микросекунду, что и get_or_create в setUp.
+        TotalReadersCounter.objects.filter(pk=1).update(
+            changed_at=timezone.now() - timedelta(seconds=1),
+        )
+        self.obj.refresh_from_db()
         prev = self.obj.changed_at
         TotalReadersCounter.add_full_balloon()
         self.obj.refresh_from_db()

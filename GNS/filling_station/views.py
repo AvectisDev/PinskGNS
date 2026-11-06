@@ -212,7 +212,7 @@ def reader_info(request, reader_number=1):
         })
 
     # Получаем статистику из DailyReaderCounter
-    reader = ReaderSettings.objects.get(number=reader_number)
+    reader = get_object_or_404(ReaderSettings, number=reader_number)
     counter_stats = DailyReaderCounter.get_reader_period_stats(reader, start_date, end_date)
     
     # Получаем список баллонов из Reader для отображения в таблице

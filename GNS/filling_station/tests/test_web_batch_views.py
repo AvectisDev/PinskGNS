@@ -88,3 +88,14 @@ class BalloonsBatchFormTests(TestCase):
     def test_form_valid_with_amount_of_ttn(self):
         form = BalloonsBatchForm(data=self._form_data())
         self.assertTrue(form.is_valid(), form.errors)
+
+
+class ReaderInfoViewTests(TestCase):
+    def test_missing_reader_returns_404(self):
+        response = self.client.get(reverse('filling_station:reader', args=[99]))
+        self.assertEqual(response.status_code, 404)
+
+    def test_existing_reader_returns_200(self):
+        make_reader(1, function='l')
+        response = self.client.get(reverse('filling_station:reader', args=[1]))
+        self.assertEqual(response.status_code, 200)
