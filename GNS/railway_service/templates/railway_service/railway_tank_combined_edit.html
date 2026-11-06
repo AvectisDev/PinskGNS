@@ -1,7 +1,7 @@
 {% extends 'base.html' %}
 {% load crispy_forms_tags %}
 
-{% block title %}Редактирование ж/д цистерны{% endblock %}
+{% block title %}{{ title|default:"Ж/д цистерна" }}{% endblock %}
 
 {% block content %}
 <div class="container mt-4">
@@ -9,7 +9,7 @@
     <div class="col-12 col-xl-10 col-lg-11">
       <div class="card shadow-sm">
         <div class="card-header card-header-custom">
-          <h5 class="mb-0">Цистерна {{ object.registration_number }}</h5>
+          <h5 class="mb-0">{% if object %}Цистерна {{ object.registration_number }}{% else %}{{ title|default:"Создание ж/д цистерны" }}{% endif %}</h5>
         </div>
         <div class="card-body">
           <form method="post" enctype="multipart/form-data"{% if request.GET %} action="?{{ request.GET.urlencode }}"{% endif %}>
