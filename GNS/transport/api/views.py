@@ -201,35 +201,29 @@ class TruckView(APIView):
     """
     permission_classes = [IsAuthenticated]
 
-    def _should_log_on_station(self, request) -> bool:
-        raw = request.GET.get('on_station')
-        if raw is None and hasattr(request, 'query_params'):
-            raw = request.query_params.get('on_station')
-        return raw is not None and str(raw).lower() == 'true'
-
     def dispatch(self, request, *args, **kwargs):
-        log_on_station = (
-            request.method == 'GET' and self._should_log_on_station(request)
-        )
-        if log_on_station:
+        log_get = request.method == 'GET'
+        if log_get:
+            query = dict(request.GET)
             logger.info(
-                'IN GET /api/trucks?on_station=true path=%s query=%s user=%s headers=%s',
+                'IN GET /api/trucks path=%s query=%s user=%s headers=%s',
                 request.path,
-                dict(request.GET),
+                query,
                 getattr(getattr(request, 'user', None), 'username', None),
                 _request_headers_for_log(request),
             )
         response = super().dispatch(request, *args, **kwargs)
-        if log_on_station:
+        if log_get:
             body = _response_body_preview(response)
             content_type = response.get('Content-Type', '')
             logger.info(
-                'OUT GET /api/trucks?on_station=true status=%s content_type=%s '
-                'html=%s auth_user=%s body=%s',
+                'OUT GET /api/trucks status=%s content_type=%s html=%s '
+                'auth_user=%s query=%s body=%s',
                 response.status_code,
                 content_type,
                 _looks_like_html(body),
                 getattr(getattr(request, 'user', None), 'username', None),
+                dict(request.GET),
                 body,
             )
         return response
