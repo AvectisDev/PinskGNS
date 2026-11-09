@@ -122,17 +122,6 @@ def build_logging_config(logs_dir: str) -> dict[str, Any]:
                 'delay': True,
                 'use_gzip': False,
             },
-            'transport_api_file': {
-                'level': 'DEBUG',
-                'class': 'concurrent_log_handler.ConcurrentRotatingFileHandler',
-                'filename': os.path.join(logs_dir, 'transport/api.log'),
-                'maxBytes': 5 * 1024 * 1024,  # 5MB
-                'backupCount': 30,
-                'formatter': 'verbose',
-                'encoding': 'utf-8',
-                'delay': True,
-                'use_gzip': False,
-            },
             'intellect_file': {
                 'level': 'DEBUG',
                 'class': 'concurrent_log_handler.ConcurrentRotatingFileHandler',
@@ -188,11 +177,6 @@ def build_logging_config(logs_dir: str) -> dict[str, Any]:
             },
             'kpp': {
                 'handlers': ['kpp_file'],
-                'level': 'DEBUG',
-                'propagate': False,
-            },
-            'transport.api': {
-                'handlers': ['transport_api_file'],
                 'level': 'DEBUG',
                 'propagate': False,
             },

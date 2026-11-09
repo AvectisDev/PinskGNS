@@ -1,7 +1,5 @@
 """API грузовиков и прицепов на станции: список, создание, частичное обновление."""
 
-import logging
-
 from django.shortcuts import get_object_or_404
 from drf_spectacular.utils import extend_schema, OpenApiParameter, OpenApiExample, OpenApiTypes, extend_schema_view
 from rest_framework import generics, status, viewsets
@@ -17,55 +15,13 @@ from core.api.schema import (
 from transport.api.serializers import TrailerSerializer, TruckSerializer
 from transport.models import Trailer, Truck
 
-logger = logging.getLogger('transport.api')
 
-_BODY_LOG_LIMIT = 2000
+class Windows1251JSONRenderer(JSONRenderer):
+    """JSON в Windows-1251 для Simple-Scada (GET без PostPutResponseCodepage)."""
 
-
-def _mask_auth(value: str) -> str:
-    if not value:
-        return ''
-    parts = value.split(' ', 1)
-    if len(parts) == 2 and len(parts[1]) > 12:
-        return f'{parts[0]} {parts[1][:6]}…{parts[1][-4:]}'
-    return '***'
-
-
-def _request_headers_for_log(request) -> dict:
-    meta = getattr(request, 'META', {}) or {}
-    headers = {
-        'Host': meta.get('HTTP_HOST'),
-        'Accept': meta.get('HTTP_ACCEPT'),
-        'Content-Type': meta.get('CONTENT_TYPE'),
-        'User-Agent': meta.get('HTTP_USER_AGENT'),
-        'X-Forwarded-For': meta.get('HTTP_X_FORWARDED_FOR'),
-        'X-Real-IP': meta.get('HTTP_X_REAL_IP'),
-        'Remote-Addr': meta.get('REMOTE_ADDR'),
-    }
-    auth = meta.get('HTTP_AUTHORIZATION') or ''
-    headers['Authorization'] = _mask_auth(auth) if auth else None
-    return {key: value for key, value in headers.items() if value}
-
-
-def _response_body_preview(response) -> str:
-    try:
-        if hasattr(response, 'render') and not getattr(response, 'is_rendered', True):
-            response.render()
-        content = getattr(response, 'content', b'') or b''
-        if isinstance(content, bytes):
-            text = content.decode('utf-8', errors='replace')
-        else:
-            text = str(content)
-    except Exception as exc:  # noqa: BLE001 — диагностика ответа
-        return f'<unreadable: {exc}>'
-    if len(text) > _BODY_LOG_LIMIT:
-        return f'{text[:_BODY_LOG_LIMIT]}…(truncated, {len(text)} chars)'
-    return text
-
-
-def _looks_like_html(text: str) -> bool:
-    sample = text.lstrip()[:200].lower()
-    return sample.startswith('<!doctype html') or sample.startswith('<html') or '<html' in sample
+    media_type = 'application/json'
+    charset = 'windows-1251'
+    ensure_ascii = False
 
 
 @extend_schema_view(
@@ -201,35 +157,8 @@ class TruckView(APIView):
     - Управлять временем въезда/выезда
     """
     permission_classes = [IsAuthenticated]
-    # SCADA шлёт Accept: text/html — без этого DRF отдаёт BrowsableAPI HTML.
-    renderer_classes = [JSONRenderer]
-
-    def dispatch(self, request, *args, **kwargs):
-        log_get = request.method == 'GET'
-        if log_get:
-            query = dict(request.GET)
-            logger.info(
-                'IN GET /api/trucks path=%s query=%s user=%s headers=%s',
-                request.path,
-                query,
-                getattr(getattr(request, 'user', None), 'username', None),
-                _request_headers_for_log(request),
-            )
-        response = super().dispatch(request, *args, **kwargs)
-        if log_get:
-            body = _response_body_preview(response)
-            content_type = response.get('Content-Type', '')
-            logger.info(
-                'OUT GET /api/trucks status=%s content_type=%s html=%s '
-                'auth_user=%s query=%s body=%s',
-                response.status_code,
-                content_type,
-                _looks_like_html(body),
-                getattr(getattr(request, 'user', None), 'username', None),
-                dict(request.GET),
-                body,
-            )
-        return response
+    # JSON only (SCADA шлёт Accept: text/html) + CP1251 для кириллицы.
+    renderer_classes = [Windows1251JSONRenderer]
 
     def get(self, request):
         """
@@ -427,7 +356,7 @@ class TrailerView(APIView):
     - Управлять временем въезда/выезда
     """
     permission_classes = [IsAuthenticated]
-    renderer_classes = [JSONRenderer]
+    renderer_classes = [Windows1251JSONRenderer]
 
     def get(self, request):
         """
