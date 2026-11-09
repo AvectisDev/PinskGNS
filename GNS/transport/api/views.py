@@ -1,5 +1,7 @@
 """API грузовиков и прицепов на станции: список, создание, частичное обновление."""
 
+import logging
+
 from django.shortcuts import get_object_or_404
 from drf_spectacular.utils import extend_schema, OpenApiParameter, OpenApiExample, OpenApiTypes, extend_schema_view
 from rest_framework import generics, status, viewsets
@@ -13,6 +15,56 @@ from core.api.schema import (
 )
 from transport.api.serializers import TrailerSerializer, TruckSerializer
 from transport.models import Trailer, Truck
+
+logger = logging.getLogger('transport.api')
+
+_BODY_LOG_LIMIT = 2000
+
+
+def _mask_auth(value: str) -> str:
+    if not value:
+        return ''
+    parts = value.split(' ', 1)
+    if len(parts) == 2 and len(parts[1]) > 12:
+        return f'{parts[0]} {parts[1][:6]}…{parts[1][-4:]}'
+    return '***'
+
+
+def _request_headers_for_log(request) -> dict:
+    meta = getattr(request, 'META', {}) or {}
+    headers = {
+        'Host': meta.get('HTTP_HOST'),
+        'Accept': meta.get('HTTP_ACCEPT'),
+        'Content-Type': meta.get('CONTENT_TYPE'),
+        'User-Agent': meta.get('HTTP_USER_AGENT'),
+        'X-Forwarded-For': meta.get('HTTP_X_FORWARDED_FOR'),
+        'X-Real-IP': meta.get('HTTP_X_REAL_IP'),
+        'Remote-Addr': meta.get('REMOTE_ADDR'),
+    }
+    auth = meta.get('HTTP_AUTHORIZATION') or ''
+    headers['Authorization'] = _mask_auth(auth) if auth else None
+    return {key: value for key, value in headers.items() if value}
+
+
+def _response_body_preview(response) -> str:
+    try:
+        if hasattr(response, 'render') and not getattr(response, 'is_rendered', True):
+            response.render()
+        content = getattr(response, 'content', b'') or b''
+        if isinstance(content, bytes):
+            text = content.decode('utf-8', errors='replace')
+        else:
+            text = str(content)
+    except Exception as exc:  # noqa: BLE001 — диагностика ответа
+        return f'<unreadable: {exc}>'
+    if len(text) > _BODY_LOG_LIMIT:
+        return f'{text[:_BODY_LOG_LIMIT]}…(truncated, {len(text)} chars)'
+    return text
+
+
+def _looks_like_html(text: str) -> bool:
+    sample = text.lstrip()[:200].lower()
+    return sample.startswith('<!doctype html') or sample.startswith('<html') or '<html' in sample
 
 
 @extend_schema_view(
@@ -148,6 +200,39 @@ class TruckView(APIView):
     - Управлять временем въезда/выезда
     """
     permission_classes = [IsAuthenticated]
+
+    def _should_log_on_station(self, request) -> bool:
+        raw = request.GET.get('on_station')
+        if raw is None and hasattr(request, 'query_params'):
+            raw = request.query_params.get('on_station')
+        return raw is not None and str(raw).lower() == 'true'
+
+    def dispatch(self, request, *args, **kwargs):
+        log_on_station = (
+            request.method == 'GET' and self._should_log_on_station(request)
+        )
+        if log_on_station:
+            logger.info(
+                'IN GET /api/trucks?on_station=true path=%s query=%s user=%s headers=%s',
+                request.path,
+                dict(request.GET),
+                getattr(getattr(request, 'user', None), 'username', None),
+                _request_headers_for_log(request),
+            )
+        response = super().dispatch(request, *args, **kwargs)
+        if log_on_station:
+            body = _response_body_preview(response)
+            content_type = response.get('Content-Type', '')
+            logger.info(
+                'OUT GET /api/trucks?on_station=true status=%s content_type=%s '
+                'html=%s auth_user=%s body=%s',
+                response.status_code,
+                content_type,
+                _looks_like_html(body),
+                getattr(getattr(request, 'user', None), 'username', None),
+                body,
+            )
+        return response
 
     def get(self, request):
         """
