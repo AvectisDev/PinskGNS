@@ -5,9 +5,10 @@ import logging
 from django.shortcuts import get_object_or_404
 from drf_spectacular.utils import extend_schema, OpenApiParameter, OpenApiExample, OpenApiTypes, extend_schema_view
 from rest_framework import generics, status, viewsets
-from rest_framework.views import APIView
-from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
+from rest_framework.renderers import JSONRenderer
+from rest_framework.response import Response
+from rest_framework.views import APIView
 from core.api.schema import (
     DetailErrorSerializer,
     ErrorFieldSerializer,
@@ -200,6 +201,8 @@ class TruckView(APIView):
     - Управлять временем въезда/выезда
     """
     permission_classes = [IsAuthenticated]
+    # SCADA шлёт Accept: text/html — без этого DRF отдаёт BrowsableAPI HTML.
+    renderer_classes = [JSONRenderer]
 
     def dispatch(self, request, *args, **kwargs):
         log_get = request.method == 'GET'
@@ -424,6 +427,7 @@ class TrailerView(APIView):
     - Управлять временем въезда/выезда
     """
     permission_classes = [IsAuthenticated]
+    renderer_classes = [JSONRenderer]
 
     def get(self, request):
         """
