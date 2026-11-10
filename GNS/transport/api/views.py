@@ -16,21 +16,14 @@ from transport.api.serializers import TrailerSerializer, TruckSerializer
 from transport.models import Trailer, Truck
 
 
-class Windows1251JSONRenderer(JSONRenderer):
-    """JSON в Windows-1251 для Simple-Scada (GET без PostPutResponseCodepage)."""
-
-    media_type = 'application/json'
-    charset = 'windows-1251'
-    ensure_ascii = False
-
-
 @extend_schema_view(
     get=extend_schema(
         tags=['Грузовики'],
         summary='Получить список грузовиков',
-        description='''Получение списка грузовиков с возможностью фильтрации:
-        - По наличию на станции (on_station)
-        - По регистрационному номеру (registration_number)''',
+        description='''Полный список грузовиков для мобильного приложения.
+        Параметр on_station не фильтрует список.
+        Грузовики только на станции: GET /api/trucks/on-station.
+        Один грузовик: registration_number.''',
         parameters=[
             OpenApiParameter(
                 name='on_station',
@@ -157,8 +150,8 @@ class TruckView(APIView):
     - Управлять временем въезда/выезда
     """
     permission_classes = [IsAuthenticated]
-    # JSON only (SCADA шлёт Accept: text/html) + CP1251 для кириллицы.
-    renderer_classes = [Windows1251JSONRenderer]
+    # Только JSON: SCADA шлёт Accept: text/html и иначе получает BrowsableAPI HTML.
+    renderer_classes = [JSONRenderer]
 
     def get(self, request):
         """
@@ -170,18 +163,10 @@ class TruckView(APIView):
         Returns:
             Response: список/объект TruckSerializer или 404.
         """
-        on_station = request.query_params.get('on_station')
         registration_number = request.query_params.get('registration_number')
 
+        # Параметр on_station не фильтрует: мобильное приложение ждёт полный список.
         queryset = Truck.objects.select_related('type', 'driver').prefetch_related('trailer')
-
-        if on_station is not None:
-            queryset = queryset.filter(is_on_station=on_station.lower() == 'true')
-            if not queryset.exists():
-                return Response(
-                    {"detail": "Грузовики с указанным фильтром не найдены"},
-                    status=status.HTTP_404_NOT_FOUND
-                )
 
         if registration_number:
             truck = get_object_or_404(queryset, registration_number=registration_number)
@@ -230,6 +215,34 @@ class TruckView(APIView):
             serializer.save()
             return Response(serializer.data)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class TrucksOnStationView(APIView):
+    """Список грузовиков, которые сейчас на станции. Для SCADA."""
+
+    permission_classes = [IsAuthenticated]
+    renderer_classes = [JSONRenderer]
+
+    @extend_schema(
+        tags=['Грузовики'],
+        summary='Грузовики на станции',
+        responses={
+            200: TruckSerializer(many=True),
+            404: DetailErrorSerializer,
+        },
+    )
+    def get(self, request):
+        queryset = (
+            Truck.objects.filter(is_on_station=True)
+            .select_related('type', 'driver')
+            .prefetch_related('trailer')
+        )
+        if not queryset.exists():
+            return Response(
+                {'detail': 'Грузовики с указанным фильтром не найдены'},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        return Response(TruckSerializer(queryset, many=True).data)
 
 
 @extend_schema_view(
@@ -356,7 +369,7 @@ class TrailerView(APIView):
     - Управлять временем въезда/выезда
     """
     permission_classes = [IsAuthenticated]
-    renderer_classes = [Windows1251JSONRenderer]
+    renderer_classes = [JSONRenderer]
 
     def get(self, request):
         """

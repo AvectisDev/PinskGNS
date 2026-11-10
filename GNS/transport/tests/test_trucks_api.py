@@ -39,8 +39,14 @@ class TrucksOnStationApiTests(APITestCase):
         numbers = {item['registration_number'] for item in response.json()}
         self.assertEqual(numbers, {'AC 5512-1', 'AP 1852-1'})
 
-    def test_on_station_true_returns_only_trucks_on_station(self):
+    def test_legacy_on_station_query_returns_all_trucks(self):
         response = self.client.get('/api/trucks', {'on_station': 'true'})
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        numbers = {item['registration_number'] for item in response.json()}
+        self.assertEqual(numbers, {'AC 5512-1', 'AP 1852-1'})
+
+    def test_on_station_true_returns_only_trucks_on_station(self):
+        response = self.client.get('/api/trucks/on-station')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         data = response.json()
         self.assertEqual(len(data), 1)
@@ -51,7 +57,7 @@ class TrucksOnStationApiTests(APITestCase):
     def test_on_station_true_returns_404_when_empty(self):
         self.on_station.is_on_station = False
         self.on_station.save(update_fields=['is_on_station'])
-        response = self.client.get('/api/trucks', {'on_station': 'true'})
+        response = self.client.get('/api/trucks/on-station')
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
         self.assertEqual(
             response.json(),
@@ -66,7 +72,7 @@ class TrucksOnStationApiTests(APITestCase):
             type=self.trailer_type,
             is_on_station=True,
         )
-        response = self.client.get('/api/trucks', {'on_station': 'true'})
+        response = self.client.get('/api/trucks/on-station')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         numbers = {item['registration_number'] for item in response.json()}
         self.assertEqual(numbers, {'AC 5512-1'})
