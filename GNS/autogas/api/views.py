@@ -2,9 +2,9 @@ from django.shortcuts import get_object_or_404
 from django.db.models.signals import post_save, post_delete
 from django.dispatch import receiver
 from rest_framework import status, viewsets
-from rest_framework.response import Response
 from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
 from drf_spectacular.utils import (
     extend_schema,
     extend_schema_view,
@@ -21,6 +21,7 @@ from autogas.services import (
 )
 from .serializers import AutoGasBatchSerializer
 from core.api.schema import DetailErrorSerializer, FIELD_ERRORS_RESPONSE
+from transport.api.views import AsciiJSONRenderer
 
 
 @extend_schema_view(
@@ -123,7 +124,13 @@ class AutoGasBatchView(viewsets.ViewSet):
     permission_classes = [IsAuthenticated]
     serializer_class = AutoGasBatchSerializer
 
-    @action(detail=False, methods=['get'], url_path='statistic', url_name='statistic')
+    @action(
+        detail=False,
+        methods=['get'],
+        url_path='statistic',
+        url_name='statistic',
+        renderer_classes=[AsciiJSONRenderer],
+    )
     def auto_batch_statistic(self, request):
         return Response(get_batch_statistic())
 
