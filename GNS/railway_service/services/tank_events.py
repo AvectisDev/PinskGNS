@@ -11,30 +11,22 @@ from django.conf import settings
 from django.core.files.base import ContentFile
 
 from opcua.api import write_tag
-from core.intellect import (
-    RAILWAY_CAMERA,
-    get_plate_image,
-    get_registration_number_list,
-)
 from railway_service.models import RailwayBatch, RailwayTank, RailwayTankHistory
+from railway_service.services.intellect_match import (
+    MatchedTank,
+    append_pending_weighing,
+    clear_pending_weighings,
+    get_pending_weighings,
+    mark_protocols_seen,
+    match_protocols_to_weighings,
+    matched_newest_first,
+    poll_new_protocols,
+    set_pending_weighings,
+)
 from railway_service.services.ocryp import log_number_comparison
 from railway_service.services.status_log import log_railway_tank_status
 
 logger = logging.getLogger('railway')
-
-
-def fetch_railway_tank_data() -> tuple[Optional[int], Optional[bytes]]:
-    """Запрос в Интеллект: номер последней цистерны и фото."""
-    logger.debug('Выполняется запрос к Интеллекту...')
-    railway_tank_list = get_registration_number_list(RAILWAY_CAMERA)
-    if not railway_tank_list:
-        logger.error('ЖД цистерна не определена')
-        return None, None
-
-    last_tank = railway_tank_list[-1]
-    plate_image = last_tank.get('plate_numbers.id')
-    photo_of_number = get_plate_image(plate_image) if plate_image else None
-    return int(last_tank['number']), photo_of_number
 
 
 def batch_process(railway_tank: RailwayTank) -> None:
@@ -192,6 +184,99 @@ def tank_process(
         return None
 
 
+def _apply_matched_tank(matched: MatchedTank) -> None:
+    registration_number = matched.registration_number
+    image_data = matched.image_data
+    weighing = matched.weighing
+
+    if getattr(settings, 'OCRYP_URL', ''):
+        try:
+            log_number_comparison(registration_number, image_data)
+        except Exception as error:
+            logger.error(
+                'OCR сравнение завершилось ошибкой: %s',
+                error,
+                exc_info=True,
+            )
+
+    railway_tank = tank_process(
+        registration_number,
+        image_data,
+        weighing.on_station,
+        weighing.stable_weight,
+    )
+    if railway_tank:
+        batch_process(railway_tank)
+        logger.info(
+            'ЖД весовая. Обработка цистерны № %s успешно завершена',
+            registration_number,
+        )
+
+
+def resolve_pending_with_intellect(*, add_weighing: Optional[dict] = None) -> int:
+    """
+    Опрос Интеллекта с повторами и сопоставление с очередью взвешиваний.
+
+    Args:
+        add_weighing: если задан — сначала положить текущее взвешивание в очередь
+            (`stable_weight`, `on_station`).
+
+    Returns:
+        Число успешно сопоставленных цистерн.
+    """
+    if add_weighing is not None:
+        append_pending_weighing(
+            stable_weight=add_weighing['stable_weight'],
+            on_station=add_weighing['on_station'],
+        )
+
+    pending = get_pending_weighings()
+    if not pending:
+        return 0
+
+    new_protocols = poll_new_protocols()
+    matched, remaining = match_protocols_to_weighings(new_protocols, pending)
+    set_pending_weighings(remaining)
+
+    if not matched:
+        logger.error(
+            'ЖД цистерна не определена — взвешиваний в очереди: %s',
+            len(remaining),
+        )
+        return 0
+
+    mark_protocols_seen([item.protocol_id for item in matched])
+    for item in matched_newest_first(matched):
+        _apply_matched_tank(item)
+    return len(matched)
+
+
+def flush_pending_weighings_before_batch_close() -> None:
+    """Добор номеров перед закрытием партии; неразобранное — в лог и очистка."""
+    pending_before = get_pending_weighings()
+    if not pending_before:
+        return
+
+    logger.info(
+        'Закрытие партии: в очереди %s взвешиваний без номера — добор из Интеллекта',
+        len(pending_before),
+    )
+    resolve_pending_with_intellect(add_weighing=None)
+    leftover = clear_pending_weighings()
+    if leftover:
+        logger.error(
+            'Закрытие партии: не сопоставлено взвешиваний: %s',
+            [
+                {
+                    'stable_weight': item.stable_weight,
+                    'on_station': item.on_station,
+                    'captured_at': item.captured_at,
+                }
+                for item in leftover
+            ],
+        )
+
+
 def process_railway_tank_event(payload: Mapping[str, Any]) -> None:
     """
     Обработка срабатывания камеры ЖД весовой.
@@ -224,33 +309,12 @@ def process_railway_tank_event(payload: Mapping[str, Any]) -> None:
     )
 
     try:
-        registration_number, image_data = fetch_railway_tank_data()
-        if not registration_number:
-            logger.error('ЖД цистерна не определена — пропуск обработки')
-            return
-
-        if getattr(settings, 'OCRYP_URL', ''):
-            try:
-                log_number_comparison(registration_number, image_data)
-            except Exception as error:
-                logger.error(
-                    'OCR сравнение завершилось ошибкой: %s',
-                    error,
-                    exc_info=True,
-                )
-
-        railway_tank = tank_process(
-            registration_number,
-            image_data,
-            bool(on_station),
-            stable_weight,
+        resolve_pending_with_intellect(
+            add_weighing={
+                'stable_weight': stable_weight,
+                'on_station': bool(on_station),
+            }
         )
-        if railway_tank:
-            batch_process(railway_tank)
-            logger.info(
-                'ЖД весовая. Обработка цистерны № %s успешно завершена',
-                registration_number,
-            )
     finally:
         # ПЛК ждёт сброс от Django после каждого цикла камеры.
         write_tag('railway.camera_worked', False)

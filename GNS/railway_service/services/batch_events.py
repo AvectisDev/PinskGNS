@@ -9,6 +9,7 @@ from django.db import transaction
 from django.utils import timezone
 
 from railway_service.models import RailwayBatch
+from railway_service.services.tank_events import flush_pending_weighings_before_batch_close
 
 logger = logging.getLogger('railway')
 
@@ -64,6 +65,9 @@ def process_railway_batch_started(payload: Mapping[str, Any]) -> None:
 
 def process_railway_batch_ended(payload: Mapping[str, Any]) -> None:
     """Спад railway.active TRUE→FALSE: закрыть активную партию."""
+    # Добор номеров, пока партия ещё активна (batch_process смотрит is_active).
+    flush_pending_weighings_before_batch_close()
+
     with transaction.atomic():
         active = (
             RailwayBatch.objects

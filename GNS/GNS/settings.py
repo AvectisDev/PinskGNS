@@ -311,6 +311,11 @@ DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL')
 
 # Intellect
 INTELLECT_SERVER_ADDRESS = os.environ.get('INTELLECT_SERVER_ADDRESS')
+# ЖД весовая: пауза перед запросом номера и число попыток (0 = без паузы)
+INTELLECT_RAILWAY_WAIT_SECONDS = float(
+    os.environ.get('INTELLECT_RAILWAY_WAIT_SECONDS', '2')
+)
+INTELLECT_RAILWAY_ATTEMPTS = int(os.environ.get('INTELLECT_RAILWAY_ATTEMPTS', '3'))
 
 # ocryp — параллельное распознавание номеров ж/д цистерн (пустое = выключено)
 OCRYP_URL = os.environ.get('OCRYP_URL', '')
