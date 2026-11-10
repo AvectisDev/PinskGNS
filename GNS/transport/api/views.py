@@ -16,6 +16,17 @@ from transport.api.serializers import TrailerSerializer, TruckSerializer
 from transport.models import Trailer, Truck
 
 
+class AsciiJSONRenderer(JSONRenderer):
+    """JSON только из ASCII: кириллица как \\uXXXX.
+
+    Simple-Scada читает тело GET в системной кодировке и портит сырой UTF-8.
+    Экранирование \\u не зависит от кодировки. В скрипте: UnicodeToStr(AsStr).
+    """
+
+    ensure_ascii = True
+    charset = 'utf-8'
+
+
 @extend_schema_view(
     get=extend_schema(
         tags=['Грузовики'],
@@ -221,7 +232,7 @@ class TrucksOnStationView(APIView):
     """Список грузовиков, которые сейчас на станции. Для SCADA."""
 
     permission_classes = [IsAuthenticated]
-    renderer_classes = [JSONRenderer]
+    renderer_classes = [AsciiJSONRenderer]
 
     @extend_schema(
         tags=['Грузовики'],
