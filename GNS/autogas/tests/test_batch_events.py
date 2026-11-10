@@ -489,6 +489,34 @@ class AutoGasBatchEventTests(AutoGasFixturesMixin, TestCase):
         write_tag.assert_any_call('autogas.response_batch_create', True)
 
     @patch('autogas.batch_events.write_tag')
+    def test_confirm_list_mode_without_selection_uses_proposed(self, write_tag):
+        """ПЛК поднял list_mode до выбора строки — берём proposed WORD[17]."""
+        process_autogas_operator_confirm({
+            'batch_type_code': 2,
+            'gas_type': 2,
+            'request_batch_create': True,
+            'response_batch_create': False,
+            'list_mode': True,
+            'proposed_ready': True,
+            'proposed_truck_number': pack_melsoft_string('AI0008-1'),
+            'proposed_trailer_number': empty_melsoft_words(),
+            'selected_vehicle_index': -1,
+            'operator_confirm': True,
+            'vehicle_list_0': empty_melsoft_words(),
+            'vehicle_list_1': empty_melsoft_words(),
+            'vehicle_list_2': empty_melsoft_words(),
+            'vehicle_list_3': empty_melsoft_words(),
+            'vehicle_list_4': empty_melsoft_words(),
+            'vehicle_list_5': empty_melsoft_words(),
+            'vehicle_list_6': empty_melsoft_words(),
+            'vehicle_list_7': empty_melsoft_words(),
+        })
+        batch = AutoGasBatch.objects.get()
+        self.assertEqual(batch.truck_id, self.truck.pk)
+        self.assertIsNone(batch.trailer_id)
+        write_tag.assert_any_call('autogas.response_batch_create', True)
+
+    @patch('autogas.batch_events.write_tag')
     def test_confirm_list_mode_from_word_buffer(self, write_tag):
         line = format_list_line(0, VehicleCombo(truck=self.truck))
         process_autogas_operator_confirm({

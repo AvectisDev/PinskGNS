@@ -447,16 +447,26 @@ def process_autogas_operator_confirm(payload: Mapping[str, Any]) -> None:
         return
 
     list_mode = bool(payload.get('list_mode'))
+    combo: Optional[VehicleCombo] = None
     if list_mode:
         combo = combo_from_list_selection(payload)
-    else:
+    if combo is None:
+        # ПЛК иногда поднимает list_mode до выбора строки (index=-1, пустой список).
+        # В этом случае proposed_* уже записаны — берём их.
         combo = combo_from_numbers(
             payload.get('proposed_truck_number'),
             payload.get('proposed_trailer_number'),
         )
 
     if combo is None:
-        logger.error('Confirm: не удалось определить транспорт')
+        logger.error(
+            'Confirm: не удалось определить транспорт '
+            '(list_mode=%s, selected_vehicle_index=%s, proposed_truck=%r, proposed_trailer=%r)',
+            list_mode,
+            payload.get('selected_vehicle_index'),
+            coerce_vehicle_select_text(payload.get('proposed_truck_number')),
+            coerce_vehicle_select_text(payload.get('proposed_trailer_number')),
+        )
         write_tag('autogas.vehicle_select.operator_confirm', False)
         return
 
