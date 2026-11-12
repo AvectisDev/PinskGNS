@@ -42,7 +42,12 @@ TAGS: Mapping[str, TagDef] = {
         node_id='ns=4; s=Address Space.PLC_SU1.railway_batch.batch_type',
         domain='railway',
     ),
-    # Autogas PLC_SU2
+    # Autogas PLC_SU2 — vehicle_batch
+    'autogas.process_step': TagDef(
+        name='autogas.process_step',
+        node_id='ns=4; s=Address Space.PLC_SU2.vehicle_batch.process_step',
+        domain='autogas',
+    ),
     'autogas.batch_type_code': TagDef(
         name='autogas.batch_type_code',
         node_id='ns=4; s=Address Space.PLC_SU2.vehicle_batch.batch_type',
@@ -53,9 +58,24 @@ TAGS: Mapping[str, TagDef] = {
         node_id='ns=4; s=Address Space.PLC_SU2.vehicle_batch.gas_type',
         domain='autogas',
     ),
+    'autogas.is_active': TagDef(
+        name='autogas.is_active',
+        node_id='ns=4; s=Address Space.PLC_SU2.vehicle_batch.is_active',
+        domain='autogas',
+    ),
+    'autogas.start_batch': TagDef(
+        name='autogas.start_batch',
+        node_id='ns=4; s=Address Space.PLC_SU2.vehicle_batch.start_batch',
+        domain='autogas',
+    ),
     'autogas.stop_batch': TagDef(
         name='autogas.stop_batch',
         node_id='ns=4; s=Address Space.PLC_SU2.vehicle_batch.stop_batch',
+        domain='autogas',
+    ),
+    'autogas.gas_filling_in_progress': TagDef(
+        name='autogas.gas_filling_in_progress',
+        node_id='ns=4; s=Address Space.PLC_SU2.vehicle_batch.gas_filling_in_progress',
         domain='autogas',
     ),
     'autogas.initial_mass_meter': TagDef(
@@ -93,6 +113,11 @@ TAGS: Mapping[str, TagDef] = {
         node_id='ns=4; s=Address Space.PLC_SU2.vehicle_batch.truck_capacity',
         domain='autogas',
     ),
+    'autogas.fill_percentage': TagDef(
+        name='autogas.fill_percentage',
+        node_id='ns=4; s=Address Space.PLC_SU2.vehicle_batch.fill_percentage',
+        domain='autogas',
+    ),
     'autogas.request_batch_create': TagDef(
         name='autogas.request_batch_create',
         node_id='ns=4; s=Address Space.PLC_SU2.vehicle_batch.request_number_identification',
@@ -111,6 +136,27 @@ TAGS: Mapping[str, TagDef] = {
     'autogas.response_batch_complete': TagDef(
         name='autogas.response_batch_complete',
         node_id='ns=4; s=Address Space.PLC_SU2.vehicle_batch.response_batch_complete',
+        domain='autogas',
+    ),
+    # Autogas PLC_SU2 — vehicle_scale
+    'autogas.vehicle_scale.current_weight': TagDef(
+        name='autogas.vehicle_scale.current_weight',
+        node_id='ns=4; s=Address Space.PLC_SU2.vehicle_scale.current_weight',
+        domain='autogas',
+    ),
+    'autogas.vehicle_scale.previous_weight': TagDef(
+        name='autogas.vehicle_scale.previous_weight',
+        node_id='ns=4; s=Address Space.PLC_SU2.vehicle_scale.previous_weight',
+        domain='autogas',
+    ),
+    'autogas.vehicle_scale.is_stable': TagDef(
+        name='autogas.vehicle_scale.is_stable',
+        node_id='ns=4; s=Address Space.PLC_SU2.vehicle_scale.is_stable',
+        domain='autogas',
+    ),
+    'autogas.vehicle_scale.start_stabilization_timer': TagDef(
+        name='autogas.vehicle_scale.start_stabilization_timer',
+        node_id='ns=4; s=Address Space.PLC_SU2.vehicle_scale.start_stabilization_timer',
         domain='autogas',
     ),
     # VehicleSelect (GS21 manual / propose)

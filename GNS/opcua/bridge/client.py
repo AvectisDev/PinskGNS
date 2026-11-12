@@ -9,6 +9,7 @@ from typing import Any, Optional
 from asyncua import Client, Node, ua
 from asyncua.common.subscription import DataChangeEvent, StatusChangeEvent
 
+from opcua.autogas_process_log import log_process_event, should_log_opc_change
 from opcua.bridge.dispatcher import TriggerDispatcher
 from opcua.melsoft_words import (
     MELSOFT_STRING_WORD_COUNT,
@@ -362,5 +363,7 @@ class OpcBridgeClient:
         previous = self.dispatcher.snapshot.get(name, object())
         if previous == value:
             return
-        logger.debug('OPC change %s=%s', name, value)
+        if should_log_opc_change(name, previous, value):
+            logger.debug('OPC change %s=%s', name, value)
         self.dispatcher.on_snapshot({name: value})
+        log_process_event(name, self.dispatcher.snapshot)
